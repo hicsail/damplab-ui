@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useContext } from 'react';
 import ReactFlow, {
     ReactFlowProvider,
     Controls,
@@ -25,7 +25,7 @@ import ContextTestComponent from '../components/ContextTestComponent';
 import { CanvasContext } from '../contexts/Canvas';
 
 import '../styles/sidebar.css';
-import Context from '@mui/base/TabsUnstyled/TabsContext';
+
 
 const nodeTypes = {
     selectorNode: CustomDemoNode,
@@ -35,6 +35,7 @@ const initBgColor = '#1A192B';
 
 const fitViewOptions: FitViewOptions = {
     padding: 0.2,
+    
 };
 
 
@@ -42,14 +43,28 @@ export default function MainFlow() {
 
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-    const [nodes, setNodes] = useState<Node[]>([]);
-    const [edges, setEdges] = useState<Edge[]>([]);
+    // const [nodes, setNodes] = useState<Node[]>([]);
+    // const [edges, setEdges] = useState<Edge[]>([]);
     const [bgColor, setBgColor] = useState(initBgColor);
+
+    let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
+    // const nodes = canvasContext.nodes;
+    // const edges = canvasContext.edges;
+    // const setNodes = canvasContext.setNodes;
+    // const setEdges = canvasContext.setEdges;
+
+    const snapGrid = [15, 15];
+
+    useEffect(() => {
+        
+    }, [nodes])
+
 
     useEffect((): any => {
         const onChange = (event: any) => {
-            setNodes((nds) =>
-                nds.map((node) => {
+            console.log('hit');
+            setNodes((nds: any) =>
+                nds.map((node: any) => {
                     if (node.id !== '2') {
                         return node;
                     }
@@ -69,47 +84,46 @@ export default function MainFlow() {
             );
         };
 
-        setNodes(
-            [
-                {
-                    id: '1',
-                    data: { label: 'Node 1' },
-                    type: 'input',
-                    position: { x: 250, y: 5 },
-                    sourcePosition: 'right',
-                },
-                {
-                    id: '2',
-                    data: { label: 'Node 2' },
-                    position: { x: 5, y: 100 },
-                    targetPosition: 'left',
-                },
-                {
-                    id: '3',
-                    type: 'selectorNode',
-                    data: { onChange: onChange, color: initBgColor },
-                    style: { border: '1px solid #777', padding: 10 },
-                    position: { x: 300, y: 50 },
-                },
-            ]
-        )
+        // setNodes(
+        //     [
+        //         {
+        //             id: '1',
+        //             data: { label: 'Node 1' },
+        //             type: 'input',
+        //             position: { x: 250, y: 5 },
+        //             sourcePosition: 'right',
+        //         },
+        //         {
+        //             id: '2',
+        //             data: { label: 'Node 2' },
+        //             position: { x: 5, y: 100 },
+        //             targetPosition: 'left',
+        //         },
+        //         {
+        //             id: '3',
+        //             type: 'selectorNode',
+        //             data: { onChange: onChange, color: initBgColor, label: 'Node 3' },
+        //             style: { border: '1px solid #777', padding: 10 },
+        //             position: { x: 300, y: 50 },
+        //         },
+        //     ]
+        // )
 
-        setEdges(
-            [{ id: 'e1-2', source: '1', target: '2' }]
-        );
+        // setEdges(
+        //     [{ id: 'e1-2', source: '1', target: '2' }]
+        // );
     }, []);
 
     const onNodesChange = useCallback(
-
-        (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
+        (changes: NodeChange[]) => setNodes((nds: any) => applyNodeChanges(changes, nds)),
         [setNodes]
     );
     const onEdgesChange = useCallback(
-        (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+        (changes: EdgeChange[]) => setEdges((eds: any) => applyEdgeChanges(changes, eds)),
         [setEdges]
     );
     const onConnect = useCallback(
-        (connection: Connection) => setEdges((eds) => addEdge(connection, eds)),
+        (connection: Connection) => setEdges((eds: any) => addEdge(connection, eds)),
         [setEdges]
     );
 
@@ -122,60 +136,73 @@ export default function MainFlow() {
 
         event.preventDefault();
         const reactFlowBounds = reactFlowWrapper.current!.getBoundingClientRect();
-        const type = event.dataTransfer.getData('application/reactflow');
-
+        let type = event.dataTransfer.getData('application/reactflow');
+        type = JSON.parse(type);
+        const name = type.name;
         // check if the dropped element is valid
         if (typeof type === 'undefined' || !type) {
             return;
         }
-
+        // get nodes from context
+       
         const position = reactFlowInstance.project({
             x: event.clientX - reactFlowBounds.left,
             y: event.clientY - reactFlowBounds.top,
         });
 
+        // find active node and set it to false
+
+        const nodeId = Math.random().toString(36).substring(2, 9);
+        setActiveComponentId(nodeId);
+
         const newNode = {
-            id: Math.random().toString(36).substring(2, 9),
-            type,
+            id: nodeId,
+            name,
+            type: 'selectorNode',
             position,
-            data: { label: `${type} node` },
+            active: true,
+            data: { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, resultParams: type.resultParams, inputBaseParams: [], inputResultParams: [] },
         };
 
-        setNodes((nds) => nds.concat(newNode));
-        console.log(JSON.stringify(nodes));
-        console.log(JSON.stringify(edges));
-    }, [reactFlowInstance]);
+        setNodes((nds: any) => nds.concat(newNode));
+    }, [reactFlowInstance, nodes]);
 
 
     return (
         <>
-            <CanvasContext.Provider value="Hello">
-                <HeaderBar />
-                <div style={{ height: '100vh' }}>
-                    <ReactFlowProvider>
-                        <div className="reactflow-wrapper" style={{ height: '90vh', display: 'flex' }} ref={reactFlowWrapper}>
+            <div style={{ height: '100vh' }}>
+                <ReactFlowProvider>
+                    <div className="reactflow-wrapper" style={{ height: '85vh', display: 'flex' }} ref={reactFlowWrapper}>
+                        <div style={{ maxWidth: '15%', borderRight: 'solid 1px' }}>
                             <Sidebar />
-                            <ReactFlow
-                                nodes={nodes}
-                                edges={edges}
-                                onNodesChange={onNodesChange}
-                                onEdgesChange={onEdgesChange}
-                                onConnect={onConnect}
-                                onInit={setReactFlowInstance}
-                                onDrop={onDrop}
-                                nodeTypes={nodeTypes}
-                                onDragOver={onDragOver}
-                                fitView
-                                fitViewOptions={fitViewOptions}
-                            >
-                                <Background />
-                                <Controls />
-                            </ReactFlow>
+                        </div>
+
+                        <ReactFlow
+                            nodes={nodes}
+                            edges={edges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onConnect={onConnect}
+                            onInit={setReactFlowInstance}
+                            onDrop={onDrop}
+                            //snapToGrid={true}
+                            snapGrid={[25, 25]}
+                            nodeTypes={nodeTypes}
+                            onDragOver={onDragOver}
+                            fitView
+                            fitViewOptions={fitViewOptions}
+                            style={{ width: '70%', height: '100%'}}
+                        >
+                            <Background />
+                            <Controls />
+                        </ReactFlow>
+                        <div style={{ minWidth: '15%', borderLeft: 'solid 1px' }}>
                             <ContextTestComponent />
                         </div>
-                    </ReactFlowProvider>
-                </div>
-            </CanvasContext.Provider>
+
+                    </div>
+                </ReactFlowProvider>
+            </div>
 
         </>
     )
