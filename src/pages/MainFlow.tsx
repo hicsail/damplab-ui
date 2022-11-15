@@ -172,7 +172,7 @@ export default function MainFlow() {
             type: 'selectorNode',
             position,
             active: true,
-            data: { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, resultParams: type.resultParams, inputBaseParams: [], inputResultParams: [], additionalInstructions: "", formData: formData },
+            data: { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData },
         };
 
         setNodes((nds: any) => nds.concat(newNode));

@@ -42,14 +42,33 @@ export default function Checkout() {
                                         </h3>
                                     </div>
                                     <div>
-                                        Base Params: {JSON.stringify(node.data.inputBaseParams)}
+                                        {
+                                            node.data.formData ? (
+                                                <div>
+                                                    <h4>
+                                                        Param Data
+                                                    </h4>
+                                                </div>
+                                            ) : null
+                                        }
                                     </div>
                                     <div>
-                                        Input Params: {JSON.stringify(node.data.inputResultParams)}
+                                        {
+                                            // node.data.formData is a list of objects
+                                            // print values of each object line by line
+                                            node.data.formData.map((obj: any) => {
+                                                return (
+                                                    <div>
+                                                        <pre>
+                                                            {JSON.stringify(obj, null, 2)}
+                                                        </pre>
+                                                    </div>
+                                                )
+                                            })
+                                            
+                                        }
                                     </div>
-                                    <div>
-                                        User Instructions: {JSON.stringify(node.data.additionalInstructions)}
-                                    </div>
+                                    
                                 </div>
                             </div>
                         )
