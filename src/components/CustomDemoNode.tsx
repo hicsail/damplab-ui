@@ -1,4 +1,4 @@
-import React, { memo, useContext } from 'react';
+import React, { memo, useContext, useEffect, useState } from 'react';
 import { Handle } from 'reactflow';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -24,23 +24,32 @@ const style = {
 
 export default memo((input: Input) => {
 
-    const { setActiveComponentId } = useContext(CanvasContext);
+    const { setActiveComponentId, activeComponentId } = useContext(CanvasContext);
     const isConnectable = input.isConnectable;
     const data = input;
+    const [background, setBackground] = useState('white');
 
     const handleOpen = () => {
         setActiveComponentId(data.data.id);
     };
-
+    
+    // if activeComponentId is equal to this node's id, then set background to green
+    useEffect(() => {
+        if (activeComponentId === data.data.id) {
+            setBackground('rgb(153, 255, 204)');
+        } else {
+            setBackground('white');
+        }
+    }, [activeComponentId, data.data.id]);
     return (
         <div>
-            <Box>
+            <Box style={{background : background}}>
                 <Handle type="target" position="left" isConnectable={isConnectable} />
                 <Button variant="outlined" onClick={handleOpen} style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
                     <div>
                         <img src={data.data.icon} alt={data.data.label} style={{ width: 30 }} />
                     </div>
-                    { data.data.label }
+                    {data.data.label}
                 </Button>
                 <Handle type="source" position="right" isConnectable={isConnectable} />
             </Box>

@@ -59,10 +59,9 @@ export default function MainFlow() {
         
     }, [nodes])
 
-
     useEffect((): any => {
         const onChange = (event: any) => {
-            console.log('hit');
+            
             setNodes((nds: any) =>
                 nds.map((node: any) => {
                     if (node.id !== '2') {
@@ -83,35 +82,6 @@ export default function MainFlow() {
                 })
             );
         };
-
-        // setNodes(
-        //     [
-        //         {
-        //             id: '1',
-        //             data: { label: 'Node 1' },
-        //             type: 'input',
-        //             position: { x: 250, y: 5 },
-        //             sourcePosition: 'right',
-        //         },
-        //         {
-        //             id: '2',
-        //             data: { label: 'Node 2' },
-        //             position: { x: 5, y: 100 },
-        //             targetPosition: 'left',
-        //         },
-        //         {
-        //             id: '3',
-        //             type: 'selectorNode',
-        //             data: { onChange: onChange, color: initBgColor, label: 'Node 3' },
-        //             style: { border: '1px solid #777', padding: 10 },
-        //             position: { x: 300, y: 50 },
-        //         },
-        //     ]
-        // )
-
-        // setEdges(
-        //     [{ id: 'e1-2', source: '1', target: '2' }]
-        // );
     }, []);
 
     const onNodesChange = useCallback(
@@ -155,13 +125,54 @@ export default function MainFlow() {
         const nodeId = Math.random().toString(36).substring(2, 9);
         setActiveComponentId(nodeId);
 
+        // generate form data 
+        const formData = [];
+
+        for (let i = 0; i < type.parameters.length; i++) {
+            const parameter = type.parameters[i];
+            
+            
+            const formId = Math.random().toString(36).substring(2, 9);
+            formData.push({
+                id: formId,
+                nodeId: nodeId,
+                name: parameter.name,
+                type: parameter.type,
+                paramType: 'input',
+                value: null,
+                //setValue: setValue,
+                required: true // parameter.required,
+            });
+        }
+
+        if (type.resultParams) {
+            for (let i = 0; i < type.resultParams.length; i++) {
+                const parameter = type.resultParams[i];
+                
+                
+                const formId = Math.random().toString(36).substring(2, 9);
+                formData.push({
+                    id: formId,
+                    nodeId: nodeId,
+                    name: parameter,
+                    type: parameter.type,
+                    paramType: 'result',
+                    value: null,
+                    //setValue: setValue,
+                    required: true // parameter.required,
+                });
+            }
+        }
+
+        console.log(formData);
+
         const newNode = {
             id: nodeId,
             name,
             type: 'selectorNode',
             position,
             active: true,
-            data: { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, resultParams: type.resultParams, inputBaseParams: [], inputResultParams: [] },
+            data: { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, resultParams: type.resultParams, inputBaseParams: [], inputResultParams: [], additionalInstructions: "", formData: formData },
         };
 
         setNodes((nds: any) => nds.concat(newNode));

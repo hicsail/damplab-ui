@@ -30,33 +30,34 @@ export default function Checkout() {
                 {
                     // print node order line by line
                     traverse(val.nodes, val.edges).map((node: any) => {
-                        console.log(node);
                         return (
                             <div>
-                            <div style={{ border: 'solid 1px', width: 'fit-content', marginLeft: 'auto', marginRight: 'auto', padding: 20, marginBottom: 20 }}>
-                                <div>
-                                    <img src={node.data.icon} alt={node.name} style={{ width: 30 }} />
+                                <div style={{ border: 'solid 1px', width: 'fit-content', marginLeft: 'auto', marginRight: 'auto', padding: 20, marginBottom: 20 }}>
+                                    <div>
+                                        <img src={node.data.icon} alt={node.name} style={{ width: 30 }} />
+                                    </div>
+                                    <div>
+                                        <h3>
+                                            {node.name}
+                                        </h3>
+                                    </div>
+                                    <div>
+                                        Base Params: {JSON.stringify(node.data.inputBaseParams)}
+                                    </div>
+                                    <div>
+                                        Input Params: {JSON.stringify(node.data.inputResultParams)}
+                                    </div>
+                                    <div>
+                                        User Instructions: {JSON.stringify(node.data.additionalInstructions)}
+                                    </div>
                                 </div>
-                                <div>
-                                    {node.name}
-                                </div>
-                                <div>
-                                    {JSON.stringify(node.data.inputBaseParams)}
-                                </div>
-                            </div>
-                                <p>
-                                    |
-                                </p>
-                                <p>
-                                    V
-                                </p>
                             </div>
                         )
                     })
                 }
             </div>
-            
+
         </div>
-        
+
     )
 }
