@@ -27,7 +27,6 @@ export default function ContextTestComponent() {
     const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
     const [additionalInstructions, setAdditionalInstructions] = useState('');
     const [openToast, setOpenToast] = useState(false);
-
     const [open, setOpen] = useState(false);
 
     const handleClickOpen = () => {
@@ -35,10 +34,17 @@ export default function ContextTestComponent() {
     };
 
     const handleClose = () => {
+        // put logic to discard changes here
         setOpen(false);
     };
 
-    const getInitValues = (str: string) => {
+    const handleSave = () => {
+        handleClose();
+        save();
+        setOpenToast(true);
+    }
+
+    const getInitValues = () => {
         let initValues: any = {};
         activeNode?.data.formData.forEach((param: any) => {
             initValues[param.id] = param.value;
@@ -48,9 +54,8 @@ export default function ContextTestComponent() {
     }
 
     const formik = useFormik({
-        initialValues: getInitValues('here'),
+        initialValues: getInitValues(),
         onSubmit: (values) => {
-            console.log(values);
             save();
         },
     });
@@ -59,6 +64,13 @@ export default function ContextTestComponent() {
 
         return (
             <div>
+                <div>
+                    <h1>
+                        {
+                            activeNode?.data.label
+                        }
+                    </h1>
+                </div>
                 <div>
                     {
                         formData ? (
@@ -73,7 +85,7 @@ export default function ContextTestComponent() {
                         formData ? formData.map((param: any) => {
                             if (param.paramType === 'input' && param.type === 'string') {
                                 return (
-                                    <div>
+                                    <div key={param.id}>
                                         <TextField
                                             style={{ margin: 10 }}
                                             label={param.name}
@@ -88,7 +100,7 @@ export default function ContextTestComponent() {
                             }
                             if (param.paramType === 'input' && param.type === 'number') {
                                 return (
-                                    <div>
+                                    <div key={param.id}>
                                         <TextField
                                             style={{ margin: 10 }}
                                             label={param.name}
@@ -103,13 +115,13 @@ export default function ContextTestComponent() {
                             }
                             if (param.paramType === 'result') {
                                 return (
-                                    <>
+                                    <div key={param.id}>
                                         {param.name}<Checkbox
                                             name={param.id}
                                             checked={formik.values[param.id] ? formik.values[param.id] : false}
                                             onChange={formik.handleChange}
                                         />
-                                    </>
+                                    </div>
                                 )
                             }
 
@@ -120,7 +132,19 @@ export default function ContextTestComponent() {
                         {
                             formData ?
                                 (
-                                    <Button type="submit">Save</Button>
+                                    <div>
+                                        <div>
+                                            <TextField
+                                                id="outlined-multiline-flexible"
+                                                label="Additional Instructions"
+                                                multiline
+                                                rows={4}
+                                                value={additionalInstructions}
+                                                onChange={(e) => setAdditionalInstructions(e.target.value)}
+                                            />
+                                        </div>
+                                        <Button type="submit">Save</Button>
+                                    </div>
                                 ) : null
 
                         }
@@ -133,15 +157,16 @@ export default function ContextTestComponent() {
     const writeToParamsContext = () => {
 
         // loop over formik.values and update params in context
-        console.log(formik.values);
         for (const [key, value] of Object.entries(formik.values)) {
             const id = key;
             // find param in activeNode.nodes.data.formData
-            console.log(activeNode?.data.formData);
             const param = activeNode?.data.formData.find((param: any) => param.id === id);
             if (param) param.value = value;
         }
 
+        if (activeNode && additionalInstructions) {
+            activeNode.data.formData['additionalInstructions'] = additionalInstructions;
+        }
     }
 
     const compare = () => {
@@ -174,11 +199,11 @@ export default function ContextTestComponent() {
 
     useEffect(() => {
         if (compare()) {
-
+            setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
         } else {
-            alert('unsaved params');
+            handleClickOpen();
         }
-        setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
+
     }, [val.activeComponentId]);
 
     useEffect(() => {
@@ -193,6 +218,7 @@ export default function ContextTestComponent() {
 
 
     const save = async () => {
+        setOpenToast(true);
         writeToParamsContext();
     }
 
@@ -251,7 +277,7 @@ export default function ContextTestComponent() {
                 {
                     activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (activeNode.data.allowedConnections.map((connection: string) => {
                         return (
-                            <NodeButton node={getNodeFromId(connection)} />
+                            <NodeButton key={Math.random().toString(36).substring(2, 9)} node={getNodeFromId(connection)} />
                         )
                     })) : null
                 }
@@ -260,9 +286,9 @@ export default function ContextTestComponent() {
                 {
                     activeNode ? (
                         <>
-                            <Button onClick={() => save()}>
+                            {/* <Button onClick={() => save()}>
                                 Save
-                            </Button>
+                            </Button> */}
                             <Snackbar
                                 open={openToast}
                                 autoHideDuration={3000}
@@ -272,12 +298,12 @@ export default function ContextTestComponent() {
                                 key={'bottom' + 'right'}
                                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                             />
-                            <Button onClick={() => print()}>
+                            {/* <Button onClick={() => print()}>
                                 print
                             </Button>
                             <Button variant="outlined" onClick={handleClickOpen}>
                                 Open alert dialog
-                            </Button>
+                            </Button> */}
                             <Dialog
                                 open={open}
                                 onClose={handleClose}
@@ -291,7 +317,7 @@ export default function ContextTestComponent() {
                                 </DialogContent>
                                 <DialogActions>
                                     <Button onClick={handleClose}>Discard</Button>
-                                    <Button onClick={handleClose} autoFocus>
+                                    <Button onClick={handleSave} autoFocus>
                                         Save
                                     </Button>
                                 </DialogActions>

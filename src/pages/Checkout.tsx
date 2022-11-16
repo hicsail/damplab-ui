@@ -68,6 +68,22 @@ export default function Checkout() {
                                             
                                         }
                                     </div>
+                                    <div>
+                                        {
+                                            node.data.formData.additionalInstructions ? (
+                                                <div>
+                                                    <h4>
+                                                        Additional Instructions
+                                                    </h4>
+                                                    <div>
+                                                        <p>
+                                                            {node.data.formData.additionalInstructions}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : null
+                                        }
+                                    </div>
                                     
                                 </div>
                             </div>

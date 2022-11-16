@@ -24,7 +24,7 @@ export default () => {
       {
         services.map((service: Service) => {
           return (
-            <div style={buttonElementStyle} className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(service))} draggable>
+            <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(service))} draggable>
               <Button variant="outlined" style={{width: 163, display: 'flex', justifyContent: 'space-around'}}>
                 <div>
                 <img src={service.icon} alt={service.name} style={{width: 30}}/>
@@ -35,11 +35,7 @@ export default () => {
           )
         })
       }
-      <div style={buttonElementStyle} className="dndnode input" onDragStart={(event) => onDragStart(event, 'input')} draggable>
-        <Button variant="outlined">
-          Input Node
-        </Button>
-      </div>
+
     </aside>
   );
 };

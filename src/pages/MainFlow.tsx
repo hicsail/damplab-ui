@@ -43,46 +43,9 @@ export default function MainFlow() {
 
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-    // const [nodes, setNodes] = useState<Node[]>([]);
-    // const [edges, setEdges] = useState<Edge[]>([]);
     const [bgColor, setBgColor] = useState(initBgColor);
-
     let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
-    // const nodes = canvasContext.nodes;
-    // const edges = canvasContext.edges;
-    // const setNodes = canvasContext.setNodes;
-    // const setEdges = canvasContext.setEdges;
-
     const snapGrid = [15, 15];
-
-    useEffect(() => {
-        
-    }, [nodes])
-
-    useEffect((): any => {
-        const onChange = (event: any) => {
-            
-            setNodes((nds: any) =>
-                nds.map((node: any) => {
-                    if (node.id !== '2') {
-                        return node;
-                    }
-
-                    const color = event.target.value;
-
-                    setBgColor(color);
-
-                    return {
-                        ...node,
-                        data: {
-                            ...node.data,
-                            color,
-                        },
-                    };
-                })
-            );
-        };
-    }, []);
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => setNodes((nds: any) => applyNodeChanges(changes, nds)),
@@ -107,6 +70,7 @@ export default function MainFlow() {
         event.preventDefault();
         const reactFlowBounds = reactFlowWrapper.current!.getBoundingClientRect();
         let type = event.dataTransfer.getData('application/reactflow');
+        console.log(type);
         type = JSON.parse(type);
         const name = type.name;
         // check if the dropped element is valid
@@ -163,8 +127,6 @@ export default function MainFlow() {
                 });
             }
         }
-
-        console.log(formData);
 
         const newNode = {
             id: nodeId,
