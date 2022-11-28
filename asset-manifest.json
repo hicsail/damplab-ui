@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/damplab-ui/static/css/main.eed9170f.css",
+    "main.js": "/damplab-ui/static/js/main.5f9022b2.js",
+    "static/js/787.990aba62.chunk.js": "/damplab-ui/static/js/787.990aba62.chunk.js",
+    "index.html": "/damplab-ui/index.html",
+    "main.eed9170f.css.map": "/damplab-ui/static/css/main.eed9170f.css.map",
+    "main.5f9022b2.js.map": "/damplab-ui/static/js/main.5f9022b2.js.map",
+    "787.990aba62.chunk.js.map": "/damplab-ui/static/js/787.990aba62.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.eed9170f.css",
+    "static/js/main.5f9022b2.js"
+  ]
+}
