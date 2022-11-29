@@ -1,4 +1,3 @@
-import { Parameter } from "./Parameter";
 
 export type Service = {
     id: string;

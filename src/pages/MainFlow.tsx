@@ -12,18 +12,19 @@ import ReactFlow, {
     NodeChange,
     EdgeChange,
     Connection,
+    useNodes,
     useNodesState,
     useEdgesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-
+import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
 import Sidebar from '../components/Sidebar';
 import CustomDemoNode from '../components/CustomDemoNode';
 import HeaderBar from '../components/HeaderBar';
 import ContextTestComponent from '../components/ContextTestComponent';
 
 import { CanvasContext } from '../contexts/Canvas';
-
+import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import '../styles/sidebar.css';
 
 
@@ -31,11 +32,8 @@ const nodeTypes = {
     selectorNode: CustomDemoNode,
 };
 
-const initBgColor = '#1A192B';
-
 const fitViewOptions: FitViewOptions = {
-    padding: 0.2,
-    
+    padding: 0.2,   
 };
 
 
@@ -43,9 +41,7 @@ export default function MainFlow() {
 
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-    const [bgColor, setBgColor] = useState(initBgColor);
     let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
-    const snapGrid = [15, 15];
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => setNodes((nds: any) => applyNodeChanges(changes, nds)),
@@ -70,72 +66,24 @@ export default function MainFlow() {
         event.preventDefault();
         const reactFlowBounds = reactFlowWrapper.current!.getBoundingClientRect();
         let type = event.dataTransfer.getData('application/reactflow');
-        console.log(type);
         type = JSON.parse(type);
         const name = type.name;
         // check if the dropped element is valid
         if (typeof type === 'undefined' || !type) {
             return;
         }
-        // get nodes from context
        
         const position = reactFlowInstance.project({
             x: event.clientX - reactFlowBounds.left,
             y: event.clientY - reactFlowBounds.top,
         });
 
-        // find active node and set it to false
-
         const nodeId = Math.random().toString(36).substring(2, 9);
         setActiveComponentId(nodeId);
 
-        // generate form data 
-        const formData = [];
-
-        for (let i = 0; i < type.parameters.length; i++) {
-            const parameter = type.parameters[i];
-            
-            
-            const formId = Math.random().toString(36).substring(2, 9);
-            formData.push({
-                id: formId,
-                nodeId: nodeId,
-                name: parameter.name,
-                type: parameter.type,
-                paramType: 'input',
-                value: null,
-                //setValue: setValue,
-                required: true // parameter.required,
-            });
-        }
-
-        if (type.resultParams) {
-            for (let i = 0; i < type.resultParams.length; i++) {
-                const parameter = type.resultParams[i];
-                
-                
-                const formId = Math.random().toString(36).substring(2, 9);
-                formData.push({
-                    id: formId,
-                    nodeId: nodeId,
-                    name: parameter,
-                    type: parameter.type,
-                    paramType: 'result',
-                    value: null,
-                    //setValue: setValue,
-                    required: true // parameter.required,
-                });
-            }
-        }
-
-        const newNode = {
-            id: nodeId,
-            name,
-            type: 'selectorNode',
-            position,
-            active: true,
-            data: { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData },
-        };
+        const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
+        const data: NodeData = { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData };
+        const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
         setNodes((nds: any) => nds.concat(newNode));
     }, [reactFlowInstance, nodes]);

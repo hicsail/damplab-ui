@@ -1,8 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react'
 import { CanvasContext } from '../contexts/Canvas'
 import TextField from '@mui/material/TextField';
-import FormGroup from '@mui/material/FormGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import NodeButton from './NodeButton';
 import { services } from '../data/services';
@@ -10,16 +8,12 @@ import { Button, Input } from '@mui/material';
 import Snackbar from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
-
-import { getIn, useFormik } from 'formik';
-import { Check } from '@mui/icons-material';
-
+import { useFormik } from 'formik';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-
+import ParamsForm from './ParamsForm';
 
 export default function ContextTestComponent() {
 
@@ -48,8 +42,9 @@ export default function ContextTestComponent() {
         let initValues: any = {};
         activeNode?.data.formData.forEach((param: any) => {
             initValues[param.id] = param.value;
-        })
-
+        });
+        
+        initValues[`addinst${activeNode?.data.id}`] = activeNode?.data.additionalInstructions;
         return initValues;
     }
 
@@ -60,99 +55,7 @@ export default function ContextTestComponent() {
         },
     });
 
-    const buildFormikForm = (formData: any) => {
-
-        return (
-            <div>
-                <div>
-                    <h1>
-                        {
-                            activeNode?.data.label
-                        }
-                    </h1>
-                </div>
-                <div>
-                    {
-                        formData ? (
-                            <h2>
-                                Parameters
-                            </h2>
-                        ) : null
-                    }
-                </div>
-                <form onSubmit={formik.handleSubmit}>
-                    {
-                        formData ? formData.map((param: any) => {
-                            if (param.paramType === 'input' && param.type === 'string') {
-                                return (
-                                    <div key={param.id}>
-                                        <TextField
-                                            style={{ margin: 10 }}
-                                            label={param.name}
-                                            variant="outlined"
-                                            type="text"
-                                            value={formik.values[param.id] ? formik.values[param.id] : ''}
-                                            onChange={formik.handleChange}
-                                            name={param.id}
-                                        />
-                                    </div>
-                                )
-                            }
-                            if (param.paramType === 'input' && param.type === 'number') {
-                                return (
-                                    <div key={param.id}>
-                                        <TextField
-                                            style={{ margin: 10 }}
-                                            label={param.name}
-                                            variant="outlined"
-                                            type="number"
-                                            value={formik.values[param.id] ? formik.values[param.id] : ''}
-                                            onChange={formik.handleChange}
-                                            name={param.id}
-                                        />
-                                    </div>
-                                )
-                            }
-                            if (param.paramType === 'result') {
-                                return (
-                                    <div key={param.id}>
-                                        {param.name}<Checkbox
-                                            name={param.id}
-                                            checked={formik.values[param.id] ? formik.values[param.id] : false}
-                                            onChange={formik.handleChange}
-                                        />
-                                    </div>
-                                )
-                            }
-
-                        }) : null
-
-                    }
-                    <div>
-                        {
-                            formData ?
-                                (
-                                    <div>
-                                        <div>
-                                            <TextField
-                                                id="outlined-multiline-flexible"
-                                                label="Additional Instructions"
-                                                multiline
-                                                rows={4}
-                                                value={additionalInstructions}
-                                                onChange={(e) => setAdditionalInstructions(e.target.value)}
-                                            />
-                                        </div>
-                                        <Button type="submit">Save</Button>
-                                    </div>
-                                ) : null
-
-                        }
-                    </div>
-                </form>
-            </div>
-        )
-    }
+    
 
     const writeToParamsContext = () => {
 
@@ -175,7 +78,6 @@ export default function ContextTestComponent() {
         let formData = activeNode?.data.formData;
         let formikValues = formik.values;
         let formikKeys = Object.keys(formikValues);
-        console.log(formikKeys);
         let returnVal = true;
         // loop over formData list and match id with formikKeys and compare values
         formData?.forEach((param: any) => {
@@ -183,7 +85,6 @@ export default function ContextTestComponent() {
             if (formikKeys.includes(param.id)) {
                 console.log('hello');
                 if (param.value !== formikValues[param.id]) {
-                    console.log('values are different');
                     returnVal = false;
                     return
                 }
@@ -192,10 +93,6 @@ export default function ContextTestComponent() {
 
         return returnVal;
     }
-
-
-
-
 
     useEffect(() => {
         if (compare()) {
@@ -206,27 +103,13 @@ export default function ContextTestComponent() {
 
     }, [val.activeComponentId]);
 
-    useEffect(() => {
-        console.log(formik.values);
-    }, [activeNode]);
-
-
     const getNodeFromId = (id: string) => {
         return services.find((node: any) => node.id === id);
     }
 
-
-
     const save = async () => {
         setOpenToast(true);
         writeToParamsContext();
-    }
-
-    const print = () => {
-        // find node in val.nodes and update it using setNodes
-        console.log(compare());
-        console.log(formik.values);
-        console.log(val.nodes);
     }
 
     const handleClick = () => {
@@ -259,11 +142,14 @@ export default function ContextTestComponent() {
 
     return (
         <div style={{ wordWrap: 'break-word', padding: 10, overflow: 'scroll', height: '80vh' }}>
-            <div>
-                {
-                    buildFormikForm(activeNode?.data.formData)
-                }
-            </div>
+            {
+                activeNode?.data.formData ? (
+                    <div>
+                        <ParamsForm activeNode={activeNode} />
+                    </div>
+                ) : null
+            }
+            
             <div>
                 {
                     // return header with text Allowed Connections if allowedConnections list is not empty

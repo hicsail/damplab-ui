@@ -122,7 +122,12 @@ export let services = [
         icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png',
         resultParams: ['pcr-product'],
         parameters: [
-
+            {
+                id: 'pcr-product-param',
+                name: 'PCR Product Result',
+                type: null,
+                paramType: 'result'
+            }
         ],
         allowedConnections: [
             'run-gel', 'column-purification'
@@ -146,6 +151,12 @@ export let services = [
                 id: 'ladder',
                 name: 'Ladder',
                 type: 'string',
+            },
+            {
+                id: 'pcr-product-param',
+                name: 'PCR Product Result',
+                type: null,
+                paramType: 'result'
             }
         ],
         allowedConnections: [

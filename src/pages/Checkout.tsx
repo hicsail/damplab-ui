@@ -70,14 +70,14 @@ export default function Checkout() {
                                     </div>
                                     <div>
                                         {
-                                            node.data.formData.additionalInstructions ? (
+                                            node.data.additionalInstructions ? (
                                                 <div>
                                                     <h4>
                                                         Additional Instructions
                                                     </h4>
                                                     <div>
                                                         <p>
-                                                            {node.data.formData.additionalInstructions}
+                                                            {node.data.additionalInstructions}
                                                         </p>
                                                     </div>
                                                 </div>
