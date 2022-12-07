@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import logo from './logo.svg';
 import './App.css';
 import MainFlow from './pages/MainFlow';
 import Checkout from './pages/Checkout';
-import { BrowserRouter, Routes, Route, Outlet, Link } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route,} from "react-router-dom";
 import HeaderBar from './components/HeaderBar';
 import { CanvasContext } from './contexts/Canvas';
 
@@ -14,17 +13,19 @@ function App() {
   const [activeComponentId, setActiveComponentId] = useState('');
   const [nodeParams, setNodeParams] = useState([]);
 
+  // give me code to set up routes using hashrouter
+
 
   return (
     <div className="App">
       <CanvasContext.Provider value={{ nodes: nodes, edges: edges, setNodes: setNodes, setEdges: setEdges, activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId, nodeParams: nodeParams, setNodeParams: setNodeParams }}>
-      <BrowserRouter>
+      <HashRouter>
         <HeaderBar />
         <Routes>
           <Route path="/" element={<MainFlow />} />
           <Route path="/checkout" element={<Checkout />} />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
       </CanvasContext.Provider>
     </div>
   );
