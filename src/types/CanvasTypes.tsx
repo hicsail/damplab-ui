@@ -6,6 +6,7 @@ export type NodeData = {
     parameters: NodeParameter[];
     additionalInstructions: string;
     formData: NodeParameter[];
+    serviceId: string;
 }
 
 

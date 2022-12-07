@@ -34,30 +34,3 @@ export const createNodeObject = (id: string, name: string, type: string, positio
 
     return newNode;
 }
-
-// if (type.resultParams) {
-    //     for (let i = 0; i < type.resultParams.length; i++) {
-    //         const parameter = type.resultParams[i];
-            
-            
-    //         const formId = Math.random().toString(36).substring(2, 9);
-    //         formData.push({
-    //             id: formId,
-    //             nodeId: nodeId,
-    //             name: parameter,
-    //             type: parameter.type,
-    //             paramType: 'result',
-    //             value: null,
-    //             //setValue: setValue,
-    //             required: true // parameter.required,
-    //         });
-    //     }
-    // } 
-
-    // {
-    //     id: nodeId,
-    //     name,
-    //     type: 'selectorNode',
-    //     position,
-    //     active: true,
-    // };

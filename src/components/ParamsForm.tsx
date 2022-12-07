@@ -40,11 +40,7 @@ export default function (props: any) {
         });
         initValues[`addinst${node?.data.id}`] = '';
         values = initValues;
-        console.log(values);
-        //return initValues;
     }
-
-    
 
     return (
         <div>

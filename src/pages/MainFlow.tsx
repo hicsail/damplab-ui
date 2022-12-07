@@ -7,26 +7,23 @@ import ReactFlow, {
     FitViewOptions,
     applyNodeChanges,
     applyEdgeChanges,
-    Node,
-    Edge,
+   
     NodeChange,
     EdgeChange,
     Connection,
-    useNodes,
-    useNodesState,
-    useEdgesState,
+    
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
 import Sidebar from '../components/Sidebar';
 import CustomDemoNode from '../components/CustomDemoNode';
 import HeaderBar from '../components/HeaderBar';
-import ContextTestComponent from '../components/ContextTestComponent';
+import RightSidebar from '../components/RightSidebar';
 
 import { CanvasContext } from '../contexts/Canvas';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import '../styles/sidebar.css';
-
+import { isValidConnection } from '../controllers/GraphHelpers';
 
 const nodeTypes = {
     selectorNode: CustomDemoNode,
@@ -51,10 +48,14 @@ export default function MainFlow() {
         (changes: EdgeChange[]) => setEdges((eds: any) => applyEdgeChanges(changes, eds)),
         [setEdges]
     );
-    const onConnect = useCallback(
-        (connection: Connection) => setEdges((eds: any) => addEdge(connection, eds)),
-        [setEdges]
-    );
+    const onConnect = useCallback((connection: Connection) => {
+        let customConnection: any = connection;
+        if (!isValidConnection(nodes, customConnection.source, customConnection.target)) {
+            customConnection.label = 'invalid connection';
+            customConnection.style = { stroke: 'red' };
+        }
+        setEdges((eds: any) => addEdge(customConnection, eds))
+    },[setEdges, nodes]);
 
     const onDragOver = useCallback((event: any) => {
         event.preventDefault();
@@ -67,6 +68,8 @@ export default function MainFlow() {
         const reactFlowBounds = reactFlowWrapper.current!.getBoundingClientRect();
         let type = event.dataTransfer.getData('application/reactflow');
         type = JSON.parse(type);
+        
+        const serviceId = type.id
         const name = type.name;
         // check if the dropped element is valid
         if (typeof type === 'undefined' || !type) {
@@ -82,7 +85,7 @@ export default function MainFlow() {
         setActiveComponentId(nodeId);
 
         const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
-        const data: NodeData = { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData };
+        const data: NodeData = { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId };
         const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
         setNodes((nds: any) => nds.concat(newNode));
@@ -118,7 +121,7 @@ export default function MainFlow() {
                             <Controls />
                         </ReactFlow>
                         <div style={{ minWidth: '15%', borderLeft: 'solid 1px' }}>
-                            <ContextTestComponent />
+                            <RightSidebar />
                         </div>
 
                     </div>

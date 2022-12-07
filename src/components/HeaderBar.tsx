@@ -9,7 +9,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import Button from '@mui/material/Button';
 import DialogTitle from '@mui/material/DialogTitle';
 import Dialog from '@mui/material/Dialog';
-import { Input, TextField } from '@mui/material';
+import { TextField } from '@mui/material';
 import { CanvasContext } from '../contexts/Canvas';
 
 

@@ -23,11 +23,18 @@ export default () => {
       
       {
         services.map((service: Service) => {
+          
+          // service.icon could be a url or a path to an svg, handle both cases and save to icon variable so that it can be used as src
+          let icon = service.icon.startsWith('http') ? service.icon : "";
+          if (service.icon.startsWith('http') === false) {
+            icon = require(`../assets/icons/${service.icon}`);
+          }
+
           return (
             <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(service))} draggable>
               <Button variant="outlined" style={{width: 163, display: 'flex', justifyContent: 'space-around'}}>
                 <div>
-                <img src={service.icon} alt={service.name} style={{width: 30}}/>
+                <img src={ icon } alt={service.name} style={{width: 30}}/>
                 </div>
                 {service.name}
               </Button>

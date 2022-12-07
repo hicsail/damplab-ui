@@ -289,6 +289,137 @@ export let services = [
         id: 'glyc-storage',
         name: 'Glycerol Stock Storage',
         icon: 'https://cdn-icons-png.flaticon.com/512/4352/4352975.png', 
-    }
+    },
+    {
+        id: 'eth-perc',
+        name: 'DNA/RNA Ethanol Precipitation',
+        icon: 'DNA-RNA-Ethanol.svg',
+        category: ['dna-rna'],
+        allowedConnections: [
+            'bioanalyzer', 'rna-extraction', 
+        ],
+        parameters : [
+            {
+                id: 'pcr-product-param',
+                name: 'PCR Product Result',
+                type: 'string',
+                paramType: 'input'
+            },
+        ],
+        result: {
+            id: 'eth-perc-product',
+            type: 'EthPercResult',
+            name: 'Ethanol Precipitation Result',
+        }
+    },
+    {
+        id: 'bioanalyzer',
+        name: 'Bioanalyzer',
+        icon: 'Library.svg',
+        category: ['transcriptomics'],
+        allowedConnections: [
+            'library-prep', 'seq', 'eth-perc'
+        ],
+        parameters : [
+            {
+                id: 'eth-perc-product',
+                name: 'Ethanol Precipitation Result',
+                type: 'string',
+                paramType: 'input'
+            },
+            {
+                id: 'control',
+                name: 'Control Type',
+                type: 'string',
+                paramType: 'input'
+            }
+        ],
+        result: {
+            id: 'bioanalyzer-product',
+            type: 'BioanalyzerResult',
+            name: 'Bioanalyzer Result',
+        }
+    },
+    {
+        id: 'mRNA-enrichment',
+        name: 'mRNA Enrichment',
+        icon: 'mRNA-Enrichment.svg',
+        category: ['transcriptomics'],
+        allowedConnections: [
+            'rna-extraction', 'library-prep', 'bioanalyzer'
+        ],
+        parameters : [
+            {
+                id: 'bioanalyzer-product',
+                name: 'Bioanalyzer Result',
+                type: 'string',
+                paramType: 'result',
+                required: true
+            },
+        ],
+        result: {
+            id: 'mRNA-enrichment-product',
+            type: 'MRnaEnrichmentResult',
+            name: 'mRNA Enrichment Result',
+        }
+    },
+    {
+        id: 'library-prep',
+        name: 'Library Prep',
+        icon: 'Library.svg',
+        category: ['transcriptomics'],
+        allowedConnections: [
+            'seq', 'mRNA-enrichment', 'bioanalyzer'
+        ],
+        parameters : [
+            {
+                id: 'mRNA-enrichment-product',
+                name: 'mRNA Enrichment Result',
+                type: 'string',
+                paramType: 'result',
+                required: true
+            },
+        ],
+        result: {
+            id: 'library-prep-product',
+            type: 'LibraryPrepResult',
+            name: 'Library Prep Result',
+        }
+    },
+    {
+        id: 'seq',
+        name: 'NGS Sequencing',
+        icon: 'RNA-Sequencing.svg',
+        category: ['transcriptomics'],
+        allowedConnections: [
+            'bioanalyzer'
+        ],
+        parameters : [
+            {
+                id: 'library-prep-product',
+                name: 'Library Prep Result',
+                type: 'string',
+                paramType: 'result',
+                required: true
+            },
+            // add more
+        ],
+        result: {
+            id: 'seq-product',
+            type: 'SeqResult',
+            name: 'NGS Sequencing Result',
+        }
+    },
+
 
 ]   
+
+
+// sit with courtney to figure out how to make this work
+// get allowed connections for everythign
+// get required field for everythign
+// fix result params to fit them in params
+// get icons for everything
+// put icons in the right place
+// create result thing on graph
+// add category to everything
