@@ -1,0 +1,19 @@
+{
+  "files": {
+    "main.css": "/damplab-ui/static/css/main.eed9170f.css",
+    "main.js": "/damplab-ui/static/js/main.d1920a30.js",
+    "static/js/787.990aba62.chunk.js": "/damplab-ui/static/js/787.990aba62.chunk.js",
+    "static/media/mRNA-Enrichment.svg": "/damplab-ui/static/media/mRNA-Enrichment.990faed30c2277039fc2.svg",
+    "static/media/Library.svg": "/damplab-ui/static/media/Library.c3f381232c70b5f6b924.svg",
+    "static/media/RNA-Sequencing.svg": "/damplab-ui/static/media/RNA-Sequencing.f23e3e82501cae1fd8ae.svg",
+    "static/media/DNA-RNA-Ethanol.svg": "/damplab-ui/static/media/DNA-RNA-Ethanol.af8589096b7b74083222.svg",
+    "index.html": "/damplab-ui/index.html",
+    "main.eed9170f.css.map": "/damplab-ui/static/css/main.eed9170f.css.map",
+    "main.d1920a30.js.map": "/damplab-ui/static/js/main.d1920a30.js.map",
+    "787.990aba62.chunk.js.map": "/damplab-ui/static/js/787.990aba62.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.eed9170f.css",
+    "static/js/main.d1920a30.js"
+  ]
+}
