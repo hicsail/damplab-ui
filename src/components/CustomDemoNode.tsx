@@ -28,12 +28,15 @@ export default memo((input: Input) => {
     const isConnectable = input.isConnectable;
     const data = input;
     const [background, setBackground] = useState('white');
+    const [bottomLeftHandle, setBottomLeftHandle] = useState(false);
+    const [bottomRightHandle, setBottomRightHandle] = useState(false);
 
     const handleOpen = () => {
         setActiveComponentId(data.data.id);
     };
-    
-    // if activeComponentId is equal to this node's id, then set background to green
+        
+
+
     useEffect(() => {
         if (activeComponentId === data.data.id) {
             setBackground('rgb(153, 255, 204)');
@@ -44,14 +47,16 @@ export default memo((input: Input) => {
     return (
         <div>
             <Box style={{background : background}}>
-                <Handle type="target" position="left" isConnectable={isConnectable} />
+                <Handle type="target" position="top" isConnectable={isConnectable} />
                 <Button variant="outlined" onClick={handleOpen} style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
                     <div>
                         <img src={data.data.icon} alt={data.data.label} style={{ width: 30 }} />
                     </div>
                     {data.data.label}
+                    
                 </Button>
-                <Handle type="source" position="right" isConnectable={isConnectable} />
+                <Handle type="source" position="bottom" isConnectable={isConnectable} />
+                
             </Box>
         </div>
     );

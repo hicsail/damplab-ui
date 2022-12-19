@@ -18,7 +18,8 @@ export let services = [
         ],
         allowedConnections: [
             'gene', 'storage', 'design-primers'
-        ]
+        ],
+        categories: ['dna-rna']
     }, 
     {
         id: 'gene',
@@ -33,7 +34,8 @@ export let services = [
         ],
         allowedConnections: [
             'design-primers',
-        ]
+        ],
+        categories: ['dna-assembly-cloning']
     },
     {
         id: 'design-primers',
@@ -63,6 +65,7 @@ export let services = [
                 type: 'string',
             }
         ],
+        categories: ['dna-assembly-cloning'],
         allowedConnections: [
             'rehydrate-primer'
         ]
@@ -80,7 +83,8 @@ export let services = [
         ],
         allowedConnections: [
             'pcr'
-        ]
+        ],
+        categories: ['dna-assembly-cloning']
     },
     {
         id: 'pcr',
@@ -107,6 +111,7 @@ export let services = [
         allowedConnections: [
             'run-gel', 'dpn1'
         ],
+        categories: ['dna-assembly-cloning'],
         result: {
             id: 'pcr-product',
             type: 'PCRResult',
@@ -139,7 +144,8 @@ export let services = [
                 id: 'dpn1-result',
                 amount: 'number', // pcr result - gel amount
             }
-        }
+        },
+        categories: ['dna-assembly-cloning'],
     },
     {
         id: 'run-gel',
@@ -162,6 +168,7 @@ export let services = [
         allowedConnections: [
             'column-purification'
         ],
+        categories: ['dna-rna'],
         result: {
             id: 'gel-product',
             type: 'GelResult',
@@ -177,21 +184,36 @@ export let services = [
                 id: 'desired-concentration',
                 name: 'Desired Concentration',
                 type: 'number',
+            },
+            {
+                id: 'dpn1-product-param',
+                name: 'Dpn1 Product Result',
+                type: null,
+                paramType: 'result'
             }
         ],
         allowedConnections: [
             'assembly', 'dna-gel'
-        ]
+        ],
+        categories: ['dna-rna']
     },
     {
         id: 'dna-gel',
         name: 'Purify DNA from Agarose Gel Extraction',
         icon: 'https://cdn-icons-png.flaticon.com/512/3182/3182554.png',
         resultParams: ['gel-product'],
-        parameters: [],
+        parameters: [
+            {
+                id: 'gel-product-param',
+                name: 'Gel Product Result',
+                type: null,
+                paramType: 'result'
+            }
+        ],
         allowedConnections: [
             'assembly'
-        ]
+        ],
+        categories: ['dna-rna']
     },
     {
         id: 'm-cloning',
@@ -221,11 +243,25 @@ export let services = [
                 id: 'ladder',
                 name: 'Ladder',
                 type: 'string',
-            }
+            },
+            {
+                id: 'forward-primer-flow-param',
+                name: 'Forward Primer Flow Result',
+                type: null,
+                paramType: 'result'
+            },
+            {
+                id: 'reverse-primer-flow-param',
+                name: 'Reverse Primer Flow Result',
+                type: null,
+                paramType: 'result'
+            },
+
         ],
         allowedConnections: [
             'transformation'
         ],
+        categories: ['fluorescence-based-assays'],
         result: {
             id: 'm-cloning-product',
             type: 'MCloningResult',
@@ -236,10 +272,24 @@ export let services = [
         name: 'Transformation',
         icon: 'https://cdn-icons-png.flaticon.com/512/203/203144.png',
         resultParams: ['m-cloning-product', 'antibiotic-workflow'],
-        parameters: [],
+        parameters: [
+            {
+                id: 'm-cloning-product-param',
+                name: 'MCloning Product Result',
+                type: null,
+                paramType: 'result'
+            },
+            {
+                id: 'antibiotic-workflow-product-param',
+                name: 'Antibiotic Workflow Result',
+                type: null,
+                paramType: 'result'
+            },
+        ],
         allowedConnections: [
             'overnight-culture', 'plate-storage'
         ],
+        categories: ['fluorescence-based-assays'],
         result: {
             id: 'transformation-product',
             type: 'TransformationResult',
@@ -255,11 +305,24 @@ export let services = [
                 id: 'desired-volume',
                 name: 'Desired Volume',
                 type: 'number',
-            }
+            },
+            {
+                id: 'transformation-product-param',
+                name: 'Transformation Product Result',
+                type: null,
+                paramType: 'result'
+            },
+            {
+                id: 'antibiotic-workflow-product-param',
+                name: 'Antibiotic Workflow Result',
+                type: null,
+                paramType: 'result'
+            },
         ],
         allowedConnections: [
             'miniprep'
         ],
+        categories: ['culturing-media'],
         result: {
             id: 'overnight-culture-product',
             type: 'OvernightCultureResult',
@@ -275,8 +338,15 @@ export let services = [
                 id: 'desired-concentration',
                 name: 'Desired Concentration',
                 type: 'number',
-            }
+            },
+            {
+                id: 'overnight-culture-product-param',
+                name: 'Overnight Culture Product Result',
+                type: null,
+                paramType: 'result'
+            },
         ],
+        categories: ['dna-rna'],
         allowedConnections: [
             'storage', 'seq'
         ],
@@ -289,12 +359,14 @@ export let services = [
         id: 'glyc-storage',
         name: 'Glycerol Stock Storage',
         icon: 'https://cdn-icons-png.flaticon.com/512/4352/4352975.png', 
+        categories: ['pcr-reactions'],
+        parameters: []
     },
     {
         id: 'eth-perc',
         name: 'DNA/RNA Ethanol Precipitation',
         icon: 'DNA-RNA-Ethanol.svg',
-        category: ['dna-rna'],
+        categories: ['dna-rna'],
         allowedConnections: [
             'bioanalyzer', 'rna-extraction', 
         ],
@@ -316,7 +388,7 @@ export let services = [
         id: 'bioanalyzer',
         name: 'Bioanalyzer',
         icon: 'Library.svg',
-        category: ['transcriptomics'],
+        categories: ['transcriptomics'],
         allowedConnections: [
             'library-prep', 'seq', 'eth-perc'
         ],
@@ -344,7 +416,7 @@ export let services = [
         id: 'mRNA-enrichment',
         name: 'mRNA Enrichment',
         icon: 'mRNA-Enrichment.svg',
-        category: ['transcriptomics'],
+        categories: ['transcriptomics'],
         allowedConnections: [
             'rna-extraction', 'library-prep', 'bioanalyzer'
         ],
@@ -367,7 +439,7 @@ export let services = [
         id: 'library-prep',
         name: 'Library Prep',
         icon: 'Library.svg',
-        category: ['transcriptomics'],
+        categories: ['transcriptomics'],
         allowedConnections: [
             'seq', 'mRNA-enrichment', 'bioanalyzer'
         ],
@@ -390,7 +462,7 @@ export let services = [
         id: 'seq',
         name: 'NGS Sequencing',
         icon: 'RNA-Sequencing.svg',
-        category: ['transcriptomics'],
+        categories: ['transcriptomics'],
         allowedConnections: [
             'bioanalyzer'
         ],
@@ -410,8 +482,6 @@ export let services = [
             name: 'NGS Sequencing Result',
         }
     },
-
-
 ]   
 
 
@@ -423,3 +493,4 @@ export let services = [
 // put icons in the right place
 // create result thing on graph
 // add category to everything
+// talk to courtney about multiple destinations

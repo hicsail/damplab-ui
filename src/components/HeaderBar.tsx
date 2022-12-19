@@ -90,10 +90,10 @@ export default function HeaderBar() {
         const handleClose = (fileName: any) => {
             // get file from local storage and load it into the canvas
             let file = JSON.parse(localStorage.getItem(fileName) || '{}');
-            console.log(file);
+            
             onClose(selectedValue);
-            setNodes(file.nodes);
-            setEdges(file.edges);
+            if (file.nodes) setNodes(file.nodes);
+            if (file.edges) setEdges(file.edges);
             setLoadOpen(false);
         };
       
@@ -133,7 +133,11 @@ export default function HeaderBar() {
                     <Link to={"/"} style={{ textDecoration: 'none', color: 'white' }}>
                     <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png" style={{width: 300}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
                     </Link>
+                    <div>
+                            v1.0
+                        </div>
                     <div style={alignRight}>
+                        
                     <IconButton
                         size="large"
                         aria-label="account of current user"
