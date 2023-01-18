@@ -18,5 +18,9 @@ export let categories = [
     {
         id: 'transcriptomics',
         label: 'Transcriptomics',
-    }
+    },
+    {
+        id: 'storage',
+        label: 'Materials Repository and Storage',
+    },
 ]

@@ -3,7 +3,7 @@ import { Handle } from 'reactflow';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { CanvasContext } from '../contexts/Canvas';
-
+import WarningIcon from '@mui/icons-material/Warning';
 
 type Input = {
     isConnectable: boolean;
@@ -24,39 +24,59 @@ const style = {
 
 export default memo((input: Input) => {
 
-    const { setActiveComponentId, activeComponentId } = useContext(CanvasContext);
+    const { setActiveComponentId, activeComponentId, nodes } = useContext(CanvasContext);
     const isConnectable = input.isConnectable;
     const data = input;
     const [background, setBackground] = useState('white');
-    const [bottomLeftHandle, setBottomLeftHandle] = useState(false);
-    const [bottomRightHandle, setBottomRightHandle] = useState(false);
+    const [allFilled, setAllFilled] = useState(false);
 
     const handleOpen = () => {
         setActiveComponentId(data.data.id);
     };
-        
-
 
     useEffect(() => {
+
         if (activeComponentId === data.data.id) {
             setBackground('rgb(153, 255, 204)');
         } else {
             setBackground('white');
         }
-    }, [activeComponentId, data.data.id]);
+        setAllFilled(checkIfDataFilled(data.data.formData))
+    }, [activeComponentId, data.data.id, data.data.formData]);
+
+    const checkIfDataFilled = (formData: any) => {
+
+        let filled = true;
+        formData.forEach((obj: any) => {
+            if (obj.paramType === 'result') {
+                if (obj.value === true && obj.resultParamValue === '') {
+                    filled = false;
+                }
+            }
+            else if (obj.value === '' || obj.value === undefined || obj.value === null) {
+                filled = false;
+            }
+        });
+
+        return filled;
+    }
+
     return (
         <div>
-            <Box style={{background : background}}>
+            <Box style={{ background: background }}>
                 <Handle type="target" position="top" isConnectable={isConnectable} />
-                <Button variant="outlined" onClick={handleOpen} style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
-                    <div>
-                        <img src={data.data.icon} alt={data.data.label} style={{ width: 30 }} />
-                    </div>
-                    {data.data.label}
-                    
-                </Button>
+                <div>
+                    <Button variant="outlined" onClick={handleOpen} style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
+                        <div style={{ paddingTop: 30 }}>
+                            <img src={data.data.icon} alt={data.data.label} style={{ width: 30 }} />
+                        </div>
+                        {data.data.label}
+                        <div>
+                            {allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
+                        </div>
+                    </Button>
+                </div>
                 <Handle type="source" position="bottom" isConnectable={isConnectable} />
-                
             </Box>
         </div>
     );

@@ -93,7 +93,7 @@ export default () => {
 
             // service.icon could be a url or a path to an svg, handle both cases and save to icon variable so that it can be used as src
             let icon = service.icon.startsWith('http') ? service.icon : "";
-            if (service.icon.startsWith('http') === false) {
+            if (service.icon.startsWith('http') === false && service.icon !== "") {
               icon = require(`../assets/icons/${service.icon}`);
             }
 

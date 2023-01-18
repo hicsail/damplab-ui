@@ -1,6 +1,9 @@
-import { FireExtinguisher } from '@mui/icons-material';
-import Button from '@mui/material/Button';
 import React, { useContext } from 'react'
+import { Accordion } from '@mui/material';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import Button from '@mui/material/Button';
 import { CanvasContext } from '../contexts/Canvas'
 
 
@@ -9,23 +12,6 @@ export default function Checkout() {
     const val = useContext(CanvasContext);
 
     // function that traverses over nodes and edges and returns a list of all the nodes in order
-    const traverse = (nodes: any, edges: any) => {
-        if (nodes.length === 0) return [];
-        let node = nodes[0];
-        let list = [node];
-        let i = 0;
-        while (i < edges.length) {
-            let edge = edges[i];
-            if (edge.source === node.id) {
-                node = nodes.find((n: any) => n.id === edge.target);
-                list.push(node);
-                i = 0;
-            } else {
-                i++;
-            }
-        }
-        return list;
-    }
 
     const getWorkflowsFromGraph = (nodes: any, edges: any) => {
 
@@ -45,11 +31,25 @@ export default function Checkout() {
             }
         });
 
+        // add start nodes that are not in edges.source or destination
+        nodes.forEach((node: any) => {
+            let isStartNode = true;
+            edges.forEach((e: any) => {
+                if (node.id === e.source || node.id === e.target) {
+                    isStartNode = false;
+                }
+            });
+            if (isStartNode) {
+                startNodes.push(node.id);
+            }
+        });
+
+
+
         // loop over start nodes and create workflows
         let workflows: any = [];
         startNodes.forEach((startNode: any) => {
             let workflow: any = [];
-            const workflowId = startNode;
             let node = nodes.find((n: any) => n.id === startNode);
             workflow.push(node);
             let i = 0;
@@ -65,7 +65,7 @@ export default function Checkout() {
             }
             workflows.push(workflow);
         });
-        console.log(workflows);
+        
         return workflows;
     }
 
@@ -78,16 +78,20 @@ export default function Checkout() {
                         // print workflows side by side
                         getWorkflowsFromGraph(val.nodes, val.edges).map((workflow: any, index: number) => {
                             return (
-                                <div style={{ textAlign: 'start', padding: 10 }}>
+                                <div style={{ textAlign: 'start', padding: 10, overflowX: 'auto' }}>
                                     <div>
                                         <h4>Workflow {index+1}</h4>
                                     </div>
                                     
-                                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-start', height: 'fit-content' }}>
                                     
                                     {
                                         workflow.map((node: any) => {
                                             return (
+                                                <Accordion>
+                                                <AccordionSummary
+                                                expandIcon={<ExpandMoreIcon />}
+                                                >
                                                 <div style={{ border: 'solid 1px', width: 'fit-content', margin: 10, padding: 10 }}>
                                                     <div>
                                                         <img src={node.data.icon} alt={node.name} style={{ width: 30 }} />
@@ -98,6 +102,40 @@ export default function Checkout() {
                                                         </h3>
                                                     </div>
                                                 </div>
+                                                </AccordionSummary>
+                                                <AccordionDetails>
+                                                    <div>
+                                                        <h4>Details</h4>
+                                                        <div>
+                                                            <h5>Node ID: {node.id}</h5>
+                                                        </div>
+                                                        <div>
+                                                            <h5>Node Name: {node.name}</h5>
+                                                        </div>
+                                                        <div>
+                                                            <h5>Parameters</h5>
+                                                            <div>
+                                                                {
+                                                                    node.data.formData.map((parameter: any) => {
+                                                                
+                                                                        return (
+                                                                            <div style={{display: 'flex', justifyItems: 'flex-start'}}>
+                                                                                <h6>{parameter.name + ' : '} </h6>
+                                                                                <div>
+                                                                                    <h6>{' ' + parameter.value}</h6>
+                                                                                </div> {
+                                                                                    parameter.paramType === 'result' ? <h6>Alternate: { parameter.resultParamValue }</h6> : null
+                                                                                }
+                                                                            </div>
+                                                                        )
+                                                                    })
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </AccordionDetails>
+                                                
+                                                </Accordion>
                                             )
                                         })
                                     
@@ -109,12 +147,6 @@ export default function Checkout() {
                     }
                 </div>
             </div>
-            <div>
-               <Button onClick={()=> console.log(getWorkflowsFromGraph(val.nodes,val.edges))}>
-                    Print
-                </Button>  
-            </div>
-
         </div>
 
     )

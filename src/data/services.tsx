@@ -320,7 +320,8 @@ export let services = [
             },
         ],
         allowedConnections: [
-            'miniprep'
+            'miniprep',
+            'storage'
         ],
         categories: ['culturing-media'],
         result: {
@@ -365,7 +366,7 @@ export let services = [
     {
         id: 'eth-perc',
         name: 'DNA/RNA Ethanol Precipitation',
-        icon: 'DNA-RNA-Ethanol.svg',
+        icon: 'https://drive.google.com/uc?id=1Gdv5OByXeIQET13AowTdKAEKrC-687TH',
         categories: ['dna-rna'],
         allowedConnections: [
             'bioanalyzer', 'rna-extraction', 
@@ -415,7 +416,7 @@ export let services = [
     {
         id: 'mRNA-enrichment',
         name: 'mRNA Enrichment',
-        icon: 'mRNA-Enrichment.svg',
+        icon: 'https://drive.google.com/uc?id=15Dg7u9OWhZjVQ8lGYszIYDo7FcTQkkOW',
         categories: ['transcriptomics'],
         allowedConnections: [
             'rna-extraction', 'library-prep', 'bioanalyzer'
@@ -438,7 +439,7 @@ export let services = [
     {
         id: 'library-prep',
         name: 'Library Prep',
-        icon: 'Library.svg',
+        icon: 'https://drive.google.com/uc?id=1aQ-sXASGWS_ZjBR-ROIdlsbg7mhg2Yk7',
         categories: ['transcriptomics'],
         allowedConnections: [
             'seq', 'mRNA-enrichment', 'bioanalyzer'
@@ -461,7 +462,8 @@ export let services = [
     {
         id: 'seq',
         name: 'NGS Sequencing',
-        icon: 'RNA-Sequencing.svg',
+        icon: 'https://drive.google.com/uc?id=1oiZLiBOUJqFPI_46_YCtk9mrYNkkfFLL',
+
         categories: ['transcriptomics'],
         allowedConnections: [
             'bioanalyzer'
@@ -482,6 +484,105 @@ export let services = [
             name: 'NGS Sequencing Result',
         }
     },
+    {
+        id: 'cell-culture-induction',
+        name: 'Cell Culture Induction and Selection',
+        icon: '', // Cell Culture.svg
+        categories: ['culturing-media'],
+        allowedConnections: [
+            'plate-reader',
+            'storage',
+            'flow-cytometry',
+        ],
+        parameters : [
+            {
+                id: 'induction-culture',
+                name: 'Overnight Bacterial Culture',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+        ],
+        result: {
+            id: 'induced-sample',
+            type: 'InducedSampleResult',
+            name: 'Induced Bacterial Culture Result',
+        }
+    },
+    {
+        id: 'cell-lysate',
+        name: 'Cell Lysate Production',
+        icon: '', // Cell Lysate Production.svg
+        categories: ['culturing-media'],
+        allowedConnections: [
+            'plate-reader',
+            'storage',
+            'cell-culture-induction',
+        ],
+        parameters : [
+            {
+                id: 'lysate-bacterial-culture',
+                name: 'Large Volume Bacterial Culture',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+        ],
+        result: {
+            id: 'cell-lysate-product',
+            type: 'CellLysateResult',
+            name: 'Cell Lysate Result',
+        }
+    },
+    {
+        id: 'protein-production',
+        name: 'Protein Production and Purification from Cell Lysate',
+        icon: '', // Protein Production.svg
+        categories: ['culturing-media'],
+        allowedConnections: [
+            'plate-reader',
+            'storage',
+            'cell-lysate',
+            'cell-culture-induction'
+        ],
+        parameters : [
+            {
+                id: "protein-bacterial-culture",
+                name: 'Large Volume Bacterial Culture',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+        ],
+        result: {
+            id: 'lysate-protein',
+            type: 'LysateProteinResult',
+            name: 'Cell Lysate Containing Protein',
+        }
+    },
+    {
+        id: 'storage',
+        name: "Overnight Innoculums of Bacteria Cell Culture Storage",
+        icon: '', // Storage Bacteria.svg
+        categories: ['materials-repository-storage'],
+        allowedConnections: [
+            'overnight-culture',
+        ],
+        parameters : [
+            {
+                id: 'overnight-culture',
+                name: 'Overnight Bacterial Culture',
+                type: 'string',
+                paramType: 'result',
+                required: true
+            },
+        ],
+        result: {
+            id: 'overnight-culture-storage',
+            type: 'OvernightCultureStorageResult',
+            name: 'Overnight Bacterial Culture Storage Result',
+        }
+    }
 ]   
 
 

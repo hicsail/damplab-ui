@@ -44,6 +44,47 @@ export let bundles = [
         ]        
     },
     {
+        id: 'modular-cloning-provided',
+        label: 'Modular Assembly and Cloning with Provided DNA',
+        icon: 'https://drive.google.com/uc?id=1rsXIFQsWknecXVkMIOFrm80YFgNYlkUg',
+        services: [
+            {
+                id: 'seq',
+            },
+            {
+                id:'design-primers'
+            },
+            {
+                id: 'rehydrate-primer'
+            },
+            {
+                id: 'pcr'
+            },
+            {
+                id: 'dpn1'
+            },
+            {
+                id: 'run-gel'
+            },
+            {
+                id: 'column-purification'
+            },
+            {
+                id: 'dna-gel'
+            },
+            {
+                id: 'm-cloning'
+            },
+            {
+                id: 'transformation'
+            },
+            {
+                id: 'overnight-culture'
+            }
+
+        ]        
+    },
+    {
         id: 'rna-seq',
         label: 'RNA Sequencing',
         icon: 'https://drive.google.com/uc?id=1mbl2UEtWGdybUuS5gImE_BLqqT3SE7d6',
@@ -70,6 +111,25 @@ export let bundles = [
                 id: 'seq'
             }
         ]
+    },
+    {
+        id: 'protein-production',
+        label: 'Protein Production, Purification, and Induction Bundle',
+        icon: '', //Bundle 9.svg
+        services: [
+            {
+                // cell culture induction and selction
+                id: 'cell-culture-induction'
+            },
+            {
+                // cell lysate production
+                id: 'cell-lysate'
+            },
+            {
+                // protein production purification from cell lysate
+                id: 'protein-production'
+            }
+        ] 
     }
 
 ];

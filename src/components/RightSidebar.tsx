@@ -134,7 +134,7 @@ export default function ContextTestComponent() {
                 }
             </div>
             <div>
-                <Button onClick={ ()=> console.log(val.nodes, val.edges)}>Print</Button>
+                <Button onClick={ ()=> console.log(JSON.stringify(val.nodes), JSON.stringify(val.edges))}>Print</Button>
             </div>
         </div>
     )

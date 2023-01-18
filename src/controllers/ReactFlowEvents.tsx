@@ -4,7 +4,6 @@ import { NodeData, NodeParameter } from '../types/CanvasTypes';
 export const generateFormDataFromParams = (paramsData: any, nodeId: string): NodeParameter[] => {
 
     const formData : NodeParameter[] = [];
-    console.log(paramsData);
     for (let i = 0; i < paramsData.length; i++) {
         const parameter = paramsData[i];
         const formId = Math.random().toString(36).substring(2, 9);
@@ -14,6 +13,7 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string): Nod
             name: parameter.name,
             type: parameter.type,
             paramType: parameter.paramType ? parameter.paramType : null,
+            resultParamValue: "",
             value: null,
             required: true // parameter.required,
         });
