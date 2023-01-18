@@ -487,7 +487,7 @@ export let services = [
     {
         id: 'cell-culture-induction',
         name: 'Cell Culture Induction and Selection',
-        icon: '', // Cell Culture.svg
+        icon: 'https://drive.google.com/uc?id=1f7fX9OQzpzq6q66p6Rn-ednSCQysE14o', // Cell Culture.svg
         categories: ['culturing-media'],
         allowedConnections: [
             'plate-reader',
@@ -512,7 +512,7 @@ export let services = [
     {
         id: 'cell-lysate',
         name: 'Cell Lysate Production',
-        icon: '', // Cell Lysate Production.svg
+        icon: 'https://drive.google.com/uc?id=13aVzjB_unTVcr-3GsNLJeEDy63LE-yZ4', // Cell Lysate Production.svg
         categories: ['culturing-media'],
         allowedConnections: [
             'plate-reader',
@@ -537,7 +537,7 @@ export let services = [
     {
         id: 'protein-production',
         name: 'Protein Production and Purification from Cell Lysate',
-        icon: '', // Protein Production.svg
+        icon: 'https://drive.google.com/uc?id=1r0uMBqqugBe-KqkdZacY5w1RqyL5ijh5', // Protein Production.svg
         categories: ['culturing-media'],
         allowedConnections: [
             'plate-reader',
@@ -563,8 +563,8 @@ export let services = [
     {
         id: 'storage',
         name: "Overnight Innoculums of Bacteria Cell Culture Storage",
-        icon: '', // Storage Bacteria.svg
-        categories: ['materials-repository-storage'],
+        icon: 'https://drive.google.com/uc?id=1DfUSEFooEi-C4FPUD6Snu-c-tPLzppwp', // Storage Bacteria.svg
+        categories: ['storage'],
         allowedConnections: [
             'overnight-culture',
         ],

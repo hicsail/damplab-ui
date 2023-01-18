@@ -115,7 +115,7 @@ export let bundles = [
     {
         id: 'protein-production',
         label: 'Protein Production, Purification, and Induction Bundle',
-        icon: '', //Bundle 9.svg
+        icon: 'https://drive.google.com/uc?id=1-eu6BfldPqDK2aSrsvwmX_uyZ40K7Ddo', //Bundle 9.svg
         services: [
             {
                 // cell culture induction and selction
