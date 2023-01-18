@@ -69,7 +69,13 @@ export default memo((input: Input) => {
                     <div>
                         <img src={data.data.icon} alt={data.data.label} style={{ width: 30 }} />
                     </div>
-                    {data.data.label}
+                    <div>
+                        {data.data.label}
+                    </div>
+                    <div>
+                        { allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
+                    </div>
+                    
                     
                 </Button>
                 <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
