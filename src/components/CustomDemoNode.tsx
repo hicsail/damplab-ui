@@ -1,5 +1,5 @@
 import React, { memo, useContext, useEffect, useState } from 'react';
-import { Handle } from 'reactflow';
+import { Handle, Position } from 'reactflow';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { CanvasContext } from '../contexts/Canvas';
@@ -63,20 +63,17 @@ export default memo((input: Input) => {
 
     return (
         <div>
-            <Box style={{ background: background }}>
-                <Handle type="target" position="top" isConnectable={isConnectable} />
-                <div>
-                    <Button variant="outlined" onClick={handleOpen} style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
-                        <div style={{ paddingTop: 30 }}>
-                            <img src={data.data.icon} alt={data.data.label} style={{ width: 30 }} />
-                        </div>
-                        {data.data.label}
-                        <div>
-                            {allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
-                        </div>
-                    </Button>
-                </div>
+            <Box style={{background : background}}>
+                <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
+                <Button variant="outlined" onClick={handleOpen} style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
+                    <div>
+                        <img src={data.data.icon} alt={data.data.label} style={{ width: 30 }} />
+                    </div>
+                    {data.data.label}
+                    
+                </Button>
                 <Handle type="source" position="bottom" isConnectable={isConnectable} />
+                
             </Box>
         </div>
     );
