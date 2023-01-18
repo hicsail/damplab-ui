@@ -72,7 +72,7 @@ export default memo((input: Input) => {
                     {data.data.label}
                     
                 </Button>
-                <Handle type="source" position="bottom" isConnectable={isConnectable} />
+                <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
                 
             </Box>
         </div>
