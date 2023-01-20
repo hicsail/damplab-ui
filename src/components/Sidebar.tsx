@@ -50,9 +50,12 @@ export default () => {
     setAlignment(newAlignment);
   };
 
+  
+  
 
   return (
     <aside style={{ padding: 20, height: '80vh', overflow: 'scroll' }}>
+      
       <ToggleButtonGroup
         color="primary"
         value={alignment}

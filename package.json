@@ -4,6 +4,7 @@
   "private": true,
   "homepage": "https://sail.codes/damplab-ui",
   "dependencies": {
+    "@apollo/client": "^3.7.4",
     "@emotion/react": "^11.10.4",
     "@emotion/styled": "^11.10.4",
     "@mui/icons-material": "^5.10.9",
@@ -16,6 +17,7 @@
     "@types/react": "^18.0.21",
     "@types/react-dom": "^18.0.6",
     "formik": "^2.2.9",
+    "graphql": "^16.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.4.2",

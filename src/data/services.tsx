@@ -8,12 +8,16 @@ export let services = [
                 id: 'sample',
                 name: 'Sample Type',
                 type: 'string',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'plasmid',
                 name: 'Plasmid Name',
                 type: 'string',
-                flowId: 'plasmid-flow'
+                paramType: 'flow',
+                flowId: 'plasmid-flow',
+                required: true
             }
         ],
         allowedConnections: [
@@ -30,6 +34,8 @@ export let services = [
                 id: 'fragment-sequence',
                 name: 'Fragment Sequence',
                 type: 'string',
+                paramType: 'input',
+                required: true
             },
         ],
         allowedConnections: [
@@ -46,23 +52,32 @@ export let services = [
                 id: 'target-gene',
                 name: 'Target Gene',
                 type: 'string',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'forward-primer',
                 name: 'Forward Primer',
                 type: 'string',
-                flowId: 'forward-primer-flow'
+                paramType: 'flow',
+                flowId: 'forward-primer-flow',
+                required: true
             },
             {
                 id: 'reverse-primer',
                 name: 'Reverse Primer',
                 type: 'string',
-                flowId: 'reverse-primer-flow'
+                flowId: 'reverse-primer-flow',
+                paramType: 'flow',
+                required: true
+
             },
             {
                 id: 'sequencing-primer',
                 name: 'Sequencing Primer',
                 type: 'string',
+                paramType: 'input',
+                required: true
             }
         ],
         categories: ['dna-assembly-cloning'],
@@ -79,6 +94,8 @@ export let services = [
                 id: 'buffer',
                 name: 'Buffer',
                 type: 'string',
+                paramType: 'input',
+                required: true
             },
         ],
         allowedConnections: [
@@ -96,16 +113,22 @@ export let services = [
                 id: 'melting-temp',
                 name: 'Melting Temperature',
                 type: 'number',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'cycle-time',
                 name: 'Cycle Time',
                 type: 'number',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'reaction-volume',
                 name: 'Reaction Volume',
                 type: 'number',
+                paramType: 'input',
+                required: true
             }
         ],
         allowedConnections: [
@@ -131,7 +154,8 @@ export let services = [
                 id: 'pcr-product-param',
                 name: 'PCR Product Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             }
         ],
         allowedConnections: [
@@ -184,12 +208,15 @@ export let services = [
                 id: 'desired-concentration',
                 name: 'Desired Concentration',
                 type: 'number',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'dpn1-product-param',
                 name: 'Dpn1 Product Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             }
         ],
         allowedConnections: [
@@ -207,7 +234,8 @@ export let services = [
                 id: 'gel-product-param',
                 name: 'Gel Product Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             }
         ],
         allowedConnections: [
@@ -227,34 +255,44 @@ export let services = [
                 id: 'antibiotic',
                 name: 'Antibiotic',
                 type: 'string',
-                workflowId: 'antibiotic-workflow'
+                workflowId: 'antibiotic-workflow',
+                paramType: 'flow',
+                required: true
             },
             {
                 id: 'buffer',
                 name: 'Buffer',
                 type: 'string',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'desired-concentration',
                 name: 'Desired Concentration',
                 type: 'number',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'ladder',
                 name: 'Ladder',
                 type: 'string',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'forward-primer-flow-param',
                 name: 'Forward Primer Flow Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             },
             {
                 id: 'reverse-primer-flow-param',
                 name: 'Reverse Primer Flow Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             },
 
         ],
@@ -277,13 +315,15 @@ export let services = [
                 id: 'm-cloning-product-param',
                 name: 'MCloning Product Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             },
             {
                 id: 'antibiotic-workflow-product-param',
                 name: 'Antibiotic Workflow Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             },
         ],
         allowedConnections: [
@@ -310,13 +350,15 @@ export let services = [
                 id: 'transformation-product-param',
                 name: 'Transformation Product Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             },
             {
                 id: 'antibiotic-workflow-product-param',
                 name: 'Antibiotic Workflow Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             },
         ],
         allowedConnections: [
@@ -339,12 +381,15 @@ export let services = [
                 id: 'desired-concentration',
                 name: 'Desired Concentration',
                 type: 'number',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'overnight-culture-product-param',
                 name: 'Overnight Culture Product Result',
                 type: null,
-                paramType: 'result'
+                paramType: 'result',
+                required: true
             },
         ],
         categories: ['dna-rna'],
@@ -398,13 +443,15 @@ export let services = [
                 id: 'eth-perc-product',
                 name: 'Ethanol Precipitation Result',
                 type: 'string',
-                paramType: 'input'
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'control',
                 name: 'Control Type',
                 type: 'string',
-                paramType: 'input'
+                paramType: 'input',
+                required: true
             }
         ],
         result: {
