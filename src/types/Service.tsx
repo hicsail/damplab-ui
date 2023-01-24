@@ -8,7 +8,7 @@ export type Service = {
     // parameters?: Parameter[];
     // allowedConnections?: string[];
     // result?: string;
-    // category?: string;
+     categories?: string[];
 };  
 
 

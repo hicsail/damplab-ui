@@ -3,6 +3,7 @@ import logo from './logo.svg';
 import './App.css';
 import MainFlow from './pages/MainFlow';
 import Checkout from './pages/Checkout';
+import Submitted from './pages/Submitted';
 import { BrowserRouter, Routes, Route, Outlet, Link } from "react-router-dom";
 import HeaderBar from './components/HeaderBar';
 import { CanvasContext } from './contexts/Canvas';
@@ -42,6 +43,7 @@ function App() {
             <Routes>
               <Route path="/" element={<MainFlow />} />
               <Route path="/checkout" element={<Checkout />} />
+              <Route path="/submitted/:name" element={<Submitted />} />
             </Routes>
           </BrowserRouter>
         </CanvasContext.Provider>
