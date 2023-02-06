@@ -1,269 +1,180 @@
-import React, { useContext, useState } from 'react'
-import { Accordion, Snackbar, TextField } from '@mui/material';
+import React, { useContext, useEffect, useState } from 'react'
+import { Accordion, Paper, Snackbar, TextField, Typography } from '@mui/material';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Button from '@mui/material/Button';
 import { CanvasContext } from '../contexts/Canvas'
-import { ApolloError, gql, useMutation } from '@apollo/client';
-import { onError } from "apollo-link-error";
-import { GraphQLError } from 'graphql';
+import { gql, useMutation } from '@apollo/client';
+import { getWorkflowsFromGraph, transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
+import { CREATE_JOB, CREATE_WORKFLOW } from '../gql/mutations';
+import WorkflowStepper from '../components/WorkflowStepper';
+import FormControl from '@mui/material/FormControl';
 
 
 export default function Checkout() {
 
     const val = useContext(CanvasContext);
-    const [workflowName, setWorkflowName] = useState('');
+    const [workflowName, setWorkflowName] = useState<string>('');
     const [username, setUserName] = useState('');
     const [institution, setInstitution] = useState('');
+    const [email, setEmail] = useState('');
     const [open, setOpen] = useState(false);
+    const [workflowIds, setWorkflowIds] = useState<string[]>([]);
+    const [workflows, setWorklows] = useState(getWorkflowsFromGraph(val.nodes, val.edges));
+    const [expanded, setExpanded] = useState(true);
+    const [workflowNames, setWorkflowNames] = useState<any>({});
 
-
-    // function that traverses over nodes and edges and returns a list of all the nodes in order
-
-    const getWorkflowsFromGraph = (nodes: any, edges: any) => {
-
-        if (nodes.length === 0) return [];
-        // loop over edges and identify start nodes
-        let startNodes: any = [];
-        // if edge.source is not in edges.target, then it is a start node
-        edges.forEach((edge: any) => {
-            let isStartNode = true;
-            edges.forEach((e: any) => {
-                if (edge.source === e.target) {
-                    isStartNode = false;
-                }
-            });
-            if (isStartNode) {
-                startNodes.push(edge.source);
+    const createWorkflowObj = () => {
+        let workflows = getWorkflowsFromGraph(val.nodes, val.edges);
+        let workflowObjs: any = [];
+        workflows.forEach((workflow: any) => {
+            let id = Math.random() * 100;
+            // add id and value object to workflowNames state
+            setWorkflowNames({ ...workflowNames, [id]: "" });
+            let obj =
+            {
+                id: id,
+                name: "",
+                nodes: workflow
             }
+            workflowObjs.push(obj);
         });
-
-        // add start nodes that are not in edges.source or destination
-        nodes.forEach((node: any) => {
-            let isStartNode = true;
-            edges.forEach((e: any) => {
-                if (node.id === e.source || node.id === e.target) {
-                    isStartNode = false;
-                }
-            });
-            if (isStartNode) {
-                startNodes.push(node.id);
-            }
-        });
-
-
-
-        // loop over start nodes and create workflows
-        let workflows: any = [];
-        startNodes.forEach((startNode: any) => {
-            let workflow: any = [];
-            let node = nodes.find((n: any) => n.id === startNode);
-            workflow.push(node);
-            let i = 0;
-            while (i < edges.length) {
-                let edge = edges[i];
-                if (edge.source === node.id) {
-                    node = nodes.find((n: any) => n.id === edge.target);
-                    workflow.push(node);
-                    i = 0;
-                } else {
-                    i++;
-                }
-            }
-            workflows.push(workflow);
-        });
-
-        return workflows;
+        return workflowObjs;
     }
 
-    const transformNodesToGQL = (nodes: any) => {
+    const [checkoutWorkflow, setCheckoutWorkflow] = useState<any>([]);
 
-        let gqlNodes: any = [];
+    useEffect(() => {
+        setCheckoutWorkflow(createWorkflowObj());
+    }, [val.nodes, val.edges]);
 
-        nodes.forEach((node: any) => {
-            let gqlNode: any = {};
-            gqlNode = { ...node.data };
-            gqlNode.reactNode = node;
-            gqlNode.serviceId = node.data.serviceId // random value for now 
-            // remove allowedConnections
-            delete gqlNode.allowedConnections;
-            delete gqlNode.icon;
-            //delete gqlNode.serviceId;
-            delete gqlNode.parameters;
-            gqlNodes.push(gqlNode);
-        });
-        return gqlNodes;
+    useEffect(() => {
+        console.log('workflowNames', workflowNames);
+    }, [workflowNames]);
 
-    }
-
-    const transformEdgesToGQL = (edges: any) => {
-
-        let gqlEdges: any = [];
-
-        edges.forEach((edge: any) => {
-            let gqlEdge: any = {};
-            gqlEdge.source = edge.source;
-            gqlEdge.target = edge.target;
-            gqlEdge.reactEdge = edge;
-            gqlEdge.id = "hello world" + Math.random() // random value for now 
-            gqlEdges.push(gqlEdge);
-        });
-        return gqlEdges;
-    }
-
-    const CREATE_WORKFLOW = gql`
-        mutation createWorkflow($createWorkflowInput: AddWorkflowInput!) {
-        createWorkflow(createWorkflowInput: $createWorkflowInput) {
-            name
-            nodes {
-            id
-            }
-            edges {
-            id
-            }
+    useEffect(() => {
+        if (workflowIds.length === workflows.length && workflowIds.length > 0) {
+            console.log('creating job', { name: workflowName, username: username, institution: institution, email: email, workflowIds: workflowIds });
+            createJob({ variables: { createJobInput: { name: workflowName, username: username, institute: institution, email: email, workflows: workflowIds, } } });
         }
-        }
-    `;
+    }, [workflowIds]);
 
-    const [createWorkflow, { data, loading, error }] = useMutation(CREATE_WORKFLOW, {
+    const [createWorkflow] = useMutation(CREATE_WORKFLOW, {
         onCompleted: (data) => {
-            // handle success
-            console.log('success');
-            console.log(data);
+            console.log('successfully created workflow:', data.createWorkflow.id);
+            setWorkflowIds([...workflowIds, data.createWorkflow.id]);
         },
         onError: (error: any) => {
-            console.log(error.networkError?.result?.errors);
+            console.log('error creating workflow', error);
         }
     });
-    const saveWorkflow = () => {
 
-        let gqlWorkflows: any = transformNodesToGQL(val.nodes);
-        let gqlEdges: any = transformEdgesToGQL(val.edges);
-        let workflow = {
-            name: workflowName,
-            username: username,
-            institution: institution,
-            nodes: gqlWorkflows,
-            edges: gqlEdges
+    const [createJob] = useMutation(CREATE_JOB, {
+        onCompleted: (data) => {
+            console.log('successfully created job:', data);
+            setOpen(true);
+            setWorkflowIds([]);
+        },
+        onError: (error: any) => {
+            console.log('error creating job', error);
         }
-        console.log(workflow);
-        createWorkflow({
-            variables: { createWorkflowInput: workflow }, onCompleted(data, clientOptions) {
-                console.log(data);
-                setOpen(true);
-                console.log(clientOptions);
-            },
-        });
+    });
 
+    const saveWorkflows = async () => {
+        let flows = checkoutWorkflow;
+        flows.forEach(async (flow: any) => {
+            let workflow = flow.nodes;
+            let gqlWorkflows: any = transformNodesToGQL(workflow);
+            let edges = val.edges.filter((edge: any) => {
+                return workflow.find((node: any) => node.id === edge.source) && workflow.find((node: any) => node.id === edge.target);
+            });
+
+            let gqlEdges: any = transformEdgesToGQL(edges);
+            let gqlWorkflow = {
+                name: workflowNames[flow.id],
+                nodes: gqlWorkflows,
+                edges: gqlEdges
+            }
+            console.log('creating workflow', gqlWorkflow);
+            const res = await createWorkflow({ variables: { createWorkflowInput: gqlWorkflow } });
+        });
     }
 
-    const link = onError(({ graphQLErrors, networkError }) => {
-        if (graphQLErrors)
-            graphQLErrors.map(({ message, locations, path }) =>
-                console.log(
-                    `[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`,
-                ),
-            );
-
-        if (networkError) console.log(`[Network error]: ${networkError}`);
-    });
+    const setWorkflowNameFunction = (id: number, name: string) => {
+        setWorkflowNames({ ...workflowNames, [id]: name });
+        console.log(workflowNames)
+    }
 
     return (
         <div>
             <div>
                 <div>
-                    <h1>Checkout</h1>
-                    {
-                        // print workflows side by side
-                        getWorkflowsFromGraph(val.nodes, val.edges).map((workflow: any, index: number) => {
-                            return (
-                                <div style={{ textAlign: 'start', padding: 10, overflowX: 'auto' }}>
-                                    <div>
-                                        <h4>Workflow {index + 1}</h4>
-                                    </div>
+                    <Typography variant='h2'>Checkout</Typography>
+                    <Accordion key={Math.random() * 100} expanded={expanded}>
+                        <AccordionSummary
+                            expandIcon={<ExpandMoreIcon />}
+                            aria-controls="panel1a-content"
+                            id="panel1a-header"
+                            onClick={() => setExpanded(!expanded)}
+                        >
+                            <Typography>Workflows Summary</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                            {
+                                checkoutWorkflow.map((workflow: any) => {
+                                    let value = workflowNames[workflow.id];
+                                    return (
+                                        <div id={workflow.id} style={{ textAlign: 'start', padding: 10, overflowX: 'auto', border: '1px solid grey', borderRadius: 5, margin: 5, }}>
+                                            <TextField
+                                                id="outlined-basic"
+                                                label="Workflow Name"
+                                                variant="outlined"
+                                                value={value}
+                                                onChange={(e) => {
+                                                    setWorkflowNames({ ...workflowNames, [workflow.id]: e.target.value });
+                                                }
+                                                }
+                                            />
+                                            <WorkflowStepper workflow={workflow.nodes} name={workflow.name} />
+                                        </div>
+                                    )
+                                })
+                            }
+                            {/* {
+                                // print workflows side by side
+                                getWorkflowsFromGraph(val.nodes, val.edges).map((workflow: any, index: number) => {
+                                    return (
+                                        <div style={{ textAlign: 'start', padding: 10, overflowX: 'auto', border: '1px solid grey', borderRadius: 5, margin: 5, }}>
+                                            <WorkflowStepper workflow={workflow} indexNumber={index + 1}/>
+                                        </div>
+                                    )
+                                })
+                            } */}
 
-                                    <div style={{ display: 'flex', justifyContent: 'flex-start', height: 'fit-content' }}>
-
-                                        {
-                                            workflow.map((node: any) => {
-                                                return (
-                                                    <Accordion>
-                                                        <AccordionSummary
-                                                            expandIcon={<ExpandMoreIcon />}
-                                                        >
-                                                            <div style={{ border: 'solid 1px', width: 'fit-content', margin: 10, padding: 10 }}>
-                                                                <div>
-                                                                    <img src={node.data.icon} alt={node.name} style={{ width: 30 }} />
-                                                                </div>
-                                                                <div>
-                                                                    <h3>
-                                                                        {node.name}
-                                                                    </h3>
-                                                                </div>
-                                                            </div>
-                                                        </AccordionSummary>
-                                                        <AccordionDetails>
-                                                            <div>
-                                                                <h4>Details</h4>
-                                                                <div>
-                                                                    <h5>Node ID: {node.id}</h5>
-                                                                </div>
-                                                                <div>
-                                                                    <h5>Node Name: {node.name}</h5>
-                                                                </div>
-                                                                <div>
-                                                                    <h5>Parameters</h5>
-                                                                    <div>
-                                                                        {
-                                                                            node.data.formData.map((parameter: any) => {
-
-                                                                                return (
-                                                                                    <div style={{ display: 'flex', justifyItems: 'flex-start' }}>
-                                                                                        <h6>{parameter.name + ' : '} </h6>
-                                                                                        <div>
-                                                                                            <h6>{' ' + parameter.value}</h6>
-                                                                                        </div> {
-                                                                                            parameter.paramType === 'result' ? <h6>Alternate: {parameter.resultParamValue}</h6> : null
-                                                                                        }
-                                                                                    </div>
-                                                                                )
-                                                                            })
-                                                                        }
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </AccordionDetails>
-
-                                                    </Accordion>
-                                                )
-                                            })
-
-                                        }
-                                    </div>
-                                </div>
-                            )
-                        })
-                    }
+                        </AccordionDetails>
+                    </Accordion>
                 </div>
-                <div>
-                </div>
-                <div>
-                    <TextField label="Workflow" variant="outlined" onChange={(e) => setWorkflowName(e.target.value)} />
-                    <TextField label="Name" variant="outlined" onChange={(e) => setUserName(e.target.value)} />
-                    <TextField label="Institution" variant="outlined" onChange={(e) => setInstitution(e.target.value)} />
-                    <Button variant="contained" onClick={() => {
-                        console.log(workflowName);
-                        console.log(username);
-                        console.log(institution);
-                        saveWorkflow();
-                    }}>Submit</Button>
+                <div style={{ padding: 30 }}>
+                    <Typography variant='h4'>Your Infomration</Typography>
+                    <FormControl>
+                        <TextField label="Job Name" margin="dense" variant="outlined" onChange={(e) => setWorkflowName(e.target.value)} required />
+                        <TextField label="Submitter Name" margin="dense" variant="outlined" onChange={(e) => setUserName(e.target.value)} required />
+                        <TextField label="Institution" margin="dense" variant="outlined" onChange={(e) => setInstitution(e.target.value)} required />
+                        <TextField label="Email" margin="dense" variant="outlined" onChange={(e) => setEmail(e.target.value)} required />
+                        <Button variant="contained" onClick={() => {
+                            console.log(workflowName);
+                            console.log(username);
+                            console.log(institution);
+                            saveWorkflows();
+                        }}>Submit</Button>
+                    </FormControl>
                 </div>
             </div>
             <Snackbar
                 open={open}
                 autoHideDuration={6000}
-                message={"Saved, find at /submitted/" + {workflowName}}
+                message={"Saved, find at /submitted/" + { workflowName }}
             />
         </div>
 

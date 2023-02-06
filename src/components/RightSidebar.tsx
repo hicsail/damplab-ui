@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react'
 import { CanvasContext } from '../contexts/Canvas'
 import NodeButton from './NodeButton';
-import { services } from '../data/services';
+import { getServiceFromId } from '../controllers/GraphHelpers';
 import { Button, Input } from '@mui/material';
 import Snackbar from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
@@ -11,11 +11,12 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import ParamsForm from './ParamsForm';
-import { addNodeToCanvasWithEdge } from '../controllers/GraphHelpers';
+import { AppContext } from '../contexts/App';
 
 export default function ContextTestComponent() {
 
     const val = useContext(CanvasContext);
+    const { services } = useContext(AppContext);
     const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
     const [openToast, setOpenToast] = useState(false);
     const [open, setOpen] = useState(false);
@@ -37,10 +38,6 @@ export default function ContextTestComponent() {
         //     handleClickOpen();
         // }
     }, [val.activeComponentId]);
-
-    const getServiceFromId = (id: string) => {
-        return services.find((node: any) => node.id === id);
-    }
 
     const handleCloseToast = (event: React.SyntheticEvent | Event, reason?: string) => {
         if (reason === 'clickaway') {
@@ -89,7 +86,7 @@ export default function ContextTestComponent() {
                 {
                     activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (activeNode.data.allowedConnections.map((connection: string) => {
                         return (
-                            <NodeButton key={Math.random().toString(36).substring(2, 9)} node={getServiceFromId(connection)} sourceId={val.activeComponentId} setNodes={val.setNodes} setEdges={val.setEdges} sourcePosition={activeNode.position} setActiveComponentId={val.setActiveComponentId}/>
+                            <NodeButton key={Math.random().toString(36).substring(2, 9)} node={getServiceFromId(services, connection)} sourceId={val.activeComponentId} setNodes={val.setNodes} setEdges={val.setEdges} sourcePosition={activeNode.position} setActiveComponentId={val.setActiveComponentId}/>
                         )
                     })) : null
                 }

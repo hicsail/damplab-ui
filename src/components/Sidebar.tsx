@@ -1,7 +1,6 @@
 import React, { useState, useEffect, MouseEvent, useContext } from 'react';
 import Button from '@mui/material/Button';
 import { Service } from '../types/Service';
-import { bundles } from '../data/bundles';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 import FormControl from '@mui/material/FormControl';
@@ -9,42 +8,33 @@ import Select, { SelectChangeEvent } from '@mui/material/Select';
 import { categories } from '../data/categories';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import { addNodesAndEdgesFromBundle, addNodesAndEdgesFromServiceIds } from '../controllers/GraphHelpers';
+import { addNodesAndEdgesFromBundle } from '../controllers/GraphHelpers';
 import { CanvasContext } from '../contexts/Canvas';
 import { useQuery, gql } from '@apollo/client';
+import { GET_BUNDLES, GET_SERVICES } from '../gql/queries';
+import { AppContext } from '../contexts/App';
 
 export default () => {
 
   const [category, setCategory] = useState('');
-
   const [alignment, setAlignment] = useState('bundles');
-  const [services, setServices] = useState<Service[]>([]);
+  const {services, bundles} = useContext(AppContext);
   const [filteredServices, setFilteredServices] = useState(services);
-
   const { setNodes, setEdges } = useContext(CanvasContext);
-
-  const onDragStart = (event: any, nodeType: any) => {
-    event.dataTransfer.setData('application/reactflow', nodeType);
-    event.dataTransfer.effectAllowed = 'move';
-  };
 
   const buttonElementStyle = {
     padding: 10,
   };
 
-  useEffect(() => {
-    if (category === '') {
-      setFilteredServices(services);
-    } else {
-      setFilteredServices(services.filter((service) => service.categories?.includes(category)));
-    }
-  }, [category]);
-
+  // events for dragging nodes
+  const onDragStart = (event: any, nodeType: any) => {
+    event.dataTransfer.setData('application/reactflow', nodeType);
+    event.dataTransfer.effectAllowed = 'move';
+  };
 
   const handleChange = (event: SelectChangeEvent) => {
     setCategory(event.target.value as string);
   };
-
 
   const handleToggleChange = (
     event: MouseEvent<HTMLElement>,
@@ -53,29 +43,7 @@ export default () => {
     setAlignment(newAlignment);
   };
 
-  const GET_SERVICES = gql`
-  query GetServices {
-    services {
-      id
-      name
-      icon 
-      parameters
-      allowedConnections {
-        id
-        name
-      }
-    }
-    }
-  `;
-
-  const { loading, error, data } = useQuery(GET_SERVICES);
-  console.log(data);
-  useEffect(() => {
-    if (data) {
-      setServices(data.services);
-    }
-  }, [data]);
-
+  // filtering services by category, update filteredServices when category or services change
   useEffect(() => {
     if (category === '') {
       setFilteredServices(services);
@@ -121,21 +89,13 @@ export default () => {
                 </Select>
               </FormControl>
             </div>
-
             {
               filteredServices.map((service: Service) => {
-
-                // service.icon could be a url or a path to an svg, handle both cases and save to icon variable so that it can be used as src
-                let icon = service.icon.startsWith('http') ? service.icon : "";
-                if (service.icon.startsWith('http') === false && service.icon !== "") {
-                  icon = require(`../assets/icons/${service.icon}`);
-                }
-
                 return (
                   <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(service))} draggable>
                     <Button variant="outlined" style={{ width: 163, display: 'flex', justifyContent: 'space-around' }}>
                       <div>
-                        <img src={icon} alt={service.name} style={{ width: 30 }} />
+                        <img src={service.icon} alt={service.name} style={{ width: 30 }} />
                       </div>
                       {service.name}
                     </Button>
@@ -143,14 +103,19 @@ export default () => {
                 )
               })
             }
-          </div>) : (
+          </div>
+          ) : (
           <div>
-
+            <div>
+              <p>
+                Click on a bundle to add all services to the graph.
+              </p>
+            </div>
             {
-              bundles.map((bundle) => {
+              bundles.map((bundle: any) => {
                 return (
                   <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
-                    <Button variant="outlined" style={{ width: 163, display: 'flex', justifyContent: 'space-around' }} onClick={() => addNodesAndEdgesFromBundle(bundle, setNodes, setEdges)}>
+                    <Button variant="outlined" style={{ width: 163, display: 'flex', justifyContent: 'space-around' }} onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>
                         <img src={bundle.icon} style={{ width: 30 }} />
                       </div>
@@ -163,8 +128,6 @@ export default () => {
           </div>
         )
       }
-
-
     </aside>
   );
 };

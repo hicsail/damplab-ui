@@ -7,19 +7,15 @@ import ReactFlow, {
     FitViewOptions,
     applyNodeChanges,
     applyEdgeChanges,
-   
     NodeChange,
     EdgeChange,
     Connection,
-    
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
 import Sidebar from '../components/Sidebar';
 import CustomDemoNode from '../components/CustomDemoNode';
-import HeaderBar from '../components/HeaderBar';
 import RightSidebar from '../components/RightSidebar';
-
 import { CanvasContext } from '../contexts/Canvas';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import '../styles/sidebar.css';
@@ -50,10 +46,10 @@ export default function MainFlow() {
     );
     const onConnect = useCallback((connection: Connection) => {
         let customConnection: any = connection;
-        if (!isValidConnection(nodes, customConnection.source, customConnection.target)) {
-            customConnection.label = 'invalid connection';
-            customConnection.style = { stroke: 'red' };
-        }
+        // if (!isValidConnection(nodes, customConnection.source, customConnection.target)) {
+        //     customConnection.label = 'invalid connection';
+        //     customConnection.style = { stroke: 'red' };
+        // }
         setEdges((eds: any) => addEdge(customConnection, eds))
     },[setEdges, nodes]);
 

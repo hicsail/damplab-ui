@@ -25,10 +25,10 @@ const style = {
 export default memo((input: Input) => {
 
     const { setActiveComponentId, activeComponentId, nodes } = useContext(CanvasContext);
-    const isConnectable = input.isConnectable;
-    const data = input;
     const [background, setBackground] = useState('white');
     const [allFilled, setAllFilled] = useState(false);
+    const isConnectable = input.isConnectable;
+    const data = input;
 
     const handleOpen = () => {
         setActiveComponentId(data.data.id);
@@ -74,12 +74,9 @@ export default memo((input: Input) => {
                     </div>
                     <div>
                         { allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
-                    </div>
-                    
-                    
+                    </div> 
                 </Button>
-                <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />
-                
+                <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />      
             </Box>
         </div>
     );

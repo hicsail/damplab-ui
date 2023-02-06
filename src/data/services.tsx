@@ -433,7 +433,7 @@ export let services = [
     {
         id: 'bioanalyzer',
         name: 'Bioanalyzer',
-        icon: 'Library.svg',
+        icon: 'https://drive.google.com/uc?id=1L2wX2D0Vhlq6UpU3VnA4FGKaDq259LXk',
         categories: ['transcriptomics'],
         allowedConnections: [
             'library-prep', 'seq', 'eth-perc'
@@ -630,15 +630,4 @@ export let services = [
             name: 'Overnight Bacterial Culture Storage Result',
         }
     }
-]   
-
-
-// sit with courtney to figure out how to make this work
-// get allowed connections for everythign
-// get required field for everythign
-// fix result params to fit them in params
-// get icons for everything
-// put icons in the right place
-// create result thing on graph
-// add category to everything
-// talk to courtney about multiple destinations
+];
