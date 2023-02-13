@@ -122,9 +122,9 @@ export default function Submitted() {
             {workflows.map((workflow: any) => (
                 <div key={workflow.id} style={{ textAlign: 'start', border: '1px solid grey', borderRadius: 5, margin: 5, padding: 5 }}>
                     <div>
-                        <Typography variant="h6">Workflow Name: {workflow.name}</Typography>
-                        <Typography variant="h6">Workflow State: {workflow.state}</Typography>
-                        <Typography variant="h6">Workflow Submitted at: {workflow.submitted || Date.now().toString()}</Typography>
+                        <Typography variant="body1">Workflow Name: {workflow.name}</Typography>
+                        <Typography variant="body1">Workflow State: {workflow.state}</Typography>
+                        <Typography variant="body1">Workflow Submitted at: {workflow.submitted || Date.now().toString()}</Typography>
                         <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} id={workflow.id} />
                     </div>
                     

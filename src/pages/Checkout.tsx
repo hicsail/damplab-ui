@@ -5,7 +5,7 @@ import AccordionDetails from '@mui/material/AccordionDetails';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Button from '@mui/material/Button';
 import { CanvasContext } from '../contexts/Canvas'
-import { gql, useMutation } from '@apollo/client';
+import { useMutation } from '@apollo/client';
 import { getWorkflowsFromGraph, transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
 import { CREATE_JOB, CREATE_WORKFLOW } from '../gql/mutations';
 import WorkflowStepper from '../components/WorkflowStepper';
@@ -20,18 +20,19 @@ export default function Checkout() {
     const [institution, setInstitution] = useState('');
     const [email, setEmail] = useState('');
     const [open, setOpen] = useState(false);
-    const [workflowIds, setWorkflowIds] = useState<string[]>([]);
-    const [workflows, setWorklows] = useState(getWorkflowsFromGraph(val.nodes, val.edges));
+    let workflowIds : string[] = [];
+    const [workflows, setWorkflows] = useState(getWorkflowsFromGraph(val.nodes, val.edges));
     const [expanded, setExpanded] = useState(true);
     const [workflowNames, setWorkflowNames] = useState<any>({});
+    const [checkoutWorkflow, setCheckoutWorkflow] = useState<any>([]);
 
     const createWorkflowObj = () => {
-        let workflows = getWorkflowsFromGraph(val.nodes, val.edges);
+        setWorkflows(getWorkflowsFromGraph(val.nodes, val.edges));
         let workflowObjs: any = [];
         workflows.forEach((workflow: any) => {
-            let id = Math.random() * 100;
+            let id = Math.random().toString(36).substring(2, 9);
             // add id and value object to workflowNames state
-            setWorkflowNames({ ...workflowNames, [id]: "" });
+            setWorkflowNames({ ...workflowNames, [workflow.id]: "" });
             let obj =
             {
                 id: id,
@@ -43,9 +44,8 @@ export default function Checkout() {
         return workflowObjs;
     }
 
-    const [checkoutWorkflow, setCheckoutWorkflow] = useState<any>([]);
-
     useEffect(() => {
+        console.log('rerender');
         setCheckoutWorkflow(createWorkflowObj());
     }, [val.nodes, val.edges]);
 
@@ -53,17 +53,14 @@ export default function Checkout() {
         console.log('workflowNames', workflowNames);
     }, [workflowNames]);
 
-    useEffect(() => {
-        if (workflowIds.length === workflows.length && workflowIds.length > 0) {
-            console.log('creating job', { name: workflowName, username: username, institution: institution, email: email, workflowIds: workflowIds });
-            createJob({ variables: { createJobInput: { name: workflowName, username: username, institute: institution, email: email, workflows: workflowIds, } } });
-        }
-    }, [workflowIds]);
-
     const [createWorkflow] = useMutation(CREATE_WORKFLOW, {
         onCompleted: (data) => {
             console.log('successfully created workflow:', data.createWorkflow.id);
-            setWorkflowIds([...workflowIds, data.createWorkflow.id]);
+            workflowIds.push(data.createWorkflow.id);
+            if (workflowIds.length === workflows.length && workflowIds.length > 0) {
+                console.log('creating job', { name: workflowName, username: username, institution: institution, email: email, workflowIds: workflowIds });
+                createJob({ variables: { createJobInput: { name: workflowName, username: username, institute: institution, email: email, workflows: workflowIds, } } });
+            }
         },
         onError: (error: any) => {
             console.log('error creating workflow', error);
@@ -74,7 +71,7 @@ export default function Checkout() {
         onCompleted: (data) => {
             console.log('successfully created job:', data);
             setOpen(true);
-            setWorkflowIds([]);
+            workflowIds = [];
         },
         onError: (error: any) => {
             console.log('error creating job', error);
@@ -101,16 +98,19 @@ export default function Checkout() {
         });
     }
 
-    const setWorkflowNameFunction = (id: number, name: string) => {
-        setWorkflowNames({ ...workflowNames, [id]: name });
-        console.log(workflowNames)
+    const [namesTemp, setNamesTemp] = useState<any>({});
+
+    const handleNameChange = (e: any, id: number) => {
+        setNamesTemp({ ...namesTemp, [id]: e.target.value });
     }
+
+
 
     return (
         <div>
             <div>
                 <div>
-                    <Typography variant='h2'>Checkout</Typography>
+                    <Typography variant='body1'>Checkout</Typography>
                     <Accordion key={Math.random() * 100} expanded={expanded}>
                         <AccordionSummary
                             expandIcon={<ExpandMoreIcon />}
@@ -118,45 +118,38 @@ export default function Checkout() {
                             id="panel1a-header"
                             onClick={() => setExpanded(!expanded)}
                         >
-                            <Typography>Workflows Summary</Typography>
+                            <Typography variant='body1'>Workflows Summary</Typography>
                         </AccordionSummary>
                         <AccordionDetails>
                             {
                                 checkoutWorkflow.map((workflow: any) => {
-                                    let value = workflowNames[workflow.id];
+                                    console.log('inside checkout workflow map');
                                     return (
-                                        <div id={workflow.id} style={{ textAlign: 'start', padding: 10, overflowX: 'auto', border: '1px solid grey', borderRadius: 5, margin: 5, }}>
+                                        <div key={workflow.id} style={{ textAlign: 'start', padding: 10, overflowX: 'auto', border: '1px solid grey', borderRadius: 5, margin: 5, }}>
                                             <TextField
                                                 id="outlined-basic"
                                                 label="Workflow Name"
                                                 variant="outlined"
-                                                value={value}
-                                                onChange={(e) => {
-                                                    setWorkflowNames({ ...workflowNames, [workflow.id]: e.target.value });
-                                                }
+                                                value={namesTemp[workflow.id]}
+                                                onChange={
+                                                    (e) => {
+                                                        // let newObject = { ...workflowNames };
+                                                        // newObject[workflow.id] = e.target.value;
+                                                        // setWorkflowNames(newObject);
+                                                        handleNameChange(e, workflow.id);
+                                                    }
                                                 }
                                             />
-                                            <WorkflowStepper workflow={workflow.nodes} name={workflow.name} />
+                                            <WorkflowStepper workflow={workflow.nodes} name={workflow.name} parent="checkout"/>
                                         </div>
                                     )
                                 })
                             }
-                            {/* {
-                                // print workflows side by side
-                                getWorkflowsFromGraph(val.nodes, val.edges).map((workflow: any, index: number) => {
-                                    return (
-                                        <div style={{ textAlign: 'start', padding: 10, overflowX: 'auto', border: '1px solid grey', borderRadius: 5, margin: 5, }}>
-                                            <WorkflowStepper workflow={workflow} indexNumber={index + 1}/>
-                                        </div>
-                                    )
-                                })
-                            } */}
-
                         </AccordionDetails>
                     </Accordion>
                 </div>
                 <div style={{ padding: 30 }}>
-                    <Typography variant='h4'>Your Infomration</Typography>
+                    <Typography variant='body1'>Your Infomration</Typography>
                     <FormControl>
                         <TextField label="Job Name" margin="dense" variant="outlined" onChange={(e) => setWorkflowName(e.target.value)} required />
                         <TextField label="Submitter Name" margin="dense" variant="outlined" onChange={(e) => setUserName(e.target.value)} required />

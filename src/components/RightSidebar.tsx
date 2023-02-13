@@ -12,6 +12,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import ParamsForm from './ParamsForm';
 import { AppContext } from '../contexts/App';
+import { useQuery } from '@apollo/client';
 
 export default function ContextTestComponent() {
 
@@ -45,9 +46,6 @@ export default function ContextTestComponent() {
         }
         setOpenToast(false);
     };
-
-    // click on node button to add node and edge to canvas
-        
 
     const action = (
         <React.Fragment>
@@ -84,9 +82,9 @@ export default function ContextTestComponent() {
                     ) : null
                 }
                 {
-                    activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (activeNode.data.allowedConnections.map((connection: string) => {
+                    activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (activeNode.data.allowedConnections.map((connection: any) => {
                         return (
-                            <NodeButton key={Math.random().toString(36).substring(2, 9)} node={getServiceFromId(services, connection)} sourceId={val.activeComponentId} setNodes={val.setNodes} setEdges={val.setEdges} sourcePosition={activeNode.position} setActiveComponentId={val.setActiveComponentId}/>
+                            <NodeButton key={Math.random().toString(36).substring(2, 9)} node={getServiceFromId(services, connection.id)} sourceId={val.activeComponentId} setNodes={val.setNodes} setEdges={val.setEdges} sourcePosition={activeNode.position} setActiveComponentId={val.setActiveComponentId}/>
                         )
                     })) : null
                 }

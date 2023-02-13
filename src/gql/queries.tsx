@@ -7,7 +7,6 @@ export const GET_SERVICES = gql`
             name
             icon 
             parameters
-            
             allowedConnections {
                 id 
                 name
@@ -27,6 +26,24 @@ export const GET_BUNDLES = gql`
                 name
                 icon
                 parameters
+            }
+        }
+    }
+`;
+
+export const GET_CATEGORIES = gql`
+    query categories {
+        categories {
+            id
+            label
+            services {
+                id
+                name
+                icon
+                parameters
+                allowedConnections {
+                    id
+                }
             }
         }
     }

@@ -27,7 +27,6 @@ function App() {
 
   // initial load of services and bundles
   useEffect(() => {
-
     client.query({ query: GET_SERVICES }).then((result) => {
       console.log('services loaded successfully on app', result);
       setServices(result.data.services);
@@ -52,7 +51,7 @@ function App() {
               <HeaderBar />
               <div style={{ padding: 20 }}>
                 <Routes>
-                  <Route path="/" element={<MainFlow />} />
+                  <Route path="/" element={<MainFlow services={services}/>} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/submitted/:id" element={<Submitted />} />
                   <Route path="/accepted" element={<Accepted />} />

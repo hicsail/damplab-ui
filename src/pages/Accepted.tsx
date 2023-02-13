@@ -27,6 +27,7 @@ export default function Accepted() {
             getWorkflowByState(state: APPROVED) {
                     id
                     state
+                    name
                     nodes {
                         service {
                             name
@@ -93,6 +94,7 @@ export default function Accepted() {
         const val =  {
             id: workflow.id,
             state: workflow.state,
+            name: workflow.name,
             nodes: nodes,
             edges: edges
         }
@@ -121,9 +123,9 @@ export default function Accepted() {
         workflows.map((workflow: any) => (
             <div key={workflow.id + Math.random} style={{ textAlign: 'left',border: '1px solid grey', borderRadius: 5, margin: 5, padding: 5 }}>
                 <div className='nodes' key={workflow.id + Math.random}>
-                    <Typography variant='h6'>Workflow ID: {workflow.id}</Typography>
-                    <Typography variant='h6'>Workflow State: {workflow.state}</Typography>
-                    <Typography variant='h6'>Workflow Name: {workflow.name || "Name not provided"}</Typography>
+                    <Typography variant='body1'>Workflow ID: {workflow.id}</Typography>
+                    <Typography variant='body1'>Workflow State: {workflow.state}</Typography>
+                    <Typography variant='body1'>Workflow Name: {workflow.name || "Name not provided"}</Typography>
                     <Button onClick={() => queueWorkflow(workflow.id)}>
                         Move to Queue
                     </Button>

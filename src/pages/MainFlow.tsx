@@ -29,12 +29,12 @@ const fitViewOptions: FitViewOptions = {
     padding: 0.2,   
 };
 
-
-export default function MainFlow() {
+export default function MainFlow(data: any) {
 
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
+    const [services, setServices] = useState(data.services);
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => setNodes((nds: any) => applyNodeChanges(changes, nds)),
@@ -46,10 +46,10 @@ export default function MainFlow() {
     );
     const onConnect = useCallback((connection: Connection) => {
         let customConnection: any = connection;
-        // if (!isValidConnection(nodes, customConnection.source, customConnection.target)) {
-        //     customConnection.label = 'invalid connection';
-        //     customConnection.style = { stroke: 'red' };
-        // }
+        if (!isValidConnection(services, nodes, customConnection.source, customConnection.target)) {
+            customConnection.label = 'invalid connection';
+            customConnection.style = { stroke: 'red' };
+        }
         setEdges((eds: any) => addEdge(customConnection, eds))
     },[setEdges, nodes]);
 
@@ -96,7 +96,6 @@ export default function MainFlow() {
                         <div style={{ maxWidth: '15%', borderRight: 'solid 1px' }}>
                             <Sidebar />
                         </div>
-
                         <ReactFlow
                             nodes={nodes}
                             edges={edges}
@@ -119,7 +118,6 @@ export default function MainFlow() {
                         <div style={{ minWidth: '15%', borderLeft: 'solid 1px' }}>
                             <RightSidebar />
                         </div>
-
                     </div>
                 </ReactFlowProvider>
             </div>

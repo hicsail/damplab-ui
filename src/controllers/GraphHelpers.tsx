@@ -192,8 +192,6 @@ export const addNodesAndEdgesFromBundle = (bundle: any, services: any, setNodes:
 
     // get serviceIds from bundle
     const serviceIds = bundle.services.map((service: any) => service.id);
-    // call addNodesAndEdgesFromServiceIds
-    console.log('serviceIds', serviceIds)
     addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges);
 }
 

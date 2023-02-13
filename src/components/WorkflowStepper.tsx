@@ -79,11 +79,11 @@ export default function WorkflowStepper(workflow: any) {
     };
 
     const acceptWorkflow = () => {
+        
         let updateWorkflowState = {
             workflowId: workflow.id,
             state: 'APPROVED'
         }
-
         acceptWorkflowMutation({
             variables: { updateWorkflowState: updateWorkflowState }
         });
@@ -91,17 +91,18 @@ export default function WorkflowStepper(workflow: any) {
     return (
         <div style={{ padding: 25 }}>
             <div>
-                {/* <div>
-                    <TextField id="outlined-basic" margin='normal' label="Workflow Name" variant="outlined" value={workflowName} onChange={(e) => setWorkflowName(e.target.value)} />
-                </div> */}
-                <div>
-                    <Button>
-                        Flag
-                    </Button>
-                    <Button onClick={acceptWorkflow}>
-                        Validate
-                    </Button>
-                </div>
+                {
+                    workflow.parent !== 'checkout' && (
+                        <div>
+                            <Button>
+                                Flag
+                            </Button>
+                            <Button onClick={acceptWorkflow}>
+                                Validate
+                            </Button>
+                        </div>
+                    )
+                }    
             </div>
             <div style={{ overflowX: 'auto' }}>
                 <Stepper nonLinear activeStep={activeStep} style={{ overflowX: 'auto' }}>
@@ -136,7 +137,7 @@ export default function WorkflowStepper(workflow: any) {
                                 </React.Fragment>
                             ) : (
                                 <React.Fragment>
-                                    <Typography sx={{ mb: 1, py: 1 }} style={{ height: 150, overflow: 'auto' }}>
+                                    <Box sx={{ mb: 1, py: 1 }} style={{ height: 150, overflow: 'auto' }}>
                                         <div className='name-and-icon' style={{ display: 'flex', justifyContent: 'flex-start', margin: 10 }}>
                                             <div className='icon' style={{marginRight:10}}>
                                                 <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} alt={workflow.workflow[activeStep].name} />
@@ -164,7 +165,7 @@ export default function WorkflowStepper(workflow: any) {
                                                 )
                                             })}
                                         </div>
-                                    </Typography>
+                                    </Box>
                                     <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
                                         <Button
                                             color="inherit"
@@ -193,7 +194,6 @@ export default function WorkflowStepper(workflow: any) {
                                     </Box>
                                 </React.Fragment>
                             )}
-
                         </div>
                     </AccordionDetails>
                 </Accordion>

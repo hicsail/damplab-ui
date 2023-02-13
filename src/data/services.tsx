@@ -135,6 +135,7 @@ export let services = [
             'run-gel', 'dpn1'
         ],
         categories: ['dna-assembly-cloning'],
+        resources: ['pcr','hifi'],
         result: {
             id: 'pcr-product',
             type: 'PCRResult',
