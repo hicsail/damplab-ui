@@ -10,6 +10,7 @@ import { AppContext } from './contexts/App';
 import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery } from '@apollo/client';
 import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 import Accepted from './pages/Accepted';
+import JobSubmitted from './pages/JobSubmitted';
 
 function App() {
 
@@ -54,6 +55,7 @@ function App() {
                   <Route path="/" element={<MainFlow services={services}/>} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/submitted/:id" element={<Submitted />} />
+                  <Route path="/submitted" element={<JobSubmitted />} />
                   <Route path="/accepted" element={<Accepted />} />
                   <Route path="/*" element={<div>404 Route not found</div>} />
                 </Routes>

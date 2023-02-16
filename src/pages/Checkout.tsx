@@ -1,5 +1,6 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useEffect, useState, useRef } from 'react'
 import { Accordion, Paper, Snackbar, TextField, Typography } from '@mui/material';
+import { useNavigate } from "react-router-dom";
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -11,20 +12,46 @@ import { CREATE_JOB, CREATE_WORKFLOW } from '../gql/mutations';
 import WorkflowStepper from '../components/WorkflowStepper';
 import FormControl from '@mui/material/FormControl';
 
-
 export default function Checkout() {
 
     const val = useContext(CanvasContext);
-    const [workflowName, setWorkflowName] = useState<string>('');
+    const navigate = useNavigate();
+
+    // form states
+    const [jobName, setJobName] = useState<string>('');
     const [username, setUserName] = useState('');
     const [institution, setInstitution] = useState('');
     const [email, setEmail] = useState('');
+
+    // ui states
     const [open, setOpen] = useState(false);
-    let workflowIds : string[] = [];
-    const [workflows, setWorkflows] = useState(getWorkflowsFromGraph(val.nodes, val.edges));
     const [expanded, setExpanded] = useState(true);
+
+    // workflow states
+    const [workflows, setWorkflows] = useState(getWorkflowsFromGraph(val.nodes, val.edges));
     const [workflowNames, setWorkflowNames] = useState<any>({});
     const [checkoutWorkflow, setCheckoutWorkflow] = useState<any>([]);
+
+    // refs for workflows
+    const myRefs= useRef<any>([]);
+    const jobRef = useRef<any>(null);
+    const userRef = useRef<any>(null);
+    const institutionRef = useRef<any>(null);
+    const emailRef = useRef<any>(null);
+
+    const [createJob] = useMutation(CREATE_JOB, {
+        onCompleted: (data) => {
+            console.log('successfully created job:', data);
+            navigate('/submitted');
+        },
+        onError: (error: any) => {
+            console.log('error creating job', error);
+        }
+    });
+
+    useEffect(() => {
+        setCheckoutWorkflow(createWorkflowObj());
+    }, [val.nodes, val.edges]);
 
     const createWorkflowObj = () => {
         setWorkflows(getWorkflowsFromGraph(val.nodes, val.edges));
@@ -44,68 +71,30 @@ export default function Checkout() {
         return workflowObjs;
     }
 
-    useEffect(() => {
-        console.log('rerender');
-        setCheckoutWorkflow(createWorkflowObj());
-    }, [val.nodes, val.edges]);
+    const getGQLWorkflows = () => {
+        
+        let workflows: any = [];
+        checkoutWorkflow.forEach(async (flow: any, index: number) => {
 
-    useEffect(() => {
-        console.log('workflowNames', workflowNames);
-    }, [workflowNames]);
-
-    const [createWorkflow] = useMutation(CREATE_WORKFLOW, {
-        onCompleted: (data) => {
-            console.log('successfully created workflow:', data.createWorkflow.id);
-            workflowIds.push(data.createWorkflow.id);
-            if (workflowIds.length === workflows.length && workflowIds.length > 0) {
-                console.log('creating job', { name: workflowName, username: username, institution: institution, email: email, workflowIds: workflowIds });
-                createJob({ variables: { createJobInput: { name: workflowName, username: username, institute: institution, email: email, workflows: workflowIds, } } });
-            }
-        },
-        onError: (error: any) => {
-            console.log('error creating workflow', error);
-        }
-    });
-
-    const [createJob] = useMutation(CREATE_JOB, {
-        onCompleted: (data) => {
-            console.log('successfully created job:', data);
-            setOpen(true);
-            workflowIds = [];
-        },
-        onError: (error: any) => {
-            console.log('error creating job', error);
-        }
-    });
-
-    const saveWorkflows = async () => {
-        let flows = checkoutWorkflow;
-        flows.forEach(async (flow: any) => {
             let workflow = flow.nodes;
             let gqlWorkflows: any = transformNodesToGQL(workflow);
+
             let edges = val.edges.filter((edge: any) => {
                 return workflow.find((node: any) => node.id === edge.source) && workflow.find((node: any) => node.id === edge.target);
             });
-
             let gqlEdges: any = transformEdgesToGQL(edges);
+
             let gqlWorkflow = {
-                name: workflowNames[flow.id],
+                name: myRefs.current[index].value,  //workflowNames[flow.id],
                 nodes: gqlWorkflows,
                 edges: gqlEdges
             }
-            console.log('creating workflow', gqlWorkflow);
-            const res = await createWorkflow({ variables: { createWorkflowInput: gqlWorkflow } });
+            workflows.push(gqlWorkflow);
         });
+
+        return workflows;
     }
-
-    const [namesTemp, setNamesTemp] = useState<any>({});
-
-    const handleNameChange = (e: any, id: number) => {
-        setNamesTemp({ ...namesTemp, [id]: e.target.value });
-    }
-
-
-
+    
     return (
         <div>
             <div>
@@ -122,23 +111,16 @@ export default function Checkout() {
                         </AccordionSummary>
                         <AccordionDetails>
                             {
-                                checkoutWorkflow.map((workflow: any) => {
-                                    console.log('inside checkout workflow map');
+                                checkoutWorkflow.map((workflow: any, index: number) => {
                                     return (
                                         <div key={workflow.id} style={{ textAlign: 'start', padding: 10, overflowX: 'auto', border: '1px solid grey', borderRadius: 5, margin: 5, }}>
                                             <TextField
-                                                id="outlined-basic"
+                                                id={workflow.id}
                                                 label="Workflow Name"
                                                 variant="outlined"
-                                                value={namesTemp[workflow.id]}
-                                                onChange={
-                                                    (e) => {
-                                                        // let newObject = { ...workflowNames };
-                                                        // newObject[workflow.id] = e.target.value;
-                                                        // setWorkflowNames(newObject);
-                                                        handleNameChange(e, workflow.id);
-                                                    }
-                                                }
+                                                inputRef={(el) => (myRefs.current[index] = el)}
+                                                // value={namesTemp[workflow.id]}
+                                                // onChange={(e) => { handleNameChange(e, workflow.id)}}
                                             />
                                             <WorkflowStepper workflow={workflow.nodes} name={workflow.name} parent="checkout"/>
                                         </div>
@@ -151,15 +133,20 @@ export default function Checkout() {
                 <div style={{ padding: 30 }}>
                     <Typography variant='body1'>Your Infomration</Typography>
                     <FormControl>
-                        <TextField label="Job Name" margin="dense" variant="outlined" onChange={(e) => setWorkflowName(e.target.value)} required />
-                        <TextField label="Submitter Name" margin="dense" variant="outlined" onChange={(e) => setUserName(e.target.value)} required />
-                        <TextField label="Institution" margin="dense" variant="outlined" onChange={(e) => setInstitution(e.target.value)} required />
-                        <TextField label="Email" margin="dense" variant="outlined" onChange={(e) => setEmail(e.target.value)} required />
+                        <TextField label="Job Name" margin="dense" variant="outlined" inputRef={jobRef}  required />
+                        <TextField label="Submitter Name" margin="dense" variant="outlined" inputRef={userRef}  required />
+                        <TextField label="Institution" margin="dense" variant="outlined" inputRef={institutionRef}  required />
+                        <TextField label="Email" margin="dense" variant="outlined" inputRef={emailRef} required />
                         <Button variant="contained" onClick={() => {
-                            console.log(workflowName);
-                            console.log(username);
-                            console.log(institution);
-                            saveWorkflows();
+                            //saveWorkflows();
+                            const data = { 
+                                name: jobRef.current.value, 
+                                username: userRef.current.value, 
+                                institute: institutionRef.current.value, 
+                                email: emailRef.current.value, 
+                                workflows: getGQLWorkflows(), 
+                            };
+                            createJob({ variables: { createJobInput: data }});
                         }}>Submit</Button>
                     </FormControl>
                 </div>
@@ -167,7 +154,7 @@ export default function Checkout() {
             <Snackbar
                 open={open}
                 autoHideDuration={6000}
-                message={"Saved, find at /submitted/" + { workflowName }}
+                message={"Saved, find at /submitted/"}
             />
         </div>
 
