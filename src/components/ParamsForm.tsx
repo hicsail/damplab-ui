@@ -16,33 +16,6 @@ export default function (props: any) {
     const [formValues, setFormValues] = useState<any>({});
     const [dataChange, setDataChange] = useState(false);
     let change : boolean = false;
-    const getInitValues = () => {
-        console.log("init form data", formData);
-        let initValues: any = formValues;
-        formData.forEach((obj: any) => {
-
-            if (obj.paramType === 'result') {
-                obj.value = obj.value ? obj.value : true;
-                initValues[obj.id] = obj.value ? obj.value : true;
-                
-                obj.resultParamValue = obj.resultParamValue ? obj.resultParamValue : '';
-                initValues[`resultParamValue${obj.id}`] = obj.resultParamValue ? obj.resultParamValue : '';
-            }
-            else initValues[obj.id] = obj.value ? obj.value : '';
-            //setValuesInitiated([...valuesInitiated, obj.id]);
-        });
-        
-        initValues[`addinst${node?.data.id}`] = node?.data.additionalInstructions ? node?.data.additionalInstructions : '';
-
-        for (let key in initValues) {
-            if (!(key in formValues)) {
-                setFormValues({ ...formValues, ...initValues });
-                setFormDataState({ ...formValues, ...initValues });
-            }
-        }
-
-        return initValues;
-    }
 
     const initValues = () => {
         // init values using formDataState and setFormDataState
@@ -56,7 +29,6 @@ export default function (props: any) {
             }
             else initValues[obj.id] = obj.value ? obj.value : '';
         });
-
         initValues[`addinst${node?.data.id}`] = node?.data.additionalInstructions ? node?.data.additionalInstructions : '';
         return initValues;
     }
@@ -88,34 +60,7 @@ export default function (props: any) {
             }
         });
         nodeData.additionalInstructions = values[`addinst${node?.data.id}`];
-
         setFormDataState([...formData]);
-    }
-
-    const resetValues = () => {
-        formData.forEach((obj: any) => {
-            obj.value = '';
-        });
-        nodeData.additionalInstructions = '';
-    }
-
-    const resetFormikValues = (values: any) => {
-        let initValues: any = {};
-        formData.forEach((obj: any) => {
-            if (obj.paramType === 'result') {
-                obj.value = true;
-                obj.resultParamValue = "";
-                initValues[obj.id] = true;
-                initValues[`resultParamValue${obj.id}`] = "";
-            }
-            else {
-                obj.value = '';
-                initValues[obj.id] = '';
-            }
-        });
-
-        initValues[`addinst${node?.data.id}`] = '';
-        values = initValues;
     }
 
     const validate = (values: any) => {
@@ -178,12 +123,14 @@ export default function (props: any) {
             </h2>
             <div>
                 <div className='formik-errors'>
-                    <ul style={{background: 'pink'}}>
+                    <ul style={{background: 'pink', fontSize: 10}}>
                         {
                             Object.keys(formik.errors).map((key: any) => {
+                                let name = formData.find((obj: any) => obj.id === key)?.name;
+                                console.log(name)
                                 return (
                                     <li key={key}>
-                                        {key}: {formik.errors[key]}
+                                        {name  }: {formik.errors[key]}
                                     </li>
                                 )
                             })
