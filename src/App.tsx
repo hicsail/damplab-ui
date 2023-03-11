@@ -3,7 +3,7 @@ import './App.css';
 import MainFlow from './pages/MainFlow';
 import Checkout from './pages/Checkout';
 import Submitted from './pages/Submitted';
-import { BrowserRouter, Routes, Route, Outlet, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, } from "react-router-dom";
 import HeaderBar from './components/HeaderBar';
 import { CanvasContext } from './contexts/Canvas';
 import { AppContext } from './contexts/App';
@@ -11,6 +11,7 @@ import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery } from '@apo
 import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 import Accepted from './pages/Accepted';
 import JobSubmitted from './pages/JobSubmitted';
+import ELabs from './pages/ELabs';
 
 function App() {
 
@@ -57,6 +58,8 @@ function App() {
                   <Route path="/submitted/:id" element={<Submitted />} />
                   <Route path="/submitted" element={<JobSubmitted />} />
                   <Route path="/accepted" element={<Accepted />} />
+                  <Route path="/elabs" element={<ELabs />} />
+                  <Route path="/callback" element={<ELabs />} />
                   <Route path="/*" element={<div>404 Route not found</div>} />
                 </Routes>
               </div>

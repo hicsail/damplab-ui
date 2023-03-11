@@ -10,6 +10,7 @@ import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
 export default function Accepted() {
 
     const [workflows, setWorkflows] = useState([]);
+    const [displayWorkflows, setDisplayWorkflows] = useState([]);
 
     const [updateWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
         onCompleted: (data) => {
@@ -64,6 +65,7 @@ export default function Accepted() {
         onCompleted: (data) => {
             console.log('workflows loaded successfully on accepted', data);
             setWorkflows(data.getWorkflowByState);
+            setDisplayWorkflows(data.getWorkflowByState);
         },
         onError: (error: any) => {
             console.log(error.networkError?.result?.errors);
@@ -113,14 +115,23 @@ export default function Accepted() {
         });
 
     }
+
+    const searchWorkflows = (searchTerm: string) => {
+        console.log('searching for workflows with term', searchTerm);
+        let filteredWorkflows = workflows.filter((workflow: any) => {
+            return workflow.name.includes(searchTerm);
+        });
+        console.log('filtered workflows', filteredWorkflows);
+        setDisplayWorkflows(filteredWorkflows);
+    }
     
 
   return (
     <>
     <h4>Accepted Workflows</h4>
-    <TextField id="outlined-basic" label="Search workflows" variant="outlined" fullWidth/>
+    <TextField id="outlined-basic" label="Search workflows" variant="outlined" onChange={(e)=> searchWorkflows(e.target.value)} fullWidth/>
     {
-        workflows.map((workflow: any) => (
+        displayWorkflows.map((workflow: any) => (
             <div key={workflow.id + Math.random} style={{ textAlign: 'left',border: '1px solid grey', borderRadius: 5, margin: 5, padding: 5 }}>
                 <div className='nodes' key={workflow.id + Math.random}>
                     <Typography variant='body1'>Workflow ID: {workflow.id}</Typography>

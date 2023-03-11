@@ -3,7 +3,9 @@ export let bundles = [
         id: 'modular-cloning-ordering',
         label: 'Modular Assembly and Cloning with Ordering',
         icon: 'https://drive.google.com/uc?id=1rsXIFQsWknecXVkMIOFrm80YFgNYlkUg',
-        services: ['seq', 'gene', 'design-primers', 'rehydrate-primer', 'pcr', 'dpn1', 'run-gel', 'column-purification', 'dna-gel', 'm-cloning', 'transformation', 'overnight-culture'],    
+        services: ['seq', 'gene', 'design-primers', 'rehydrate-primer', 'pcr', 'dpn1', 
+        'run-gel', 'column-purification', 'dna-gel', 'm-cloning', 
+        'transformation', 'overnight-culture'],    
     },
     {
         id: 'modular-cloning-provided',

@@ -17,12 +17,6 @@ export default function Checkout() {
     const val = useContext(CanvasContext);
     const navigate = useNavigate();
 
-    // form states
-    const [jobName, setJobName] = useState<string>('');
-    const [username, setUserName] = useState('');
-    const [institution, setInstitution] = useState('');
-    const [email, setEmail] = useState('');
-
     // ui states
     const [open, setOpen] = useState(false);
     const [expanded, setExpanded] = useState(true);
@@ -60,8 +54,7 @@ export default function Checkout() {
             let id = Math.random().toString(36).substring(2, 9);
             // add id and value object to workflowNames state
             setWorkflowNames({ ...workflowNames, [workflow.id]: "" });
-            let obj =
-            {
+            let obj = {
                 id: id,
                 name: "",
                 nodes: workflow
