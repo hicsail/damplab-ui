@@ -12,6 +12,8 @@ import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 import Accepted from './pages/Accepted';
 import JobSubmitted from './pages/JobSubmitted';
 import ELabs from './pages/ELabs';
+import { searchForEndService } from './controllers/GraphHelpers';
+import Tracking from './pages/Tracking';
 
 function App() {
 
@@ -32,6 +34,8 @@ function App() {
     client.query({ query: GET_SERVICES }).then((result) => {
       console.log('services loaded successfully on app', result);
       setServices(result.data.services);
+      let array: any = [];
+      console.log(searchForEndService('seq', 'dpn1', result.data.services, array));
     }).catch((error) => {
       console.log('error when loading services on app', error);
     });
@@ -43,6 +47,8 @@ function App() {
       console.log('error when loading bundles on app', error);
     });
   }, []);
+
+  
 
   return (
     <div className="App">
@@ -57,6 +63,7 @@ function App() {
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/submitted/:id" element={<Submitted />} />
                   <Route path="/submitted" element={<JobSubmitted />} />
+                  <Route path="/tracking/:id" element={<Tracking />} />
                   <Route path="/accepted" element={<Accepted />} />
                   <Route path="/elabs" element={<ELabs />} />
                   <Route path="/callback" element={<ELabs />} />

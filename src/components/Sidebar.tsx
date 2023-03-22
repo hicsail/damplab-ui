@@ -126,7 +126,7 @@ export default () => {
               bundles.map((bundle: any) => {
                 return (
                   <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
-                    <Button variant="outlined" style={{ width: 163, display: 'flex', justifyContent: 'space-around' }} onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
+                    <Button variant="outlined" style={{ width: 163, display: 'flex', justifyContent: 'space-around', marginLeft: 'auto', marginRight: 'auto' }} onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>
                         <img src={bundle.icon} style={{ width: 30 }} />
                       </div>

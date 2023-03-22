@@ -1,6 +1,7 @@
 import { services } from '../data/services';
 import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
+import { Service } from '../types/Service';
 
 
 export const getServiceFromId = (services: any, id: string) => {
@@ -52,10 +53,10 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
             target: nodeId,
             animated: true,
             arrowHeadType: 'arrowclosed',
-            label: 'added w click',
+            //label: 'added w click',
             labelStyle: { fill: '#f6ab6c', fontWeight: 700 },
             style: { stroke: '#f6ab6c' },
-            type: 'smoothstep',
+            //type: 'smoothstep',
         };
         setEdges((eds: any) => eds.concat(newEdge));
 
@@ -205,6 +206,34 @@ export const paramsFilledOnNode = (node: any) : Boolean => {
     });
     return allFilled;
 }
+
+export const searchForEndService : any = (serviceId : string, endServiceId: string, visited: any[]) => {
+    
+    const service: any | undefined = services.find(s => s.id === serviceId);
+    console.log(service);
+    if (!service) {
+        return null;
+    }
+    if (visited.includes(service)) {
+        return null;
+    }
+    visited.push(service);
+    console.log(visited);
+    if (service.id === endServiceId) {
+      return service;
+    }
+    if (service.allowedConnections) {
+    for (const connection of service.allowedConnections) {
+      const connectedService = services.find(s => s.id === connection);
+      const result = searchForEndService(connectedService, endServiceId, visited);
+      if (result) {
+        return result;
+      }
+    }
+    }
+  
+    return null;
+  };
 
 
 

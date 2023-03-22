@@ -5,6 +5,7 @@ import { GET_JOB_BY_ID, } from '../gql/queries';
 import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
 import { Button, Typography } from '@mui/material';
 import WorkflowStepper from '../components/WorkflowStepper';
+import JobFeedbackModal from '../components/JobFeedbackModal';
 
 export default function Submitted() {
 
@@ -59,6 +60,16 @@ export default function Submitted() {
 
     }
 
+    const [modalOpen, setModalOpen] = useState(false);
+
+    const handleOpenModal = () => {
+        setModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setModalOpen(false);
+    };
+
     const transformGQLToWorkflow = (workflow: any) => {
         console.log(workflow);
         let nodes = workflow.nodes.map((node: any) => {
@@ -69,7 +80,7 @@ export default function Submitted() {
                     icon: node.service.icon,
                     formData: node.formData
                 },
-                
+
             }
         });
 
@@ -80,7 +91,7 @@ export default function Submitted() {
             }
         });
 
-        const val =  {
+        const val = {
             id: workflow.id,
             state: workflow.state,
             name: workflow.name,
@@ -127,9 +138,11 @@ export default function Submitted() {
                         <Typography variant="body1">Workflow Submitted at: {workflow.submitted || Date.now().toString()}</Typography>
                         <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} id={workflow.id} />
                     </div>
-                    
+
                 </div>
             ))}
+            <Button onClick={handleOpenModal}>Review Job</Button>
+            <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} />
         </>
     )
 }
