@@ -13,6 +13,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import ParamsForm from './ParamsForm';
 import { AppContext } from '../contexts/App';
 import { useQuery } from '@apollo/client';
+import Params from './Params';
 
 export default function ContextTestComponent() {
 
@@ -68,7 +69,8 @@ export default function ContextTestComponent() {
             {
                 activeNode?.data.formData ? (
                     <div>
-                        <ParamsForm activeNode={activeNode} />
+                       
+                        <Params activeNode={activeNode} />
                     </div>
                 ) : null
             }

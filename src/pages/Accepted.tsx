@@ -44,18 +44,6 @@ export default function Accepted() {
                             id
                         }
                     }
-                
-            }
-        }
-    `;
-
-    const GET_JOB_BY_WORKFLOW_ID = gql`
-        query JobByWorkflowId($id: ID!) {
-            jobByWorkflowId(id: $id) {
-                id
-                name
-                username
-                institute
             }
         }
     `;

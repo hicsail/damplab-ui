@@ -159,7 +159,7 @@ export default function WorkflowStepper(workflow: any) {
                                                             :
                                                         </div>
                                                         <div className='parameter-value'>
-                                                            <input type='text' value={parameter.value} onChange={(e) => parameter.value = e.target.value} />
+                                                            <input type='text' value={parameter.value ? parameter.value : ""} onChange={(e) => parameter.value = e.target.value} />
                                                         </div>
                                                     </div>
                                                 )

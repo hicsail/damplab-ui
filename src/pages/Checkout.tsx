@@ -32,6 +32,7 @@ export default function Checkout() {
     const userRef = useRef<any>(null);
     const institutionRef = useRef<any>(null);
     const emailRef = useRef<any>(null);
+    const notesRef = useRef<any>(null);
 
     const [createJob] = useMutation(CREATE_JOB, {
         onCompleted: (data) => {
@@ -130,6 +131,7 @@ export default function Checkout() {
                         <TextField label="Submitter Name" margin="dense" variant="outlined" inputRef={userRef}  required />
                         <TextField label="Institution" margin="dense" variant="outlined" inputRef={institutionRef}  required />
                         <TextField label="Email" margin="dense" variant="outlined" inputRef={emailRef} required />
+                        <TextField label="Notes" margin="dense" variant="outlined" inputRef={notesRef} required />
                         <Button variant="contained" onClick={() => {
                             //saveWorkflows();
                             const data = { 

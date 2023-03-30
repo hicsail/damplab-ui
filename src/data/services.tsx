@@ -23,8 +23,9 @@ export let services = [
         allowedConnections: [
             'gene', 'storage', 'design-primers'
         ],
-        categories: ['dna-rna']
-    }, 
+        categories: ['dna-rna'],
+        // need to think about to capture result that comes from a file they send
+    },
     {
         id: 'gene',
         name: 'Order Gene Fragment',
@@ -129,6 +130,34 @@ export let services = [
                 type: 'number',
                 paramType: 'input',
                 required: true
+            },
+            {
+                id: 'forward-primer',
+                name: 'Forward Primer',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'reverse-primer',
+                name: 'Reverse Primer',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'template-dna',
+                name: 'Template DNA',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'polymerase',
+                name: 'Polymerase',
+                type: 'string',
+                paramType: 'input',
+                required: true
             }
         ],
         allowedConnections: [
@@ -144,6 +173,36 @@ export let services = [
                 amount: 'number', // this will be equal to reaction volume number
             }
         }
+    },
+    {
+        id: 'gel-electrophoresis',
+        name: 'Gel Electrophoresis',
+        icon: 'https://cdn-icons-png.flaticon.com/512/2222/2222661.png', // find real icon
+        parameters: [
+            {
+                id: 'gel-type',
+                name: 'Gel Type',
+                type: 'string',
+                paramType: 'input',
+                required: false
+            },
+            {
+                id: 'sample-length',
+                name: 'Sample Length',
+                type: 'number',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'ladder',
+                name: 'Ladder',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            }
+        ],
+
+        // allowed connections : purified dna from agrose gel extraction, mutagenesis, mutagensis by inverse pcr, perform pcr reaction, perform qpcr reaction, colony pcr,temperatue gradient test, colony PCR
     },
     {
         id: 'dpn1',
@@ -171,6 +230,145 @@ export let services = [
             }
         },
         categories: ['dna-assembly-cloning'],
+    },
+    {
+        id: 'gibson-assembly',
+        name: 'Gibson Assembly',
+        icon: 'https://cdn-icons-png.flaticon.com/512/2222/2222661.png', // go find it
+        parameters: [
+            {
+                id: 'template-dna',
+                name: 'Template DNA',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'forward-primer',
+                name: 'Forward Primer',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'reverse-primer',
+                name: 'Reverse Primer',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'master-mix',
+                name: 'Master Mix',
+                type: 'string',
+                paramType: 'input',
+                required: false
+            },
+            {
+                id: 'enzyme',
+                name: 'Enzyme',
+                type: 'string',
+                paramType: 'input',
+                required: false 
+            },
+            {
+                id: 'antibiotic',
+                name: 'Antibiotic',
+                type: 'string',
+                paramType: 'input',
+                required: false
+            }
+        ],
+        allowedConnections: [
+            'transformation', 'ordering-dna-fragments', 'dna-storage', 'mutagenesis', 'mutagenesis-by-inverse-pcr', 
+            'temperature-gradient-test', 
+        ],
+    },
+    {
+        id: 'restriction-digest',
+        name: 'Restriction Digest',
+        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        parameters: [
+            {
+                id: 'template-dna',
+                name: 'Template DNA',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'restriction-enzyme',
+                name: 'Restriction Enzyme',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            }
+        ],
+        allowedConnections: [
+            'clean-up', 'dna-storage', 'gel-electrodsgfasd', 'restriction-ligation'
+        ],
+    },
+    {
+        id: 'restriction-ligation',
+        name: 'Restriction Ligation',
+        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        parameters: [
+            {
+                id: 'digest-dna',
+                name: 'Digest DNA',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'dna-ligase',
+                name: 'DNA Ligase',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            }
+        ],
+        allowedConnections: [
+            'transformation', 'ordering-dna-fragment', 'dna-storage', 'restriction-digest'
+        ],
+    },
+    {
+        id: 'clean-up',
+        name: 'Clean Up and Concentrate DNA',
+        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        parameters: [
+            {
+                id: 'template-dna',
+                name: 'Template DNA',
+                type: null,
+                paramType: 'result',
+                required: true
+            },
+            {
+                id: 'concentration',
+                name: 'Concentration',
+                type: 'number',
+                paramType: 'input',
+                required: true
+            },
+        ],
+        // add allowed connections
+    },
+    {
+        id: 'dna-storage',
+        name: 'Plasmid, DNA fragment, or oligo storage',
+        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        parameters: [
+            {
+                id: 'dna-types',
+                name: 'Type',
+                type: 'ENUM',
+                paramType: 'input',
+                required: true
+            },
+        ]
+        // add allowed connections
+
     },
     {
         id: 'run-gel',
@@ -240,7 +438,7 @@ export let services = [
             }
         ],
         allowedConnections: [
-            'assembly'
+            'dna-storage', 'gel-electrophoresis'
         ],
         categories: ['dna-rna']
     },
@@ -383,7 +581,7 @@ export let services = [
                 name: 'Desired Concentration',
                 type: 'number',
                 paramType: 'input',
-                required: true
+                required: false
             },
             {
                 id: 'overnight-culture-product-param',
@@ -407,7 +605,12 @@ export let services = [
         name: 'Glycerol Stock Storage',
         icon: 'https://cdn-icons-png.flaticon.com/512/4352/4352975.png', 
         categories: ['pcr-reactions'],
-        parameters: []
+        parameters: [],
+        result: {
+            id: 'glyc-storage-product',
+            type: 'GlycStorageResult',
+            name: 'Glycerol Stock Storage Result',
+        }
     },
     {
         id: 'eth-perc',
@@ -524,6 +727,7 @@ export let services = [
                 paramType: 'result',
                 required: true
             },
+
             // add more
         ],
         result: {
