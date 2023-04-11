@@ -89,8 +89,6 @@ export default function ({ activeNode } : MyFormProps) {
         },
     });
 
-   
-
     useEffect(() => {
         setFormData(nodeData.formData);
         // setDataChange(!dataChange);

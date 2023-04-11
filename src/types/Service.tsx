@@ -5,11 +5,11 @@ export type Service = {
     name: string;
     icon: string;
     // optional result params
-     resultParams?: string[];
-     parameters?: Parameter[];
-     allowedConnections?: string[];
-     result?: string;
-     categories?: string[];
+    resultParams?: string[];
+    parameters?: Parameter[];
+    allowedConnections?: string[];
+    result?: any;
+    categories?: string[];
 };  
 
 
