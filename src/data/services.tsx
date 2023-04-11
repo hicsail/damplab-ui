@@ -1,8 +1,11 @@
-export let services = [
+import { Service } from "../types/Service";
+
+export let services : Service[] = [
     {
         id: 'seq',
         name: 'Send Sample to Sequencing',
-        icon: 'https://cdn-icons-png.flaticon.com/512/4425/4425323.png',
+        icon: 'https://drive.google.com/uc?id=1KwchGg3_H3REm_jv5vf6IIUDmTupIPVs',
+        // Name of item, type (plasmid, purified PCR, unpurified PCR, cosmid, BAC, Genomic DNA, Colony, RCA), size (kb), concentration (ng/ul), premixed? (yes/no), sequencing primer (with name), concentration of sequencing primer (uM)
         parameters: [
             {
                 id: 'sample',
@@ -20,16 +23,18 @@ export let services = [
                 required: true
             }
         ],
+
         allowedConnections: [
             'gene', 'storage', 'design-primers'
         ],
         categories: ['dna-rna'],
         // need to think about to capture result that comes from a file they send
+        result: null,
     },
     {
         id: 'gene',
         name: 'Order Gene Fragment',
-        icon: 'https://cdn-icons-png.flaticon.com/512/4848/4848965.png',
+        icon: 'https://drive.google.com/uc?id=1Zj4BohScCf6NNgebjrzDazseNSGN4CI9',
         parameters: [
             {
                 id: 'fragment-sequence',
@@ -42,7 +47,12 @@ export let services = [
         allowedConnections: [
             'design-primers',
         ],
-        categories: ['dna-assembly-cloning']
+        categories: ['dna-assembly-cloning'],
+        result: {
+            id: 'gene-fragment-result',
+            type: 'GeneFragmentResult',
+            text: 'DNA suspended in solution to standard concentration'
+        }
     },
     {
         id: 'design-primers',
@@ -84,12 +94,13 @@ export let services = [
         categories: ['dna-assembly-cloning'],
         allowedConnections: [
             'rehydrate-primer'
-        ]
+        ],
+        result: null
     },
     {
         id: 'rehydrate-primer',
         name: 'Rehydrate Primers',
-        icon: 'https://cdn-icons-png.flaticon.com/512/3304/3304587.png',
+        icon: 'https://drive.google.com/uc?id=1r3Jk3Y1P-YMmp1CNryY0-5nFCIYLc7Wy',
         parameters: [
             {
                 id: 'buffer',
@@ -102,13 +113,13 @@ export let services = [
         allowedConnections: [
             'pcr'
         ],
-        categories: ['dna-assembly-cloning']
+        categories: ['dna-assembly-cloning'],
+        result: null,
     },
     {
         id: 'pcr',
         name: 'PCR',
-        icon: 'https://cdn-icons-png.flaticon.com/512/4192/4192192.png',
-        flowParams: ['plasmid-flow', 'forward-primer-flow', 'reverse-primer-flow'],
+        icon: 'https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt',
         parameters: [
             {
                 id: 'melting-temp',
@@ -134,21 +145,21 @@ export let services = [
             {
                 id: 'forward-primer',
                 name: 'Forward Primer',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
             {
                 id: 'reverse-primer',
                 name: 'Reverse Primer',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
             {
                 id: 'template-dna',
                 name: 'Template DNA',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -164,7 +175,6 @@ export let services = [
             'run-gel', 'dpn1'
         ],
         categories: ['dna-assembly-cloning'],
-        resources: ['pcr','hifi'],
         result: {
             id: 'pcr-product',
             type: 'PCRResult',
@@ -177,7 +187,7 @@ export let services = [
     {
         id: 'gel-electrophoresis',
         name: 'Gel Electrophoresis',
-        icon: 'https://cdn-icons-png.flaticon.com/512/2222/2222661.png', // find real icon
+        icon: 'https://drive.google.com/uc?id=1lIq60MG4kdCmu4iJrNZikAc60TUlta5M', // find real icon
         parameters: [
             {
                 id: 'gel-type',
@@ -201,8 +211,10 @@ export let services = [
                 required: true
             }
         ],
-
         // allowed connections : purified dna from agrose gel extraction, mutagenesis, mutagensis by inverse pcr, perform pcr reaction, perform qpcr reaction, colony pcr,temperatue gradient test, colony PCR
+        allowedConnections: [
+            'column-purification', 'mutagenesis', 'inverse-pcr', 'pcr', 'qpcr', 'colony-pcr', 'temperature-gradient-test', 'colony-pcr'
+        ],
     },
     {
         id: 'dpn1',
@@ -213,7 +225,7 @@ export let services = [
             {
                 id: 'pcr-product-param',
                 name: 'PCR Product Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             }
@@ -239,21 +251,21 @@ export let services = [
             {
                 id: 'template-dna',
                 name: 'Template DNA',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
             {
                 id: 'forward-primer',
                 name: 'Forward Primer',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
             {
                 id: 'reverse-primer',
                 name: 'Reverse Primer',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -292,7 +304,7 @@ export let services = [
             {
                 id: 'template-dna',
                 name: 'Template DNA',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -316,7 +328,7 @@ export let services = [
             {
                 id: 'digest-dna',
                 name: 'Digest DNA',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -340,7 +352,7 @@ export let services = [
             {
                 id: 'template-dna',
                 name: 'Template DNA',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -366,7 +378,8 @@ export let services = [
                 paramType: 'input',
                 required: true
             },
-        ]
+        ],
+        categories: ['dna-assembly-cloning']
         // add allowed connections
 
     },
@@ -380,12 +393,15 @@ export let services = [
                 id: 'ladder',
                 name: 'Ladder',
                 type: 'string',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'pcr-product-param',
                 name: 'PCR Product Result',
-                type: null,
-                paramType: 'result'
+                type: 'boolean',
+                paramType: 'result',
+                required: true
             }
         ],
         allowedConnections: [
@@ -413,7 +429,7 @@ export let services = [
             {
                 id: 'dpn1-product-param',
                 name: 'Dpn1 Product Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             }
@@ -432,7 +448,7 @@ export let services = [
             {
                 id: 'gel-product-param',
                 name: 'Gel Product Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             }
@@ -482,14 +498,14 @@ export let services = [
             {
                 id: 'forward-primer-flow-param',
                 name: 'Forward Primer Flow Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
             {
                 id: 'reverse-primer-flow-param',
                 name: 'Reverse Primer Flow Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -513,14 +529,14 @@ export let services = [
             {
                 id: 'm-cloning-product-param',
                 name: 'MCloning Product Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
             {
                 id: 'antibiotic-workflow-product-param',
                 name: 'Antibiotic Workflow Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -544,18 +560,20 @@ export let services = [
                 id: 'desired-volume',
                 name: 'Desired Volume',
                 type: 'number',
+                paramType: 'input',
+                required: true
             },
             {
                 id: 'transformation-product-param',
                 name: 'Transformation Product Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
             {
                 id: 'antibiotic-workflow-product-param',
                 name: 'Antibiotic Workflow Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -586,7 +604,7 @@ export let services = [
             {
                 id: 'overnight-culture-product-param',
                 name: 'Overnight Culture Product Result',
-                type: null,
+                type: 'boolean',
                 paramType: 'result',
                 required: true
             },
@@ -625,7 +643,8 @@ export let services = [
                 id: 'pcr-product-param',
                 name: 'PCR Product Result',
                 type: 'string',
-                paramType: 'input'
+                paramType: 'input',
+                required: true
             },
         ],
         result: {
@@ -714,7 +733,6 @@ export let services = [
         id: 'seq',
         name: 'NGS Sequencing',
         icon: 'https://drive.google.com/uc?id=1oiZLiBOUJqFPI_46_YCtk9mrYNkkfFLL',
-
         categories: ['transcriptomics'],
         allowedConnections: [
             'bioanalyzer'
