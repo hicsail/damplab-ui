@@ -36,9 +36,7 @@ export default function ContextTestComponent() {
     useEffect(() => {
         // if (compare()) {
         setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
-        // } else {
-        //     handleClickOpen();
-        // }
+        console.log(val.nodes.find((node: any) => node.id === val.activeComponentId));
     }, [val.activeComponentId]);
 
     const handleCloseToast = (event: React.SyntheticEvent | Event, reason?: string) => {
@@ -65,11 +63,25 @@ export default function ContextTestComponent() {
     );
 
     return (
-        <div style={{ wordWrap: 'break-word', padding: 10, overflow: 'scroll', height: '80vh' }}>
+        <div style={{ wordWrap: 'break-word', padding: 20, overflow: 'scroll', height: '80vh', textAlign: 'left', }}>
+            <div>
+                <h2>
+                    {activeNode?.data.label}
+                </h2>
+            </div>
+            <div>
+                <p>
+                    Placeholder for high level description of the service and guidance around entering parameters
+                </p>
+            </div>
+            <div>
+                <p>
+                    Placeholder for high level output of the service and guidance around interpreting the results
+                </p>
+            </div>
             {
                 activeNode?.data.formData ? (
                     <div>
-                       
                         <Params activeNode={activeNode} />
                     </div>
                 ) : null

@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { useFormik, } from 'formik';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { IconButton } from '@mui/material';
 
 interface ParamFormProps {
     activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -9,11 +11,12 @@ export default function ({ activeNode }: ParamFormProps) {
 
     const initValues = () => {
         // init values using formDataState and setFormDataState
+        console.log('running init');
         let initValues: any = {};
         activeNode.data.formData.forEach((obj: any) => {
             if (obj.paramType === 'result') {
-                obj.value = obj.value ? obj.value : true;
-                initValues[obj.id] = obj.value ? obj.value : true;
+                obj.value = obj.value !== null ? obj.value : true;
+                initValues[obj.id] = obj.value !== null ? obj.value : true;
                 obj.resultParamValue = obj.resultParamValue ? obj.resultParamValue : '';
                 initValues[`resultParamValue${obj.id}`] = obj.resultParamValue ? obj.resultParamValue : '';
             }
@@ -58,6 +61,7 @@ export default function ({ activeNode }: ParamFormProps) {
 
     useEffect(() => {
         copyFormikValuesToNodeData(formik.values);
+        console.log(formik.values)
         const errors = validate(formik.values);
         if (Object.keys(errors).length > 0) {
             formik.setErrors(errors);
@@ -78,7 +82,7 @@ export default function ({ activeNode }: ParamFormProps) {
                         {
                             Object.keys(formik.errors).map((key: any) => {
                                 let name = activeNode.data.formData.find((obj: any) => obj.id === key)?.name;
-                                console.log(name)
+                                
                                 return (
                                     <li key={key}>
                                         {name}: {formik.errors[key]}
@@ -107,6 +111,19 @@ export default function ({ activeNode }: ParamFormProps) {
                     </div>
                     <div className="result-parms">
                         {
+                            // check if there are any result params and display info if there are
+                            activeNode.data.formData.find((obj: any) => obj.paramType === 'result') &&
+                            <div>
+                                Result Paramaters 
+                                <IconButton onClick={()=> {
+                                    alert('Result parameteres are results of experiments that were previously run in the workflow. By default we will use their outputs, if you would like to specify a different input, you can deselect and enter what we should use.')
+                                }}>
+                                    <InfoOutlinedIcon />
+                                </IconButton>
+                                
+                            </div>
+                        }
+                        {
                             activeNode.data.formData.map((param: any) => {
                                 if (param.paramType === 'result') {
                                     return (
@@ -122,7 +139,7 @@ export default function ({ activeNode }: ParamFormProps) {
                                                 name={param.id}
                                             />
                                             {
-                                                // add input if not checked
+                                                // add input if not checked      
                                                 !formik.values[param.id] &&
                                                 <div>
                                                     <label>
