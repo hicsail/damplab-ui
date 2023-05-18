@@ -49,7 +49,7 @@ export default memo((input: Input) => {
         let filled = true;
         formData.forEach((obj: any) => {
             if (obj.paramType === 'result') {
-                if (obj.value === true && obj.resultParamValue === '') {
+                if (obj.value === false && ( obj.resultParamValue=== null || obj.resultParamValue === '')) {
                     filled = false;
                 }
             }

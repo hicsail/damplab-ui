@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useFormik, } from 'formik';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { IconButton } from '@mui/material';
+import { IconButton, TextField } from '@mui/material';
 
 interface ParamFormProps {
     activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -61,7 +61,6 @@ export default function ({ activeNode }: ParamFormProps) {
 
     useEffect(() => {
         copyFormikValuesToNodeData(formik.values);
-        console.log(formik.values)
         const errors = validate(formik.values);
         if (Object.keys(errors).length > 0) {
             formik.setErrors(errors);
@@ -82,7 +81,7 @@ export default function ({ activeNode }: ParamFormProps) {
                         {
                             Object.keys(formik.errors).map((key: any) => {
                                 let name = activeNode.data.formData.find((obj: any) => obj.id === key)?.name;
-                                
+
                                 return (
                                     <li key={key}>
                                         {name}: {formik.errors[key]}
@@ -97,13 +96,9 @@ export default function ({ activeNode }: ParamFormProps) {
                         {
                             activeNode.data.formData.map((param: any) => {
                                 if (param.paramType !== 'result') {
+                                    param.description = "Numbers and base pairs 50bp - 10000bp"
                                     return (
-                                        <div key={param.id}>
-                                            <label>
-                                                {param.name}
-                                            </label>
-                                            <input type={param.paramType} value={formik.values[param.id] ? formik.values[param.id] : ""} name={param.id} onChange={formik.handleChange} onBlur={formik.handleBlur} />
-                                        </div>
+                                        <TextField helperText={param.description ? param.description : null} size='small' key={param.id} label={param.name} type={param.type} value={formik.values[param.id] ? formik.values[param.id] : ""} name={param.id} onChange={formik.handleChange} onBlur={formik.handleBlur} sx={{mt:1, width: '20ch'}} />
                                     )
                                 }
                             })
@@ -114,13 +109,13 @@ export default function ({ activeNode }: ParamFormProps) {
                             // check if there are any result params and display info if there are
                             activeNode.data.formData.find((obj: any) => obj.paramType === 'result') &&
                             <div>
-                                Result Paramaters 
-                                <IconButton onClick={()=> {
+                                Result Paramaters
+                                <IconButton onClick={() => {
                                     alert('Result parameteres are results of experiments that were previously run in the workflow. By default we will use their outputs, if you would like to specify a different input, you can deselect and enter what we should use.')
                                 }}>
                                     <InfoOutlinedIcon />
                                 </IconButton>
-                                
+
                             </div>
                         }
                         {
@@ -145,7 +140,7 @@ export default function ({ activeNode }: ParamFormProps) {
                                                     <label>
                                                         Result Alternative
                                                     </label>
-                                                    <input type={param.paramType} value={formik.values[`resultParamValue${param.id}`] ? formik.values[`resultParamValue${param.id}`] : ""} name={`resultParamValue${param.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                                                    <input type={param.type} value={formik.values[`resultParamValue${param.id}`] ? formik.values[`resultParamValue${param.id}`] : null} name={`resultParamValue${param.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
                                                 </div>
                                             }
                                         </div>
@@ -155,12 +150,10 @@ export default function ({ activeNode }: ParamFormProps) {
                         }
                     </div>
                     <div className="add-instructs">
-                        <label htmlFor="add">Additional Instructions</label>
-                        <textarea value={formik.values[`addinst${activeNode?.data.id}`] ? formik.values[`addinst${activeNode?.data.id}`] : ""} name={`addinst${activeNode?.data.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                        <TextField multiline sx={{mt:5}} label="Additional Instructions" value={formik.values[`addinst${activeNode?.data.id}`] ? formik.values[`addinst${activeNode?.data.id}`] : ""} name={`addinst${activeNode?.data.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
                     </div>
                 </form>
             </div>
-
         </div>
     )
 }

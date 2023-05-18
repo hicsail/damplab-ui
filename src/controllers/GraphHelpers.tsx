@@ -17,11 +17,16 @@ export const isValidConnection = (services: any, nodes: any, sourceId: any, targ
     // get service data from source and target
     const sourceService = getServiceFromId(services, sourceNode?.data.serviceId);
     const targetService = getServiceFromId(services, targetNode?.data.serviceId);
-
-    // if targetService is in sourceService.allowedConnections, return true
-    if (targetService && sourceService?.allowedConnections?.includes(targetService.id)) {
-        return true;
+    console.log(sourceService, targetService);
+    
+    // check if target is in source.allowedConnections when source.allowedConnections contains a list of objects with id and name of services
+    if (sourceService?.allowedConnections) {
+        const allowed = sourceService.allowedConnections.find((connection: any) => connection.id === targetService?.id);
+        if (allowed) {
+            return true;
+        }
     }
+    
     return false;   
 }
 
@@ -55,7 +60,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
             arrowHeadType: 'arrowclosed',
             //label: 'added w click',
             labelStyle: { fill: '#f6ab6c', fontWeight: 700 },
-            style: { stroke: '#f6ab6c' },
+            style: { stroke: 'green' },
             //type: 'smoothstep',
         };
         setEdges((eds: any) => eds.concat(newEdge));

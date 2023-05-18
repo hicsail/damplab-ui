@@ -20,6 +20,7 @@ import { CanvasContext } from '../contexts/Canvas';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import '../styles/sidebar.css';
 import { isValidConnection } from '../controllers/GraphHelpers';
+import { AppContext } from '../contexts/App';
 
 const nodeTypes = {
     selectorNode: CustomDemoNode,
@@ -34,7 +35,8 @@ export default function MainFlow(data: any) {
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
-    const [services, setServices] = useState(data.services);
+    let {services} = useContext(AppContext);
+    //const [services, setServices] = useState(data.services);
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => setNodes((nds: any) => applyNodeChanges(changes, nds)),
@@ -46,10 +48,12 @@ export default function MainFlow(data: any) {
     );
     const onConnect = useCallback((connection: Connection) => {
         let customConnection: any = connection;
+        console.log(services, nodes, customConnection.source, customConnection.target);
         if (!isValidConnection(services, nodes, customConnection.source, customConnection.target)) {
             customConnection.label = 'invalid connection';
             customConnection.style = { stroke: 'red' };
         }
+        else customConnection.style = { stroke: 'green' };
         setEdges((eds: any) => addEdge(customConnection, eds))
     },[setEdges, nodes]);
 
@@ -115,7 +119,7 @@ export default function MainFlow(data: any) {
                             <Background />
                             <Controls />
                         </ReactFlow>
-                        <div style={{ minWidth: '15%', borderLeft: 'solid 1px' }}>
+                        <div style={{ minWidth: '10%', width: 450, borderLeft: 'solid 1px' }}>
                             <RightSidebar />
                         </div>
                     </div>

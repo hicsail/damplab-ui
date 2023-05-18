@@ -71,7 +71,6 @@ export default function Submitted() {
     };
 
     const transformGQLToWorkflow = (workflow: any) => {
-        console.log(workflow);
         let nodes = workflow.nodes.map((node: any) => {
             return {
                 id: node.service.id,

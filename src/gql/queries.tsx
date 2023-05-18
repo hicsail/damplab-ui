@@ -67,6 +67,7 @@ export const GET_JOB_BY_ID = gql`
                         icon
                     }
                     formData
+                    state
                 }
                 edges {
                     source {

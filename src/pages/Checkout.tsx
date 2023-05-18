@@ -37,7 +37,7 @@ export default function Checkout() {
     const [createJob] = useMutation(CREATE_JOB, {
         onCompleted: (data) => {
             console.log('successfully created job:', data);
-            navigate('/submitted');
+            navigate('/submitted', { state: { id: data.createJob.id } });
         },
         onError: (error: any) => {
             console.log('error creating job', error);

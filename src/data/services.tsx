@@ -1,3 +1,4 @@
+import { Description } from "@mui/icons-material";
 import { Service } from "../types/Service";
 
 export let services : Service[] = [
@@ -120,6 +121,7 @@ export let services : Service[] = [
         id: 'pcr',
         name: 'PCR',
         icon: 'https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt',
+        description: '',
         parameters: [
             {
                 id: 'melting-temp',
@@ -187,11 +189,13 @@ export let services : Service[] = [
     {
         id: 'gel-electrophoresis',
         name: 'Gel Electrophoresis',
+        description: 'Gel electrophoresis is a laboratory method used to separate mixtures of DNA, RNA, or proteins according to molecular size. In gel electrophoresis, the molecules to be separated are pushed by an electrical field through a gel that contains small pores.',
         icon: 'https://drive.google.com/uc?id=1lIq60MG4kdCmu4iJrNZikAc60TUlta5M', // find real icon
         parameters: [
             {
                 id: 'gel-type',
-                name: 'Gel Type',
+                name: 'Gel Percentage',
+                description: 'Provide a number between 0.5% and 3.0%',
                 type: 'string',
                 paramType: 'input',
                 required: false
@@ -199,6 +203,7 @@ export let services : Service[] = [
             {
                 id: 'sample-length',
                 name: 'Sample Length',
+                description: 'Numbers and base pairs 50bp - 10000bp',
                 type: 'number',
                 paramType: 'input',
                 required: true
@@ -206,9 +211,34 @@ export let services : Service[] = [
             {
                 id: 'ladder',
                 name: 'Ladder',
+                description: 'select from dropdown',
                 type: 'string',
                 paramType: 'input',
                 required: true
+            },
+            {
+                id: 'dye',
+                name: 'Dye',
+                description: 'autofill SYVBR Safe',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'voltage',
+                name: 'Voltage',
+                description: 'Numbers and volts 50 - 200',
+                type: 'number',
+                paramType: 'input',
+                required: false
+            },
+            {
+                id: 'time',
+                name: 'Time',
+                description: 'Numbers and minutes 10 - 60',
+                type: 'number',
+                paramType: 'input',
+                required: false
             }
         ],
         // allowed connections : purified dna from agrose gel extraction, mutagenesis, mutagensis by inverse pcr, perform pcr reaction, perform qpcr reaction, colony pcr,temperatue gradient test, colony PCR
@@ -252,20 +282,7 @@ export let services : Service[] = [
                 id: 'template-dna',
                 name: 'Template DNA',
                 type: 'boolean',
-                paramType: 'result',
-                required: true
-            },
-            {
-                id: 'forward-primer',
-                name: 'Forward Primer',
-                type: 'boolean',
-                paramType: 'result',
-                required: true
-            },
-            {
-                id: 'reverse-primer',
-                name: 'Reverse Primer',
-                type: 'boolean',
+                description: 'result param from pcr',
                 paramType: 'result',
                 required: true
             },
@@ -283,13 +300,6 @@ export let services : Service[] = [
                 paramType: 'input',
                 required: false 
             },
-            {
-                id: 'antibiotic',
-                name: 'Antibiotic',
-                type: 'string',
-                paramType: 'input',
-                required: false
-            }
         ],
         allowedConnections: [
             'transformation', 'ordering-dna-fragments', 'dna-storage', 'mutagenesis', 'mutagenesis-by-inverse-pcr', 
@@ -529,6 +539,7 @@ export let services : Service[] = [
             {
                 id: 'm-cloning-product-param',
                 name: 'MCloning Product Result',
+                description: 'Result from Gibson Assembly, ask for what the volume will be 1mL - 10 mL',
                 type: 'boolean',
                 paramType: 'result',
                 required: true
@@ -537,9 +548,41 @@ export let services : Service[] = [
                 id: 'antibiotic-workflow-product-param',
                 name: 'Antibiotic Workflow Result',
                 type: 'boolean',
-                paramType: 'result',
+                paramType: 'input',
                 required: true
             },
+            {
+                id: 'competent-cells',
+                name: 'Competent Cells',
+                type: 'string',
+                paramType: 'input',
+                required: true,
+                description: 'select from dropdown defauly is DH5alpha'
+            },
+            {
+                id: 'recovery-media',
+                name: 'Recovery Media',
+                type: 'string',
+                paramType: 'input',
+                required: true,
+                description: 'select from dropdown default is SOC <- other option is LBE <- capture amount as well default is 10x reaction volume 198mL, range is 50-900'
+            },
+            {
+                id: 'recovery-time',
+                name: 'Recovery Time',
+                type: 'number',
+                paramType: 'input',
+                required: true,
+                description: 'default is 1 hour, range is 0.5 - 2 hours'
+            },
+            {
+                id: 'recovery-incubation-temp',
+                name: 'Recovery Incubation Temperature',
+                type: 'number',
+                paramType: 'input',
+                required: true,
+                description: 'default is 37 degrees C and 250RPM, range is 30 - 42 degrees C'
+            }
         ],
         allowedConnections: [
             'overnight-culture', 'plate-storage'
@@ -577,6 +620,46 @@ export let services : Service[] = [
                 paramType: 'result',
                 required: true
             },
+            {
+                id: 'growth-media',
+                name: 'Growth Media',
+                type: 'string',
+                paramType: 'input',
+                required: true,
+                description: 'select from dropdown default is LBE <- other option is SOC or TB or M9 <- capture amount as well default is 10x reaction volume 198mL, range is 50-900'
+            },
+            {
+                id: 'growth-tilt',
+                name: 'Growth Tilt',
+                type: 'number',
+                paramType: 'input',
+                required: true,
+                description: '0-45 degrees'
+            },
+            {
+                id: 'rpm',
+                name: 'RPM',
+                type: 'number',
+                paramType: 'input',
+                required: true,
+                description: 'default is 250RPM, range is 50-300'
+            },
+            {
+                id: 'growth-temp',
+                name: 'Growth Temperature',
+                type: 'number',
+                paramType: 'input',
+                required: true,
+                description: 'default is 37 degrees C, range is 30 - 42 degrees C'
+            },
+            {
+                id: 'growth-time',
+                name: 'Growth Time',
+                type: 'number',
+                paramType: 'input',
+                required: true,
+                description: 'default is 16 hours, range is 10 - 48 hours'
+            }
         ],
         allowedConnections: [
             'miniprep',
@@ -592,6 +675,7 @@ export let services : Service[] = [
         id: 'miniprep-gs',
         name: 'Miniprep and Glycerol Stock',
         icon: 'https://cdn-icons-png.flaticon.com/512/1474/1474390.png',
+        description: 'we use thermofisher no charge spin switch',
         resultParams: ['overnight-culture-product'],
         parameters: [
             {

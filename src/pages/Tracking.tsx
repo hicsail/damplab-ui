@@ -2,6 +2,9 @@ import { useQuery } from '@apollo/client';
 import React, { useState } from 'react'
 import { useParams } from 'react-router-dom';
 import { GET_JOB_BY_ID } from '../gql/queries';
+import { Box, InputLabel, Typography } from '@mui/material';
+import WorkflowStepper from '../components/WorkflowStepper';
+import WorkflowSteps from '../components/WorkflowSteps';
 
 export default function Tracking() {
 
@@ -31,17 +34,61 @@ export default function Tracking() {
             console.log(error.networkError?.result?.errors);
         }
     });
-    return (
-        <div>
 
-            <div>Submitted</div>
-            <div>
-                <h1>Name : {workflowName}</h1>
-                <h1>State : IN REVIEW</h1>
-                <h1>Submitter: {workflowUsername}</h1>
-                <h1>Institution: {workflowInstitution}</h1>
-                <h1>Email: {workflowEmail}</h1>
-            </div>
+    const transformGQLToWorkflow = (workflow: any) => {
+        let nodes = workflow.nodes.map((node: any) => {
+            return {
+                id: node.service.id,
+                name: node.service.name,
+                state: node.state,
+                data: {
+                    icon: node.service.icon,
+                    formData: node.formData
+                },
+
+            }
+        });
+
+        let edges = workflow.edges.map((edge: any) => {
+            return {
+                source: edge.source.id,
+                target: edge.target.id
+            }
+        });
+
+        const val = {
+            id: workflow.id,
+            state: workflow.state,
+            name: workflow.name,
+            nodes: nodes,
+            edges: edges
+        }
+        console.log(val);
+        return val;
+    }
+
+    return (
+        <div style={{ textAlign: 'left', padding: '5vh' }}>
+            <Typography variant="h3">Job Tracking</Typography>
+            <Box sx={{ flexDirection: 'column', p: 1, m: 1 }}>
+                <Typography variant="h5" style={{marginBottom: 15}}>Details</Typography>
+                <Typography>Name: {workflowName}</Typography>
+                <Typography>State : IN REVIEW</Typography>
+                <Typography>Submitter: {workflowUsername}</Typography>
+                <Typography>Institution: {workflowInstitution}</Typography>
+                <Typography>Email: {workflowEmail}</Typography>
+            </Box>
+            <Box>
+                <Typography variant="h5" style={{marginBottom: 50}}>Workflow</Typography>
+                {
+                    workflows.map((workflow: any) => {
+                        return (
+                            <WorkflowSteps workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
+                        )
+                    })
+                }
+            </Box>
+
         </div>
     )
 }

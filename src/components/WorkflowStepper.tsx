@@ -116,11 +116,10 @@ export default function WorkflowStepper(workflow: any) {
                 </Stepper>
                 <Accordion>
                     <AccordionSummary
-                        expandIcon={<ExpandMoreIcon />}
+                        expandIcon={<ExpandMoreIcon fontSize='small'/>}
                         aria-controls="panel1a-content"
                         id="panel1a-header"
                     >
-                        <Typography>Protocol Details</Typography>
                     </AccordionSummary>
                     <AccordionDetails>
                         <div>
@@ -137,7 +136,7 @@ export default function WorkflowStepper(workflow: any) {
                                 </React.Fragment>
                             ) : (
                                 <React.Fragment>
-                                    <Box sx={{ mb: 1, py: 1 }} style={{ height: 150, overflow: 'auto' }}>
+                                    <Box sx={{   }} style={{ height: 150, overflow: 'auto' }}>
                                         <div className='name-and-icon' style={{ display: 'flex', justifyContent: 'flex-start', margin: 10 }}>
                                             <div className='icon' style={{marginRight:10}}>
                                                 <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} alt={workflow.workflow[activeStep].name} />

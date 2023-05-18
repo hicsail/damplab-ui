@@ -10,6 +10,7 @@ export type Service = {
     allowedConnections?: string[];
     result?: any;
     categories?: string[];
+    description?: string;
 };  
 
 

@@ -6,4 +6,5 @@ export type Parameter = {
     paramType: string;
     required: boolean;
     workflowId?: string;
+    description?: string;
 };
