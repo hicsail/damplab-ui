@@ -1,7 +1,7 @@
 import { Description } from "@mui/icons-material";
 import { Service } from "../types/Service";
 
-export let services : Service[] = [
+export let services: Service[] = [
     {
         id: 'seq',
         name: 'Send Sample to Sequencing',
@@ -196,7 +196,7 @@ export let services : Service[] = [
                 id: 'gel-type',
                 name: 'Gel Percentage',
                 description: 'Provide a number between 0.5% and 3.0%',
-                type: 'string',
+                type: 'number',
                 paramType: 'input',
                 required: false
             },
@@ -212,14 +212,27 @@ export let services : Service[] = [
                 id: 'ladder',
                 name: 'Ladder',
                 description: 'select from dropdown',
-                type: 'string',
+                options: [
+                    {
+                        id: '100-bp-ladder',
+                        name: '100 bp ladder'
+                    }, {
+                        id: '1-kb-ladder',
+                        name: '1 kb ladder'
+                    },
+                    {
+                        id: '1-kb-plus-ladder',
+                        name: '1 kb plus ladder'
+                    }
+                ],
+                type: 'dropdown',
                 paramType: 'input',
                 required: true
             },
             {
                 id: 'dye',
                 name: 'Dye',
-                description: 'autofill SYVBR Safe',
+                description: 'autofill SYBR Safe',
                 type: 'string',
                 paramType: 'input',
                 required: true
@@ -235,7 +248,7 @@ export let services : Service[] = [
             {
                 id: 'time',
                 name: 'Time',
-                description: 'Numbers and minutes 10 - 60',
+                description: 'Provide minutes 10 - 60',
                 type: 'number',
                 paramType: 'input',
                 required: false
@@ -263,7 +276,7 @@ export let services : Service[] = [
         allowedConnections: [
             'run-gel', 'column-purification'
         ],
-        result : {
+        result: {
             id: 'dpn1-product',
             type: 'Dpn1Result',
             result: {
@@ -276,7 +289,7 @@ export let services : Service[] = [
     {
         id: 'gibson-assembly',
         name: 'Gibson Assembly',
-        icon: 'https://cdn-icons-png.flaticon.com/512/2222/2222661.png', // go find it
+        icon: 'https://drive.google.com/uc?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I', // go find it
         parameters: [
             {
                 id: 'template-dna',
@@ -298,12 +311,12 @@ export let services : Service[] = [
                 name: 'Enzyme',
                 type: 'string',
                 paramType: 'input',
-                required: false 
+                required: false
             },
         ],
         allowedConnections: [
-            'transformation', 'ordering-dna-fragments', 'dna-storage', 'mutagenesis', 'mutagenesis-by-inverse-pcr', 
-            'temperature-gradient-test', 
+            'transformation', 'ordering-dna-fragments', 'dna-storage', 'mutagenesis', 'mutagenesis-by-inverse-pcr',
+            'temperature-gradient-test',
         ],
     },
     {
@@ -533,13 +546,13 @@ export let services : Service[] = [
     {
         id: 'transformation',
         name: 'Transformation',
-        icon: 'https://cdn-icons-png.flaticon.com/512/203/203144.png',
+        icon: 'https://drive.google.com/uc?id=1JRRNNrprfVjobLCnNRUUvCcRiJ0TkVI0',
         resultParams: ['m-cloning-product', 'antibiotic-workflow'],
         parameters: [
             {
                 id: 'm-cloning-product-param',
                 name: 'MCloning Product Result',
-                description: 'Result from Gibson Assembly, ask for what the volume will be 1mL - 10 mL',
+                description: 'Result from Gibson Assembly',
                 type: 'boolean',
                 paramType: 'result',
                 required: true
@@ -548,16 +561,31 @@ export let services : Service[] = [
                 id: 'antibiotic-workflow-product-param',
                 name: 'Antibiotic Workflow Result',
                 type: 'boolean',
-                paramType: 'input',
+                paramType: 'result',
                 required: true
             },
             {
                 id: 'competent-cells',
                 name: 'Competent Cells',
-                type: 'string',
+                type: 'dropdown',
                 paramType: 'input',
                 required: true,
-                description: 'select from dropdown defauly is DH5alpha'
+                description: 'select from dropdown defauly is DH5alpha',
+                options : [
+                    {
+                        id: 'DH5alpha',
+                        name: 'DH5alpha'
+                    },
+                    {
+                        id: 'DH10B',
+                        name: 'DH10B'
+                    },
+                    {
+                        id: 'e-coli',
+                        name: 'E-coli'
+                    }
+                ]
+
             },
             {
                 id: 'recovery-media',
@@ -565,7 +593,22 @@ export let services : Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true,
-                description: 'select from dropdown default is SOC <- other option is LBE <- capture amount as well default is 10x reaction volume 198mL, range is 50-900'
+                description: 'select from dropdown default is SOC',
+                // <- other option is LBE <- capture amount as well default is 10x reaction volume 198mL, range is 50-900'
+                options : [
+                    {
+                        id: 'SOC',
+                        name: 'SOC'
+                    },
+                    {
+                        id: 'LBE',
+                        name: 'LBE'
+                    },
+                    {
+                        id: 'TB',
+                        name: 'TB'
+                    },
+                ]
             },
             {
                 id: 'recovery-time',
@@ -596,7 +639,7 @@ export let services : Service[] = [
     {
         id: 'overnight-culture',
         name: 'Overnight Inoculum',
-        icon: 'https://cdn-icons-png.flaticon.com/512/3625/3625162.png',
+        icon: 'https://drive.google.com/uc?id=1Wckp8P3GwvJw-7_tb1DevtSVCFPaevcG',
         resultParams: ['transformation-product', 'antibiotic-workflow'],
         parameters: [
             {
@@ -626,7 +669,26 @@ export let services : Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true,
-                description: 'select from dropdown default is LBE <- other option is SOC or TB or M9 <- capture amount as well default is 10x reaction volume 198mL, range is 50-900'
+                description: 'select from dropdown',
+                // default is LBE <- other option is SOC or TB or M9 <- capture amount as well default is 10x reaction volume 198mL, range is 50-900
+                options : [
+                    {
+                        id: 'LBE',
+                        name: 'LBE'
+                    },
+                    {
+                        id: 'SOC',
+                        name: 'SOC'
+                    },
+                    {
+                        id: 'TB',
+                        name: 'TB'
+                    },
+                    {
+                        id: 'M9',
+                        name: 'M9'
+                    }
+                ],
             },
             {
                 id: 'growth-tilt',
@@ -674,7 +736,7 @@ export let services : Service[] = [
     {
         id: 'miniprep-gs',
         name: 'Miniprep and Glycerol Stock',
-        icon: 'https://cdn-icons-png.flaticon.com/512/1474/1474390.png',
+        icon: 'https://drive.google.com/uc?id=1Lam_nDy2e5CwjAK_TU6L1zPAEAeZGRqw',
         description: 'we use thermofisher no charge spin switch',
         resultParams: ['overnight-culture-product'],
         parameters: [
@@ -705,7 +767,7 @@ export let services : Service[] = [
     {
         id: 'glyc-storage',
         name: 'Glycerol Stock Storage',
-        icon: 'https://cdn-icons-png.flaticon.com/512/4352/4352975.png', 
+        icon: 'https://cdn-icons-png.flaticon.com/512/4352/4352975.png',
         categories: ['pcr-reactions'],
         parameters: [],
         result: {
@@ -720,9 +782,9 @@ export let services : Service[] = [
         icon: 'https://drive.google.com/uc?id=1Gdv5OByXeIQET13AowTdKAEKrC-687TH',
         categories: ['dna-rna'],
         allowedConnections: [
-            'bioanalyzer', 'rna-extraction', 
+            'bioanalyzer', 'rna-extraction',
         ],
-        parameters : [
+        parameters: [
             {
                 id: 'pcr-product-param',
                 name: 'PCR Product Result',
@@ -745,7 +807,7 @@ export let services : Service[] = [
         allowedConnections: [
             'library-prep', 'seq', 'eth-perc'
         ],
-        parameters : [
+        parameters: [
             {
                 id: 'eth-perc-product',
                 name: 'Ethanol Precipitation Result',
@@ -775,7 +837,7 @@ export let services : Service[] = [
         allowedConnections: [
             'rna-extraction', 'library-prep', 'bioanalyzer'
         ],
-        parameters : [
+        parameters: [
             {
                 id: 'bioanalyzer-product',
                 name: 'Bioanalyzer Result',
@@ -798,7 +860,7 @@ export let services : Service[] = [
         allowedConnections: [
             'seq', 'mRNA-enrichment', 'bioanalyzer'
         ],
-        parameters : [
+        parameters: [
             {
                 id: 'mRNA-enrichment-product',
                 name: 'mRNA Enrichment Result',
@@ -821,7 +883,7 @@ export let services : Service[] = [
         allowedConnections: [
             'bioanalyzer'
         ],
-        parameters : [
+        parameters: [
             {
                 id: 'library-prep-product',
                 name: 'Library Prep Result',
@@ -848,7 +910,7 @@ export let services : Service[] = [
             'storage',
             'flow-cytometry',
         ],
-        parameters : [
+        parameters: [
             {
                 id: 'induction-culture',
                 name: 'Overnight Bacterial Culture',
@@ -873,7 +935,7 @@ export let services : Service[] = [
             'storage',
             'cell-culture-induction',
         ],
-        parameters : [
+        parameters: [
             {
                 id: 'lysate-bacterial-culture',
                 name: 'Large Volume Bacterial Culture',
@@ -899,7 +961,7 @@ export let services : Service[] = [
             'cell-lysate',
             'cell-culture-induction'
         ],
-        parameters : [
+        parameters: [
             {
                 id: "protein-bacterial-culture",
                 name: 'Large Volume Bacterial Culture',
@@ -922,7 +984,7 @@ export let services : Service[] = [
         allowedConnections: [
             'overnight-culture',
         ],
-        parameters : [
+        parameters: [
             {
                 id: 'overnight-culture',
                 name: 'Overnight Bacterial Culture',
