@@ -1,51 +1,83 @@
 import React, { useEffect, useState } from "react";
 import { gql, useMutation, useQuery } from "@apollo/client";
-import WorkflowStepper from "../components/WorkflowStepper";
 import { Button, Typography } from "@mui/material";
 import DominosStepper from "../components/DominosStepper";
+import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
 
 export default function Dominos() {
-    const [workflows, setWorkflows] = useState([]); // ▶ URLSearchParams {}
+    const [queuedWorkflows,     setQueuedWorkflows]     = useState([]);
+    const [inProgressWorkflows, setInProgressWorkflows] = useState([]);
+    const [completedWorkflows,  setCompletedWorkflows]  = useState([]);
 
-    // get workflows from gql
+    const [updateWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
+        onCompleted: (data) => {
+            console.log('successfully completed workflow:', data);
+        },
+        onError: (error: any) => {
+            console.log(error.networkError?.result?.errors);
+            console.log('error completing workflow', error);
+        }
+    });
+
+    // GQL Query: workflow retrieval by state:(QUEUED | IN_PROGRESS | COMPLETE)
     const GET_WORKFLOWS_BY_STATE = gql`
-        query {
-            getWorkflowByState(state: QUEUED) {
+        query GetWorkflowByState($state: WorkflowState!) {
+            getWorkflowByState(state: $state) {
                 id
+                name
+                state
+                # technician
+                # dueDate
+                # timeCompleted
                 nodes {
-                    label
                     formData
                     service {
                         id
                         name
                         parameters
+                        icon
                     }
                 }
-                edges {
-                    id
-                    source {
-                        id
-                        formData
-                    }
-                    target {
-                        id
-                        formData
-                    }
-                }
-                state
             }
         }
     `;
 
+    // Retrieve QUEUED
     useQuery(GET_WORKFLOWS_BY_STATE, {
         variables: { state: "QUEUED" },
         onCompleted: (data) => {
-            console.log("workflows loaded successfully on queued", data);
-            setWorkflows(data.getWorkflowByState);
+            console.log("queued workflows loaded successfully", data);
+            setQueuedWorkflows(data.getWorkflowByState);
         },
         onError: (error: any) => {
             console.log(error.networkError?.result?.errors);
-            console.log("error when loading workflows on queued", error);
+            console.log("error when loading queued workflows", error);
+        },
+    });
+
+    // Retrieve IN_PROGRESS
+    useQuery(GET_WORKFLOWS_BY_STATE, {
+        variables: { state: "IN_PROGRESS" },
+        onCompleted: (data) => {
+            console.log("in progress workflows loaded successfully", data);
+            setInProgressWorkflows(data.getWorkflowByState);
+        },
+        onError: (error: any) => {
+            console.log(error.networkError?.result?.errors);
+            console.log("error when loading in progress workflows", error);
+        },
+    });
+
+    // Retrieve COMPLETE
+    useQuery(GET_WORKFLOWS_BY_STATE, {
+        variables: { state: "COMPLETE" },
+        onCompleted: (data) => {
+            console.log("completed workflows loaded successfully", data);
+            setCompletedWorkflows(data.getWorkflowByState);
+        },
+        onError: (error: any) => {
+            console.log(error.networkError?.result?.errors);
+            console.log("error when loading completed workflows", error);
         },
     });
 
@@ -61,48 +93,68 @@ export default function Dominos() {
             };
         });
 
-        let edges = workflow.edges.map((edge: any) => {
-            return {
-                source: edge.source.id,
-                target: edge.target.id,
-            };
-        });
-
         const val = {
             id: workflow.id,
-            state: workflow.state,
             name: workflow.name,
+            state: workflow.state,
+            // technician: technician,
+            // dueDate: dueDate
+            // timeCompleted: timeCompleted
             nodes: nodes,
-            edges: edges,
         };
         return val;
     };
 
-    const [queuedWorkflows, setQueuedWorkflows] = useState<any>([]);
-
     return (
         <>
-            <h1>Queued</h1>
-            {workflows.map((workflow: any) => (
+            <h1>Recently Completed Workflows</h1>
+            {completedWorkflows.map((workflow: any) => (
                 <div
                     key={workflow.id}
                     style={{
                         textAlign: "start",
                         border: "1px solid grey",
                         borderRadius: 5,
+                        borderColor: 'green',
                         margin: 5,
                         padding: 5,
                     }}
                 >
                     <div>
                         <Typography variant="body1">
-                            ID: {workflow.id}
+                            Name (ID): {workflow.name} ({workflow.id})
                         </Typography>
                         <Typography variant="body1">
-                            Status: {workflow.state}
+                            Status: <span style={{color: 'green'}}>Completed by {workflow.technician ? workflow.technician : "UNASSIGNED"} on {new Date(Date.now()).toDateString().toLocaleString()}</span>
+                        </Typography>
+                    </div>
+                </div>
+            ))}
+            <h1>Queued Workflows</h1>
+            {queuedWorkflows.map((workflow: any) => (
+                <div
+                    key={workflow.id}
+                    style={{
+                        textAlign: "start",
+                        border: "1px solid grey",
+                        borderRadius: 5,
+                        borderColor: 'blue',
+                        margin: 5,
+                        padding: 5,
+                    }}
+                >
+                    <div>
+                        <Typography variant="body1">
+                            Name (ID): {workflow.name} ({workflow.id})
                         </Typography>
                         <Typography variant="body1">
-                            Technician: TECHNICIAN NAME HERE
+                            Status: <span style={{color: 'blue'}}>{workflow.state}</span>
+                        </Typography>
+                        <Typography variant="body1">
+                            Due Date: {new Date(Date.now()).toDateString().toLocaleString()}
+                        </Typography>
+                        <Typography variant="body1">
+                            Technician: {workflow.technician ? workflow.technician : "UNASSIGNED"}
                         </Typography>
                         <DominosStepper
                             workflow={transformGQLToWorkflow(workflow).nodes}
