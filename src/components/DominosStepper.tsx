@@ -1,30 +1,11 @@
-import React, { useState, useContext } from "react";
-import { Service } from '../types/Service';
-import Box from "@mui/material/Box";
-import { Stepper, Step, StepButton, StepIconProps, StepLabel, stepClasses } from "@mui/material";
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
-import Check from '@mui/icons-material/Check';
+import { useState } from "react";
+import { Stepper, Step, StepButton, StepIconProps, StepLabel } from "@mui/material";
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useMutation } from "@apollo/client";
 import { UPDATE_WORKFLOW_STATE } from "../gql/mutations";
-import { CanvasContext } from '../contexts/Canvas';
-import { AppContext } from '../contexts/App';
-import { makeStyles, styled } from "@mui/material";
-import clsx from 'clsx';
-import SettingsIcon from '@mui/icons-material/Settings';
-import GroupAddIcon from '@mui/icons-material/GroupAdd';
-import VideoLabelIcon from '@mui/icons-material/VideoLabel';
-import { services } from '../data/services';
-import { getServiceFromId } from '../controllers/GraphHelpers'
+import { styled } from "@mui/material";
 
 export default function DominosStepper(workflow: any) {
-    const [category, setCategory] = useState('');
-    const [categories, setCategories] = useState<any>([]);
-    const [alignment, setAlignment] = useState('bundles');
-    const {services, bundles} = useContext(AppContext);
-    const [filteredServices, setFilteredServices] = useState(services);
-    const {setNodes, setEdges} = useContext(CanvasContext);
-
     const [workflowNames, setWorkflowNames] = useState(
         workflow.workflow.map((workflow: any) => {
             return workflow.name;
@@ -42,13 +23,6 @@ export default function DominosStepper(workflow: any) {
         },
     });
 
-    const handleAdvance = (index: number) => {
-        const newCompleted: any = completed;
-        newCompleted[activeStep] = true;
-        setCompleted(newCompleted);
-        handleNext();
-    };
-
     const totalSteps = () => {
         return workflowNames.length;
     };
@@ -57,29 +31,8 @@ export default function DominosStepper(workflow: any) {
         return Object.keys(completed).length;
     };
 
-    const isLastStep = () => {
-        return activeStep === totalSteps() - 1;
-    };
-
     const allStepsCompleted = () => {
         return completedSteps() === totalSteps();
-    };
-
-    const handleNext = () => {
-        const newActive =
-            isLastStep() && !allStepsCompleted()
-                ? workflowNames.findIndex((workflow: any, i: number) => !(i in completed))
-                : activeStep + 1;
-        setActiveStep(newActive);
-        if (allStepsCompleted()) {
-            isLastStep() 
-                ? setActiveStep(0)
-                : setActiveStep(totalSteps() - 1)
-        }
-    };
-
-    const handleBack = () => {
-        setActiveStep((prevActive) => prevActive - 1);
     };
 
     const activateStep = (step: number) => () => {
@@ -99,6 +52,10 @@ export default function DominosStepper(workflow: any) {
         setActiveStep(newActiveStep);
 
         updateWorkflowMutation();
+
+        // if (allStepsCompleted()) {
+        //     completeWorkflow();
+        // }
     }; 
 
     const deactivateStep = (step: number) => () => {
@@ -112,24 +69,6 @@ export default function DominosStepper(workflow: any) {
 
         updateWorkflowMutation();
     }; 
-
-    const handleComplete = () => {
-        const newCompleted: any = completed;
-        newCompleted[activeStep] = true;
-        setCompleted(newCompleted);
-        // handleNext();
-        // allStepsCompleted() 
-        //     ? setActive(0)
-        //     : handleNext();
-        // if (allStepsCompleted()) {
-        //     // {completeWorkflow();}
-        // }
-    };
-
-    const handleReset = () => {
-        setActiveStep(0);
-        setCompleted({});
-    };
 
     const startWorkflow = () => {
         let updateWorkflowState = {
@@ -152,8 +91,9 @@ export default function DominosStepper(workflow: any) {
     };
 
     const completeWorkflow = () => {
+        console.log("All workflow servivices completed")
         let updateWorkflowState = {
-            workflowId: workflow.id,
+            workflowId: workflow.id, 
             state: "COMPLETE",
         };
         updateWorkflowMutation({
@@ -166,31 +106,28 @@ export default function DominosStepper(workflow: any) {
       }>(({ theme, ownerState }) => ({
         backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : '#aaa',
         zIndex: 1,
-        width: 65,
-        height: 65,
-        display: 'flex',
-        borderRadius: '50%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
-        ...(ownerState.active && {
-          backgroundImage:
+        width: 65,              height: 65,
+        display: 'flex',        justifyContent: 'center',   alignItems: 'center',
+        borderRadius: '50%',    boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
+        ...(ownerState.active && {backgroundImage:
             'linear-gradient( 136deg, rgb(128,128,255) 0%, rgb(64,64,255) 50%, rgb(0,0,255) 100%)',
-            boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
         }),
-        ...(ownerState.completed && {
-          backgroundImage:
+        ...(ownerState.completed && {backgroundImage:
             'linear-gradient( 136deg, rgb(0,255,0) 0%, rgb(32,128,32) 50%, rgb(64,128,64) 100%)',
-            boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
         })
     }));
       
     function ColorlibStepIcon(props: StepIconProps) {
         const { active, completed, className } = props;
-
+        let image: any;
+        completed 
+            ? image = <CheckCircleOutlineIcon fontSize="large" sx={{color: "white"}}/>
+            : image = <img className={className} 
+                       src={workflow.workflow[Number(props.icon)-1].data.icon} 
+                       width="50" height="50" />
         return (
             <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>
-                {<img className={className} src={workflow.workflow[Number(props.icon)-1].data.icon} width="50" height="50" />}
+                {image}
             </ColorlibStepIconRoot>
         );
     }
@@ -200,20 +137,20 @@ export default function DominosStepper(workflow: any) {
             <div>
                 <Stepper
                     nonLinear
+                    alternativeLabel 
                     activeStep = {activeStep}
                     style={{ overflowX: "auto", padding: "25px", textAlign: 'center', fontSize: "12px"}}
                     connector={null}
-                    alternativeLabel 
                 > 
                     {workflowNames.map((label: string, index: number) => ( 
                         <Step key={label} completed={completed[index]} active={activeStep[index]}>
                             {workflow.workflow[index].technicianFirst  
                                 ? workflow.workflow[index].technicianFirst 
-                                : "First"
+                                : ""
                             }<br/> 
                             {workflow.workflow[index].technicianLast 
                                 ? workflow.workflow[index].technicianLast 
-                                : "Last"
+                                : "Unassigned"
                             }<br/><br/>
                             <StepButton onClick={
                                 activeStep[index] === true ? completeStep(index) : 
