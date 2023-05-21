@@ -1,19 +1,21 @@
 import React, { useState, useContext } from "react";
 import { Service } from '../types/Service';
 import Box from "@mui/material/Box";
-import Stepper from "@mui/material/Stepper";
-import Step from "@mui/material/Step";
-import StepButton from "@mui/material/StepButton";
+import { Stepper, Step, StepButton, StepIconProps, StepLabel, stepClasses } from "@mui/material";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
-import Accordion from "@mui/material/Accordion";
-import AccordionSummary from "@mui/material/AccordionSummary";
-import AccordionDetails from "@mui/material/AccordionDetails";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import Check from '@mui/icons-material/Check';
 import { useMutation } from "@apollo/client";
 import { UPDATE_WORKFLOW_STATE } from "../gql/mutations";
 import { CanvasContext } from '../contexts/Canvas';
 import { AppContext } from '../contexts/App';
+import { makeStyles, styled } from "@mui/material";
+import clsx from 'clsx';
+import SettingsIcon from '@mui/icons-material/Settings';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import VideoLabelIcon from '@mui/icons-material/VideoLabel';
+import { services } from '../data/services';
+import { getServiceFromId } from '../controllers/GraphHelpers'
 
 export default function DominosStepper(workflow: any) {
     const [category, setCategory] = useState('');
@@ -28,7 +30,7 @@ export default function DominosStepper(workflow: any) {
             return workflow.name;
         })
     );
-    const [activeStep, setActiveStep] = useState(0);
+    const [activeStep, setActiveStep] = useState({} as any);
     const [completed, setCompleted] = useState({} as any);
     const [updateWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
         onCompleted: (data) => {
@@ -39,6 +41,13 @@ export default function DominosStepper(workflow: any) {
             console.log("error completing workflow", error);
         },
     });
+
+    const handleAdvance = (index: number) => {
+        const newCompleted: any = completed;
+        newCompleted[activeStep] = true;
+        setCompleted(newCompleted);
+        handleNext();
+    };
 
     const totalSteps = () => {
         return workflowNames.length;
@@ -57,11 +66,11 @@ export default function DominosStepper(workflow: any) {
     };
 
     const handleNext = () => {
-        const newActiveStep =
+        const newActive =
             isLastStep() && !allStepsCompleted()
                 ? workflowNames.findIndex((workflow: any, i: number) => !(i in completed))
                 : activeStep + 1;
-        setActiveStep(newActiveStep);
+        setActiveStep(newActive);
         if (allStepsCompleted()) {
             isLastStep() 
                 ? setActiveStep(0)
@@ -70,20 +79,47 @@ export default function DominosStepper(workflow: any) {
     };
 
     const handleBack = () => {
-        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+        setActiveStep((prevActive) => prevActive - 1);
     };
 
-    const handleStep = (workflowName: any) => () => {
-        setActiveStep(workflowName);
-    };
+    const activateStep = (step: number) => () => {
+        const newActiveStep: any = activeStep; 
+        newActiveStep[step] = true;
+        setActiveStep(newActiveStep);
+        updateWorkflowMutation();
+    }; 
+
+    const completeStep = (step: number) => () => {
+        const newCompleted: any = completed; 
+        newCompleted[step] = true;
+        setCompleted(newCompleted);
+
+        const newActiveStep: any = activeStep; 
+        newActiveStep[step] = false;
+        setActiveStep(newActiveStep);
+
+        updateWorkflowMutation();
+    }; 
+
+    const deactivateStep = (step: number) => () => {
+        const newCompleted: any = completed; 
+        newCompleted[step] = false;
+        setCompleted(newCompleted);
+
+        const newActiveStep: any = activeStep; 
+        newActiveStep[step] = false;
+        setActiveStep(newActiveStep);
+
+        updateWorkflowMutation();
+    }; 
 
     const handleComplete = () => {
         const newCompleted: any = completed;
         newCompleted[activeStep] = true;
         setCompleted(newCompleted);
-        handleNext();
+        // handleNext();
         // allStepsCompleted() 
-        //     ? setActiveStep(0)
+        //     ? setActive(0)
         //     : handleNext();
         // if (allStepsCompleted()) {
         //     // {completeWorkflow();}
@@ -121,174 +157,78 @@ export default function DominosStepper(workflow: any) {
             state: "COMPLETE",
         };
         updateWorkflowMutation({
-            variables: { updateWorkflowState: updateWorkflowState },
+            variables: { updateWorkflowState: updateWorkflowState }, 
         });
     };
 
+    const ColorlibStepIconRoot = styled('div')<{
+        ownerState: { completed?: boolean; active?: boolean };
+      }>(({ theme, ownerState }) => ({
+        backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : '#aaa',
+        zIndex: 1,
+        width: 65,
+        height: 65,
+        display: 'flex',
+        borderRadius: '50%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
+        ...(ownerState.active && {
+          backgroundImage:
+            'linear-gradient( 136deg, rgb(128,128,255) 0%, rgb(64,64,255) 50%, rgb(0,0,255) 100%)',
+            boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
+        }),
+        ...(ownerState.completed && {
+          backgroundImage:
+            'linear-gradient( 136deg, rgb(0,255,0) 0%, rgb(32,128,32) 50%, rgb(64,128,64) 100%)',
+            boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
+        })
+    }));
+      
+    function ColorlibStepIcon(props: StepIconProps) {
+        const { active, completed, className } = props;
+
+        return (
+            <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>
+                {<img className={className} src={workflow.workflow[Number(props.icon)-1].data.icon} width="50" height="50" />}
+            </ColorlibStepIconRoot>
+        );
+    }
+
     return (
-        <div style={{ padding: 25 }}>
-            {/* <div>
-                {workflow.parent !== "checkout" && (
-                    <div>
-                        <Button>
-                            Start Workflow
-                        </Button>
-                    </div>
-                )}
-            </div> */}
+        <div>
             <div>
                 <Stepper
                     nonLinear
-                    activeStep={activeStep}
-                    style={{ overflowX: "auto", padding: "30px"}}
-                    alternativeLabel
-                    sx={{
-                        '& .MuiStepLabel-root .Mui-completed': {
-                          color: 'green',
-                        },
-                        '& .MuiStepLabel-root .Mui-active': {
-                          color: 'blue',
-                        },
-                        '& .MuiStepLabel-label.Mui-unselected.MuiStepLabel-alternativeLabel': {
-                          color: 'black', // Just text label (COMPLETED)
-                        },
-                      }}
-                >
-                    {workflowNames.map((label: string, index: number) => (
-                        <Step key={label} completed={completed[index]}>
-                            <StepButton
-                                color="inherit"
-                                onClick={handleStep(index)}
-                            >
-                            <img
-                                style={{ height: 30, }}
-                                src={workflow.workflow[index].data.icon}
-                                alt={workflow.workflow[index].name}
-                            /><br/>
-                                {label}
+                    activeStep = {activeStep}
+                    style={{ overflowX: "auto", padding: "25px", textAlign: 'center', fontSize: "12px"}}
+                    connector={null}
+                    alternativeLabel 
+                > 
+                    {workflowNames.map((label: string, index: number) => ( 
+                        <Step key={label} completed={completed[index]} active={activeStep[index]}>
+                            {workflow.workflow[index].technicianFirst  
+                                ? workflow.workflow[index].technicianFirst 
+                                : "First"
+                            }<br/> 
+                            {workflow.workflow[index].technicianLast 
+                                ? workflow.workflow[index].technicianLast 
+                                : "Last"
+                            }<br/><br/>
+                            <StepButton onClick={
+                                activeStep[index] === true ? completeStep(index) : 
+                                completed[index] === true ? deactivateStep(index) :
+                                activateStep(index)
+                            }>
+                                <StepLabel StepIconComponent={ColorlibStepIcon}>
+                                    <span style={{fontSize: "11px"}}>
+                                        {label}
+                                    </span>
+                                </StepLabel> 
                             </StepButton>
                         </Step>
                     ))}
                 </Stepper>
-                <Accordion>
-                    <AccordionSummary
-                        expandIcon={<ExpandMoreIcon />}
-                        aria-controls="panel1a-content"
-                        id="panel1a-header"
-                    >
-                        <div
-                            style={{
-                                    display: "flex",
-                                    justifyContent: "flex-start",
-                                    margin: 10,
-                                }}
-                        >
-                            <img
-                                style={{ width: 20 }}
-                                src={workflow.workflow[activeStep].data.icon}
-                                alt={workflow.workflow[activeStep].name}
-                            />
-                            <Typography>
-                                &nbsp;&nbsp;&nbsp;{workflow.workflow[activeStep].name}...
-                            </Typography>
-                        </div>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                        <div>
-                            <>
-
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        flexDirection: "row",
-                                        justifyContent: 'space-evenly'
-                                    }}
-                                >
-                                    {allStepsCompleted() ? (
-                                        <div>
-                                            <Button onClick={handleReset}>
-                                                Reset
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <Button
-                                                color="inherit"
-                                                disabled={activeStep === 0}
-                                                onClick={handleBack}
-                                                sx={{ mr: 1 }}
-                                            >
-                                                Back
-                                            </Button>
-                                            <Button 
-                                                onClick={handleNext} 
-                                                sx={{ mr: 1 }}
-                                            >
-                                                Next
-                                            </Button>
-                                            {activeStep !== workflowNames.length &&
-                                                (completed[activeStep] ? (
-                                                    <Typography
-                                                        variant="caption"
-                                                        sx={{display: "inline-block",}}
-                                                    >
-                                                        Step {activeStep + 1}{" "}
-                                                        already completed
-                                                    </Typography>
-                                                ) : (
-                                                    <Button onClick={handleComplete}>
-                                                        {completedSteps() === totalSteps() - 1
-                                                            ? "Finish"
-                                                            : "Complete Step"}
-                                                    </Button>
-                                            ))}
-                                        </div>)
-                                    }
-                                </Box>
-                                <Box>
-                                    <div
-                                        className="parameters"
-                                        style={{ overflow: "auto" }}
-                                    >
-                                        {workflow.workflow[activeStep].data.formData.map(
-                                            (parameter: any) => {
-                                                return (
-                                                    <div
-                                                        className="parameter"
-                                                        style={{display: "flex",}}
-                                                        key={Math.random()}
-                                                    >
-                                                        <div className="parameter-name">
-                                                            {parameter.name}
-                                                        </div>
-                                                        <div
-                                                            className="parameter-separator"
-                                                            style={{marginLeft: 5, marginRight: 5,}}
-                                                        >
-                                                            :
-                                                        </div>
-                                                        <div className="parameter-value">
-                                                            <input
-                                                                type="text"
-                                                                value={parameter.value
-                                                                    ? parameter.value
-                                                                    : ""
-                                                                }
-                                                                onChange={(e) =>
-                                                                    (parameter.value = e.target.value)
-                                                                }
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }
-                                        )}
-                                    </div>
-                                </Box>
-                            </>
-                        </div>
-                    </AccordionDetails>
-                </Accordion>
             </div>
         </div>
     );
