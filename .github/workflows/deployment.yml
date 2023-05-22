@@ -38,3 +38,10 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      - name: Push to Staging
+        uses: fjogeleit/http-request-action@v1
+        if: github.ref == 'refs/heads/master'
+        with:
+          method: "POST"
+          url: ${{ secrets.PORTAINER_STAGING_WEBHOOK }}
+          preventFailureOnNoResponse: true
