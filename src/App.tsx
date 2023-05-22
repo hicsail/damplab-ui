@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import './styles/dominos.css';
 import MainFlow from './pages/MainFlow';
 import Checkout from './pages/Checkout';
 import Submitted from './pages/Submitted';

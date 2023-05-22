@@ -1,136 +1,150 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Stepper, Step, StepButton, StepIconProps, StepLabel } from "@mui/material";
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { useMutation } from "@apollo/client";
-import { UPDATE_WORKFLOW_STATE } from "../gql/mutations";
-import { styled } from "@mui/material";
+import { useQuery, useMutation } from "@apollo/client";
+import { UPDATE_WORKFLOW_STATE, MUTATE_NODE_STATUS, MUTATE_WORKFLOW_STATE } from "../gql/mutations";
+import { GET_JOB_BY_ID } from "../gql/queries";
+import { ColorlibStepIconRoot } from "../controllers/StepperHelpers"
 
 export default function DominosStepper(workflow: any) {
-    const [workflowNames, setWorkflowNames] = useState(
-        workflow.workflow.map((workflow: any) => {
-            return workflow.name;
+    const [nodeNames] = useState(
+        workflow.nodes.map((node: any) => {
+            return node.name;
         })
     );
-    const [activeStep, setActiveStep] = useState({} as any);
-    const [completed, setCompleted] = useState({} as any);
-    const [updateWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
+    const [nodeIds] = useState(
+        workflow.nodes.map((node: any) => {
+            return node.globalId;
+        })
+    );
+    const [activeSteps, setActiveSteps] = useState({} as any);
+    const [completedSteps, setCompletedSteps] = useState({} as any);
+    const [updateNodeStatus] = useMutation(MUTATE_NODE_STATUS, {
         onCompleted: (data) => {
-            console.log("successfully completed workflow:", data);
+            console.log("successfully updated node:", data);
         },
         onError: (error: any) => {
             console.log(error.networkError?.result?.errors);
-            console.log("error completing workflow", error);
+            console.log("error updating node", error);
         },
     });
+    const [updateWorkflowMutation] = useMutation(MUTATE_WORKFLOW_STATE, {
+        onCompleted: (data) => {
+            console.log('successfully updated workflow:', data);
+        },
+        onError: (error: any) => {
+            console.log(error.networkError?.result?.errors);
+            console.log('error updated workflow', error);
+        }
+    });
 
-    const totalSteps = () => {
-        return workflowNames.length;
-    };
-
-    const completedSteps = () => {
-        return Object.keys(completed).length;
+    const atLeastOneStepActive = () => {
+        // return Object.keys(activeSteps).length > 0;
+        for (var val of Object.entries(activeSteps)) {
+            if (val[1] == true) return true; 
+        }
+        return false;
     };
 
     const allStepsCompleted = () => {
-        return completedSteps() === totalSteps();
+        // return Object.keys(completedSteps).length === nodeNames.length;
+        for (var val of Object.entries(completedSteps)) {
+            if (val[1] == false) return false;
+        }
+        return true;
     };
 
     const activateStep = (step: number) => () => {
-        const newActiveStep: any = activeStep; 
+        const newActiveStep: any = activeSteps; 
         newActiveStep[step] = true;
-        setActiveStep(newActiveStep);
-        updateWorkflowMutation();
+        setActiveSteps(newActiveStep);
+
+        const newCompleted: any = completedSteps; 
+        newCompleted[step] = false;
+        setCompletedSteps(newCompleted);
+
+        updateNode(nodeIds[step], 'IN_PROGRESS');
+        // console.log(activeSteps[step], completedSteps[step]);
     }; 
 
     const completeStep = (step: number) => () => {
-        const newCompleted: any = completed; 
-        newCompleted[step] = true;
-        setCompleted(newCompleted);
-
-        const newActiveStep: any = activeStep; 
+        const newActiveStep: any = activeSteps; 
         newActiveStep[step] = false;
-        setActiveStep(newActiveStep);
+        setActiveSteps(newActiveStep);
 
-        updateWorkflowMutation();
+        const newCompleted: any = completedSteps; 
+        newCompleted[step] = true;
+        setCompletedSteps(newCompleted);
 
-        // if (allStepsCompleted()) {
-        //     completeWorkflow();
-        // }
+        updateNode(nodeIds[step], 'COMPLETE');
+        // console.log(activeSteps[step], completedSteps[step]);
     }; 
 
     const deactivateStep = (step: number) => () => {
-        const newCompleted: any = completed; 
-        newCompleted[step] = false;
-        setCompleted(newCompleted);
-
-        const newActiveStep: any = activeStep; 
+        const newActiveStep: any = activeSteps; 
         newActiveStep[step] = false;
-        setActiveStep(newActiveStep);
+        setActiveSteps(newActiveStep);
 
-        updateWorkflowMutation();
+        const newCompleted: any = completedSteps; 
+        newCompleted[step] = false;
+        setCompletedSteps(newCompleted);
+
+        updateNode(nodeIds[step], 'QUEUED');
+        // console.log(activeSteps[step], completedSteps[step]);
     }; 
 
-    const startWorkflow = () => {
-        let updateWorkflowState = {
-            workflowId: workflow.id,
-            state: "IN_PROGRESS",
-        };
-        updateWorkflowMutation({
-            variables: { updateWorkflowState: updateWorkflowState },
+    const updateNode = (globalId: string, status: string) => {
+        updateNodeStatus({
+            variables: { _ID: globalId, State: status }
         });
-    };
+    }
 
-    const stopWorkflow = () => {
-        let updateWorkflowState = {
-            workflowId: workflow.id,
-            state: "QUEUED",
-        };
-        updateWorkflowMutation({
-            variables: { updateWorkflowState: updateWorkflowState },
-        });
-    };
-
-    const completeWorkflow = () => {
-        console.log("All workflow servivices completed")
-        let updateWorkflowState = {
-            workflowId: workflow.id, 
-            state: "COMPLETE",
-        };
-        updateWorkflowMutation({
-            variables: { updateWorkflowState: updateWorkflowState }, 
-        });
-    };
-
-    const ColorlibStepIconRoot = styled('div')<{
-        ownerState: { completed?: boolean; active?: boolean };
-      }>(({ theme, ownerState }) => ({
-        backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : '#aaa',
-        zIndex: 1,
-        width: 65,              height: 65,
-        display: 'flex',        justifyContent: 'center',   alignItems: 'center',
-        borderRadius: '50%',    boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
-        ...(ownerState.active && {backgroundImage:
-            'linear-gradient( 136deg, rgb(128,128,255) 0%, rgb(64,64,255) 50%, rgb(0,0,255) 100%)',
-        }),
-        ...(ownerState.completed && {backgroundImage:
-            'linear-gradient( 136deg, rgb(0,255,0) 0%, rgb(32,128,32) 50%, rgb(64,128,64) 100%)',
-        })
-    }));
-      
     function ColorlibStepIcon(props: StepIconProps) {
         const { active, completed, className } = props;
         let image: any;
         completed 
             ? image = <CheckCircleOutlineIcon fontSize="large" sx={{color: "white"}}/>
             : image = <img className={className} 
-                       src={workflow.workflow[Number(props.icon)-1].data.icon} 
+                       src={workflow.nodes[Number(props.icon)-1].icon} 
                        width="50" height="50" />
         return (
             <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>
                 {image}
             </ColorlibStepIconRoot>
         );
-    }
+    };
+
+    useEffect(() => {
+        nodeNames.map((label: string, index: number) => (
+            workflow.nodes[index].state === 'COMPLETE' 
+            ? (activeSteps[index] = false, completedSteps[index] = true)  
+            : workflow.nodes[index].state === 'IN_PROGRESS' 
+            ? (activeSteps[index] = true,  completedSteps[index] = false) 
+            : (activeSteps[index] = false, completedSteps[index] = false)
+        ))
+    }, [ MUTATE_NODE_STATUS ]);
+
+    useEffect(() => {
+        let state: string;
+        console.log(workflow.id, "complete:", allStepsCompleted(), "active:", atLeastOneStepActive(), "first step:", completedSteps[1]);
+        if ( allStepsCompleted() && workflow.workflowState!='COMPLETE') {
+            state = 'COMPLETE'
+        } else if ( atLeastOneStepActive() && workflow.workflowState!='IN_PROGRESS') {
+            state = 'IN_PROGRESS'
+        } else if ( workflow.workflowState!='QUEUED' ) {
+            state = 'QUEUED'
+        } else {
+            return
+        }; 
+
+        const updateWorkflow = (workflowId: string) => {
+            updateWorkflowMutation({
+                variables: { ID: workflowId, State: state }
+            });
+        }
+
+        updateWorkflow(workflow.id);
+    }, [ activeSteps, completedSteps ]);
 
     return (
         <div>
@@ -138,29 +152,33 @@ export default function DominosStepper(workflow: any) {
                 <Stepper
                     nonLinear
                     alternativeLabel 
-                    activeStep = {activeStep}
-                    style={{ overflowX: "auto", padding: "25px", textAlign: 'center', fontSize: "12px"}}
+                    activeStep = {activeSteps}
+                    style={{ overflowX: "auto", padding: "25px", textAlign: 'center', 
+                             fontSize: "11px",  lineHeight: "1.2" }}
                     connector={null}
                 > 
-                    {workflowNames.map((label: string, index: number) => ( 
-                        <Step key={label} completed={completed[index]} active={activeStep[index]}>
-                            {workflow.workflow[index].technicianFirst  
-                                ? workflow.workflow[index].technicianFirst 
+                    {nodeNames.map((label: string, index: number) => ( 
+                        <Step key={label} 
+                              completed={completedSteps[index]} 
+                              active={activeSteps[index]}
+                        >
+                            {workflow.nodes[index].technicianFirst  
+                                ? workflow.nodes[index].technicianFirst 
                                 : ""
                             }<br/> 
-                            {workflow.workflow[index].technicianLast 
-                                ? workflow.workflow[index].technicianLast 
+                            {workflow.nodes[index].technicianLast 
+                                ? workflow.nodes[index].technicianLast 
                                 : "Unassigned"
                             }<br/><br/>
                             <StepButton onClick={
-                                activeStep[index] === true ? completeStep(index) : 
-                                completed[index] === true ? deactivateStep(index) :
+                                activeSteps[index]    === true ? completeStep(index) :
+                                completedSteps[index] === true ? deactivateStep(index) :
                                 activateStep(index)
                             }>
                                 <StepLabel StepIconComponent={ColorlibStepIcon}>
-                                    <span style={{fontSize: "11px"}}>
+                                    <div style={{fontSize: "11px"}}>
                                         {label}
-                                    </span>
+                                    </div>
                                 </StepLabel> 
                             </StepButton>
                         </Step>

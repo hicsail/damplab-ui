@@ -80,3 +80,27 @@ export const GET_JOB_BY_ID = gql`
         }
     }
 `;
+
+// workflow retrieval by state:(QUEUED | IN_PROGRESS | COMPLETE)
+export const GET_WORKFLOWS_FOR_DOMINOS = gql`
+    query GetWorkflowByState($state: WorkflowState!) {
+        getWorkflowByState(state: $state) {
+            id
+            name
+            state
+            # dueDate
+            # timeCompleted
+            nodes {
+                id
+                _id
+                label
+                state
+                # technicianFirst
+                # technicianLast
+                service {
+                    icon
+                }
+            }
+        }
+    }
+`;

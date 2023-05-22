@@ -235,6 +235,24 @@ export const searchForEndService : any = (serviceId : string, endServiceId: stri
     return null;
   };
 
+export const transformGQLforDominos = (workflow: any) => {
+    let nodes = workflow.nodes.map((node: any) => {
+        return {
+            id      : node.service.id,
+            globalId: node._id,
+            name    : node.label,
+            state   : node.state,
+                // technicianFirst: node.technicianFirst,
+                // technicianLast: node.technicianLast,
+            icon: node.service.icon,
+        };
+    });
 
-
-
+    const val: any = {
+        id   : workflow.id,
+        name : workflow.name,
+        state: workflow.state,
+        nodes: nodes,
+    };
+    return val;
+};
