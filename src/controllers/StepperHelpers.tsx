@@ -16,3 +16,18 @@ export const ColorlibStepIconRoot = styled('div')<{
         'linear-gradient( 136deg, rgb(0,255,0) 0%, rgb(32,128,32) 50%, rgb(64,128,64) 100%)',
     })
 }));
+
+// Check statuses of steps in the workflow in the DominosStepper
+export const atLeastOneServiceActive = (serviceStatuses: any) => {
+    for (var val of Object.entries(serviceStatuses)) {
+        if (val[1] === 'in_progress' || val[1] === 'complete') return true; 
+    }
+    return false;
+};
+
+export const allServicesCompleted = (serviceStatuses: any) => {
+    for (var val of Object.entries(serviceStatuses)) {
+        if (val[1] !== 'complete') return false;
+    }
+    return true;
+};
