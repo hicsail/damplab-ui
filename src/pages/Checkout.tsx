@@ -125,7 +125,7 @@ export default function Checkout() {
                     </Accordion>
                 </div>
                 <div style={{ padding: 30 }}>
-                    <Typography variant='body1'>Your Infomration</Typography>
+                    <Typography variant='body1'>Your Information</Typography>
                     <FormControl>
                         <TextField label="Job Name" margin="dense" variant="outlined" inputRef={jobRef}  required />
                         <TextField label="Submitter Name" margin="dense" variant="outlined" inputRef={userRef}  required />
