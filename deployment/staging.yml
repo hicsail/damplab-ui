@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  damplab-ui-client:
+    image: hicsail/damplab-ui:master
+    restart: always
+    container_name: damplab-ui-client
+    ports:
+      - 3003:80

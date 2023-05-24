@@ -2,7 +2,6 @@
   "name": "damplab-ui",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://sail.codes/damplab-ui",
   "dependencies": {
     "@apollo/client": "^3.7.4",
     "@emotion/react": "^11.10.4",
