@@ -36,9 +36,10 @@ export default function Tracking() {
     });
 
     const transformGQLToWorkflow = (workflow: any) => {
+        console.log(workflow);
         let nodes = workflow.nodes.map((node: any) => {
             return {
-                id: node.service.id,
+                id: node.id,
                 name: node.service.name,
                 state: node.state,
                 data: {
@@ -63,7 +64,6 @@ export default function Tracking() {
             nodes: nodes,
             edges: edges
         }
-        console.log(val);
         return val;
     }
 

@@ -48,7 +48,6 @@ export default function MainFlow(data: any) {
     );
     const onConnect = useCallback((connection: Connection) => {
         let customConnection: any = connection;
-        console.log(services, nodes, customConnection.source, customConnection.target);
         if (!isValidConnection(services, nodes, customConnection.source, customConnection.target)) {
             customConnection.label = 'invalid connection';
             customConnection.style = { stroke: 'red' };

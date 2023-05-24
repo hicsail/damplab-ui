@@ -36,7 +36,6 @@ export default function ContextTestComponent() {
     useEffect(() => {
         // if (compare()) {
         setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
-        console.log(val.nodes.find((node: any) => node.id === val.activeComponentId));
     }, [val.activeComponentId]);
 
     const handleCloseToast = (event: React.SyntheticEvent | Event, reason?: string) => {

@@ -12,6 +12,8 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string): Nod
             nodeId: nodeId,
             name: parameter.name,
             type: parameter.type,
+            options: parameter.options ? parameter.options : null,
+            description: parameter.description,
             paramType: parameter.paramType ? parameter.paramType : null,
             resultParamValue: "",
             value: null,

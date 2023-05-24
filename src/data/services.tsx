@@ -121,7 +121,7 @@ export let services: Service[] = [
         id: 'pcr',
         name: 'PCR',
         icon: 'https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt',
-        description: '',
+        description: 'Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.',
         parameters: [
             {
                 id: 'melting-temp',
@@ -174,7 +174,7 @@ export let services: Service[] = [
             }
         ],
         allowedConnections: [
-            'run-gel', 'dpn1'
+            'run-gel', 'dpn1', 'gel-electrophoresis'
         ],
         categories: ['dna-assembly-cloning'],
         result: {
@@ -256,7 +256,7 @@ export let services: Service[] = [
         ],
         // allowed connections : purified dna from agrose gel extraction, mutagenesis, mutagensis by inverse pcr, perform pcr reaction, perform qpcr reaction, colony pcr,temperatue gradient test, colony PCR
         allowedConnections: [
-            'column-purification', 'mutagenesis', 'inverse-pcr', 'pcr', 'qpcr', 'colony-pcr', 'temperature-gradient-test', 'colony-pcr'
+            'column-purification', 'mutagenesis', 'inverse-pcr', 'pcr', 'qpcr', 'colony-pcr', 'temperature-gradient-test', 'colony-pcr', 'gibson-assembly'
         ],
     },
     {
@@ -289,7 +289,8 @@ export let services: Service[] = [
     {
         id: 'gibson-assembly',
         name: 'Gibson Assembly',
-        icon: 'https://drive.google.com/uc?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I', // go find it
+        icon: 'https://drive.google.com/uc?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I',
+        description: 'Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously.',
         parameters: [
             {
                 id: 'template-dna',
@@ -547,6 +548,7 @@ export let services: Service[] = [
         id: 'transformation',
         name: 'Transformation',
         icon: 'https://drive.google.com/uc?id=1JRRNNrprfVjobLCnNRUUvCcRiJ0TkVI0',
+        description: 'Transform cells with DNA',
         resultParams: ['m-cloning-product', 'antibiotic-workflow'],
         parameters: [
             {
@@ -628,7 +630,7 @@ export let services: Service[] = [
             }
         ],
         allowedConnections: [
-            'overnight-culture', 'plate-storage'
+            'overnight-culture', 'plate-storage', 'overnight-culture'
         ],
         categories: ['fluorescence-based-assays'],
         result: {
@@ -640,6 +642,7 @@ export let services: Service[] = [
         id: 'overnight-culture',
         name: 'Overnight Inoculum',
         icon: 'https://drive.google.com/uc?id=1Wckp8P3GwvJw-7_tb1DevtSVCFPaevcG',
+        description: 'Grow cells overnight',
         resultParams: ['transformation-product', 'antibiotic-workflow'],
         parameters: [
             {
@@ -725,7 +728,8 @@ export let services: Service[] = [
         ],
         allowedConnections: [
             'miniprep',
-            'storage'
+            'storage',
+            'miniprep-gs'
         ],
         categories: ['culturing-media'],
         result: {
@@ -737,7 +741,7 @@ export let services: Service[] = [
         id: 'miniprep-gs',
         name: 'Miniprep and Glycerol Stock',
         icon: 'https://drive.google.com/uc?id=1Lam_nDy2e5CwjAK_TU6L1zPAEAeZGRqw',
-        description: 'we use thermofisher no charge spin switch',
+        description: 'We use thermofisher, no charge spin switch',
         resultParams: ['overnight-culture-product'],
         parameters: [
             {
@@ -782,7 +786,7 @@ export let services: Service[] = [
         icon: 'https://drive.google.com/uc?id=1Gdv5OByXeIQET13AowTdKAEKrC-687TH',
         categories: ['dna-rna'],
         allowedConnections: [
-            'bioanalyzer', 'rna-extraction',
+            'bioanalyzer', 'rna-extraction', 'gel'
         ],
         parameters: [
             {

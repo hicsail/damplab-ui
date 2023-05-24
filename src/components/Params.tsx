@@ -1,17 +1,15 @@
 import React, { useEffect } from 'react';
 import { useFormik, } from 'formik';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { IconButton, TextField } from '@mui/material';
+import { FormControl, FormHelperText, IconButton, InputLabel, MenuItem, Select, TextField } from '@mui/material';
 
 interface ParamFormProps {
     activeNode: any; // Replace 'any' with the appropriate type for activeNode
 }
 
 export default function ({ activeNode }: ParamFormProps) {
-
     const initValues = () => {
         // init values using formDataState and setFormDataState
-        console.log('running init');
         let initValues: any = {};
         activeNode.data.formData.forEach((obj: any) => {
             if (obj.paramType === 'result') {
@@ -96,11 +94,42 @@ export default function ({ activeNode }: ParamFormProps) {
                         {
                             activeNode.data.formData.map((param: any) => {
                                 if (param.paramType !== 'result') {
-                                    param.description = "Numbers and base pairs 50bp - 10000bp"
-                                    return (
-                                        <TextField helperText={param.description ? param.description : null} size='small' key={param.id} label={param.name} type={param.type} value={formik.values[param.id] ? formik.values[param.id] : ""} name={param.id} onChange={formik.handleChange} onBlur={formik.handleBlur} sx={{mt:1, width: '20ch'}} />
-                                    )
-                                }
+                                    if (param.type === "dropdown") {
+                                      return (
+                                        <FormControl size='small' sx={{mt:1, width: '20ch'}} key={param.id}>
+                                          <InputLabel>{param.name}</InputLabel>
+                                          <Select
+                                            name={param.id}
+                                            value={formik.values[param.id] ? formik.values[param.id] : ""}
+                                            onChange={formik.handleChange}
+                                            onBlur={formik.handleBlur}
+                                          >
+                                            {param.options.map((option: any) => (
+                                              <MenuItem key={option.id} value={option.id}>
+                                                {option.name}
+                                              </MenuItem>
+                                            ))}
+                                          </Select>
+                                          <FormHelperText>{param.description ? param.description : null}</FormHelperText>
+                                        </FormControl>
+                                      );
+                                    } else {
+                                      return (
+                                        <TextField
+                                          helperText={param.description ? param.description : null}
+                                          size='small'
+                                          key={param.id}
+                                          label={param.name}
+                                          type={param.type}
+                                          value={formik.values[param.id] ? formik.values[param.id] : ""}
+                                          name={param.id}
+                                          onChange={formik.handleChange}
+                                          onBlur={formik.handleBlur}
+                                          sx={{mt:1, width: '20ch'}}
+                                        />
+                                      );
+                                    }
+                                  }
                             })
                         }
                     </div>

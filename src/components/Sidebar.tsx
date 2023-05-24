@@ -46,7 +46,6 @@ export default () => {
   // execute query to get categories
   const { loading, error, data } = useQuery(GET_CATEGORIES, {
     onCompleted: (data) => {
-      console.log('data', data);
       setCategories(data.categories);
     },
     onError: (error) => {

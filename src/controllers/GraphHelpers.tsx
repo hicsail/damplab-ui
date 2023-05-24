@@ -17,7 +17,6 @@ export const isValidConnection = (services: any, nodes: any, sourceId: any, targ
     // get service data from source and target
     const sourceService = getServiceFromId(services, sourceNode?.data.serviceId);
     const targetService = getServiceFromId(services, targetNode?.data.serviceId);
-    console.log(sourceService, targetService);
     
     // check if target is in source.allowedConnections when source.allowedConnections contains a list of objects with id and name of services
     if (sourceService?.allowedConnections) {
