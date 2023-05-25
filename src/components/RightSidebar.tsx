@@ -1,8 +1,8 @@
 import React, { useState, useContext, useEffect } from 'react'
 import { CanvasContext } from '../contexts/Canvas'
-import NodeButton from './NodeButton';
+import NodeButton from './AllowedConnectionButton';
 import { getServiceFromId } from '../controllers/GraphHelpers';
-import { Button, Input } from '@mui/material';
+import { Button } from '@mui/material';
 import Snackbar from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
@@ -10,9 +10,7 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
-import ParamsForm from './ParamsForm';
 import { AppContext } from '../contexts/App';
-import { useQuery } from '@apollo/client';
 import Params from './Params';
 
 export default function ContextTestComponent() {

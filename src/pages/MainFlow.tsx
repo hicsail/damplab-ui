@@ -14,7 +14,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
 import Sidebar from '../components/Sidebar';
-import CustomDemoNode from '../components/CustomDemoNode';
+import CustomDemoNode from '../components/CanvasNode';
 import RightSidebar from '../components/RightSidebar';
 import { CanvasContext } from '../contexts/Canvas';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
