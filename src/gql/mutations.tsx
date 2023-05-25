@@ -28,3 +28,27 @@ export const UPDATE_WORKFLOW_STATE = gql`
         }
     }
 `;
+
+export const MUTATE_WORKFLOW_STATE = gql`
+    mutation updateWorkflowState($ID: ID!, $State: WorkflowState!) {
+        changeWorkflowState(
+            workflow: $ID,
+            newState: $State
+        ) {
+            id
+            state
+        }
+    }
+`;
+
+export const MUTATE_NODE_STATUS = gql`
+    mutation changeWorkflowNodeState($_ID: ID!, $State: WorkflowNodeState!) {
+        changeWorkflowNodeState(
+            workflowNode: $_ID,
+            newState: $State
+        ) {
+            _id
+            state
+        }
+    }
+`;

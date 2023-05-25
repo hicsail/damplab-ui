@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import './styles/dominos.css';
 import MainFlow from './pages/MainFlow';
 import Checkout from './pages/Checkout';
 import Submitted from './pages/Submitted';
+import Dominos from "./pages/Dominos";
 import { BrowserRouter, Routes, Route, } from "react-router-dom";
 import HeaderBar from './components/HeaderBar';
 import { CanvasContext } from './contexts/Canvas';
@@ -63,6 +65,7 @@ function App() {
                   <Route path="/submitted" element={<JobSubmitted />} />
                   <Route path="/tracking/:id" element={<Tracking />} />
                   <Route path="/accepted" element={<Accepted />} />
+                  <Route path="/dominos" element={<Dominos />} />
                   <Route path="/elabs" element={<ELabs />} />
                   <Route path="/callback" element={<ELabs />} />
                   <Route path="/*" element={<div>404 Route not found</div>} />
