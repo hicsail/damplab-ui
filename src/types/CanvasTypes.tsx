@@ -15,7 +15,10 @@ export type NodeParameter = {
     nodeId: string;
     name: string;
     type: string;
+    options?: any[];
+    description: string;
     paramType: string;
+    resultParamValue: string;
     value: any;
     required: boolean;
 }

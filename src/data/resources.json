@@ -1,0 +1,49 @@
+{    
+    "categories": [
+        {
+            "id": "plastics",
+            "sub-category": "MANUAL",
+            "executionTime": 150 
+        },
+        {
+            "id": "chem",
+            "sub-category": "MANUAL",
+            "executionTime": 150 
+        },
+        {
+            "id": "misc",
+            "sub-category": "MANUAL",
+            "executionTime": 150 
+        }
+    ],
+    "items" : [
+       {
+            "id": "pcr",
+            "name": "PCR-TUBE",
+            "category": [
+                "plastics"
+            ]
+       },
+       {
+            "id": "hifi",
+            "name": "HiFi DNA Assembly Master Mix",
+            "category": [
+                "chem"
+            ]
+       },
+       {
+        "id": "hifi",
+        "name": "HiFi DNA Assembly Master Mix",
+        "category": [
+                "chem"
+        ]
+        },
+        {
+            "id": "free-tube",
+            "name": "1.5 mL RNase free tube",
+            "category": [
+                "plastics"
+            ]
+        }
+    ]
+}
