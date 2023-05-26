@@ -2,7 +2,7 @@ import { useQuery } from '@apollo/client';
 import React, { useState } from 'react'
 import { useParams } from 'react-router-dom';
 import { GET_JOB_BY_ID } from '../gql/queries';
-import { Box, InputLabel, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, CardActions, InputLabel, Typography } from '@mui/material';
 import WorkflowStepper from '../components/WorkflowStepper';
 import WorkflowSteps from '../components/WorkflowSteps';
 
@@ -67,19 +67,24 @@ export default function Tracking() {
         return val;
     }
 
-    return (
-        <div style={{ textAlign: 'left', padding: '5vh' }}>
-            <Typography variant="h3">Job Tracking</Typography>
-            <Box sx={{ flexDirection: 'column', p: 1, m: 1 }}>
-                <Typography variant="h5" style={{marginBottom: 15}}>Details</Typography>
-                <Typography>Name: {workflowName}</Typography>
-                <Typography>State : IN REVIEW</Typography>
-                <Typography>Submitter: {workflowUsername}</Typography>
-                <Typography>Institution: {workflowInstitution}</Typography>
-                <Typography>Email: {workflowEmail}</Typography>
+    const card = (
+        <Card>
+          <CardContent>
+            <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
+                <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">
+                  IN REVIEW
+                </Typography>
+                <Typography sx={{ fontSize: 12 }} color="text.secondary" align="right">
+                  {workflowInstitution}
+                </Typography>
             </Box>
+            <Typography variant="h5" component="div">
+              {workflowName}
+            </Typography>
+            <Typography sx={{ fontSize:12 }} color="text.secondary" display = {{ marginBottom: 50}} >
+              {workflowUsername} ({workflowEmail})
+            </Typography>
             <Box>
-                <Typography variant="h5" style={{marginBottom: 50}}>Workflow</Typography>
                 {
                     workflows.map((workflow: any) => {
                         return (
@@ -88,7 +93,16 @@ export default function Tracking() {
                     })
                 }
             </Box>
+          </CardContent>
+        </Card>
+      );
 
+    return (
+        <div style={{ textAlign: 'left', padding: '5vh' }}>
+            <Typography variant="h3">Job Tracking</Typography>
+            <Box sx={{ flexDirection: 'column', p: 1, m: 1 }}>
+                {card}
+            </Box>
         </div>
     )
 }
