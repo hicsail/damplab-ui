@@ -2,7 +2,7 @@ import { useQuery } from '@apollo/client';
 import React, { useState } from 'react'
 import { useParams } from 'react-router-dom';
 import { GET_JOB_BY_ID } from '../gql/queries';
-import { Box, Button, Card, CardContent, CardActions, InputLabel, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, InputLabel, Typography } from '@mui/material';
 import WorkflowStepper from '../components/WorkflowStepper';
 import WorkflowSteps from '../components/WorkflowSteps';
 
@@ -67,7 +67,7 @@ export default function Tracking() {
         return val;
     }
 
-    const card = (
+    const jobCard = (
         <Card>
           <CardContent>
             <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
@@ -101,7 +101,7 @@ export default function Tracking() {
         <div style={{ textAlign: 'left', padding: '5vh' }}>
             <Typography variant="h3">Job Tracking</Typography>
             <Box sx={{ flexDirection: 'column', p: 1, m: 1 }}>
-                {card}
+                {jobCard}
             </Box>
         </div>
     )
