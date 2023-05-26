@@ -11,6 +11,7 @@ export default function Tracking() {
     const { id } = useParams();
     const [workflowName, setWorkflowName] = useState('');
     const [workflowState, setWorkflowState] = useState('');
+    const [jobState, setJobState] = useState('');
     const [workflowUsername, setWorkflowUsername] = useState('');
     const [workflowInstitution, setWorkflowInstitution] = useState('');
     const [workflowEmail, setWorkflowEmail] = useState('');
@@ -25,6 +26,7 @@ export default function Tracking() {
             console.log('job successfully loaded: ', data);
             setWorkflowName(data.jobById.name);
             setWorkflowState(data.jobById.workflows[0].state);
+            setJobState(data.jobById.state);
             setWorkflowUsername(data.jobById.username);
             setWorkflowInstitution(data.jobById.institute);
             setWorkflowEmail(data.jobById.email);
@@ -67,42 +69,71 @@ export default function Tracking() {
         return val;
     }
 
+    const jobStatusColor = () => {
+        switch (jobState) {
+            case 'CREATING':
+                return 'rgba(256, 256, 0, 0.5)'
+            case 'ACCEPTED':
+                return 'rgb(0, 256, 0, 0.5)';
+            case 'REJECTED':
+                return 'rgb(256, 0, 0, 0.5)';
+            default:
+                return 'rgb(0, 0, 0, 0)';
+        }
+    }
+
     const jobCard = (
         <Card>
           <CardContent>
-            <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
-                <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">
-                  IN REVIEW
-                </Typography>
-                <Typography sx={{ fontSize: 12 }} color="text.secondary" align="right">
-                  {workflowInstitution}
-                </Typography>
-            </Box>
-            <Typography variant="h5" component="div">
-              {workflowName}
-            </Typography>
-            <Typography sx={{ fontSize:12 }} color="text.secondary" display = {{ marginBottom: 50}} >
-              {workflowUsername} ({workflowEmail})
-            </Typography>
-            <Box>
+          <Typography sx={{ fontSize:12 }} color="text.secondary" align="left">{workflowName}</Typography> 
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
                 {
                     workflows.map((workflow: any) => {
                         return (
-                            <WorkflowSteps workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
+                        <WorkflowSteps workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
                         )
-                    })
+                })
                 }
-            </Box>
+            </Box>        
           </CardContent>
         </Card>
       );
 
     return (
         <div style={{ textAlign: 'left', padding: '5vh' }}>
-            <Typography variant="h3">Job Tracking</Typography>
-            <Box sx={{ flexDirection: 'column', p: 1, m: 1 }}>
-                {jobCard}
+            <Typography variant="h3" sx={{mb: 3}}>Job Tracking</Typography>
+
+            <Box sx={{display:'flex', justifyContent: 'space-between'}}>
+                <Typography variant="h4" align='left'>
+                  {workflowName}
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <Typography sx={{ fontSize:12 }} align="right">
+                      {workflowUsername} ({workflowEmail})
+                    </Typography>
+                    <Typography sx={{ fontSize:12 }} display={{ marginBottom: 20 }} align="right">
+                      {workflowInstitution}
+                    </Typography>
+                </Box>
             </Box>
+
+            <Box sx={{display: 'flex', justifyContent: 'space-between', py: 3, my: 2, bgcolor:jobStatusColor(), borderRadius: '8px'}}>
+                <Typography sx={{ fontSize: 15}} display = {{marginLeft: 20}} align="left">
+                  {jobState}
+                </Typography>
+                <Typography sx={{ fontSize: 15 }} display = {{marginRight: 20}} align="right">
+                  {id}
+                </Typography>
+            </Box>
+
+            <Box>
+                <Typography sx = {{ fontsize: 18}}> 
+                Workflows
+                </Typography>
+                <Box sx={{ flexDirection: 'column', p: 1, m: 1 }}>
+                    {jobCard}
+                </Box>
+            </Box>      
         </div>
     )
 }
