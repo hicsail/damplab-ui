@@ -1,8 +1,8 @@
 import React, { useState, useContext, useEffect } from 'react'
 import { CanvasContext } from '../contexts/Canvas'
-import NodeButton from './NodeButton';
-import { services } from '../data/services';
-import { Button, Input } from '@mui/material';
+import NodeButton from './AllowedConnectionButton';
+import { getServiceFromId } from '../controllers/GraphHelpers';
+import { Button } from '@mui/material';
 import Snackbar from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
@@ -10,12 +10,13 @@ import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
-import ParamsForm from './ParamsForm';
-import { addNodeToCanvasWithEdge } from '../controllers/GraphHelpers';
+import { AppContext } from '../contexts/App';
+import Params from './Params';
 
 export default function ContextTestComponent() {
 
     const val = useContext(CanvasContext);
+    const { services } = useContext(AppContext);
     const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
     const [openToast, setOpenToast] = useState(false);
     const [open, setOpen] = useState(false);
@@ -33,14 +34,7 @@ export default function ContextTestComponent() {
     useEffect(() => {
         // if (compare()) {
         setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
-        // } else {
-        //     handleClickOpen();
-        // }
     }, [val.activeComponentId]);
-
-    const getServiceFromId = (id: string) => {
-        return services.find((node: any) => node.id === id);
-    }
 
     const handleCloseToast = (event: React.SyntheticEvent | Event, reason?: string) => {
         if (reason === 'clickaway') {
@@ -48,9 +42,6 @@ export default function ContextTestComponent() {
         }
         setOpenToast(false);
     };
-
-    // click on node button to add node and edge to canvas
-        
 
     const action = (
         <React.Fragment>
@@ -69,11 +60,26 @@ export default function ContextTestComponent() {
     );
 
     return (
-        <div style={{ wordWrap: 'break-word', padding: 10, overflow: 'scroll', height: '80vh' }}>
+        <div style={{ wordWrap: 'break-word', padding: 20, overflow: 'scroll', height: '80vh', textAlign: 'left', }}>
+            <div>
+                <h2>
+                    {activeNode?.data.label}
+                </h2>
+            </div>
+            <div>
+                <p>
+                    Placeholder for high level description of the service and guidance around entering parameters
+                </p>
+            </div>
+            <div>
+                <p>
+                    Placeholder for high level output of the service and guidance around interpreting the results
+                </p>
+            </div>
             {
                 activeNode?.data.formData ? (
                     <div>
-                        <ParamsForm activeNode={activeNode} />
+                        <Params activeNode={activeNode} />
                     </div>
                 ) : null
             }
@@ -87,9 +93,9 @@ export default function ContextTestComponent() {
                     ) : null
                 }
                 {
-                    activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (activeNode.data.allowedConnections.map((connection: string) => {
+                    activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (activeNode.data.allowedConnections.map((connection: any) => {
                         return (
-                            <NodeButton key={Math.random().toString(36).substring(2, 9)} node={getServiceFromId(connection)} sourceId={val.activeComponentId} setNodes={val.setNodes} setEdges={val.setEdges} sourcePosition={activeNode.position} setActiveComponentId={val.setActiveComponentId}/>
+                            <NodeButton key={Math.random().toString(36).substring(2, 9)} node={getServiceFromId(services, connection.id)} sourceId={val.activeComponentId} setNodes={val.setNodes} setEdges={val.setEdges} sourcePosition={activeNode.position} setActiveComponentId={val.setActiveComponentId}/>
                         )
                     })) : null
                 }
@@ -132,6 +138,9 @@ export default function ContextTestComponent() {
                         </div>
                     )
                 }
+            </div>
+            <div>
+                <Button onClick={ ()=> console.log(JSON.stringify(val.nodes), JSON.stringify(val.edges))}>Print</Button>
             </div>
         </div>
     )

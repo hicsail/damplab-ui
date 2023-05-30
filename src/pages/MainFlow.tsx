@@ -7,23 +7,20 @@ import ReactFlow, {
     FitViewOptions,
     applyNodeChanges,
     applyEdgeChanges,
-   
     NodeChange,
     EdgeChange,
     Connection,
-    
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
 import Sidebar from '../components/Sidebar';
-import CustomDemoNode from '../components/CustomDemoNode';
-import HeaderBar from '../components/HeaderBar';
+import CustomDemoNode from '../components/CanvasNode';
 import RightSidebar from '../components/RightSidebar';
-
 import { CanvasContext } from '../contexts/Canvas';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import '../styles/sidebar.css';
 import { isValidConnection } from '../controllers/GraphHelpers';
+import { AppContext } from '../contexts/App';
 
 const nodeTypes = {
     selectorNode: CustomDemoNode,
@@ -33,12 +30,13 @@ const fitViewOptions: FitViewOptions = {
     padding: 0.2,   
 };
 
-
-export default function MainFlow() {
+export default function MainFlow(data: any) {
 
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
+    let {services} = useContext(AppContext);
+    //const [services, setServices] = useState(data.services);
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => setNodes((nds: any) => applyNodeChanges(changes, nds)),
@@ -50,10 +48,11 @@ export default function MainFlow() {
     );
     const onConnect = useCallback((connection: Connection) => {
         let customConnection: any = connection;
-        if (!isValidConnection(nodes, customConnection.source, customConnection.target)) {
+        if (!isValidConnection(services, nodes, customConnection.source, customConnection.target)) {
             customConnection.label = 'invalid connection';
             customConnection.style = { stroke: 'red' };
         }
+        else customConnection.style = { stroke: 'green' };
         setEdges((eds: any) => addEdge(customConnection, eds))
     },[setEdges, nodes]);
 
@@ -97,10 +96,9 @@ export default function MainFlow() {
             <div style={{ height: '100vh' }}>
                 <ReactFlowProvider>
                     <div className="reactflow-wrapper" style={{ height: '85vh', display: 'flex' }} ref={reactFlowWrapper}>
-                        <div style={{ maxWidth: '15%', borderRight: 'solid 1px' }}>
+                        <div style={{ maxWidth: '15%', textAlign: 'center', minWidth: 230, borderRight: 'solid 1px' }}>
                             <Sidebar />
                         </div>
-
                         <ReactFlow
                             nodes={nodes}
                             edges={edges}
@@ -120,10 +118,9 @@ export default function MainFlow() {
                             <Background />
                             <Controls />
                         </ReactFlow>
-                        <div style={{ minWidth: '15%', borderLeft: 'solid 1px' }}>
+                        <div style={{ minWidth: '10%', width: 450, borderLeft: 'solid 1px' }}>
                             <RightSidebar />
                         </div>
-
                     </div>
                 </ReactFlowProvider>
             </div>
