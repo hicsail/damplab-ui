@@ -2,9 +2,8 @@ import { useQuery } from '@apollo/client';
 import React, { useState } from 'react'
 import { useParams } from 'react-router-dom';
 import { GET_JOB_BY_ID } from '../gql/queries';
-import { Box, Button, Card, CardContent, InputLabel, Typography } from '@mui/material';
+import { Box, Card, CardContent, Typography } from '@mui/material';
 import { AccessTime, NotInterested, Check } from '@mui/icons-material';
-import WorkflowStepper from '../components/WorkflowStepper';
 import WorkflowSteps from '../components/WorkflowSteps';
 
 export default function Tracking() {
@@ -86,6 +85,8 @@ export default function Tracking() {
                 return ['rgb(0, 0, 0, 0)', <NotInterested />];
         }
     }
+    const jobStatusColor = jobStatus()[0];
+    const jobStatusIcon = jobStatus()[1];
 
     const workflowCard = (
         <Card>
@@ -105,20 +106,23 @@ export default function Tracking() {
         </Card>
       );
 
+    
+
+
     return (
         <div style={{ textAlign: 'left', padding: '5vh' }}>
             <Typography variant="h3" sx={{mb: 3}}>Job Tracking</Typography>
 
-            <Box sx={{py: 3, my: 2, mb: 1, bgcolor:jobStatus()[0], borderRadius: '8px'}}>
+            <Box sx={{py: 3, my: 2, mb: 1, bgcolor:jobStatusColor as any, borderRadius: '8px'}}>
                 <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
-                    <Typography sx={{ fontSize: 15}} display = {{marginLeft: 20}} align="left">
-                      {jobStatus()[1]} <b>{jobState}</b>
+                    <Typography sx={{ fontSize: 15}} display = {{marginLeft: '20'}} align="left">
+                      {jobStatusIcon} <b>{jobState}</b>
                     </Typography>
-                    <Typography sx={{ fontSize: 15 }} display = {{marginRight: 20}} align="right">
+                    <Typography sx={{ fontSize: 15 }} display = {{marginRight: '20'}} align="right">
                       <b>{id}</b>
                     </Typography>
                 </Box>
-                <Typography sx={{ fontSize: 12 }} display = {{marginTop: 5, marginLeft: 20, marginRight: 20}} align="left" >
+                <Typography sx={{ fontSize: 12 }} display = {{marginTop: '5', marginLeft: '20', marginRight: '20'}} align="left" >
                   <i>This is a description of what the current state means.</i>
                 </Typography>
             </Box>
@@ -133,7 +137,7 @@ export default function Tracking() {
                     <Typography sx={{ fontSize:12 }}>
                       <b>User: </b>{workflowUsername} ({workflowEmail})
                     </Typography>
-                    <Typography sx={{ fontSize:12 }} display={{ marginBottom: 20 }}>
+                    <Typography sx={{ fontSize:12 }} display={{ marginBottom: '20' }}>
                       <b>Organization: </b>{workflowInstitution}
                     </Typography>
                     
