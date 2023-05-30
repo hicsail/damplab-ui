@@ -11,6 +11,8 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Dialog from '@mui/material/Dialog';
 import { TextField } from '@mui/material';
 import { CanvasContext } from '../contexts/Canvas';
+import { useParams } from 'react-router-dom';
+import "../styles/resubmit.css";
 
 
 export default function HeaderBar() {
@@ -93,7 +95,9 @@ export default function HeaderBar() {
             
             onClose(selectedValue);
             if (file.nodes) setNodes(file.nodes);
+            // console.log("Load nodes: ", file.nodes);
             if (file.edges) setEdges(file.edges);
+            // console.log("Load edges: ", file.edges);
             setLoadOpen(false);
         };
       
@@ -121,7 +125,6 @@ export default function HeaderBar() {
                 })
             }
             </div>
-
           </Dialog>
         );
     }
@@ -162,18 +165,17 @@ export default function HeaderBar() {
                             <SaveOutlined style={{color: 'white'}}/>
                         
                     </IconButton>
-                    <IconButton
-                        
-                        size="large"
-                        aria-label="account of current user"
-                        aria-controls="menu-appbar"
-                        aria-haspopup="true"
-                        color="inherit"
-                    >
-                        <Link to="/checkout">
-                            <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
-                        </Link>
-                    </IconButton>
+                        {window.location.href.includes('resubmission')
+                        ? <Link to="/" className="a a--hover a--active">Resubmit Now</Link>
+                        : <IconButton 
+                            size="large"
+                            aria-label="account of current user"
+                            aria-controls="menu-appbar"
+                            aria-haspopup="true"
+                            color="inherit"
+                        >
+                            <Link to="/checkout"><ShoppingCartOutlinedIcon style={{color: 'white'}}/></Link> 
+                        </IconButton>}
                     </div>
                 </Toolbar>
                 <SimpleDialog

@@ -6,8 +6,19 @@ export const bodyText = createTheme({
         fontSize: 16,
     }, 
 });
+
 // bodyText.typography.body2 = {};  // for variatn; use variant="body2"
 export const StyledContainer = styled(Typography)(({ theme }) => ({
     display: 'flex',
     justifyContent: 'space-between'  
+}));
+
+export const StyledList = styled(Typography)(({ theme }) => ({
+    display: 'flex',
+    alignItems: 'flex-end',
+}));
+
+export const StyledBreak = styled(Typography)(({ theme }) => ({
+    flexBasis: '100%',
+    height: '0',
 }));

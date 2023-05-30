@@ -1,0 +1,15 @@
+.trackingStepper {
+    display: block;
+    height: 60px;
+    width: 60px;
+    line-height: 60px;
+
+    -moz-border-radius: 50%;
+    border-radius: 50%;
+
+    background-color: lightblue;
+    color: white;
+
+    text-align: center;
+    font-size: 2em;
+}

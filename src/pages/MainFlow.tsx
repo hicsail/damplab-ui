@@ -21,6 +21,11 @@ import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import '../styles/sidebar.css';
 import { isValidConnection } from '../controllers/GraphHelpers';
 import { AppContext } from '../contexts/App';
+import { useParams } from 'react-router-dom';
+import { useQuery } from '@apollo/client';
+import { GET_JOB_BY_ID } from '../gql/queries';
+import { addNodesAndEdgesFromServiceIdsAlt } from '../controllers/ResubmissionHelpers';
+
 
 const nodeTypes = {
     selectorNode: CustomDemoNode,
@@ -30,8 +35,8 @@ const fitViewOptions: FitViewOptions = {
     padding: 0.2,   
 };
 
-export default function MainFlow(data: any) {
-
+export default function MainFlow(datas: any) {
+    const { id } = useParams();
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
@@ -89,6 +94,34 @@ export default function MainFlow(data: any) {
 
         setNodes((nds: any) => nds.concat(newNode));
     }, [reactFlowInstance, nodes]);
+
+
+    const { loading, error, data, refetch } = useQuery(GET_JOB_BY_ID, {
+        variables: { id: id },
+        skip: id == undefined,
+        fetchPolicy: 'standby',
+        onCompleted: (data: any) => {
+            console.log('job successfully loaded: ', data);
+            data.jobById.workflows.map((workflow: any) => {
+                console.log(workflow);
+                let services: any[] = [];
+                let serviceIds: any[] = [];
+                workflow.nodes.map((node: any) => {
+                    services.push(node);
+                    serviceIds.push(node.id);
+                })
+                // console.log("services: ", services);
+                // console.log("serviceIds: ", serviceIds);
+                addNodesAndEdgesFromServiceIdsAlt(services, serviceIds, setNodes, setEdges);
+            })
+        },
+        onError: (error: any) => {
+            console.log(error.networkError?.result?.errors);
+        }
+    });
+    useEffect(() => {
+        refetch();
+    }, [])
 
 
     return (

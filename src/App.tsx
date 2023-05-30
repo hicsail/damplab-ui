@@ -54,12 +54,17 @@ function App() {
     <div className="App">
       <ApolloProvider client={client}>
         <AppContext.Provider value={{ services: services, bundles: bundles }}>
-          <CanvasContext.Provider value={{ nodes: nodes, edges: edges, setNodes: setNodes, setEdges: setEdges, activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId, nodeParams: nodeParams, setNodeParams: setNodeParams }}>
+          <CanvasContext.Provider value={{ nodes: nodes, edges: edges, 
+                                           setNodes: setNodes, setEdges: setEdges, 
+                                           activeComponentId: activeComponentId, 
+                                           setActiveComponentId: setActiveComponentId, 
+                                           nodeParams: nodeParams, setNodeParams: setNodeParams }}>
             <BrowserRouter>
               <HeaderBar />
               <div style={{ padding: 20 }}>
                 <Routes>
                   <Route path="/" element={<MainFlow services={services}/>} />
+                  <Route path="/resubmission/:id" element={<MainFlow services={services}/>} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/submitted/:id" element={<Submitted />} />
                   <Route path="/submitted" element={<JobSubmitted />} />
