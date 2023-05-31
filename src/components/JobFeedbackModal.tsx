@@ -1,4 +1,7 @@
 import React, { useState } from "react";
+import { useMutation } from '@apollo/client';
+import { MUTATE_JOB_STATE } from '../gql/mutations';
+
 import {
   Modal,
   FormControl,
@@ -29,8 +32,10 @@ const ModalBox = styled(Box)`
 
 
 function JobFeedbackModal(props: any) {
+  const { open, onClose, id } = props;
   const [feedbackType, setFeedbackType] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [newState, setNewState] = useState("");
 
   const handleFeedbackTypeChange = (event: any) => {
     setFeedbackType(event.target.value);
@@ -39,9 +44,26 @@ function JobFeedbackModal(props: any) {
   const handleFeedbackMessageChange = (event: any) => {
     setFeedbackMessage(event.target.value);
   };
+  
+  // define const variable for call
+  const [mutateJobState, { loading, error }] = useMutation(MUTATE_JOB_STATE);
 
   const handleSubmit = () => {
-    // Handle form submission here
+    // use ternary operator to update state
+    feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
+
+    // do mutation in database
+    mutateJobState({
+      variables: {
+        _ID: id,
+        State: newState,
+      },
+      onError: (error: any) => {
+        console.log(error.networkError?.result?.errors);
+      },
+    });
+
+    // print to console 
   };
 
   return (
