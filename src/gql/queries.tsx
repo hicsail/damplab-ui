@@ -57,6 +57,8 @@ export const GET_JOB_BY_ID = gql`
             username
             institute 
             email
+            state
+            submitted
             workflows {
                 id
                 state

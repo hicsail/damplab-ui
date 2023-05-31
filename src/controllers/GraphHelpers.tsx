@@ -260,3 +260,35 @@ export const transformGQLforDominos = (workflow: any) => {
     };
     return val;
 };
+
+export const transformGQLToWorkflow = (workflow: any) => {
+    console.log(workflow);
+    let nodes = workflow.nodes.map((node: any) => {
+        return {
+            id: node.id,
+            name: node.service.name,
+            state: node.state,
+            data: {
+                icon: node.service.icon,
+                formData: node.formData
+            },
+
+        }
+    });
+
+    let edges = workflow.edges.map((edge: any) => {
+        return {
+            source: edge.source.id,
+            target: edge.target.id
+        }
+    });
+
+    const val = {
+        id: workflow.id,
+        state: workflow.state,
+        name: workflow.name,
+        nodes: nodes,
+        edges: edges
+    }
+    return val;
+}
