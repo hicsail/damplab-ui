@@ -19,10 +19,7 @@ export default function Submitted() {
     const [workflowUsername, setWorkflowUsername] = useState('');
     const [workflowInstitution, setWorkflowInstitution] = useState('');
     const [workflowEmail, setWorkflowEmail] = useState('');
-    const [workflowNodes, setWorkflowNodes] = useState([]); // ▶ URLSearchParams {}
     const [workflows, setWorklows] = useState([]); // ▶ URLSearchParams {}
-
-
 
     const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
@@ -122,7 +119,6 @@ export default function Submitted() {
     useEffect(() => {
         console.log('submitted workflows: ', submittedWorkflows);
     }, [submittedWorkflows]);
-
 
     const jobStatus = () => {
         switch (jobState) {
