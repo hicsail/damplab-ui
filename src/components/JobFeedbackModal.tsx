@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useMutation } from '@apollo/client';
 import { MUTATE_JOB_STATE } from '../gql/mutations';
 
@@ -36,6 +36,7 @@ function JobFeedbackModal(props: any) {
   const [feedbackType, setFeedbackType] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [newState, setNewState] = useState("");
+  const [mutationCompleted, setMutationCompleted] = useState(false);
 
   const handleFeedbackTypeChange = (event: any) => {
     setFeedbackType(event.target.value);
@@ -45,25 +46,33 @@ function JobFeedbackModal(props: any) {
     setFeedbackMessage(event.target.value);
   };
   
-  // define const variable for call
   const [mutateJobState, { loading, error }] = useMutation(MUTATE_JOB_STATE);
 
-  const handleSubmit = () => {
-    // use ternary operator to update state
+  useEffect(() => {
+    if (mutationCompleted) {
+      onClose(); // Close the modal when the mutation is completed
+      setMutationCompleted(false)
+    }
+  }, [mutationCompleted, onClose]);
+
+
+  const handleSubmit = async () => {
     feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
 
-    // do mutation in database
-    mutateJobState({
-      variables: {
-        _ID: id,
-        State: newState,
-      },
-      onError: (error: any) => {
-        console.log(error.networkError?.result?.errors);
-      },
-    });
-
-    // print to console 
+    try {
+      await mutateJobState({
+        variables: {
+          _ID: id,
+          State: newState,
+        },
+        onError: (error: any) => {
+          console.log(error.networkError?.result?.errors);
+        },
+      });
+      setMutationCompleted(true); 
+    } catch (error) {
+      console.log(error);
+    }   
   };
 
   return (
