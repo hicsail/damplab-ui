@@ -22,8 +22,9 @@ import '../styles/sidebar.css';
 import { isValidConnection } from '../controllers/GraphHelpers';
 import { AppContext } from '../contexts/App';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { GET_JOB_BY_ID } from '../gql/queries';
+import { MUTATE_JOB_STATE } from '../gql/mutations';
 import { addNodesAndEdgesFromServiceIdsAlt } from '../controllers/ResubmissionHelpers';
 
 
@@ -96,6 +97,19 @@ export default function MainFlow(datas: any) {
     }, [reactFlowInstance, nodes]);
 
 
+    const [updateJobMutation] = useMutation(MUTATE_JOB_STATE, {
+        variables: { ID: id, State: 'SUBMITTED' },
+        onCompleted: (data) => {
+            console.log('successfully updated job state:', data);
+        },
+        onError: (error: any) => {
+            console.log(error.networkError?.result?.errors);
+            console.log('error updated job state', error);
+        }
+    });
+
+    
+    // TODO: Add to job status update to checkout (with new id)
     const { loading, error, data, refetch } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
         skip: id == undefined,
@@ -104,15 +118,15 @@ export default function MainFlow(datas: any) {
             console.log('job successfully loaded: ', data);
             data.jobById.workflows.map((workflow: any) => {
                 console.log(workflow);
-                let services: any[] = [];
-                let serviceIds: any[] = [];
+                let s: any[] = [];
+                let sIds: any[] = [];
                 workflow.nodes.map((node: any) => {
-                    services.push(node);
-                    serviceIds.push(node.id);
+                    s.push(node);
+                    sIds.push(node.id);
                 })
-                // console.log("services: ", services);
-                // console.log("serviceIds: ", serviceIds);
-                addNodesAndEdgesFromServiceIdsAlt(services, serviceIds, setNodes, setEdges);
+                // console.log("services: ", s);
+                // console.log("serviceIds: ", sIds);
+                addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
             })
         },
         onError: (error: any) => {
@@ -120,7 +134,9 @@ export default function MainFlow(datas: any) {
         }
     });
     useEffect(() => {
-        refetch();
+        if (id !== undefined) {
+            refetch();
+        }
     }, [])
 
 

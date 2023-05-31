@@ -1,4 +1,7 @@
+import { services } from '../data/services';
+import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
+import { Service } from '../types/Service';
 
 
 export const addNodesAndEdgesFromServiceIdsAlt = (services: any[], 
@@ -52,7 +55,7 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
         serviceId: service.service.id
     }
 
-    const newNode = createNodeObjectAlt(nodeId, service.name, 'selectorNode', position, nodeData);
+    const newNode = createNodeObjectAlt(nodeId, service.service.name, 'selectorNode', position, nodeData);
     // console.log("newNode: ", newNode);
 
     if (sourceId !== 'source') {

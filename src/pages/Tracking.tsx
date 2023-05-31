@@ -1,7 +1,8 @@
-import { useQuery } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import React, { useState } from 'react'
 import { useParams } from 'react-router-dom';
 import { GET_JOB_BY_ID } from '../gql/queries';
+import { MUTATE_JOB_STATE } from '../gql/mutations';
 import { Box, InputLabel, Typography } from '@mui/material';
 import Button from '@mui/material/Button';
 import WorkflowStepper from '../components/WorkflowStepper';
@@ -20,6 +21,7 @@ export default function Tracking() {
     const [workflowEmail, setWorkflowEmail] = useState('');
     const [workflowNodes, setWorkflowNodes] = useState([]); // ▶ URLSearchParams {}
     const [workflows, setWorklows] = useState([]); // ▶ URLSearchParams {}
+    // const [jobState, setJobState] = useState('');
 
 
 
@@ -71,73 +73,46 @@ export default function Tracking() {
         return val;
     }
 
-    // const acceptJob = () => {
-    //     let updateWorkflowState = {
-    //         workflowId: workflow.id,
-    //         state: 'APPROVED'
-    //     }
-    //     updateJobMutation({
-    //         variables: { updateWorkflowState: updateWorkflowState }
-    //     });
-    // }
 
-    // const returnJob = () => {
-    //     let updateWorkflowState = {
-    //         workflowId: workflow.id,
-    //         state: 'WAITING_FOR_SOW'  // TODO: Will need to change; temporary
-    //     }
-    //     updateJobMutation({
-    //         variables: { updateWorkflowState: updateWorkflowState }
-    //     });
-    // }
-
-    // const rejectJob = () => {
-    //     let updateWorkflowState = {
-    //         workflowId: workflow.id,
-    //         state: 'REJECTED'
-    //     }
-    //     updateJobMutation({
-    //         variables: { updateWorkflowState: updateWorkflowState }
-    //     });
-    // }
-
-    // const [updateJobMutation] = useMutation(MUTATE_WORKFLOW_STATE, {
-    //     onCompleted: (data) => {
-    //         console.log('successfully updated workflow state:', data);
-    //     },
-    //     onError: (error: any) => {
-    //         console.log(error.networkError?.result?.errors);
-    //         console.log('error updated workflow state', error);
-    //     }
-    // });
-
+    const [updateJobMutation] = useMutation(MUTATE_JOB_STATE, {
+        variables: { ID: id, State: 'WAITING_FOR_SOW' },
+        onCompleted: (data) => {
+            console.log('successfully updated job state:', data);
+        },
+        onError: (error: any) => {
+            console.log(error.networkError?.result?.errors);
+            console.log('error updated job state', error);
+        }
+    });
 
 
     return (
         <div style={{ textAlign: 'left', padding: '5vh' }}>
             <Typography variant="h3">Job Tracking</Typography>
-            {/* // TODO: Mutate state */}
-            <Button><Link to={"/resubmission/" + id}>Return to submitter...</Link></Button>
-            <Button><Link to={"/"}>Accept as is</Link></Button>
-            <Box sx={{ flexDirection: 'column', p: 1, m: 1 }}>
-                <Typography variant="h5" style={{marginBottom: 15}}>Details</Typography>
-                <Typography>Name        : {workflowName}</Typography>
-                <Typography>State       : IN REVIEW</Typography>
-                <Typography>Submitter   : {workflowUsername}</Typography>
-                <Typography>Institution : {workflowInstitution}</Typography>
-                <Typography>Email       : {workflowEmail}</Typography>
+            <Button 
+                href={"/resubmission/" + id} 
+                style={{marginLeft:8}}
+                // onClick={updateJobMutation()}
+            >Update job on Canvas...</Button>
+            <Box sx={{ flexDirection: 'column', p: 1, m: 1, mb: 5}} key={Math.random().toString(36).substring(2, 9)}>
+                <Typography variant="h5" style={{marginBottom: 10}}>Job Details</Typography>
+                <Typography sx={{ml:2}}>Name        : {workflowName}</Typography>
+                <Typography sx={{ml:2}}>State       : IN REVIEW</Typography>
+                <Typography sx={{ml:2}}>Submitter   : {workflowUsername}</Typography>
+                <Typography sx={{ml:2}}>Institution : {workflowInstitution}</Typography>
+                <Typography sx={{ml:2}}>Email       : {workflowEmail}</Typography>
             </Box>
-            <Box>
+            <Box sx={{ p: 1, m: 1 }}>
                 {workflows.map((workflow: any) => {return (
-                    <div style={{marginBottom: 50}}>
+                    <div style={{marginBottom: 50}} key={Math.random().toString(36).substring(2, 9)}>
                         <Typography variant="h5" style={{marginBottom: 15}}>Workflow: {workflow.name}</Typography>
-                        <div>
-                            {/* {workflow.parent !== 'checkout' && (
-                                <div>
-                                    <Button onClick={}>Flag</Button>
-                                    <Button onClick={acceptJob}>Validate</Button>
+                        <div style={{marginLeft: 2}}>
+                            {workflow.parent !== 'checkout' && (
+                                <div style={{marginBottom: 8}}>
+                                    <Button>Flag</Button>
+                                    <Button>Validate</Button>
                                 </div>
-                            )}     */}
+                            )}    
                         </div>
                         <Stepper>
                             <TrackingStepper 

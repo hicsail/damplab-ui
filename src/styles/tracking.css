@@ -1,15 +1,56 @@
+/* Makes a circle */
 .trackingStepper {
     display: block;
     height: 60px;
     width: 60px;
     line-height: 60px;
+    padding: 10px;
 
     -moz-border-radius: 50%;
     border-radius: 50%;
 
-    background-color: lightblue;
+    background-color: rgb(173, 173, 173);
     color: white;
+}
 
-    text-align: center;
-    font-size: 2em;
+.trackingStepperQueued {
+    display: block;
+    height: 60px;
+    width: 60px;
+    line-height: 60px;
+    padding: 10px;
+
+    -moz-border-radius: 50%;
+    border-radius: 50%;
+
+    background-color: rgba(173, 173, 173, 0.521);
+    color: white;
+}
+
+.trackingStepperInProgress {
+    display: block;
+    height: 60px;
+    width: 60px;
+    line-height: 60px;
+    padding: 10px;
+
+    -moz-border-radius: 50%;
+    border-radius: 50%;
+
+    background-color: #0000ff7c;
+    color: white;
+}
+
+.trackingStepperComplete {
+    display: block;
+    height: 60px;
+    width: 60px;
+    line-height: 60px;
+    padding: 10px;
+
+    -moz-border-radius: 50%;
+    border-radius: 50%;
+
+    background-color: #00800081;
+    color: white;
 }

@@ -166,7 +166,7 @@ export default function HeaderBar() {
                         
                     </IconButton>
                         {window.location.href.includes('resubmission')
-                        ? <Link to="/" className="a a--hover a--active">Resubmit Now</Link>
+                        ? <Link to="/checkout" className="a a--hover a--active">Resubmit...</Link>
                         : <IconButton 
                             size="large"
                             aria-label="account of current user"

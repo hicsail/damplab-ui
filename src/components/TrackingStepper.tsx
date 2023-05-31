@@ -16,6 +16,7 @@ import PendingIcon from '@mui/icons-material/Pending';
 import "../styles/tracking.css";
 import { StyledList, StyledBreak } from "../styles/themes";
 import Grid from '@mui/material/Grid';
+import Table from '@mui/material/Table';
 
 export default function TrackingStepper(workflow: any) {
 
@@ -75,11 +76,16 @@ export default function TrackingStepper(workflow: any) {
                     <div className='name-and-icon' style={{ display: 'flex', 
                         justifyContent: 'flex-start', margin: 15 }}
                     >
-                        <div className='icon' style={{marginRight:10}}>
-                            <img style={{ width: 60, padding: 10 }} className="trackingStepper"
-                                src={workflow.workflow[activeStep].data.icon} 
-                                alt={workflow.workflow[activeStep].name} 
-                            />
+                        <div id="container" style={{position: "relative", marginRight: 100}}>
+                            {/* <div id="div1" style={{position: "absolute", top:0, left:0}}>
+                                <span className={'trackingStepper'}></span>
+                            </div> */}
+                            <div id="div2" style={{position: "absolute", top:0, left:0, padding:10}}>
+                                <img src={workflow.workflow[activeStep].data.icon} 
+                                     alt={""}
+                                     width={60} height={60}
+                                />
+                            </div>
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1' sx={{ lineHeight: '80px', verticalAlign: 'middle' }}>
@@ -87,34 +93,27 @@ export default function TrackingStepper(workflow: any) {
                             </Typography>
                         </div>
                     </div>
-                    <div className='parameters'style={{overflow: 'auto'}}>
+                    <div className='parameters'style={{overflow: 'auto', marginBottom: '10px'}}>
                         {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
                             return (
                                 <div className='parameter' 
-                                    style={{ display: 'flex' }} 
+                                    style={{ display: 'flex', marginLeft: '16px', marginBottom: '10px'}} 
                                     key={Math.random()}
                                 >
-                                    <Typography>{parameter.name}</Typography>
-                                    <Typography>: &nbsp;</Typography>
                                     <Typography>
                                         <input type='text' 
                                             value={parameter.value ? parameter.value : ""} 
                                             onChange={(e) => parameter.value = e.target.value} 
                                         />
                                     </Typography>
-                                    {/* <Grid container>
-                                        <Grid container item xs={6} direction="column" alignItems={'flex-start'}>
-                                            {parameter.name}
-                                        </Grid>
-                                        <Grid container item xs={1} direction="column" justifyContent="right" alignItems="center">
-                                            : &nbsp;
-                                        </Grid>
-                                        <Grid container item xs={2} direction="column" alignItems={'flex-start'}>
-                                            <input type='text' 
-                                                value={parameter.value ? parameter.value : ""} 
-                                                onChange={(e) => parameter.value = e.target.value} 
-                                            />
-                                        </Grid>
+                                    <Typography>&nbsp; : &nbsp;</Typography>
+                                    <Typography>{parameter.name}</Typography>
+                                    {/* <Grid container width={window.innerWidth} wrap='nowrap'>
+                                        <Grid container item direction='column' alignItems='flex-start'>{parameter.name}</Grid>
+                                        <Grid container item direction='column' justifyContent='right' alignItems='center'>: &nbsp;</Grid>
+                                        <Grid container item direction='column' alignItems='flex-start'>
+                                            <input type='text' value={parameter.value ? parameter.value : ""} onChange={(e) => parameter.value = e.target.value} />
+                                        </Grid> 
                                     </Grid> */}
                                 </div>
                             )
