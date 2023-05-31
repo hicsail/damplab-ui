@@ -20,7 +20,7 @@ export default function Submitted() {
     const [workflowInstitution, setWorkflowInstitution] = useState('');
     const [workflowEmail, setWorkflowEmail] = useState('');
     const [workflows, setWorklows] = useState([]); // ▶ URLSearchParams {}
-
+    
     const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
         onCompleted: (data) => {
