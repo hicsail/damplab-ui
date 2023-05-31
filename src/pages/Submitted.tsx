@@ -156,33 +156,31 @@ export default function Submitted() {
 
     return (
         <div style={{ textAlign: 'left', padding: '5vh' }}>
-            <Typography variant="h3" sx={{mb: 3}}>Job Tracking</Typography>
-
-            <Box sx={{py: 3, my: 2, mb: 1, bgcolor:jobStatusColor as any, borderRadius: '8px'}}>
-                <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
-                    <Typography sx={{ fontSize: 15}} display = {{marginLeft: '20'}} align="left">
+            <Typography variant="h3" sx={{ mb: 3 }}>Job Tracking</Typography>
+            <Box sx={{ py: 3, px: 3, my: 2, mb: 1, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: 15 }} display={{ marginLeft: '20' }} align="left">
                     {jobStatusIcon} <b>{jobState}</b>
-                    </Typography>
-                    <Typography sx={{ fontSize: 15 }} display = {{marginRight: '20'}} align="right">
+                </Typography>
+                <Typography sx={{ fontSize: 15 }} display={{ marginRight: '20' }} align="right">
                     <b>{id}</b>
-                    </Typography>
+                </Typography>
                 </Box>
-                <Typography sx={{ fontSize: 12 }} display = {{marginTop: '5', marginLeft: '20', marginRight: '20'}} align="left" >
+                <Typography sx={{ fontSize: 12 }} display={{ marginTop: '5', marginLeft: '20', marginRight: '20' }} align="left" >
                 <i>This is a description of what the current state means.</i>
                 </Typography>
             </Box>
-
             <Box>
                 <Typography variant="h4" align='left'>
-                  {jobName}
+                {jobName}
                 </Typography>
-                <Typography sx={{ fontSize:12 }}>
+                <Typography sx={{ fontSize: 12 }}>
                 <b>Time: </b>{jobTime}
                 </Typography>
-                <Typography sx={{ fontSize:12 }}>
+                <Typography sx={{ fontSize: 12 }}>
                 <b>User: </b>{workflowUsername} ({workflowEmail})
                 </Typography>
-                <Typography sx={{ fontSize:12 }} display={{ marginBottom: '20' }}>
+                <Typography sx={{ fontSize: 12 }} display={{ marginBottom: '20' }}>
                 <b>Organization: </b>{workflowInstitution}
                 </Typography>
             </Box>
