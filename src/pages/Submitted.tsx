@@ -6,7 +6,10 @@ import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
 import { Box, Button, Card, CardContent, Typography, colors } from '@mui/material';
 import { AccessTime, NotInterested, Check } from '@mui/icons-material';
 import WorkflowStepper from '../components/WorkflowStepper';
+import WorkflowSteps from '../components/WorkflowSteps';
 import JobFeedbackModal from '../components/JobFeedbackModal';
+import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
+
 
 export default function Submitted() {
 
@@ -74,36 +77,7 @@ export default function Submitted() {
         setModalOpen(false);
     };
 
-    const transformGQLToWorkflow = (workflow: any) => {
-        let nodes = workflow.nodes.map((node: any) => {
-            return {
-                id: node.service.id,
-                name: node.service.name,
-                data: {
-                    icon: node.service.icon,
-                    formData: node.formData
-                },
-
-            }
-        });
-
-        let edges = workflow.edges.map((edge: any) => {
-            return {
-                source: edge.source.id,
-                target: edge.target.id
-            }
-        });
-
-        const val = {
-            id: workflow.id,
-            state: workflow.state,
-            name: workflow.name,
-            nodes: nodes,
-            edges: edges
-        }
-        console.log(val);
-        return val;
-    }
+  
 
     const [submittedWorkflows, setSubmittedWorkflows] = useState<any>([]);
 
@@ -138,17 +112,17 @@ export default function Submitted() {
     const workflowCard = (
         <Card>
           <CardContent>
-          <Typography sx={{ fontSize:12 }} color="text.secondary" align="left">{workflowName}</Typography> 
-          <Typography sx={{ fontSize:12 }} color="text.secondary" align="left">{workflowState}</Typography> 
-            <Box sx={{ p: 1, m: 1 }}>
+            <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflowName}</Typography>
+            <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflowState}</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
                 {
                     workflows.map((workflow: any) => {
-                        return (
-                            <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} id={workflow.id} />
-                        )
-                })
+                    return (
+                        <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
+                    )
+                    })
                 }
-            </Box>        
+            </Box>
           </CardContent>
         </Card>
       );
@@ -159,36 +133,36 @@ export default function Submitted() {
             <Typography variant="h3" sx={{ mb: 3 }}>Job Tracking</Typography>
             <Box sx={{ py: 3, px: 3, my: 2, mb: 1, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography sx={{ fontSize: 15 }} display={{ marginLeft: '20' }} align="left">
-                    {jobStatusIcon} <b>{jobState}</b>
-                </Typography>
-                <Typography sx={{ fontSize: 15 }} display={{ marginRight: '20' }} align="right">
-                    <b>{id}</b>
-                </Typography>
+                    <Typography sx={{ fontSize: 15 }} display={{ marginLeft: '20' }} align="left">
+                        {jobStatusIcon} <b>{jobState}</b>
+                    </Typography>
+                    <Typography sx={{ fontSize: 15 }} display={{ marginRight: '20' }} align="right">
+                        <b>{id}</b>
+                    </Typography>
                 </Box>
                 <Typography sx={{ fontSize: 12 }} display={{ marginTop: '5', marginLeft: '20', marginRight: '20' }} align="left" >
-                <i>This is a description of what the current state means.</i>
+                    <i>This is a description of what the current state means.</i>
                 </Typography>
             </Box>
             <Box>
                 <Typography variant="h4" align='left'>
-                {jobName}
+                    {jobName}
                 </Typography>
                 <Typography sx={{ fontSize: 12 }}>
-                <b>Time: </b>{jobTime}
+                    <b>Time: </b>{jobTime}
                 </Typography>
                 <Typography sx={{ fontSize: 12 }}>
-                <b>User: </b>{workflowUsername} ({workflowEmail})
+                    <b>User: </b>{workflowUsername} ({workflowEmail})
                 </Typography>
                 <Typography sx={{ fontSize: 12 }} display={{ marginBottom: '20' }}>
-                <b>Organization: </b>{workflowInstitution}
+                    <b>Organization: </b>{workflowInstitution}
                 </Typography>
             </Box>
             <Box>
                 <Box sx={{ flexDirection: 'column', p: 1, m: 1 }}>
                     {workflowCard}
                 </Box>
-            </Box>     
+            </Box>
 
             <Button onClick={handleOpenModal}>Review Job</Button>
             <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id} />
