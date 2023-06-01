@@ -1,8 +1,10 @@
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
 import React, { useEffect, useState, useRef } from 'react'
+import { useMutation } from '@apollo/client';
 import LoopIcon from '@mui/icons-material/Loop';
 import DoneIcon from '@mui/icons-material/Done';
 import PendingIcon from '@mui/icons-material/Pending';
+import { MUTATE_NODE_STATUS } from '../gql/mutations';
 // the purpose of this component is to showcase nodes in a workflow and their details
 export default function WorkflowStepper(workflow: any) {
 
@@ -17,6 +19,8 @@ export default function WorkflowStepper(workflow: any) {
         return service;
     }));
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [mutateNodeStatus, { loading, error }] = useMutation(MUTATE_NODE_STATUS);
+
 
     useEffect(() => {
         function handleResize() {
@@ -39,12 +43,22 @@ export default function WorkflowStepper(workflow: any) {
         setDialogOpen(false);
     };
 
-
-
     const selectStep = (index: number) => () => {
         setActiveStep(index);
         setDialogOpen(true);
     };
+
+    const updateWorkflowNode = (newState: string) => () => {
+        mutateNodeStatus({
+            variables: {
+              _ID: workflow.workflow[activeStep].id,
+              State: newState,
+            },
+            onError: (error: any) => {
+              console.log(error.networkError?.result?.errors);
+            },
+        });
+    }
 
     useEffect(() => {
         console.log(workflow);
@@ -122,9 +136,9 @@ export default function WorkflowStepper(workflow: any) {
                         </div>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '30px' }}>
-                        <Button color="inherit"><PendingIcon /></Button>
-                        <Button color="inherit"><LoopIcon /></Button>
-                        <Button color="inherit"><DoneIcon /></Button>
+                        <Button color="inherit" onClick={updateWorkflowNode("QUEUED")}><PendingIcon /></Button>
+                        <Button color="inherit" onClick={updateWorkflowNode("IN_PROGRESS")}><LoopIcon /></Button>
+                        <Button color="inherit" onClick={updateWorkflowNode("COMPLETE")}><DoneIcon /></Button>
                     </Box>
                 </DialogContent>
                 <DialogActions>
