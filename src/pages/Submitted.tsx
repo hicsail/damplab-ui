@@ -6,7 +6,7 @@ import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
 import { Box, Button, Card, CardContent, Typography, colors } from '@mui/material';
 import { AccessTime, NotInterested, Check } from '@mui/icons-material';
 import WorkflowStepper from '../components/WorkflowStepper';
-import WorkflowSteps from '../components/WorkflowSteps';
+import WorkflowSteps from '../components/TrackingStepper';
 import JobFeedbackModal from '../components/JobFeedbackModal';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 

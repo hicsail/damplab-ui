@@ -47,11 +47,11 @@ export default function WorkflowStepper(workflow: any) {
     const updateWorkflowNode = (newState: string) => () => {
         mutateNodeStatus({
             variables: {
-              _ID: workflow.workflow[activeStep].id,
-              State: newState,
+                _ID: workflow.workflow[activeStep].id,
+                State: newState,
             },
             onError: (error: any) => {
-              console.log(error.networkError?.result?.errors);
+                console.log(error.networkError?.result?.errors);
             },
         });
     }

@@ -1,12 +1,10 @@
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
 import React, { useEffect, useState, useRef } from 'react'
-import { useMutation } from '@apollo/client';
 import LoopIcon from '@mui/icons-material/Loop';
 import DoneIcon from '@mui/icons-material/Done';
 import PendingIcon from '@mui/icons-material/Pending';
-import { MUTATE_NODE_STATUS } from '../gql/mutations';
 // the purpose of this component is to showcase nodes in a workflow and their details
-export default function WorkflowStepper(workflow: any) {
+export default function TrackingStepper(workflow: any) {
 
     const windowSize = useRef([window.innerWidth, window.innerHeight]);
     const [isSmall, setIsSmall] = useState(false);
