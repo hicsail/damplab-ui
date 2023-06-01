@@ -52,3 +52,15 @@ export const MUTATE_NODE_STATUS = gql`
         }
     }
 `;
+
+export const MUTATE_JOB_STATE = gql`
+    mutation changeJobState($ID: ID!, $State: JobState!) {
+        changeJobState(
+            job: $ID,
+            newState: $State
+        ) {
+            id
+            state
+        }
+    }
+`;

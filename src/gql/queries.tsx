@@ -64,9 +64,17 @@ export const GET_JOB_BY_ID = gql`
                 state
                 name
                 nodes {
+                    id
+                    label
                     service {
+                        id
                         name
                         icon
+                        parameters
+                        allowedConnections {
+                            id
+                            name
+                        }
                     }
                     formData
                     state

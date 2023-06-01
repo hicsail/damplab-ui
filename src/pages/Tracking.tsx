@@ -6,6 +6,7 @@ import { Box, Card, CardContent, Typography } from '@mui/material';
 import { AccessTime, NotInterested, Check } from '@mui/icons-material';
 import WorkflowSteps from '../components/WorkflowSteps';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
+import TrackingStepper from '../components/TrackingStepper';
 
 export default function Tracking() {
 
@@ -59,21 +60,19 @@ export default function Tracking() {
   const jobStatusIcon = jobStatus()[1];
 
   const workflowCard = (
-    <Card>
-      <CardContent>
-        <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflowName}</Typography>
-        <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflowState}</Typography>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
-          {
-            workflows.map((workflow: any) => {
-              return (
-                <WorkflowSteps workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
-              )
-            })
-          }
-        </Box>
-      </CardContent>
-    </Card>
+    workflows.map((workflow: any) => {
+          return (
+            <Card>
+            <CardContent>
+                <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflow.name}</Typography>
+                <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflow.state}</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
+                        <WorkflowSteps workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
+                </Box>
+            </CardContent>
+            </Card>
+        )
+    })
   );
 
   return (

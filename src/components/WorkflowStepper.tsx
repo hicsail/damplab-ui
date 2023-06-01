@@ -105,7 +105,7 @@ export default function WorkflowStepper(workflow: any) {
                 }    
             </div>
             <div style={{ overflowX: 'auto' }}>
-                <Stepper nonLinear activeStep={activeStep} style={{ overflowX: 'auto' }}>
+                <Stepper nonLinear activeStep={activeStep} style={{ overflowX: 'auto', padding:'25px' }}>
                     {workflowNames.map((label: string, index: number) => (
                         <Step key={label} completed={completed[index]}>
                             <StepButton color="inherit" onClick={handleStep(index)}>

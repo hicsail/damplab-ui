@@ -1,0 +1,14 @@
+.a {
+    color: #FFF;
+    text-decoration: none;
+}
+
+.a:hover {
+    color: lightgreen;
+    text-decoration: none;
+}
+
+.a:active {
+    color: green;
+    text-decoration: none;
+}
