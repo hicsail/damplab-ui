@@ -64,6 +64,7 @@ export const GET_JOB_BY_ID = gql`
                 state
                 name
                 nodes {
+                    _id
                     id
                     label
                     service {
