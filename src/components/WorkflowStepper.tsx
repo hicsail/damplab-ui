@@ -10,10 +10,6 @@ export default function WorkflowStepper(workflow: any) {
 
     const windowSize = useRef([window.innerWidth, window.innerHeight]);
     const [isSmall, setIsSmall] = useState(false);
-    const [workflowNames, setWorkflowNames] = useState(workflow.workflow.map((workflow: any) => {
-        return workflow.name;
-    }));
-    const [workflowName, setWorkflowName] = useState(workflow.workflow.name);
     const [activeStep, setActiveStep] = useState(0);
     const [workflowServices, setWorkflowServices] = useState(workflow.workflow.map((service: any) => {
         return service;
