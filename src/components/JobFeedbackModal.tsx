@@ -89,12 +89,12 @@ function JobFeedbackModal(props: any) {
             <FormControlLabel
               value="looks-good"
               control={<Radio />}
-              label="Looks good"
+              label="Job Accepted"
             />
             <FormControlLabel
               value="minor-changes"
               control={<Radio />}
-              label="Minor changes"
+              label="Needs Minor Changes"
             />
             {feedbackType === "minor-changes" && (
               <TextField
@@ -110,7 +110,7 @@ function JobFeedbackModal(props: any) {
             <FormControlLabel
               value="major-changes"
               control={<Radio />}
-              label="Major changes"
+              label="Needs Major Changes"
             />
             {feedbackType === "major-changes" && (
               <TextField
@@ -126,7 +126,7 @@ function JobFeedbackModal(props: any) {
             )}
           </RadioGroup>
           {feedbackType && (
-            <Button variant="contained" onClick={handleSubmit}>
+            <Button variant="contained" color="inherit" onClick={handleSubmit}>
               {feedbackType === "looks-good"
                 ? "Accept Job"
                 : "Send Feedback"}

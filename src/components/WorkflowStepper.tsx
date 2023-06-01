@@ -45,6 +45,7 @@ export default function WorkflowStepper(workflow: any) {
     };
 
     const updateWorkflowNode = (newState: string) => () => {
+        // why is it workflow.workflow and not workflow.nodes?
         mutateNodeStatus({
             variables: {
                 _ID: workflow.workflow[activeStep].id,
@@ -53,7 +54,10 @@ export default function WorkflowStepper(workflow: any) {
             onError: (error: any) => {
                 console.log(error.networkError?.result?.errors);
             },
-        });
+            onCompleted: () => {
+                window.location.reload();
+            }
+        });   
     }
 
     useEffect(() => {

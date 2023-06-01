@@ -23,7 +23,7 @@ export default function Submitted() {
     const [workflowInstitution, setWorkflowInstitution] = useState('');
     const [workflowEmail, setWorkflowEmail] = useState('');
     const [workflows, setWorklows] = useState([]); // ▶ URLSearchParams {}
-    
+
     const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
         onCompleted: (data) => {
@@ -77,7 +77,7 @@ export default function Submitted() {
         setModalOpen(false);
     };
 
-  
+
 
     const [submittedWorkflows, setSubmittedWorkflows] = useState<any>([]);
 
@@ -111,21 +111,21 @@ export default function Submitted() {
 
     const workflowCard = (
         <Card>
-          <CardContent>
-            <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflowName}</Typography>
-            <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflowState}</Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
-                {
-                    workflows.map((workflow: any) => {
-                    return (
-                        <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
-                    )
-                    })
-                }
-            </Box>
-          </CardContent>
+            <CardContent>
+                <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflowName}</Typography>
+                <Typography sx={{ fontSize: 12 }} color="text.secondary" align="left">{workflowState}</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
+                    {
+                        workflows.map((workflow: any) => {
+                            return (
+                                <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
+                            )
+                        })
+                    }
+                </Box>
+            </CardContent>
         </Card>
-      );
+    );
 
 
     return (
@@ -163,12 +163,13 @@ export default function Submitted() {
                     {workflowCard}
                 </Box>
             </Box>
-
-            <Button onClick={handleOpenModal}>Review Job</Button>
+            <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <Button onClick={handleOpenModal} color="error" variant="contained">Review Job</Button>
+            </Box>
             <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id} />
-     
+
         </div>
-            
-            
+
+
     )
 }
