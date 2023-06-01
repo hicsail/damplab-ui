@@ -58,23 +58,31 @@ function JobFeedbackModal(props: any) {
 
   const handleSubmit = async () => {
     feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
+    
+    const updatedState = feedbackType === "looks-good" ? "ACCEPTED" : "REJECTED";
 
     try {
       await mutateJobState({
         variables: {
           _ID: id,
-          State: newState,
+          State: updatedState,
         },
         onError: (error: any) => {
           console.log(error.networkError?.result?.errors);
         },
+        onCompleted: () => {
+          window.location.reload();
+        }
       });
-      setMutationCompleted(true); 
+  
+      onClose(); // Close the modal after the mutation is completed
     } catch (error) {
       console.log(error);
-    }   
-  };
-
+    }
+  };  
+  
+  
+  
   return (
     <CenteredModal open={props.open} onClose={props.onClose}>
       <ModalBox>
