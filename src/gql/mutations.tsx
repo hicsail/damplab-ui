@@ -54,9 +54,9 @@ export const MUTATE_NODE_STATUS = gql`
 `;
 
 export const MUTATE_JOB_STATE = gql`
-    mutation changeJobState($_ID: ID!, $State: JobState!) {
+    mutation changeJobState($ID: ID!, $State: JobState!) {
         changeJobState(
-            job: $_ID,
+            job: $ID,
             newState: $State
         ) {
             id

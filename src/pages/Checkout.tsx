@@ -106,6 +106,7 @@ export default function Checkout() {
                         <AccordionDetails>
                             {
                                 checkoutWorkflow.map((workflow: any, index: number) => {
+                                    console.log(workflow);
                                     return (
                                         <div key={workflow.id} style={{ textAlign: 'start', padding: 10, overflowX: 'auto', border: '1px solid grey', borderRadius: 5, margin: 5, }}>
                                             <TextField

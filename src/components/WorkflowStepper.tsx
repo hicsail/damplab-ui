@@ -96,7 +96,7 @@ export default function WorkflowStepper(workflow: any) {
                     </Step>
                 ))}
             </Stepper>
-
+        
             <Dialog
                 open={dialogOpen}
                 onClose={handleClose}

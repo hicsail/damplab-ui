@@ -53,10 +53,10 @@ export default function Tracking() {
                 return ['rgb(0, 0, 0, 0)', <NotInterested />];
         }
     }
-
     const jobStatusColor = jobStatus()[0];
     const jobStatusIcon = jobStatus()[1];
 
+ 
     const workflowCard = (
         workflows.map((workflow: any) => {
             return (

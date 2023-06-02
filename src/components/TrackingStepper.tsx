@@ -77,7 +77,7 @@ export default function TrackingStepper(workflow: any) {
                     </Step>
                 ))}
             </Stepper>
-
+        
             <Dialog
                 open={dialogOpen}
                 onClose={handleClose}
@@ -95,6 +95,7 @@ export default function TrackingStepper(workflow: any) {
                             </Typography>
                         </div>
                     </div>
+                  
                 </DialogTitle>
                 <DialogContent>
                     <Box sx={{}} style={{ height: 150, overflow: 'auto' }}>
