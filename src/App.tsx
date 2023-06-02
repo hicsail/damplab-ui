@@ -64,7 +64,7 @@ function App() {
               <div style={{ padding: 20 }}>
                 <Routes>
                   <Route path="/" element={<MainFlow /*services={services}*//>} />
-                  <Route path="/resubmission/:id" element={<MainFlow /*services={services}*//>} />
+                  <Route path="/resubmission/:id" element={<MainFlow client={client} /*services={services}*//>} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/submitted/:id" element={<Submitted />} />
                   <Route path="/submitted" element={<JobSubmitted />} />

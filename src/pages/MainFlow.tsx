@@ -22,7 +22,7 @@ import '../styles/sidebar.css';
 import { isValidConnection } from '../controllers/GraphHelpers';
 import { AppContext } from '../contexts/App';
 import { useParams } from 'react-router-dom';
-import { gql, useQuery, useLazyQuery, useMutation } from '@apollo/client';
+import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { GET_JOB_BY_ID } from '../gql/queries';
 import { MUTATE_JOB_STATE } from '../gql/mutations';
 import { addNodesAndEdgesFromServiceIdsAlt } from '../controllers/ResubmissionHelpers';
@@ -36,7 +36,7 @@ const fitViewOptions: FitViewOptions = {
     padding: 0.2,   
 };
 
-export default function MainFlow(datas: any) {
+export default function MainFlow( client: any /*datas: any*/) {
     const { id } = useParams();
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
@@ -112,34 +112,63 @@ export default function MainFlow(datas: any) {
 
     
     // TODO: Add to job status update to checkout (with new id)
-    const { loading, error, data, refetch } = useQuery(GET_JOB_BY_ID, {
-        variables: { id: id },
-        skip: id === undefined,
-        fetchPolicy: 'standby',
-        // nextFetchPolicy: 'standby',
-        onCompleted: (data) => {
-            console.log('job successfully loaded: ', data);
-            // setTimeout(() => {
-            console.log(data.jobById.workflows);
-            data.jobById.workflows.map((workflow: any) => {
-                console.log("times up, with fetch");
-                console.log(workflow);
-                let s: any[] = [];
-                let sIds: any[] = [];
-                workflow.nodes.map((node: any) => {
-                    s.push(node);
-                    sIds.push(node.id);
-                })
-                addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
-            });
-            // }, 10000);
-        },
-        onError: (error: any) => {
-            console.log(error.networkError?.result?.errors);
-        }
-    });
+    // const { loading, error, data, refetch } = useQuery(GET_JOB_BY_ID, {
+    //     variables: { id: id },
+    //     skip: id == undefined,
+    //     fetchPolicy: 'standby',
+    //     onCompleted: (data: any) => {
+    //         console.log('job successfully loaded: ', data);
+    //         data.jobById.workflows.map((workflow: any) => {
+    //             console.log(workflow);
+    //             let s   : any[] = [];
+    //             let sIds: any[] = [];
+    //             workflow.nodes.map((node: any) => {
+    //                 s.push(node);
+    //                 sIds.push(node.id);
+    //             })
+    //             console.log('s: ', s);
+    //             console.log('sId: ', sIds);
+    //             console.log('setNodes', setNodes);
+    //             console.log('setEdges', setEdges);
+    //             addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
+    //         })
+    //     },
+    //     onError: (error: any) => {
+    //         console.log(error.networkError?.result?.errors);
+    //     }
+    // });
+    // useEffect(() => {
+    //     if (id !== undefined) {
+    //         refetch();
+    //     }
+    // }, [])
 
-    refetch();
+
+    useEffect(() => {
+        if (id !== undefined) {
+            // setTimeout(() => {
+                client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
+                    console.log('job loaded successfully', result);
+                    result.data.jobById.workflows.map((workflow: any) => {
+                        let s   : any[] = [];
+                        let sIds: any[] = [];
+                        workflow.nodes.map((node: any) => {
+                            s.push(node);
+                            sIds.push(node.id);
+                        })
+                        console.log('s: ', s);
+                        console.log('sId: ', sIds);
+                        console.log('setNodes', setNodes);
+                        console.log('setEdges', setEdges);
+                        addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
+                    });
+                }).catch((error: any) => {
+                    console.log('error when loading job', error);
+                });
+            // }, 3000);
+        }
+    }, []);
+
 
     return (
         <>
