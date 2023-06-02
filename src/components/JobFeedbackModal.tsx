@@ -57,14 +57,16 @@ function JobFeedbackModal(props: any) {
 
 
   const handleSubmit = async () => {
-    feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
+    feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("CHANGES_REQUESTED");
     
-    const updatedState = feedbackType === "looks-good" ? "ACCEPTED" : "REJECTED";
+    const updatedState = feedbackType === "looks-good" ? "ACCEPTED" : "CHANGES_REQUESTED";
+    console.log("this the id", id);
+    console.log("this is the state", updatedState);
 
     try {
       await mutateJobState({
         variables: {
-          _ID: id,
+          ID: id,
           State: updatedState,
         },
         onError: (error: any) => {
