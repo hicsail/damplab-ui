@@ -71,9 +71,6 @@ function JobFeedbackModal(props: any) {
         },
         onError: (error: any) => {
           console.log(error.networkError?.result?.errors);
-        },
-        onCompleted: () => {
-          window.location.reload();
         }
       });
   
