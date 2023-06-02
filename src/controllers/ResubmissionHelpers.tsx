@@ -39,10 +39,10 @@ export const getServiceFromIdAlt = (services: any, id: string) => {
 export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, service: any, 
                                             setNodes: any, setEdges: any, 
                                             sourcePosition: any, setActiveComponentId: any) => {
-
+    console.log(service);
     const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
     const nodeId = Math.random().toString(36).substring(2, 9);
-    const formData: NodeParameter[] = service.formData;
+    // const formData: NodeParameter[] = service.formData;
 
     const nodeData = {
         id: nodeId,
@@ -50,8 +50,8 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
         allowedConnections: service.service.allowedConnections,
         icon: service.service.icon,
         parameters: service.service.parameters,
-        additionalInstructions: "",
-        formData: formData,
+        additionalInstructions: service.additionalInstructions,
+        formData: service.formData,
         serviceId: service.service.id
     }
 
@@ -83,9 +83,9 @@ export const createNodeObjectAlt = (id: string, name: string, type: string,
 
   const newNode = {
         id      : id,
-        name    : name,
+        name,
         type    : 'selectorNode',
-        position: position,
+        position,
         active  : true,
         data    : data,
     };

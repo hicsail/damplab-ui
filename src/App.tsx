@@ -36,8 +36,8 @@ function App() {
     client.query({ query: GET_SERVICES }).then((result) => {
       console.log('services loaded successfully on app', result);
       setServices(result.data.services);
-      let array: any = [];
-      console.log(searchForEndService('seq', 'dpn1', result.data.services, array));
+      // let array: any = [];
+      // console.log(searchForEndService('seq', 'dpn1', result.data.services, array));
     }).catch((error) => {
       console.log('error when loading services on app', error);
     });
@@ -63,8 +63,8 @@ function App() {
               <HeaderBar />
               <div style={{ padding: 20 }}>
                 <Routes>
-                  <Route path="/" element={<MainFlow services={services}/>} />
-                  <Route path="/resubmission/:id" element={<MainFlow services={services}/>} />
+                  <Route path="/" element={<MainFlow /*services={services}*//>} />
+                  <Route path="/resubmission/:id" element={<MainFlow /*services={services}*//>} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/submitted/:id" element={<Submitted />} />
                   <Route path="/submitted" element={<JobSubmitted />} />
