@@ -73,7 +73,7 @@ export default function MainFlow(datas: any) {
         const reactFlowBounds = reactFlowWrapper.current!.getBoundingClientRect();
         let type = event.dataTransfer.getData('application/reactflow');
         type = JSON.parse(type);
-        
+        console.log(type)
         const serviceId = type.id
         const name = type.name;
         // check if the dropped element is valid
@@ -90,7 +90,7 @@ export default function MainFlow(datas: any) {
         setActiveComponentId(nodeId);
 
         const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
-        const data: NodeData = { id: nodeId, label: name, allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId };
+        const data: NodeData = { id: nodeId, label: name , description: type.description ,allowedConnections: type.allowedConnections, icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId };
         const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
         setNodes((nds: any) => nds.concat(newNode));

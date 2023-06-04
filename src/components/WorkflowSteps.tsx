@@ -18,6 +18,7 @@ export default function WorkflowSteps(workflow: any) {
         setIsSmall(false);
       }
     }
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
