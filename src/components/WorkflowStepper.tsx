@@ -20,6 +20,7 @@ export default function WorkflowStepper(workflow: any) {
 
     useEffect(() => {
         function handleResize() {
+            console.log('resizing');
             windowSize.current = [window.innerWidth, window.innerHeight];
             if (windowSize.current[0] < 700) {
                 setIsSmall(true);
