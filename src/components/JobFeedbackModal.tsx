@@ -46,7 +46,7 @@ function JobFeedbackModal(props: any) {
     setFeedbackMessage(event.target.value);
   };
   
-  const [mutateJobState, { loading, error }] = useMutation(MUTATE_JOB_STATE);
+  const [mutateJobState, { loading, error, data }] = useMutation(MUTATE_JOB_STATE);
 
   useEffect(() => {
     if (mutationCompleted) {
@@ -60,11 +60,10 @@ function JobFeedbackModal(props: any) {
     feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
     
     const updatedState = feedbackType === "looks-good" ? "ACCEPTED" : "REJECTED";
-
     try {
       await mutateJobState({
         variables: {
-          _ID: id,
+          ID: id,
           State: updatedState,
         },
         onError: (error: any) => {

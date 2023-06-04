@@ -88,7 +88,6 @@ export default function WorkflowStepper(workflow: any) {
             </Typography>
             <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} orientation={isSmall ? 'vertical' : 'horizontal'}>
                 {workflowServices.map((service: any, index: number) => (
-                    console.log(service),
                     <Step key={service.id} style={{ maxWidth: 250 }}>
                         <StepButton onClick={selectStep(index)}>
                             <StepLabel StepIconComponent={() => getStepIcon(service.state)}>
