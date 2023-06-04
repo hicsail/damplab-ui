@@ -36,14 +36,13 @@ const fitViewOptions: FitViewOptions = {
     padding: 0.2,   
 };
 
-export default function MainFlow( client: any /*datas: any*/) {
+export default function MainFlow( client: any /*data: any*/) {
     const { id } = useParams();
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
     let {services} = useContext(AppContext);
-    // let workflows: any[] = [];
-    // const [workflows, setWorkflows] = useState([]);
+    let workflows: any[] = [];
     // const [services, setServices] = useState(data.services);
 
     const onNodesChange = useCallback(
@@ -110,62 +109,26 @@ export default function MainFlow( client: any /*datas: any*/) {
     //     }
     // });
 
-    
-    // TODO: Add to job status update to checkout (with new id)
-    // const { loading, error, data, refetch } = useQuery(GET_JOB_BY_ID, {
-    //     variables: { id: id },
-    //     skip: id == undefined,
-    //     fetchPolicy: 'standby',
-    //     onCompleted: (data: any) => {
-    //         console.log('job successfully loaded: ', data);
-    //         data.jobById.workflows.map((workflow: any) => {
-    //             console.log(workflow);
-    //             let s   : any[] = [];
-    //             let sIds: any[] = [];
-    //             workflow.nodes.map((node: any) => {
-    //                 s.push(node);
-    //                 sIds.push(node.id);
-    //             })
-    //             console.log('s: ', s);
-    //             console.log('sId: ', sIds);
-    //             console.log('setNodes', setNodes);
-    //             console.log('setEdges', setEdges);
-    //             addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
-    //         })
-    //     },
-    //     onError: (error: any) => {
-    //         console.log(error.networkError?.result?.errors);
-    //     }
-    // });
-    // useEffect(() => {
-    //     if (id !== undefined) {
-    //         refetch();
-    //     }
-    // }, [])
-
-
+    // TODO: Still needs some work updating backend and other reliability checks
     useEffect(() => {
         if (id !== undefined) {
-            // setTimeout(() => {
-                client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
-                    console.log('job loaded successfully', result);
-                    result.data.jobById.workflows.map((workflow: any) => {
+            client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
+                console.log('job loaded successfully', result);
+                if (workflows.length === 0) {
+                    workflows = result.data.jobById.workflows;
+                    workflows.map((workflow: any) => {
                         let s   : any[] = [];
                         let sIds: any[] = [];
                         workflow.nodes.map((node: any) => {
                             s.push(node);
                             sIds.push(node.id);
                         })
-                        console.log('s: ', s);
-                        console.log('sId: ', sIds);
-                        console.log('setNodes', setNodes);
-                        console.log('setEdges', setEdges);
                         addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
                     });
-                }).catch((error: any) => {
-                    console.log('error when loading job', error);
-                });
-            // }, 3000);
+                };
+            }).catch((error: any) => {
+                console.log('error when loading job', error);
+            });
         }
     }, []);
 
