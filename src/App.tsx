@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import './App.css';
 import './styles/dominos.css';
 import MainFlow from './pages/MainFlow';
@@ -9,6 +9,7 @@ import { BrowserRouter, Routes, Route, } from "react-router-dom";
 import HeaderBar from './components/HeaderBar';
 import { CanvasContext } from './contexts/Canvas';
 import { AppContext } from './contexts/App';
+import { ImagesContext } from './contexts/Images';
 import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery } from '@apollo/client';
 import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 import Accepted from './pages/Accepted';
@@ -25,6 +26,7 @@ function App() {
   const [nodeParams, setNodeParams] = useState([]);
   const [services, setServices] = useState([]);
   const [bundles, setBundles] = useState([]);
+  // const [images, setImages] = useState([]);
 
   const client = new ApolloClient({
     uri: 'https://damplab-test.sail.codes/graphql',
@@ -36,6 +38,10 @@ function App() {
     client.query({ query: GET_SERVICES }).then((result) => {
       console.log('services loaded successfully on app', result);
       setServices(result.data.services);
+      // services.map((service: any) => {
+      //   icons[service.name] = service.icon;
+      //   console.log(icons[service.name]);
+      // });
       // let array: any = [];
       // console.log(searchForEndService('seq', 'dpn1', result.data.services, array));
     }).catch((error) => {
@@ -59,24 +65,26 @@ function App() {
                                            activeComponentId: activeComponentId, 
                                            setActiveComponentId: setActiveComponentId, 
                                            nodeParams: nodeParams, setNodeParams: setNodeParams }}>
-            <BrowserRouter>
-              <HeaderBar />
-              <div style={{ padding: 20 }}>
-                <Routes>
-                  <Route path="/" element={<MainFlow /*services={services}*//>} />
-                  <Route path="/resubmission/:id" element={<MainFlow client={client} /*services={services}*//>} />
-                  <Route path="/checkout" element={<Checkout />} />
-                  <Route path="/submitted/:id" element={<Submitted />} />
-                  <Route path="/submitted" element={<JobSubmitted />} />
-                  <Route path="/tracking/:id" element={<Tracking />} />
-                  <Route path="/accepted" element={<Accepted />} />
-                  <Route path="/dominos" element={<Dominos />} />
-                  <Route path="/elabs" element={<ELabs />} />
-                  <Route path="/callback" element={<ELabs />} />
-                  <Route path="/*" element={<div>404 Route not found</div>} />
-                </Routes>
-              </div>
-            </BrowserRouter>
+            {/* <ImagesContext.Provider value={icons}> */}
+              <BrowserRouter>
+                <HeaderBar />
+                <div style={{ padding: 20 }}>
+                  <Routes>
+                    <Route path="/" element={<MainFlow /*services={services}*//>} />
+                    <Route path="/resubmission/:id" element={<MainFlow client={client} /*services={services}*//>} />
+                    <Route path="/checkout" element={<Checkout />} />
+                    <Route path="/submitted/:id" element={<Submitted />} />
+                    <Route path="/submitted" element={<JobSubmitted />} />
+                    <Route path="/tracking/:id" element={<Tracking />} />
+                    <Route path="/accepted" element={<Accepted />} />
+                    <Route path="/dominos" element={<Dominos />} />
+                    <Route path="/elabs" element={<ELabs />} />
+                    <Route path="/callback" element={<ELabs />} />
+                    <Route path="/*" element={<div>404 Route not found</div>} />
+                  </Routes>
+                </div>
+              </BrowserRouter>
+            {/* </ImagesContext.Provider> */}
           </CanvasContext.Provider>
         </AppContext.Provider>
       </ApolloProvider>

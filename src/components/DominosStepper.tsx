@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { Stepper, Step, StepButton, StepIconProps, StepLabel } from "@mui/material";
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useMutation } from "@apollo/client";
 import { MUTATE_NODE_STATUS, MUTATE_WORKFLOW_STATE } from "../gql/mutations";
 import { ColorlibStepIconRoot, atLeastOneServiceActive, allServicesCompleted } from "../controllers/StepperHelpers"
 import QuestionMarkIcon from '@mui/icons-material/QuestionMark';
+import { ImagesContext } from "../contexts/Images";
 
 export default function DominosStepper({ id, nodes, workflowState, refetchQueued, refetchInProgress, refetchComplete }: any) {
     const [serviceNames] = useState(nodes.map((node: any) => {return node.name;}));
     const [serviceIds]   = useState(nodes.map((node: any) => {return node.globalId;}));
     const [active, setActive] = useState({});
     // const [serviceIcons] = nodes.map((nodes: any) => {return nodes.icon});
+    // const icons = useContext(ImagesContext);
+    // {console.log(icons['PCR'])}
 
 // Service status handlers
     type serviceStatus = "queued" | "in_progress" | "complete"; 
@@ -113,14 +116,15 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
             ? image = <CheckCircleOutlineIcon fontSize="large" sx={{color: "white"}}/>
             :   // TODO: Cache images (keeps overloading google w/ requests)
                 // image = imageCached;
-                // image = <img className={className}
-                //   src={nodes[Number(props.icon)-1].icon}
-                //   width="50" height="50" />
-                  <QuestionMarkIcon />
+                image = <img className={className}
+                  src={nodes[Number(props.icon)-1].icon}
+                //   src={icons[serviceNames[Number(props.icon)-1]]}
+                  width="50" height="50" />
+                //   <QuestionMarkIcon />
         return (
             <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>
-                {/* {image} */}
-                <QuestionMarkIcon />
+                {image}
+                {/* <QuestionMarkIcon /> */}
             </ColorlibStepIconRoot>
         );
     };
@@ -135,7 +139,7 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
                         fontSize: "11px",  lineHeight: "1.2" }}
             connector={null}
         > 
-            {serviceNames.map((label: string, index: number) => ( 
+            {serviceNames.map((label: string, index: number) => (
                 <Step key={label} 
                         completed={Object.values(serviceStatuses).map((service) => (
                         service === 'complete' ? true : false))[index]} 
