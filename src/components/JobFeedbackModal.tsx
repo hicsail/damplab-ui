@@ -60,9 +60,7 @@ function JobFeedbackModal(props: any) {
     feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("CHANGES_REQUESTED");
     
     const updatedState = feedbackType === "looks-good" ? "ACCEPTED" : "CHANGES_REQUESTED";
-    console.log("this the id", id);
-    console.log("this is the state", updatedState);
-
+    
     try {
       await mutateJobState({
         variables: {

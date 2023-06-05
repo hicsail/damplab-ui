@@ -6,7 +6,6 @@ import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
 import { Box, Button, Card, CardContent, Typography, colors } from '@mui/material';
 import { AccessTime, NotInterested, Check } from '@mui/icons-material';
 import WorkflowStepper from '../components/WorkflowStepper';
-import WorkflowSteps from '../components/TrackingStepper';
 import JobFeedbackModal from '../components/JobFeedbackModal';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 
@@ -22,7 +21,7 @@ export default function Submitted() {
     const [workflowUsername, setWorkflowUsername] = useState('');
     const [workflowInstitution, setWorkflowInstitution] = useState('');
     const [workflowEmail, setWorkflowEmail] = useState('');
-    const [workflows, setWorklows] = useState([]); // ▶ URLSearchParams {}
+    const [workflows, setWorkflows] = useState([]); // ▶ URLSearchParams {}
 
     const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
@@ -36,7 +35,7 @@ export default function Submitted() {
             setWorkflowUsername(data.jobById.username);
             setWorkflowInstitution(data.jobById.institute);
             setWorkflowEmail(data.jobById.email);
-            setWorklows(data.jobById.workflows);
+            setWorkflows(data.jobById.workflows);
         },
         onError: (error: any) => {
             console.log(error.networkError?.result?.errors);
@@ -118,7 +117,7 @@ export default function Submitted() {
                     {
                         workflows.map((workflow: any) => {
                             return (
-                                <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
+                                <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes}/>
                             )
                         })
                     }
@@ -166,7 +165,7 @@ export default function Submitted() {
             <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 <Button onClick={handleOpenModal} color="error" variant="contained">Review Job</Button>
             </Box>
-            <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id} />
+            <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id}/>
 
         </div>
 

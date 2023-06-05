@@ -116,3 +116,18 @@ export const GET_WORKFLOWS_FOR_DOMINOS = gql`
         }
     }
 `;
+
+export const GET_WORKFLOW_BY_ID = gql`
+    query workflowById($id: ID!) {
+        workflowById(id: $id) {
+            id
+            state
+            name
+            nodes {
+                id
+                _id
+                state
+            }
+        }
+    }
+`;

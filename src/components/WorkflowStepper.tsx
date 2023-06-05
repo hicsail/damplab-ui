@@ -1,6 +1,6 @@
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
 import React, { useEffect, useState, useRef } from 'react'
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import LoopIcon from '@mui/icons-material/Loop';
 import DoneIcon from '@mui/icons-material/Done';
 import PendingIcon from '@mui/icons-material/Pending';
@@ -15,8 +15,7 @@ export default function WorkflowStepper(workflow: any) {
         return service;
     }));
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [mutateNodeStatus, { loading, error }] = useMutation(MUTATE_NODE_STATUS);
-
+    const [mutateNodeStatus, { loading: mutationLoading, error: mutationError }] = useMutation(MUTATE_NODE_STATUS);
 
     useEffect(() => {
         function handleResize() {
@@ -46,18 +45,23 @@ export default function WorkflowStepper(workflow: any) {
 
     const updateWorkflowNode = (newState: string) => () => {
         // why is it workflow.workflow and not workflow.nodes?
-        mutateNodeStatus({
-            variables: {
-                _ID: workflow.workflow[activeStep].id,
-                State: newState,
-            },
-            onError: (error: any) => {
-                console.log(error.networkError?.result?.errors);
-            },
-            onCompleted: () => {
-                window.location.reload();
-            }
-        });   
+        try {
+            mutateNodeStatus({
+                variables: {
+                    _ID: workflow.workflow[activeStep].id,
+                    State: newState,
+                },
+                onError: (error: any) => {
+                    console.log(error.networkError?.result?.errors);
+                },
+                onCompleted: () => {
+                    handleClose();
+                }
+            });   
+        } catch (error) {
+            console.log(error);
+        }
+        
     }
 
     useEffect(() => {
