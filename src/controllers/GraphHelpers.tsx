@@ -265,9 +265,10 @@ export const transformGQLToWorkflow = (workflow: any) => {
     console.log(workflow);
     let nodes = workflow.nodes.map((node: any) => {
         return {
-            id: node.id,
+            id: node._id,
             name: node.service.name,
             state: node.state,
+            description: node.description,
             data: {
                 icon: node.service.icon,
                 formData: node.formData

@@ -67,14 +67,13 @@ export default function ContextTestComponent() {
                 </h2>
             </div>
             <div>
-                <p>
-                    Placeholder for high level description of the service and guidance around entering parameters
-                </p>
-            </div>
-            <div>
-                <p>
-                    Placeholder for high level output of the service and guidance around interpreting the results
-                </p>
+                {
+                    activeNode?.data.description ? (
+                        <p>
+                            {activeNode?.data.description}
+                        </p>
+                    ) : null
+                }
             </div>
             {
                 activeNode?.data.formData ? (

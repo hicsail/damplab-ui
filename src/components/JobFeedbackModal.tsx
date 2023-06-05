@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useMutation } from '@apollo/client';
+import { MUTATE_JOB_STATE } from '../gql/mutations';
+
 import {
   Modal,
   FormControl,
@@ -29,8 +32,11 @@ const ModalBox = styled(Box)`
 
 
 function JobFeedbackModal(props: any) {
+  const { open, onClose, id } = props;
   const [feedbackType, setFeedbackType] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [newState, setNewState] = useState("");
+  const [mutationCompleted, setMutationCompleted] = useState(false);
 
   const handleFeedbackTypeChange = (event: any) => {
     setFeedbackType(event.target.value);
@@ -39,11 +45,43 @@ function JobFeedbackModal(props: any) {
   const handleFeedbackMessageChange = (event: any) => {
     setFeedbackMessage(event.target.value);
   };
+  
+  const [mutateJobState, { loading, error, data }] = useMutation(MUTATE_JOB_STATE);
 
-  const handleSubmit = () => {
-    // Handle form submission here
-  };
+  useEffect(() => {
+    if (mutationCompleted) {
+      onClose(); // Close the modal when the mutation is completed
+      setMutationCompleted(false)
+    }
+  }, [mutationCompleted, onClose]);
 
+
+  const handleSubmit = async () => {
+    feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
+    
+    const updatedState = feedbackType === "looks-good" ? "ACCEPTED" : "REJECTED";
+    try {
+      await mutateJobState({
+        variables: {
+          ID: id,
+          State: updatedState,
+        },
+        onError: (error: any) => {
+          console.log(error.networkError?.result?.errors);
+        },
+        onCompleted: () => {
+          window.location.reload();
+        }
+      });
+  
+      onClose(); // Close the modal after the mutation is completed
+    } catch (error) {
+      console.log(error);
+    }
+  };  
+  
+  
+  
   return (
     <CenteredModal open={props.open} onClose={props.onClose}>
       <ModalBox>
@@ -58,12 +96,12 @@ function JobFeedbackModal(props: any) {
             <FormControlLabel
               value="looks-good"
               control={<Radio />}
-              label="Looks good"
+              label="Job Accepted"
             />
             <FormControlLabel
               value="minor-changes"
               control={<Radio />}
-              label="Minor changes"
+              label="Needs Minor Changes"
             />
             {feedbackType === "minor-changes" && (
               <TextField
@@ -79,7 +117,7 @@ function JobFeedbackModal(props: any) {
             <FormControlLabel
               value="major-changes"
               control={<Radio />}
-              label="Major changes"
+              label="Needs Major Changes"
             />
             {feedbackType === "major-changes" && (
               <TextField
@@ -95,7 +133,7 @@ function JobFeedbackModal(props: any) {
             )}
           </RadioGroup>
           {feedbackType && (
-            <Button variant="contained" onClick={handleSubmit}>
+            <Button variant="contained" color="inherit" onClick={handleSubmit}>
               {feedbackType === "looks-good"
                 ? "Accept Job"
                 : "Send Feedback"}
