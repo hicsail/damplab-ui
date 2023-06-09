@@ -9,7 +9,6 @@ import { BrowserRouter, Routes, Route, } from "react-router-dom";
 import HeaderBar from './components/HeaderBar';
 import { CanvasContext } from './contexts/Canvas';
 import { AppContext } from './contexts/App';
-import { ImagesContext } from './contexts/Images';
 import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery } from '@apollo/client';
 import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 import Accepted from './pages/Accepted';
@@ -26,7 +25,6 @@ function App() {
   const [nodeParams, setNodeParams] = useState([]);
   const [services, setServices] = useState([]);
   const [bundles, setBundles] = useState([]);
-  // const [images, setImages] = useState([]);
 
   const client = new ApolloClient({
     uri: 'https://damplab-test.sail.codes/graphql',
@@ -38,10 +36,6 @@ function App() {
     client.query({ query: GET_SERVICES }).then((result) => {
       console.log('services loaded successfully on app', result);
       setServices(result.data.services);
-      // services.map((service: any) => {
-      //   icons[service.name] = service.icon;
-      //   console.log(icons[service.name]);
-      // });
       // let array: any = [];
       // console.log(searchForEndService('seq', 'dpn1', result.data.services, array));
     }).catch((error) => {
@@ -65,7 +59,6 @@ function App() {
                                            activeComponentId: activeComponentId, 
                                            setActiveComponentId: setActiveComponentId, 
                                            nodeParams: nodeParams, setNodeParams: setNodeParams }}>
-            {/* <ImagesContext.Provider value={icons}> */}
               <BrowserRouter>
                 <HeaderBar />
                 <div style={{ padding: 20 }}>
@@ -84,7 +77,6 @@ function App() {
                   </Routes>
                 </div>
               </BrowserRouter>
-            {/* </ImagesContext.Provider> */}
           </CanvasContext.Provider>
         </AppContext.Provider>
       </ApolloProvider>

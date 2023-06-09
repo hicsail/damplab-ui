@@ -97,19 +97,18 @@ export default function MainFlow( client: any /*data: any*/) {
         setNodes((nds: any) => nds.concat(newNode));
     }, [reactFlowInstance, nodes]);
 
+    // TODO: Need to finish job status update
+    const [updateJobMutation] = useMutation(MUTATE_JOB_STATE, {
+        variables: { ID: id, State: 'SUBMITTED' },
+        onCompleted: (data) => {
+            console.log('successfully updated job state:', data);
+        },
+        onError: (error: any) => {
+            console.log(error.networkError?.result?.errors);
+            console.log('error updated job state', error);
+        }
+    });
 
-    // const [updateJobMutation] = useMutation(MUTATE_JOB_STATE, {
-    //     variables: { ID: id, State: 'SUBMITTED' },
-    //     onCompleted: (data) => {
-    //         console.log('successfully updated job state:', data);
-    //     },
-    //     onError: (error: any) => {
-    //         console.log(error.networkError?.result?.errors);
-    //         console.log('error updated job state', error);
-    //     }
-    // });
-
-    // TODO: Still needs some work updating backend and other reliability checks
     useEffect(() => {
         if (id !== undefined) {
             client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
