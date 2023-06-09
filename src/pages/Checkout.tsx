@@ -40,7 +40,7 @@ export default function Checkout() {
             navigate('/submitted', { state: { id: data.createJob.id } });
         },
         onError: (error: any) => {
-            console.log('error creating job', error);
+            console.log('error creating job', error.networkError?.result?.errors);
         }
     });
 
@@ -134,7 +134,7 @@ export default function Checkout() {
                         <TextField label="Email" margin="dense" variant="outlined" inputRef={emailRef} required />
                         <TextField label="Notes" margin="dense" variant="outlined" inputRef={notesRef} required />
                         <Button variant="contained" onClick={() => {
-                            //saveWorkflows();
+                            console.log('submitting job');
                             const data = { 
                                 name: jobRef.current.value, 
                                 username: userRef.current.value, 
@@ -142,6 +142,7 @@ export default function Checkout() {
                                 email: emailRef.current.value, 
                                 workflows: getGQLWorkflows(), 
                             };
+                            console.log(getGQLWorkflows());
                             createJob({ variables: { createJobInput: data }});
                         }}>Submit</Button>
                     </FormControl>
