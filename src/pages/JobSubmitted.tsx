@@ -13,9 +13,9 @@ export default function JobSubmitted() {
     <div>
       <h1>Job Submitted</h1>
       <p>Job ID: {jobId}</p>
-      <div style={{ height: "auto", margin: "0 auto", maxWidth: 64, width: "100%" }}>
+      <div style={{ height: "auto", margin: "0 auto", maxWidth: 256, width: "100%" }}>
         <QRCode
-          size={256}
+          size={512}
           style={{ height: "auto", maxWidth: "100%", width: "100%" }}
           value={value}
           viewBox={`0 0 256 256`}
