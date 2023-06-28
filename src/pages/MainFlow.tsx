@@ -22,7 +22,7 @@ import '../styles/sidebar.css';
 import { isValidConnection } from '../controllers/GraphHelpers';
 import { AppContext } from '../contexts/App';
 import { useParams } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/client';
+import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { GET_JOB_BY_ID } from '../gql/queries';
 import { MUTATE_JOB_STATE } from '../gql/mutations';
 import { addNodesAndEdgesFromServiceIdsAlt } from '../controllers/ResubmissionHelpers';
@@ -36,13 +36,14 @@ const fitViewOptions: FitViewOptions = {
     padding: 0.2,   
 };
 
-export default function MainFlow(datas: any) {
+export default function MainFlow( client: any /*data: any*/) {
     const { id } = useParams();
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
     let {services} = useContext(AppContext);
-    //const [services, setServices] = useState(data.services);
+    let workflows: any[] = [];
+    // const [services, setServices] = useState(data.services);
 
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => setNodes((nds: any) => applyNodeChanges(changes, nds)),
@@ -96,7 +97,7 @@ export default function MainFlow(datas: any) {
         setNodes((nds: any) => nds.concat(newNode));
     }, [reactFlowInstance, nodes]);
 
-
+    // TODO: Need to finish job status update
     const [updateJobMutation] = useMutation(MUTATE_JOB_STATE, {
         variables: { ID: id, State: 'SUBMITTED' },
         onCompleted: (data) => {
@@ -108,36 +109,27 @@ export default function MainFlow(datas: any) {
         }
     });
 
-    
-    // TODO: Add to job status update to checkout (with new id)
-    const { loading, error, data, refetch } = useQuery(GET_JOB_BY_ID, {
-        variables: { id: id },
-        skip: id == undefined,
-        fetchPolicy: 'standby',
-        onCompleted: (data: any) => {
-            console.log('job successfully loaded: ', data);
-            data.jobById.workflows.map((workflow: any) => {
-                console.log(workflow);
-                let s: any[] = [];
-                let sIds: any[] = [];
-                workflow.nodes.map((node: any) => {
-                    s.push(node);
-                    sIds.push(node.id);
-                })
-                // console.log("services: ", s);
-                // console.log("serviceIds: ", sIds);
-                addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
-            })
-        },
-        onError: (error: any) => {
-            console.log(error.networkError?.result?.errors);
-        }
-    });
     useEffect(() => {
         if (id !== undefined) {
-            refetch();
+            client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
+                console.log('job loaded successfully', result);
+                if (workflows.length === 0) {
+                    workflows = result.data.jobById.workflows;
+                    workflows.map((workflow: any) => {
+                        let s   : any[] = [];
+                        let sIds: any[] = [];
+                        workflow.nodes.map((node: any) => {
+                            s.push(node);
+                            sIds.push(node.id);
+                        })
+                        addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
+                    });
+                };
+            }).catch((error: any) => {
+                console.log('error when loading job', error);
+            });
         }
-    }, [])
+    }, []);
 
 
     return (
@@ -145,7 +137,7 @@ export default function MainFlow(datas: any) {
             <div style={{ height: '100vh' }}>
                 <ReactFlowProvider>
                     <div className="reactflow-wrapper" style={{ height: '85vh', display: 'flex' }} ref={reactFlowWrapper}>
-                        <div style={{ maxWidth: '15%', textAlign: 'center', minWidth: 230, borderRight: 'solid 1px' }}>
+                        <div style={{ maxWidth: '15%', textAlign: 'center', minWidth: 250, borderRight: 'solid 1px' }}>
                             <Sidebar />
                         </div>
                         <ReactFlow
@@ -173,7 +165,6 @@ export default function MainFlow(datas: any) {
                     </div>
                 </ReactFlowProvider>
             </div>
-
         </>
     )
 }

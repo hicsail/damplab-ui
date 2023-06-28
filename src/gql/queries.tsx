@@ -80,6 +80,7 @@ export const GET_JOB_BY_ID = gql`
                     }
                     formData
                     state
+                    additionalInstructions
                 }
                 edges {
                     source {
