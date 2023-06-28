@@ -64,10 +64,10 @@ export default memo((input: Input) => {
     return (
         <div>
             <Box style={{background : background}}>
-                <Button variant="outlined" title={data.data.label} onClick={handleOpen} 
-                style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
+                <Handle type="target" position={Position.Top} isConnectable={isConnectable} />
+                <Button variant="outlined" onClick={handleOpen} style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
                     <div>
-                        <img src={data.data.icon} alt=" " style={{ width: 30 }} />
+                        <img src={data.data.icon} alt={data.data.label} style={{ width: 30 }} />
                     </div>
                     <div>
                         {data.data.label}
@@ -76,8 +76,7 @@ export default memo((input: Input) => {
                         { allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
                     </div> 
                 </Button>
-                <Handle type="target" position={Position.Top} isConnectable={isConnectable} style={{width: 10, height: 10}}/>
-                <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} style={{width: 10, height: 10}}/>      
+                <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} />      
             </Box>
         </div>
     );

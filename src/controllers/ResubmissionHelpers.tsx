@@ -32,7 +32,6 @@ export const addNodesAndEdgesFromServiceIdsAlt = (services: any[],
 
 
 export const getServiceFromIdAlt = (services: any, id: string) => {
-    // console.log('service val: ', services.find((service: any) => service.id === id));
     return services.find((service: any) => service.id === id);
 }
 
@@ -40,33 +39,10 @@ export const getServiceFromIdAlt = (services: any, id: string) => {
 export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, service: any, 
                                             setNodes: any, setEdges: any, 
                                             sourcePosition: any, setActiveComponentId: any) => {
-    console.log('service: ', service);
+
     const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
     const nodeId = Math.random().toString(36).substring(2, 9);
-    // const formData: NodeParameter[] = generateFormDataFromParamsAlt(service.service.parameters, nodeId);
-    // const formData: NodeParameter[] = service.formData;
-    
-    const formData = [];
-    const paramsData = service.service.parameters;
-    const formValues = service.formData;
-    for (let i = 0; i < paramsData.length; i++) {
-        const parameter = paramsData[i];
-        const formId = Math.random().toString(36).substring(2, 9);
-        formData.push({
-            id: formId,
-            nodeId: nodeId,
-            name: parameter.name,
-            type: parameter.type,
-            options: parameter.options ? parameter.options : null,
-            description: parameter.description,
-            paramType: parameter.paramType ? parameter.paramType : null,
-            resultParamValue: "",
-            value: formValues[i].value,
-            required: true // parameter.required,
-        });
-    };
-
-    // console.log(formData[0].value);
+    const formData: NodeParameter[] = service.formData;
 
     const nodeData = {
         id: nodeId,
@@ -74,7 +50,7 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
         allowedConnections: service.service.allowedConnections,
         icon: service.service.icon,
         parameters: service.service.parameters,
-        additionalInstructions: service.additionalInstructions,
+        additionalInstructions: "",
         formData: formData,
         serviceId: service.service.id
     }
@@ -96,11 +72,8 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
     }
 
     setNodes((nds: any) => nds.concat(newNode));
-    if (setActiveComponentId) {
-        setActiveComponentId(nodeId);
-        // console.log('setactivecomponentid set');
-    }
-    // console.log('nodeId: ', nodeId);
+    if (setActiveComponentId) setActiveComponentId(nodeId);
+
     return nodeId;
 }
 
@@ -110,36 +83,12 @@ export const createNodeObjectAlt = (id: string, name: string, type: string,
 
   const newNode = {
         id      : id,
-        name,
+        name    : name,
         type    : 'selectorNode',
-        position,
+        position: position,
         active  : true,
         data    : data,
     };
-    // console.log('newNode: ', newNode);
+
     return newNode;
-}
-
-
-export const generateFormDataFromParamsAlt = (paramsData: any, nodeId: string): NodeParameter[] => {
-
-    const formData : NodeParameter[] = [];
-    for (let i = 0; i < paramsData.length; i++) {
-        const parameter = paramsData[i];
-        const formId = Math.random().toString(36).substring(2, 9);
-        formData.push({
-            id: formId,
-            nodeId: nodeId,
-            name: parameter.name,
-            type: parameter.type,
-            options: parameter.options ? parameter.options : null,
-            description: parameter.description,
-            paramType: parameter.paramType ? parameter.paramType : null,
-            resultParamValue: "",
-            value: null,
-            required: true // parameter.required,
-        });
-    }
-
-    return formData;
 }

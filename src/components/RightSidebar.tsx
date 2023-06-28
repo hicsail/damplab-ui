@@ -92,16 +92,9 @@ export default function ContextTestComponent() {
                     ) : null
                 }
                 {
-                    activeNode 
-                    && activeNode.data.allowedConnections 
-                    && activeNode.data.allowedConnections.length > 0 
-                    ? (activeNode.data.allowedConnections.map((connection: any) => {
+                    activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (activeNode.data.allowedConnections.map((connection: any) => {
                         return (
-                            <NodeButton key={Math.random().toString(36).substring(2, 9)} 
-                            node={getServiceFromId(services, connection.id)} 
-                            sourceId={val.activeComponentId} setNodes={val.setNodes} 
-                            setEdges={val.setEdges} sourcePosition={activeNode.position} 
-                            setActiveComponentId={val.setActiveComponentId}/>
+                            <NodeButton key={Math.random().toString(36).substring(2, 9)} node={getServiceFromId(services, connection.id)} sourceId={val.activeComponentId} setNodes={val.setNodes} setEdges={val.setEdges} sourcePosition={activeNode.position} setActiveComponentId={val.setActiveComponentId}/>
                         )
                     })) : null
                 }

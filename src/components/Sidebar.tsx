@@ -12,8 +12,6 @@ import { CanvasContext } from '../contexts/Canvas';
 import { useQuery, gql } from '@apollo/client';
 import { GET_CATEGORIES } from '../gql/queries';
 import { AppContext } from '../contexts/App';
-import Box from '@mui/material/Box';
-
 
 export default () => {
 
@@ -26,13 +24,6 @@ export default () => {
 
   const buttonElementStyle = {
     padding: 10,
-    borderColor: '#8bbae8',
-  };
-
-  const borderStyles = {
-    m: 1,
-    border: 1,
-    borderRadius: '5px', 
   };
 
   // events for dragging nodes
@@ -111,17 +102,14 @@ export default () => {
             {
               filteredServices.map((service: Service) => {
                 return (
-                  <Box key={Math.random().toString(36).substring(2, 9)} title={service.name} 
-                  style={buttonElementStyle} className="dndnode output" 
-                  sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', ...borderStyles }} 
-                  onDragStart={(event) => onDragStart(event, JSON.stringify(service))} draggable>
+                  <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(service))} draggable>
+                    <Button variant="outlined" style={{ width: 163, display: 'flex', justifyContent: 'space-around' }}>
                       <div>
-                        <img src={service.icon} alt=" " style={{ width: 40, height: 40 }} />  
+                        <img src={service.icon} alt={service.name} style={{ width: 30 }} />
                       </div>
-                      <div style={{padding: 5}}>
-                        {service.name}
-                      </div>
-                  </Box> 
+                      {service.name}
+                    </Button>
+                  </div>
                 )
               })
             }
@@ -136,13 +124,10 @@ export default () => {
             {
               bundles.map((bundle: any) => {
                 return (
-                  <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} 
-                  className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
-                    <Button variant="outlined" title={bundle.label}  
-                    style={{ width: 163, display: 'flex', justifyContent: 'space-around', marginLeft: 'auto', marginRight: 'auto' }}
-                    onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
+                  <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
+                    <Button variant="outlined" style={{ width: 163, display: 'flex', justifyContent: 'space-around', marginLeft: 'auto', marginRight: 'auto' }} onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>
-                        <img src={bundle.icon} alt=" " style={{ width: 30 }} />
+                        <img src={bundle.icon} style={{ width: 30 }} />
                       </div>
                       {bundle.label}
                     </Button>

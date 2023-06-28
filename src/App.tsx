@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import './styles/dominos.css';
 import MainFlow from './pages/MainFlow';
@@ -36,8 +36,8 @@ function App() {
     client.query({ query: GET_SERVICES }).then((result) => {
       console.log('services loaded successfully on app', result);
       setServices(result.data.services);
-      // let array: any = [];
-      // console.log(searchForEndService('seq', 'dpn1', result.data.services, array));
+      let array: any = [];
+      console.log(searchForEndService('seq', 'dpn1', result.data.services, array));
     }).catch((error) => {
       console.log('error when loading services on app', error);
     });
@@ -59,24 +59,24 @@ function App() {
                                            activeComponentId: activeComponentId, 
                                            setActiveComponentId: setActiveComponentId, 
                                            nodeParams: nodeParams, setNodeParams: setNodeParams }}>
-              <BrowserRouter>
-                <HeaderBar />
-                <div style={{ padding: 20 }}>
-                  <Routes>
-                    <Route path="/" element={<MainFlow /*services={services}*//>} />
-                    <Route path="/resubmission/:id" element={<MainFlow client={client} /*services={services}*//>} />
-                    <Route path="/checkout" element={<Checkout />} />
-                    <Route path="/submitted/:id" element={<Submitted />} />
-                    <Route path="/submitted" element={<JobSubmitted />} />
-                    <Route path="/tracking/:id" element={<Tracking />} />
-                    <Route path="/accepted" element={<Accepted />} />
-                    <Route path="/dominos" element={<Dominos />} />
-                    <Route path="/elabs" element={<ELabs />} />
-                    <Route path="/callback" element={<ELabs />} />
-                    <Route path="/*" element={<div>404 Route not found</div>} />
-                  </Routes>
-                </div>
-              </BrowserRouter>
+            <BrowserRouter>
+              <HeaderBar />
+              <div style={{ padding: 20 }}>
+                <Routes>
+                  <Route path="/" element={<MainFlow services={services}/>} />
+                  <Route path="/resubmission/:id" element={<MainFlow services={services}/>} />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/submitted/:id" element={<Submitted />} />
+                  <Route path="/submitted" element={<JobSubmitted />} />
+                  <Route path="/tracking/:id" element={<Tracking />} />
+                  <Route path="/accepted" element={<Accepted />} />
+                  <Route path="/dominos" element={<Dominos />} />
+                  <Route path="/elabs" element={<ELabs />} />
+                  <Route path="/callback" element={<ELabs />} />
+                  <Route path="/*" element={<div>404 Route not found</div>} />
+                </Routes>
+              </div>
+            </BrowserRouter>
           </CanvasContext.Provider>
         </AppContext.Provider>
       </ApolloProvider>

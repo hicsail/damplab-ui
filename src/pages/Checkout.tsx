@@ -74,8 +74,7 @@ export default function Checkout() {
             let gqlWorkflows: any = transformNodesToGQL(workflow);
 
             let edges = val.edges.filter((edge: any) => {
-                return workflow.find((node: any) => node.id === edge.source) 
-                && workflow.find((node: any) => node.id === edge.target);
+                return workflow.find((node: any) => node.id === edge.source) && workflow.find((node: any) => node.id === edge.target);
             });
             let gqlEdges: any = transformEdgesToGQL(edges);
 
@@ -109,9 +108,7 @@ export default function Checkout() {
                                 checkoutWorkflow.map((workflow: any, index: number) => {
                                     console.log(workflow);
                                     return (
-                                        <div key={workflow.id} style={{ textAlign: 'start', 
-                                        padding: 25, overflowX: 'auto', border: '1px solid grey', 
-                                        borderRadius: 5, margin: 5, }}>
+                                        <div key={workflow.id} style={{ textAlign: 'start', padding: 10, overflowX: 'auto', border: '1px solid grey', borderRadius: 5, margin: 5, }}>
                                             <TextField
                                                 id={workflow.id}
                                                 label="Workflow Name"
@@ -131,11 +128,11 @@ export default function Checkout() {
                 <div style={{ padding: 30 }}>
                     <Typography variant='body1'>Your Information</Typography>
                     <FormControl>
-                        <TextField label = "Job Name" margin       = "dense" variant = "outlined" inputRef = {jobRef}  required />
-                        <TextField label = "Submitter Name" margin = "dense" variant = "outlined" inputRef = {userRef}  required />
-                        <TextField label = "Institution" margin    = "dense" variant = "outlined" inputRef = {institutionRef}  required />
-                        <TextField label = "Email" margin          = "dense" variant = "outlined" inputRef = {emailRef} required />
-                        <TextField label = "Notes" margin          = "dense" variant = "outlined" inputRef = {notesRef} required />
+                        <TextField label="Job Name" margin="dense" variant="outlined" inputRef={jobRef}  required />
+                        <TextField label="Submitter Name" margin="dense" variant="outlined" inputRef={userRef}  required />
+                        <TextField label="Institution" margin="dense" variant="outlined" inputRef={institutionRef}  required />
+                        <TextField label="Email" margin="dense" variant="outlined" inputRef={emailRef} required />
+                        <TextField label="Notes" margin="dense" variant="outlined" inputRef={notesRef} required />
                         <Button variant="contained" onClick={() => {
                             console.log('submitting job');
                             const data = { 

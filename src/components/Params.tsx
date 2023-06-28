@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useFormik, } from 'formik';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { FormControl, FormHelperText, IconButton, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
@@ -8,7 +8,6 @@ interface ParamFormProps {
 }
 
 export default function ({ activeNode }: ParamFormProps) {
-    const [paramErrors, setParamErrors]: any = useState([]);
 
     // init formik with values from activeNode
     const initValues = () => {
@@ -37,7 +36,6 @@ export default function ({ activeNode }: ParamFormProps) {
                 if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
             }
         }
-        setParamErrors(errors);
         return errors;
     };
 
@@ -68,10 +66,7 @@ export default function ({ activeNode }: ParamFormProps) {
         const errors = validate(formik.values);
         if (Object.keys(errors).length > 0) {
             formik.setErrors(errors);
-        };
-        if (Object(errors).length != paramErrors.length) {
-            setParamErrors(errors);
-        };
+        }
     }, [formik.values]);
 
     return (
@@ -82,12 +77,12 @@ export default function ({ activeNode }: ParamFormProps) {
             <div className='formik-errors'>
                 <ul style={{ background: 'pink', fontSize: 10 }}>
                     {
-                        Object.keys(paramErrors).map((key: any) => {
+                        Object.keys(formik.errors).map((key: any) => {
                             let name = activeNode.data.formData.find((obj: any) => obj.id === key)?.name;
 
                             return (
                                 <li key={key}>
-                                    {name}: {paramErrors[key]}
+                                    {name}: {formik.errors[key]}
                                 </li>
                             )
                         })
