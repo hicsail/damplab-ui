@@ -56,8 +56,8 @@ export default function MainFlow( client: any /*data: any*/) {
     const onConnect = useCallback((connection: Connection) => {
         let customConnection: any = connection;
         if (!isValidConnection(services, nodes, customConnection.source, customConnection.target)) {
-            customConnection.label = 'invalid connection';
-            customConnection.style = { stroke: 'red' };
+            // customConnection.label = 'invalid connection';
+            // customConnection.style = { stroke: 'red' };
         }
         else customConnection.style = { stroke: 'green' };
         setEdges((eds: any) => addEdge(customConnection, eds))
