@@ -87,8 +87,8 @@ export default function TrackingStepper(workflow: any) {
             >
                 <DialogTitle id="alert-dialog-title">
                     <div className='name-and-icon' style={{ display: 'flex', justifyContent: 'flex-start', margin: 5 }}>
-                        <div className='icon' style={{ marginRight: 10 }}>
-                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} alt={workflow.workflow[activeStep].name} />
+                        <div className='icon' style={{ marginRight: 10 }} title={workflow.workflow[activeStep].name}>
+                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} alt=" " />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>

@@ -137,7 +137,7 @@ export default function MainFlow( client: any /*data: any*/) {
             <div style={{ height: '100vh' }}>
                 <ReactFlowProvider>
                     <div className="reactflow-wrapper" style={{ height: '85vh', display: 'flex' }} ref={reactFlowWrapper}>
-                        <div style={{ maxWidth: '15%', textAlign: 'center', minWidth: 230, borderRight: 'solid 1px' }}>
+                        <div style={{ maxWidth: '15%', textAlign: 'center', minWidth: 250, borderRight: 'solid 1px' }}>
                             <Sidebar />
                         </div>
                         <ReactFlow

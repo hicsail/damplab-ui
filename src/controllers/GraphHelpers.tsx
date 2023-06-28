@@ -32,7 +32,7 @@ export const isValidConnection = (services: any, nodes: any, sourceId: any, targ
 export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, service: any, setNodes: any, setEdges: any, sourcePosition: any, setActiveComponentId: any) => {
     
     const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
-    const nodeId = Math.random().toString(36).substring(2, 9);
+    const nodeId = Math.random().toString(36).substring(2, 9);  // CK: IDs are very similar; onetime had identical workflow IDs in different jobs...
     const formData: NodeParameter[] = generateFormDataFromParams(service.parameters, nodeId);
     
     const nodeData = {

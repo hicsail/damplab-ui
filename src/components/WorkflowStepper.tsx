@@ -1,4 +1,4 @@
-import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
+import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import React, { useEffect, useState, useRef } from 'react'
 import { useMutation } from '@apollo/client';
 import LoopIcon from '@mui/icons-material/Loop';
@@ -86,7 +86,8 @@ export default function WorkflowStepper(workflow: any) {
                     workflow.name
                 }
             </Typography>
-            <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} orientation={isSmall ? 'vertical' : 'horizontal'}>
+            <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} 
+            orientation={isSmall ? 'vertical' : 'horizontal'}>
                 {workflowServices.map((service: any, index: number) => (
                     <Step key={service.id} style={{ maxWidth: 250 }}>
                         <StepButton onClick={selectStep(index)}>
@@ -105,9 +106,11 @@ export default function WorkflowStepper(workflow: any) {
                 aria-describedby="alert-dialog-description"
             >
                 <DialogTitle id="alert-dialog-title">
-                    <div className='name-and-icon' style={{ display: 'flex', justifyContent: 'flex-start', margin: 5 }}>
+                    <div className='name-and-icon' title={workflow.workflow[activeStep].name} 
+                    style={{ display: 'flex', justifyContent: 'flex-start', margin: 5 }}>
                         <div className='icon' style={{ marginRight: 10 }}>
-                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} alt={workflow.workflow[activeStep].name} />
+                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} 
+                            alt=" " />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>
@@ -129,7 +132,8 @@ export default function WorkflowStepper(workflow: any) {
                                             :
                                         </div>
                                         <div className='parameter-value'>
-                                            <input type='text' value={parameter.value ? parameter.value : ""} onChange={(e) => parameter.value = e.target.value} />
+                                            <input type='text' value={parameter.value ? parameter.value : parameter.resultParamValue} 
+                                            onChange={(e) => parameter.value = e.target.value} />
                                         </div>
                                     </div>
                                 )
@@ -137,9 +141,9 @@ export default function WorkflowStepper(workflow: any) {
                         </div>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '30px' }}>
-                        <Button color="inherit" onClick={updateWorkflowNode("QUEUED")}><PendingIcon /></Button>
-                        <Button color="inherit" onClick={updateWorkflowNode("IN_PROGRESS")}><LoopIcon /></Button>
-                        <Button color="inherit" onClick={updateWorkflowNode("COMPLETE")}><DoneIcon /></Button>
+                        <Tooltip title = "Set as Pending"><Button color     = "inherit" onClick = {updateWorkflowNode("QUEUED")}><PendingIcon/></Button></Tooltip>
+                        <Tooltip title = "Set as In Progress"><Button color = "inherit" onClick = {updateWorkflowNode("IN_PROGRESS")}><LoopIcon/></Button></Tooltip>
+                        <Tooltip title = "Set as Completed"><Button color   = "inherit" onClick = {updateWorkflowNode("COMPLETE")}><DoneIcon /></Button></Tooltip>
                     </Box>
                 </DialogContent>
                 <DialogActions>

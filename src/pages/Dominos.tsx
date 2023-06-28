@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Component, useState } from "react";
 import { useQuery, useMutation } from "@apollo/client";
 import DominosStepper from "../components/DominosStepper";
 import { GET_WORKFLOWS_FOR_DOMINOS } from "../gql/queries";
@@ -87,15 +87,15 @@ export default function Dominos() {
                     style={{borderColor: "green", 
                             backgroundColor: 'rgba(152, 251, 152, 0.3)',}}
                 >
-                    <StyledContainer>
-                            <Typography order="1">Completed&nbsp;&nbsp;
-                                <button onClick={() => {
-                                    resetServices(transformGQLforDominos(workflow).nodes); 
-                                    resetWorkflow(workflow)}
-                                }>Reset</button>
-                            </Typography>
-                            <Typography order="2">{workflow.name}</Typography>
-                            <Typography order="3">Finished: {new Date(Date.now()).toDateString().toLocaleString()}</Typography>
+                    <StyledContainer component='span'>
+                        <Typography order="1">Completed&nbsp;&nbsp;
+                            <button onClick={() => {
+                                resetServices(transformGQLforDominos(workflow).nodes); 
+                                resetWorkflow(workflow)}
+                            }>Reset</button>
+                        </Typography>
+                        <Typography order="2">{workflow.name}</Typography>
+                        <Typography order="3">Finished: {new Date(Date.now()).toDateString().toLocaleString()}</Typography>
                     </StyledContainer>
                 </div>
             ))}
@@ -105,19 +105,19 @@ export default function Dominos() {
                     style={{borderColor: "blue", 
                             backgroundColor: 'rgba(240, 255, 255, 1)',}}
                 >
-                    <StyledContainer>
-                            <Typography order="1">In Progress</Typography>
-                            <Typography order="2">{workflow.name}</Typography>
-                            <Typography order="3">Due: {new Date(Date.now()).toDateString().toLocaleString()}</Typography>
+                    <StyledContainer component='span'>
+                        <Typography order="1">In Progress</Typography>
+                        <Typography order="2">{workflow.name}</Typography>
+                        <Typography order="3">Due: {new Date(Date.now()).toDateString().toLocaleString()}</Typography>
                     </StyledContainer>
-                        <DominosStepper
-                            nodes             = {transformGQLforDominos(workflow).nodes}
-                            id                = {workflow.id}
-                            workflowState     = {workflow.state}
-                            refetchQueued     = {refetchQueued}
-                            refetchInProgress = {refetchInProgress}
-                            refetchComplete   = {refetchComplete}
-                        />
+                    <DominosStepper
+                        nodes             = {transformGQLforDominos(workflow).nodes}
+                        id                = {workflow.id}
+                        workflowState     = {workflow.state}
+                        refetchQueued     = {refetchQueued}
+                        refetchInProgress = {refetchInProgress}
+                        refetchComplete   = {refetchComplete}
+                    />
                 </div>
             ))}
             {queuedWorkflows.map((workflow: any) => (
@@ -126,19 +126,19 @@ export default function Dominos() {
                     style={{borderColor: "grey", 
                             backgroundColor: 'rgba(192, 192, 192, 0.2)',}}
                 >
-                    <StyledContainer>
-                            <Typography order="1">Pending</Typography>
-                            <Typography order="2">{workflow.name}</Typography>
-                            <Typography order="3">Due: {new Date(Date.now()).toDateString().toLocaleString()}</Typography>
+                    <StyledContainer component='span'>
+                        <Typography order="1">Pending</Typography>
+                        <Typography order="2">{workflow.name}</Typography>
+                        <Typography order="3">Due: {new Date(Date.now()).toDateString().toLocaleString()}</Typography>
                     </StyledContainer>
-                        <DominosStepper
-                            nodes             = {transformGQLforDominos(workflow).nodes}
-                            id                = {workflow.id}
-                            workflowState     = {workflow.state}
-                            refetchQueued     = {refetchQueued}
-                            refetchInProgress = {refetchInProgress}
-                            refetchComplete   = {refetchComplete}
-                        />
+                    <DominosStepper
+                        nodes             = {transformGQLforDominos(workflow).nodes}
+                        id                = {workflow.id}
+                        workflowState     = {workflow.state}
+                        refetchQueued     = {refetchQueued}
+                        refetchInProgress = {refetchInProgress}
+                        refetchComplete   = {refetchComplete}
+                    />
                 </div>
             ))}
         </ThemeProvider>
