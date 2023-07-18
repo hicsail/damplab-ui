@@ -93,6 +93,9 @@ export default function WorkflowStepper(workflow: any) {
                     return(
                         <div>
                             <Box style={{ display: 'flex', justifyContent: 'flex-start', flexDirection: 'column', alignItems: 'center', margin: 25 }}>
+                                <u style={{ fontWeight:'bold', color:'#1976d2' }}>
+                                    Stage {stageIndex+1}
+                                </u>
                                 {stage.map((service: any, serviceIndex: number) => {
                                     return(
                                         <Button style={{ margin: 15 }} variant="outlined" title={service.name} onClick={selectStep(stageIndex, serviceIndex)}>

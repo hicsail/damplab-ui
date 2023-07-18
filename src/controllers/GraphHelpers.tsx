@@ -183,7 +183,6 @@ export const getStagingForWorkflows = (nodeSets: {}[][], edgeSets: {}[][], start
         let eLeft: {}[] = edgeSets[index] ? edgeSets[index] : [];  // set/edge sets related by index
         let stages: {}[][] = [];
         const setStarts: string[] = startNodes.filter((s: string) => nSet.map((n: any) => n.id).includes(s));
-        console.log(setStarts);
         setStarts.forEach((startNode: any) => {
             let index = 0;
             if (stages[index]) {stages[index].push(nSet.find((n: any) => n.id === startNode));
@@ -198,13 +197,13 @@ export const getStagingForWorkflows = (nodeSets: {}[][], edgeSets: {}[][], start
                 if (!stages[index]) {stages[index] = [];}
                 connections.forEach((c: any) => {
                     const t = c.target;
-                    if (nLeft.map((n: any) => n.id).includes(t)) {
-                        const node = nSet.find((n: any) => n.id === t);
+                    const left = nLeft.map((n: any) => n.id);
+                    if (left.includes(t)) {
+                        const node = nSet.find((n: any) => (n.id === t));
                         stages[index].push(node);
                         nStageDict[t] = index;
                         const i = nLeft.indexOf(node);
                         nLeft.splice(i, 1);
-                        console.log('TRUE: ', t, index);
                     } else {
                         const ind = nStageDict[t];
                         if (index > ind) {
@@ -212,9 +211,7 @@ export const getStagingForWorkflows = (nodeSets: {}[][], edgeSets: {}[][], start
                             stages[index].push(node);
                             stages[ind] = stages[ind].filter(() => !stages.includes(t));
                             nStageDict[t] = index;
-                            console.log('FALSE1: ', t, index);
                         }
-                        console.log('FALSE2: ', t, index);
                     }
                 })
                 eLeft = eLeft.filter((e: any) => !connections.includes(e));
