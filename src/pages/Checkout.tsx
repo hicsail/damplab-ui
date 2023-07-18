@@ -58,7 +58,7 @@ export default function Checkout() {
             let obj = {
                 id: id,
                 name: "",
-                nodes: workflow
+                stages: workflow
             }
             workflowObjs.push(obj);
         });
@@ -94,7 +94,7 @@ export default function Checkout() {
         <div>
             <div>
                 <div>
-                    <Typography variant='body1'>Checkout</Typography>
+                    <Typography variant='body1' style={{ marginBottom: 20 }} >Checkout</Typography>
                     <Accordion key={Math.random() * 100} expanded={expanded}>
                         <AccordionSummary
                             expandIcon={<ExpandMoreIcon />}
@@ -107,7 +107,7 @@ export default function Checkout() {
                         <AccordionDetails>
                             {
                                 checkoutWorkflow.map((workflow: any, index: number) => {
-                                    console.log(workflow);
+                                    console.log('workflow...: ', workflow);
                                     return (
                                         <div key={workflow.id} style={{ textAlign: 'start', 
                                         padding: 25, overflowX: 'auto', border: '1px solid grey', 
@@ -120,7 +120,7 @@ export default function Checkout() {
                                                 // value={namesTemp[workflow.id]}
                                                 // onChange={(e) => { handleNameChange(e, workflow.id)}}
                                             />
-                                            <WorkflowStepper workflow={workflow.nodes} name={workflow.name} parent="checkout"/>
+                                            <WorkflowStepper stages={workflow.stages} name={workflow.name} parent="checkout"/>
                                         </div>
                                     )
                                 })

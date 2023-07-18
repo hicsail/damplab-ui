@@ -10,9 +10,10 @@ export default function WorkflowStepper(workflow: any) {
 
     const windowSize = useRef([window.innerWidth, window.innerHeight]);
     const [isSmall, setIsSmall] = useState(false);
-    const [activeStep, setActiveStep] = useState(0);
-    const [workflowServices, setWorkflowServices] = useState(workflow.workflow.map((service: any) => {
-        return service;
+    const [activeStage, setActiveStage] = useState(0);
+    const [activeService, setActiveService] = useState(0);
+    const [workflowStages, setWorkflowStages] = useState(workflow.stages.map((stage: any) => {
+        return stage;
     }));
     const [dialogOpen, setDialogOpen] = useState(false);
     const [mutateNodeStatus, { loading, error }] = useMutation(MUTATE_NODE_STATUS);
@@ -41,16 +42,17 @@ export default function WorkflowStepper(workflow: any) {
         setDialogOpen(false);
     };
 
-    const selectStep = (index: number) => () => {
-        setActiveStep(index);
+    const selectStep = (stageIndex: number, serviceIndex: number) => () => {
+        setActiveStage(stageIndex);
+        setActiveService(serviceIndex);
         setDialogOpen(true);
     };
 
+    // TODO: Needs to be redone...
     const updateWorkflowNode = (newState: string) => () => {
-        // why is it workflow.workflow and not workflow.nodes?
         mutateNodeStatus({
             variables: {
-                _ID: workflow.workflow[activeStep].id,
+                _ID: workflow.stages[activeStage][activeService].id,
                 State: newState,
             },
             onError: (error: any) => {
@@ -86,18 +88,36 @@ export default function WorkflowStepper(workflow: any) {
                     workflow.name
                 }
             </Typography>
-            <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} 
+            <Box style={{ display: 'flex', justifyContent: 'flex-start', flexDirection: 'row', margin: 5 }}>
+                {workflowStages.map((stage: any, stageIndex: number) => {
+                    return(
+                        <div>
+                            <Box style={{ display: 'flex', justifyContent: 'flex-start', flexDirection: 'column', alignItems: 'center', margin: 25 }}>
+                                {stage.map((service: any, serviceIndex: number) => {
+                                    return(
+                                        <Button style={{ margin: 15 }} variant="outlined" title={service.name} onClick={selectStep(stageIndex, serviceIndex)}>
+                                            {service.name}
+                                        </Button>
+                                    )
+                                })}
+                            </Box>
+                        </div>
+                    )
+                })}
+            </Box>
+
+            {/* <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} 
             orientation={isSmall ? 'vertical' : 'horizontal'}>
-                {workflowServices.map((service: any, index: number) => (
-                    <Step key={service.id} style={{ maxWidth: 250 }}>
+                {workflowStages.map((stage: any, index: number) => (
+                    <Step key={stage.id} style={{ maxWidth: 250 }}>
                         <StepButton onClick={selectStep(index)}>
-                            <StepLabel StepIconComponent={() => getStepIcon(service.state)}>
-                                {service.name}
+                            <StepLabel StepIconComponent={() => getStepIcon(stage.state)}>
+                                {stage.name}
                             </StepLabel>
                         </StepButton>
                     </Step>
                 ))}
-            </Stepper>
+            </Stepper> */}
         
             <Dialog
                 open={dialogOpen}
@@ -106,15 +126,15 @@ export default function WorkflowStepper(workflow: any) {
                 aria-describedby="alert-dialog-description"
             >
                 <DialogTitle id="alert-dialog-title">
-                    <div className='name-and-icon' title={workflow.workflow[activeStep].name} 
+                    <div className='name-and-icon' title={workflow.stages[activeStage][activeService].name} 
                     style={{ display: 'flex', justifyContent: 'flex-start', margin: 5 }}>
                         <div className='icon' style={{ marginRight: 10 }}>
-                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} 
+                            <img style={{ width: 20 }} src={workflow.stages[activeStage][activeService].data.icon} 
                             alt=" " />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>
-                                {workflow.workflow[activeStep].name}
+                                {workflow.stages[activeStage][activeService].name}
                             </Typography>
                         </div>
                     </div>
@@ -122,7 +142,7 @@ export default function WorkflowStepper(workflow: any) {
                 <DialogContent>
                     <Box sx={{}} style={{ height: 150, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
-                            {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
+                            {workflow.stages[activeStage][activeService].data.formData.map((parameter: any) => {
                                 return (
                                     <div className='parameter' style={{ display: 'flex' }} key={Math.random()}>
                                         <div className='parameter-name'>
@@ -140,11 +160,11 @@ export default function WorkflowStepper(workflow: any) {
                             })}
                         </div>
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '30px' }}>
+                    {/* <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '30px' }}>
                         <Tooltip title = "Set as Pending"><Button color     = "inherit" onClick = {updateWorkflowNode("QUEUED")}><PendingIcon/></Button></Tooltip>
                         <Tooltip title = "Set as In Progress"><Button color = "inherit" onClick = {updateWorkflowNode("IN_PROGRESS")}><LoopIcon/></Button></Tooltip>
                         <Tooltip title = "Set as Completed"><Button color   = "inherit" onClick = {updateWorkflowNode("COMPLETE")}><DoneIcon /></Button></Tooltip>
-                    </Box>
+                    </Box> */}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose} color="error">Close</Button>

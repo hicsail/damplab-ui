@@ -85,13 +85,14 @@ export const getWorkflowsFromGraph = (nodes: any, edges: any) => {
             if (edge.source === e.target) {
                 isStartNode = false;
             }
-        });
-        if (isStartNode) {
+        }); // 2nd condition prevents creation of mult workflows from branch
+        if (isStartNode && !startNodes.find((n: any) => n === edge.source)) {
             startNodes.push(edge.source);
+            // console.log('startNodes: ', startNodes)
         }
     });
 
-    // add start nodes that are not in edges.source or destination
+    // add start nodes that are not in edges.source or destination (singletons)
     nodes.forEach((node: any) => {
         let isStartNode = true;
         edges.forEach((e: any) => {
@@ -105,29 +106,126 @@ export const getWorkflowsFromGraph = (nodes: any, edges: any) => {
     });
 
 
+    // TODO: CK:Update so multiple workflows aren't produced if there's a branch
 
     // loop over start nodes and create workflows
-    let workflows: any = [];
+    // let workflows: any = [];
+    // startNodes.forEach((startNode: any) => {
+    //     let workflow: any = [];
+    //     let node = nodes.find((n: any) => n.id === startNode);
+    //     workflow.push(node);
+    //     let i = 0;
+    //     while (i < edges.length) {
+    //         let edge = edges[i];
+    //         if (edge.source === node.id) {
+    //             node = nodes.find((n: any) => n.id === edge.target);
+    //             workflow.push(node);
+    //             i = 0;
+    //         } else {
+    //             i++;
+    //         }
+    //     }
+    //     workflows.push(workflow);
+    //     // console.log(workflows);
+    // });
+
+    // loop over startNodes to generate disjoint sets of nodes and edges
+    let nodeSets: {}[][] = [[]];
+    let edgeSets: {}[][] = [[]];
+    let nodesLeft: string[] = nodes.map((n: any) => n.id);
+    let edgesLeft: any[] = edges;
+    let index = 0;
     startNodes.forEach((startNode: any) => {
-        let workflow: any = [];
-        let node = nodes.find((n: any) => n.id === startNode);
-        workflow.push(node);
-        let i = 0;
-        while (i < edges.length) {
-            let edge = edges[i];
-            if (edge.source === node.id) {
-                node = nodes.find((n: any) => n.id === edge.target);
-                workflow.push(node);
-                i = 0;
-            } else {
-                i++;
-            }
-        }
-        workflows.push(workflow);
-    });
-    
+        if (nodesLeft.includes(startNode)) {
+            nodeSets[index] = [nodes.find((n: any) => n.id === startNode)];
+            // traverse all edges (bi-directionally) until no edges left in set
+            while (edgesLeft.length > 0) {
+                let connections: {}[] = [];
+                let connectedNodes: {}[] = [];
+                edgesLeft.forEach((e: any) => {
+                    const newNode = nodeSets[index].map((n: any) => n.id).includes(e.source) ? e.target 
+                                  : nodeSets[index].map((n: any) => n.id).includes(e.target) ? e.source 
+                                  : null;
+                    if (nodesLeft.includes(newNode)) {  // skip if already visit
+                        const node = nodes.find((n: any) => n.id === newNode);
+                        connectedNodes.push(node);
+                        connections.push(e);
+                        const i = nodesLeft.indexOf(newNode);
+                        nodesLeft.splice(i, 1);
+                    };
+                });
+                if (connections.length === 0) {
+                    break;
+                }
+                if (nodeSets[index]) {nodeSets[index].push(...connectedNodes);} 
+                    else {nodeSets[index] = connectedNodes;}
+                if (edgeSets[index]) {edgeSets[index].push(...connections);}
+                    else {edgeSets[index] = connections;}
+                edgesLeft = edgesLeft.filter((e: any) => !connections.includes(e));
+            };
+            index++;
+        };
+    })
+
+    const workflows = getStagingForWorkflows(nodeSets, edgeSets, startNodes);
+
     return workflows;
 }
+
+
+export const getStagingForWorkflows = (nodeSets: {}[][], edgeSets: {}[][], startNodes: any[]) => {
+
+    // forward traverse sets (i.e. workflows) from startNodes to create stages
+    let workflows: any[] = [];
+    nodeSets.forEach((nSet: any[], index) => {
+        let nLeft: any[] = nSet;
+        let nStageDict: {[id: string] : number} = {};
+        let eLeft: {}[] = edgeSets[index] ? edgeSets[index] : [];  // set/edge sets related by index
+        let stages: {}[][] = [];
+        const setStarts: string[] = startNodes.filter((s: string) => nSet.map((n: any) => n.id).includes(s));
+        console.log(setStarts);
+        setStarts.forEach((startNode: any) => {
+            let index = 0;
+            if (stages[index]) {stages[index].push(nSet.find((n: any) => n.id === startNode));
+            } else {stages[index] = [nSet.find((n: any) => n.id === startNode)];}
+            let connections: {}[] = [];
+            while (eLeft.length > 0) {
+                connections = eLeft.filter((e: any) => stages[index].map((n: any) => n.id).includes(e.source));
+                if (connections.length === 0) {
+                    break;
+                }
+                index++;
+                if (!stages[index]) {stages[index] = [];}
+                connections.forEach((c: any) => {
+                    const t = c.target;
+                    if (nLeft.map((n: any) => n.id).includes(t)) {
+                        const node = nSet.find((n: any) => n.id === t);
+                        stages[index].push(node);
+                        nStageDict[t] = index;
+                        const i = nLeft.indexOf(node);
+                        nLeft.splice(i, 1);
+                        console.log('TRUE: ', t, index);
+                    } else {
+                        const ind = nStageDict[t];
+                        if (index > ind) {
+                            const node = nSet.find((n: any) => n.id === t);
+                            stages[index].push(node);
+                            stages[ind] = stages[ind].filter(() => !stages.includes(t));
+                            nStageDict[t] = index;
+                            console.log('FALSE1: ', t, index);
+                        }
+                        console.log('FALSE2: ', t, index);
+                    }
+                })
+                eLeft = eLeft.filter((e: any) => !connections.includes(e));
+            }
+        })
+        workflows.push(stages);
+    })
+
+    return workflows;
+}
+
 
 export const transformNodesToGQL = (nodes: any) => {
 
