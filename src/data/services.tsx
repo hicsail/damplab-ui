@@ -353,7 +353,7 @@ export let services: Service[] = [
     {
         id: 'gibson-assembly',  // PRODUCES DNA; SCREENING REQUIRED
         name: 'Gibson Assembly',
-        icon: 'https://drive.google.com/uc?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I',
+        icon: 'https://drive.google.com/thumbnail?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I',  // icon: 'https://raw.githubusercontent.com/hicsail/damplab-ui/691ace7a9955f4539add30fe641a3dcc82cba31a/public/gibson-assembly.svg',
         description: 'Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously.',
         parameters: [
             {
@@ -563,7 +563,7 @@ export let services: Service[] = [
     {
         id: 'm-cloning',  // PRODUCES DNA; SCREENING REQUIRED
         name: 'Modular Cloning',
-        icon: 'https://cdn-icons-png.flaticon.com/512/1974/1974478.png',
+        icon: 'https://cdn-icons-png.flaticon.com/512/1974/1974478.png',  // icon: 'https://github.com/hicsail/damplab-ui/blob/biosecurity-basics/public/modular-cloning.png?raw=true',
         resultParams: [
             'forward-primer-flow', 'reverse-primer-flow',
         ],
@@ -614,6 +614,7 @@ export let services: Service[] = [
             {
                 id: 'moclo-insert',
                 name: 'MoClo Insert',
+                description: 'Sequences provided here or produced by the process will undergo a safety screening.',
                 type: 'string',
                 paramType: 'input',
                 required: true
@@ -621,6 +622,7 @@ export let services: Service[] = [
             {
                 id: 'moclo-vector',
                 name: 'MoClo Vector',
+                description: 'Sequences provided here or produced by the process will undergo a safety screening.',
                 type: 'string',
                 paramType: 'input',
                 required: true
