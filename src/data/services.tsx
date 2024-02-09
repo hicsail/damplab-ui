@@ -9,7 +9,7 @@ rehydrate-primer      : str
 pcr                   : bool*3, num*3, str
 gel-electrophoresis   : dropdown, num*4, str
 dpn1                  : bool
-gibson-assembly       : bool, str*2
+gibson-assembly       : bool, str*2          // PRODUCES DNA; SCREENING REQUIRED
 restriction-digest    : bool, str
 restriction-ligation  : bool, str
 clean-up              : bool, num
@@ -17,7 +17,7 @@ dna-storage           : [ENUM?]
 run-gel               : bool, str
 column-purification   : bool, num
 dna-gel               : bool
-m-cloning             : bool*2, num, str*3
+m-cloning             : bool*2, num, str*3   // PRODUCES DNA; SCREENING REQUIRED
 transformation        : bool*2, dropdown, num*2, [dropdown or str?]
 overnight-culture     : bool*2, num*5, [dropdown or str?]
 miniprep-gs           : bool, num
@@ -351,7 +351,7 @@ export let services: Service[] = [
         categories: ['dna-assembly-cloning'],
     },
     {
-        id: 'gibson-assembly',
+        id: 'gibson-assembly',  // PRODUCES DNA; SCREENING REQUIRED
         name: 'Gibson Assembly',
         icon: 'https://drive.google.com/uc?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I',
         description: 'Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously.',
@@ -377,6 +377,20 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: false
+            },
+            {
+                id: 'gibson-insert',
+                name: 'Gibson Insert',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'gibson-vector',
+                name: 'Gibson Vector',
+                type: 'string',
+                paramType: 'input',
+                required: true
             },
         ],
         allowedConnections: [
@@ -547,7 +561,7 @@ export let services: Service[] = [
         categories: ['dna-rna']
     },
     {
-        id: 'm-cloning',
+        id: 'm-cloning',  // PRODUCES DNA; SCREENING REQUIRED
         name: 'Modular Cloning',
         icon: 'https://cdn-icons-png.flaticon.com/512/1974/1974478.png',
         resultParams: [
@@ -597,7 +611,20 @@ export let services: Service[] = [
                 paramType: 'result',
                 required: true
             },
-
+            {
+                id: 'moclo-insert',
+                name: 'MoClo Insert',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'moclo-vector',
+                name: 'MoClo Vector',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
         ],
         allowedConnections: [
             'transformation'

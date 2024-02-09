@@ -22,7 +22,7 @@ mutation {
             required: true
           }
         ]
-        description: "This is a description for Sending Sample to Sequencing"
+        description: ""
         allowedConnections: ["gene", "storage", "design-primers"]
         categories: ["dna-rna"]
         result: null
@@ -164,7 +164,7 @@ mutation {
             required: true
           }
         ]
-        allowedConnections: ["run-gel", "dpn1", "gel-electrophoresis", "gibson-assembly"]
+        allowedConnections: ["run-gel", "dpn1", "gel-electrophoresis"]
         categories: ["dna-assembly-cloning"]
         result: {
           id: "pcr-product"
@@ -261,7 +261,7 @@ mutation {
       {
         id: "gibson-assembly"
         name: "Gibson Assembly"
-        icon: "https://drive.google.com/uc?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I"
+        icon: "https://github.com/hicsail/damplab-ui/blob/biosecurity-basics/public/gibson-assembly.svg"
         description: "Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously."
         parameters: [
           {
@@ -286,6 +286,20 @@ mutation {
             paramType: "input"
             required: false
           }
+          {
+            id: "gibson-insert"
+            name: "Gibsons Insert"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "gibson-vector"
+            name: "Gibson Vector"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
         ]
         allowedConnections: ["transformation", "dna-storage"]
         categories: []
@@ -293,7 +307,7 @@ mutation {
       {
         id: "restriction-digest"
         name: "Restriction Digest"
-        icon: "https://drive.google.com/uc?id=1oKt6iHg0TI8Zb0X8maZhML7bsSmg0MPK"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
         parameters: [
           {
             id: "template-dna"
@@ -317,7 +331,7 @@ mutation {
       {
         id: "restriction-ligation"
         name: "Restriction Ligation"
-        icon: "https://drive.google.com/uc?id=1nohYUt-euRxY0RwpHdHPE2mGBPoxTAyP"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
         parameters: [
           {
             id: "digest-dna"
@@ -345,7 +359,7 @@ mutation {
       {
         id: "clean-up"
         name: "Clean Up and Concentrate DNA"
-        icon: "https://drive.google.com/uc?id=1BtuvQbiI0TXv1M59ZvLDb3Nc7_b2UMoy"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
         parameters: [
           {
             id: "template-dna"
@@ -369,7 +383,7 @@ mutation {
       {
         id: "dna-storage"
         name: "Plasmid, DNA fragment, or oligo storage"
-        icon: "https://drive.google.com/uc?id=1G03_rChZoFaJO30opPW-x_XTE1FI68q9"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
         parameters: [
           {
             id: "dna-types"
@@ -455,7 +469,7 @@ mutation {
       {
         id: "m-cloning"
         name: "Modular Cloning"
-        icon: "https://cdn-icons-png.flaticon.com/512/1974/1974478.png"
+        icon: "https://github.com/hicsail/damplab-ui/blob/biosecurity-basics/public/modular-cloning.png"
         resultParams: ["forward-primer-flow", "reverse-primer-flow"]
         description: ""
         parameters: [
@@ -500,6 +514,20 @@ mutation {
             name: "Reverse Primer Flow Result"
             type: "boolean"
             paramType: "result"
+            required: true
+          }
+          {
+            id: "moclo-insert"
+            name: "MoClo Insert"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "moclo-vector"
+            name: "MoClo Vector"
+            type: "string"
+            paramType: "input"
             required: true
           }
         ]
@@ -901,28 +929,6 @@ mutation {
           id: "overnight-culture-storage"
           type: "OvernightCultureStorageResult"
           name: "Overnight Bacterial Culture Storage Result"
-        }
-      }
-      {
-        id: "rna-extraction"
-        name: "RNA Extraction"
-        icon: "https://drive.google.com/uc?id=1_WxT_oj_D6EuXPYLwb_y2U1cALx6CVlZ"
-        description: ""
-        parameters : [
-          {
-            id: "sample"
-            name: "Sample"
-            type: "string"
-            paramType: "input"
-            required: true
-          }
-        ]
-        categories: ["dna-rna"]
-        allowedConnections: ["pcr"]
-        result : {
-          id: "rna-extraction-product"
-          type: "RNAExtractionResult"
-          name: "RNA Extraction Result"
         }
       }
     ]
