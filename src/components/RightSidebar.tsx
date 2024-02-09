@@ -62,9 +62,6 @@ export default function ContextTestComponent() {
     return (
         <div style={{ wordWrap: 'break-word', padding: 20, overflow: 'scroll', height: '80vh', textAlign: 'left', }}>
             <div>
-                DNA Screening Warning...
-            </div>
-            <div>
                 <h2>
                     {activeNode?.data.label}
                 </h2>
