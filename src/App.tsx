@@ -25,6 +25,7 @@ function App() {
   const [nodeParams, setNodeParams] = useState([]);
   const [services, setServices] = useState([]);
   const [bundles, setBundles] = useState([]);
+  const [hazards, setHazards] = useState(Array<string>);
 
   const client = new ApolloClient({
     uri: 'https://damplab-test.sail.codes/graphql',
@@ -48,12 +49,16 @@ function App() {
     }).catch((error) => {
       console.log('error when loading bundles on app', error);
     });
+
+    // TODO: Change hazards to a service attribute...
+    // Matches to 'activeNode?.data.label in RightSideBar
+    setHazards(['Gibson Assembly', 'Modular Cloning']);
   }, []);
 
   return (
     <div className="App">
       <ApolloProvider client={client}>
-        <AppContext.Provider value={{ services: services, bundles: bundles }}>
+        <AppContext.Provider value={{ services: services, bundles: bundles, hazards: hazards }}>
           <CanvasContext.Provider value={{ nodes: nodes, edges: edges, 
                                            setNodes: setNodes, setEdges: setEdges, 
                                            activeComponentId: activeComponentId, 
