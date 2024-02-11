@@ -129,9 +129,10 @@ export default () => {
           ) : (
           <div>
             <div>
-          
+                <br/>
                 Click on a bundle to add all services to the graph.
-
+                <br/>
+                <br/>
             </div>
             {
               bundles.map((bundle: any) => {
@@ -139,7 +140,7 @@ export default () => {
                   <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} 
                   className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
                     <Button variant="outlined" title={bundle.label}  
-                    style={{ width: 180, display: 'flow', justifyContent: 'space-around' }}
+                    style={{ width: 180, display: 'flow', justifyContent: 'space-around', fontWeight: 'bold' }}
                     onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>
                         <img src={bundle.icon} alt=" " style={{ height: 60 }} />

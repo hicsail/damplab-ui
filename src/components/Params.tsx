@@ -100,7 +100,7 @@ export default function ({ activeNode }: ParamFormProps) {
                             if (param.paramType !== 'result') {
                                 if (param.type === "dropdown") {
                                     return (
-                                        <FormControl size='small' sx={{ mt: 1, width: '22ch' }} key={param.id}>
+                                        <FormControl size='small' sx={{ mt: 1, width: '26ch' }} key={param.id}>
                                             <InputLabel>{param.name}</InputLabel>
                                             <Select
                                                 name={param.id}
@@ -129,7 +129,7 @@ export default function ({ activeNode }: ParamFormProps) {
                                             name={param.id}
                                             onChange={formik.handleChange}
                                             onBlur={formik.handleBlur}
-                                            sx={{ mt: 1, width: '22ch' }}
+                                            sx={{ mt: 1, width: '26ch' }}
                                         />
                                     );
                                 }
@@ -187,7 +187,7 @@ export default function ({ activeNode }: ParamFormProps) {
                     }
                 </div>
                 <div className="add-instructs" style={{marginLeft: 20}}>
-                    <TextField multiline sx={{ mt: 5, width: '22ch' }} label="Additional Instructions" rows={3}
+                    <TextField multiline sx={{ mt: 5, width: '26ch' }} label="Additional Instructions" rows={3}
                     value={formik.values[`addinst${activeNode?.data.id}`] 
                         ? formik.values[`addinst${activeNode?.data.id}`] 
                         : ""} 
