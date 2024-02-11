@@ -65,13 +65,13 @@ export default memo((input: Input) => {
         <div>
             <Box style={{background : background}}>
                 <Button variant="outlined" title={data.data.label} onClick={handleOpen} 
-                style={{ width: 200, display: 'flex', justifyContent: 'space-around' }}>
+                style={{ width: 250, display: 'flex', justifyContent: 'space-around' }}>
                     <div>
                         <img src={data.data.icon} alt=" " style={{ width: 30 }} />
                     </div>
-                    <div>
+                    <p style={{ fontSize: 12, marginLeft: 5, marginRight: 5 }}>
                         {data.data.label}
-                    </div>
+                    </p>
                     <div>
                         { allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
                     </div> 

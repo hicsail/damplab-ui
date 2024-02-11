@@ -61,7 +61,7 @@ export default function ContextTestComponent() {
     );
 
     return (
-        <div style={{ wordWrap: 'break-word', padding: 20, overflow: 'scroll', height: '80vh', textAlign: 'left', }}>
+        <div style={{ wordWrap: 'break-word', paddingLeft: 20, paddingRight: 20, overflow: 'scroll', height: '80vh', textAlign: 'left', }}>
             <div>
                 {
                     hazards.includes(activeNode?.data.label) 
@@ -94,9 +94,9 @@ export default function ContextTestComponent() {
                 {
                     // return header with text Allowed Connections if allowedConnections list is not empty
                     activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (
-                        <h2>
+                        <h3>
                             Allowed Connections
-                        </h2>
+                        </h3>
                     ) : null
                 }
                 {

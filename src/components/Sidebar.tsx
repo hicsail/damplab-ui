@@ -113,10 +113,10 @@ export default () => {
                 return (
                   <Box key={Math.random().toString(36).substring(2, 9)} title={service.name} 
                   style={buttonElementStyle} className="dndnode output" 
-                  sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', ...borderStyles }} 
+                  sx={{ display: 'flow', justifyContent: 'space-around', alignItems: 'center', ...borderStyles }} 
                   onDragStart={(event) => onDragStart(event, JSON.stringify(service))} draggable>
                       <div>
-                        <img src={service.icon} alt=" " style={{ width: 40, height: 40 }} />  
+                        <img src={service.icon} alt=" " style={{ height: 40 }} />  
                       </div>
                       <div style={{padding: 5}}>
                         {service.name}
@@ -139,10 +139,10 @@ export default () => {
                   <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} 
                   className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
                     <Button variant="outlined" title={bundle.label}  
-                    style={{ width: 163, display: 'flex', justifyContent: 'space-around', marginLeft: 'auto', marginRight: 'auto' }}
+                    style={{ width: 180, display: 'flow', justifyContent: 'space-around' }}
                     onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>
-                        <img src={bundle.icon} alt=" " style={{ width: 30 }} />
+                        <img src={bundle.icon} alt=" " style={{ height: 60 }} />
                       </div>
                       {bundle.label}
                     </Button>
