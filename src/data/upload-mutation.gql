@@ -261,7 +261,7 @@ mutation {
       {
         id: "gibson-assembly"
         name: "Gibson Assembly"
-        icon: "https://drive.google.com/thumbnail?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I"
+        icon: "https://drive.google.com/thumbnail?id=1S9H5ydQhe9jyFmRtz09yExg4a8j36-Mp"
         description: "Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously."
         parameters: [
           {
@@ -289,7 +289,7 @@ mutation {
           {
             id: "dna-warning"
             name: "Gibson Vector"
-            description: "Sequences provided here or produced by the process will undergo a safety screened."
+            description: ""
             type: "boolean"
             paramType: "input"
             required: true
@@ -297,7 +297,7 @@ mutation {
           {
             id: "gibson-insert"
             name: "Gibsons Insert"
-            description: "Sequences provided here or produced by the process will undergo a safety screened."
+            description: ""
             type: "string"
             paramType: "input"
             required: true
@@ -521,7 +521,7 @@ mutation {
           {
             id: "moclo-insert"
             name: "MoClo Insert"
-            description: "Sequences provided here or produced by the process will undergo a safety screening."
+            description: ""
             type: "string"
             paramType: "input"
             required: true
@@ -529,7 +529,7 @@ mutation {
           {
             id: "moclo-vector"
             name: "MoClo Vector"
-            description: "Sequences provided here or produced by the process will undergo a safety screening."
+            description: ""
             type: "string"
             paramType: "input"
             required: true
