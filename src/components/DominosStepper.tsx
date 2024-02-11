@@ -111,16 +111,12 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
             referrerPolicy="no-referrer" />)}, [nodes[Number(props.icon)-1].icon]);
         completed 
             ? image = <CheckCircleOutlineIcon fontSize="large" sx={{color: "white"}}/>
-            :   // TODO: Cache images (keeps overloading google w/ requests)
-                
-                image = <img className={className}
-                  src={nodes[Number(props.icon)-1].icon}
-                  width="50" height="50" />
-                //   <QuestionMarkIcon />
+            : image = <img className={className}
+                           src={nodes[Number(props.icon)-1].icon}
+                           width="50" height="50" />
         return (
             <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>
                 {image}
-                {/* <QuestionMarkIcon /> */}
             </ColorlibStepIconRoot>
         );
     };

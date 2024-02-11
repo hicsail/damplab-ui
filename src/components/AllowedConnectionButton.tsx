@@ -12,7 +12,7 @@ export default function NodeButton(data: any) {
             <Button variant="outlined" title={label} onClick={ ()=> addNodeToCanvasWithEdge([], 
                 data.sourceId, node, data.setNodes, data.setEdges, data.sourcePosition, 
                 data.setActiveComponentId) }  
-                style={{ width: 163, display: 'flex', justifyContent: 'space-around', margin: 20 }}>
+                style={{ width: 180, display: 'flex', justifyContent: 'space-around', margin: 20 }}>
                 <div>
                     <img src={icon} alt=" " style={{ width: 30 }} />
                 </div>
