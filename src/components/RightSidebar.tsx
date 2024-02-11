@@ -5,6 +5,7 @@ import { getServiceFromId } from '../controllers/GraphHelpers';
 import { Button } from '@mui/material';
 import Snackbar from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
+import { WarningRounded } from '@mui/icons-material/';
 import CloseIcon from '@mui/icons-material/Close';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -16,7 +17,7 @@ import Params from './Params';
 export default function ContextTestComponent() {
 
     const val = useContext(CanvasContext);
-    const { services } = useContext(AppContext);
+    const { services, hazards } = useContext(AppContext);
     const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
     const [openToast, setOpenToast] = useState(false);
     const [open, setOpen] = useState(false);
@@ -62,6 +63,13 @@ export default function ContextTestComponent() {
     return (
         <div style={{ wordWrap: 'break-word', padding: 20, overflow: 'scroll', height: '80vh', textAlign: 'left', }}>
             <div>
+                {
+                    hazards.includes(activeNode?.data.label) 
+                    ? (<p style={{color: 'red'}}>
+                        <WarningRounded style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                        sequences provided below or produced by the process will undergo a safety screening.</p>)
+                    : ""
+                }
                 <h2>
                     {activeNode?.data.label}
                 </h2>
