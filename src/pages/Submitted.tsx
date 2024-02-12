@@ -4,9 +4,8 @@ import { useParams } from 'react-router-dom';
 import { GET_JOB_BY_ID, } from '../gql/queries';
 import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
 import { Box, Button, Card, CardContent, Typography, colors } from '@mui/material';
-import { AccessTime, NotInterested, Check } from '@mui/icons-material';
+import { AccessTime, Publish, NotInterested, Check } from '@mui/icons-material';
 import WorkflowStepper from '../components/WorkflowStepper';
-import WorkflowSteps from '../components/TrackingStepper';
 import JobFeedbackModal from '../components/JobFeedbackModal';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 
@@ -95,19 +94,27 @@ export default function Submitted() {
     }, [submittedWorkflows]);
 
     const jobStatus = () => {
+        const submitText = "Your job has been submitted to the DAMP lab and is awaiting review. Once the review is done, you will see the updated state over here.";
+        const createText = "Your job is currently being created. Once the job is created, you will see the updated state over here.";
+        const acceptText = "Your job has been reviewed by the DAMP lab, and has been accepted. You will receive a SOW to review and sign here once it has been generated.";
+        const rejectText=  "Your job has been reviewed by the DAMP lab, and has been accepted. Please complete any necessary modifications and resubmit your job.";
+        const defaultText = "Invalid Case";
         switch (jobState) {
+            case 'SUBMITTED':
+                return ['rgba(256, 256, 0, 0.5)', <Publish />, submitText]
             case 'CREATING':
-                return ['rgba(256, 256, 0, 0.5)', <AccessTime />]
+                return ['rgba(256, 256, 0, 0.5)', <AccessTime />, createText]
             case 'ACCEPTED':
-                return ['rgb(0, 256, 0, 0.5)', <Check />];
+                return ['rgb(0, 256, 0, 0.5)', <Check />, acceptText];
             case 'REJECTED':
-                return ['rgb(256, 0, 0, 0.5)', <NotInterested />];
+                return ['rgb(256, 0, 0, 0.5)', <NotInterested />, rejectText];
             default:
-                return ['rgb(256, 256, 0, 0.5)', <NotInterested />];
+                return ['rgb(0, 0, 0, 0)', <NotInterested />, defaultText];
         }
     }
     const jobStatusColor = jobStatus()[0];
     const jobStatusIcon = jobStatus()[1];
+    const jobStatusText = jobStatus()[2];
 
     const workflowCard = (
         <Card>
@@ -141,7 +148,7 @@ export default function Submitted() {
                     </Typography>
                 </Box>
                 <Typography sx={{ fontSize: 12 }} display={{ marginTop: '5', marginLeft: '20', marginRight: '20' }} align="left" >
-                    <i>This is a description of what the current state means.</i>
+                    <i>{jobStatusText}</i>
                 </Typography>
             </Box>
             <Box>

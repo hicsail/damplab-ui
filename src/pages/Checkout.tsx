@@ -9,7 +9,7 @@ import { CanvasContext } from '../contexts/Canvas'
 import { useMutation } from '@apollo/client';
 import { getWorkflowsFromGraph, transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
 import { CREATE_JOB, CREATE_WORKFLOW } from '../gql/mutations';
-import WorkflowStepper from '../components/WorkflowStepper';
+import TrackingStepper from '../components/TrackingStepper';
 import FormControl from '@mui/material/FormControl';
 
 export default function Checkout() {
@@ -120,7 +120,7 @@ export default function Checkout() {
                                                 // value={namesTemp[workflow.id]}
                                                 // onChange={(e) => { handleNameChange(e, workflow.id)}}
                                             />
-                                            <WorkflowStepper workflow={workflow.nodes} name={workflow.name} parent="checkout"/>
+                                            <TrackingStepper workflow={workflow.nodes} name={workflow.name} parent="checkout"/>
                                         </div>
                                     )
                                 })
