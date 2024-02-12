@@ -1,13 +1,17 @@
 import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useContext, useEffect, useState, useRef } from 'react'
 import { useMutation } from '@apollo/client';
 import LoopIcon from '@mui/icons-material/Loop';
 import DoneIcon from '@mui/icons-material/Done';
 import PendingIcon from '@mui/icons-material/Pending';
 import { MUTATE_NODE_STATUS } from '../gql/mutations';
+import { Popover, Badge } from '@mui/material';
+import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
+import { AppContext } from '../contexts/App';
 // the purpose of this component is to showcase nodes in a workflow and their details
 export default function WorkflowStepper(workflow: any) {
 
+    const { hazards } = useContext(AppContext);
     const windowSize = useRef([window.innerWidth, window.innerHeight]);
     const [isSmall, setIsSmall] = useState(false);
     const [activeStep, setActiveStep] = useState(0);
@@ -17,6 +21,10 @@ export default function WorkflowStepper(workflow: any) {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [mutateNodeStatus, { loading, error }] = useMutation(MUTATE_NODE_STATUS);
 
+    const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
+    const handlePopoverOpen = (event: React.MouseEvent<HTMLElement>) => {setAnchorEl(event.currentTarget);};
+    const handlePopoverClose = () => {setAnchorEl(null);};
+    const open = Boolean(anchorEl);
 
     useEffect(() => {
         function handleResize() {
@@ -89,10 +97,42 @@ export default function WorkflowStepper(workflow: any) {
             <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} 
             orientation={isSmall ? 'vertical' : 'horizontal'}>
                 {workflowServices.map((service: any, index: number) => (
-                    <Step key={service.id} style={{ maxWidth: 250 }}>
+                    <Step key={service.id} style={{ maxWidth: 250, minWidth: 50, paddingLeft: 50, paddingRight: 50 }}>
                         <StepButton onClick={selectStep(index)}>
                             <StepLabel StepIconComponent={() => getStepIcon(service.state)}>
-                                {service.name}
+                            <div style={{display: 'flex', alignItems: 'end'}}>
+                                    <Badge   anchorOrigin={{vertical: 'top', horizontal: 'right'}} badgeContent={
+                                        <div>
+                                            <Typography
+                                                aria-owns={open ? 'mouse-over-popover' : undefined}
+                                                aria-haspopup="true"
+                                                onMouseEnter={handlePopoverOpen}
+                                                onMouseLeave={handlePopoverClose}
+                                            >
+                                                <sup>{hazards.includes(service.name) 
+                                                    ? <GppMaybeTwoTone style={{color:'grey'}}/> 
+                                                    : <p/>}</sup>
+                                            </Typography>
+                                            <Popover
+                                                id="mouse-over-popover"
+                                                sx={{pointerEvents: 'none'}}
+                                                open={open}
+                                                anchorEl={anchorEl}
+                                                anchorOrigin={{vertical: 'bottom', horizontal: 'left'}}
+                                                transformOrigin={{vertical: 'top', horizontal: 'left'}}
+                                                onClose={handlePopoverClose}
+                                                disableRestoreFocus
+                                            >
+                                                <Typography sx={{ px: 2 }}>
+                                                    <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
+                                                    <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
+                                                </Typography>
+                                            </Popover>
+                                        </div>
+                                    }>
+                                        {service.name}&nbsp;&nbsp;
+                                    </Badge>
+                                </div>
                             </StepLabel>
                         </StepButton>
                     </Step>
@@ -120,24 +160,37 @@ export default function WorkflowStepper(workflow: any) {
                     </div>
                 </DialogTitle>
                 <DialogContent>
-                    <Box sx={{}} style={{ height: 150, overflow: 'auto' }}>
+                    <Box style={{ height: 300, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
                             {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
                                 return (
-                                    <div className='parameter' style={{ display: 'flex' }} key={Math.random()}>
+                                    <div className='parameter' style={{ display: 'flex', marginBottom: 3 }} key={Math.random()}>
                                         <div className='parameter-name'>
                                             {parameter.name}
                                         </div>
-                                        <div className='parameter-separator' style={{ marginLeft: 5, marginRight: 5 }}>
+                                        <div className='parameter-separator' style={{ marginLeft: 3, marginRight: 5 }}>
                                             :
                                         </div>
-                                        <div className='parameter-value'>
+                                        <div className='parameter-value' style={{ marginBottom: 3 }}>
                                             <input type='text' value={parameter.value ? parameter.value : parameter.resultParamValue} 
                                             onChange={(e) => parameter.value = e.target.value} />
                                         </div>
                                     </div>
                                 )
                             })}
+                            {
+                                hazards.includes(workflow.workflow[activeStep].name) 
+                                ? (
+                                    <>
+                                        <p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                                        sequences provided above or produced by the process will undergo a safety screening.</p>
+                                        <Typography>
+                                            <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
+                                            <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
+                                        </Typography>
+                                    </>)
+                                : <p>{workflow.workflow[activeStep].data.label}</p>
+                            }
                         </div>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '30px' }}>

@@ -97,7 +97,7 @@ export default function Checkout() {
         <div>
             <div>
                 <div>
-                    <Typography variant='h5'>Checkout</Typography>
+                    <Typography variant='h4' sx={{ m: 2 }}>Checkout</Typography>
                     <Accordion key={Math.random() * 100} expanded={expanded}>
                         <AccordionSummary
                             expandIcon={<ExpandMoreIcon />}
@@ -105,7 +105,7 @@ export default function Checkout() {
                             id="panel1a-header"
                             onClick={() => setExpanded(!expanded)}
                         >
-                            <Typography variant='h6'>Job Summary</Typography>
+                            <Typography variant='h5'>Job Summary</Typography>
                         </AccordionSummary>
                         <AccordionDetails>
                             {
@@ -140,7 +140,7 @@ export default function Checkout() {
                                                 }
                                             </Box>
                                             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, marginTop: 3 }}>
-                                                <CheckoutStepper workflow={workflow.nodes} name={workflow.name} parent="checkout" style={{}} />
+                                                <CheckoutStepper workflow={workflow.nodes} name={workflow.name} parent="checkout" />
                                             </Box>
                                         </div>
                                     )

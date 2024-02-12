@@ -106,14 +106,14 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
         const imageCached: any = useMemo(() => 
             {return(<img className={className}
             src={nodes[Number(props.icon)-1].icon}
-            width="50" height="50" 
+            height="50" 
             alt=" "
             referrerPolicy="no-referrer" />)}, [nodes[Number(props.icon)-1].icon]);
         completed 
             ? image = <CheckCircleOutlineIcon fontSize="large" sx={{color: "white"}}/>
             : image = <img className={className}
                            src={nodes[Number(props.icon)-1].icon}
-                           width="50" height="50" />
+                           height="50" />
         return (
             <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>
                 {image}

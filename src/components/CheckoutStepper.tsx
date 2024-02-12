@@ -77,10 +77,10 @@ export default function WorkflowStepper(workflow: any) {
             <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} 
             orientation={isSmall ? 'vertical' : 'horizontal'}>
                 {workflowServices.map((service: any, index: number) => (
-                    <Step key={service.id} style={{ maxWidth: 250, minWidth: 150, paddingLeft: 50, paddingRight: 50}}>
+                    <Step key={service.id} style={{ maxWidth: 250, minWidth: 50, paddingLeft: 50, paddingRight: 50 }}>
                         <StepButton onClick={selectStep(index)}>
                             <StepLabel StepIconComponent={() => <img src={service.data.icon} height="50"/>}>
-                                <div style={{display: 'flex', alignItems: 'end'}}>
+                                <div style={{display: 'flex', alignItems: 'end' }}>
                                 <Badge   anchorOrigin={{vertical: 'top', horizontal: 'right'}} badgeContent={
                                     <div>
                                         <Typography
@@ -103,7 +103,7 @@ export default function WorkflowStepper(workflow: any) {
                                             onClose={handlePopoverClose}
                                             disableRestoreFocus
                                         >
-                                            <Typography sx={{ p: 1 }}>
+                                            <Typography sx={{ px: 2 }}>
                                                 <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
                                                 <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
                                             </Typography>
@@ -140,7 +140,7 @@ export default function WorkflowStepper(workflow: any) {
                     </div>
                 </DialogTitle>
                 <DialogContent>
-                    <Box sx={{}} style={{ height: 300, overflow: 'auto' }}>
+                    <Box style={{ height: 300, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
                             {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
                                 return (
@@ -160,14 +160,17 @@ export default function WorkflowStepper(workflow: any) {
                             })}
                             {
                                 hazards.includes(workflow.workflow[activeStep].data.label) 
-                                ? (<p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
-                                    sequences provided above or produced by the process will undergo a safety screening.</p>)
+                                ? (
+                                    <>
+                                        <p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                                        sequences provided above or produced by the process will undergo a safety screening.</p>
+                                        <Typography>
+                                            <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
+                                            <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
+                                        </Typography>
+                                    </>)
                                 : ""
                             }
-                            <Typography>
-                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
-                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
-                            </Typography>
                         </div>
                     </Box>
                 </DialogContent>
