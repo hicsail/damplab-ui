@@ -9,7 +9,7 @@ rehydrate-primer      : str
 pcr                   : bool*3, num*3, str
 gel-electrophoresis   : dropdown, num*4, str
 dpn1                  : bool
-gibson-assembly       : bool, str*2
+gibson-assembly       : bool, str*2          // PRODUCES DNA; SCREENING REQUIRED
 restriction-digest    : bool, str
 restriction-ligation  : bool, str
 clean-up              : bool, num
@@ -17,7 +17,7 @@ dna-storage           : [ENUM?]
 run-gel               : bool, str
 column-purification   : bool, num
 dna-gel               : bool
-m-cloning             : bool*2, num, str*3
+m-cloning             : bool*2, num, str*3   // PRODUCES DNA; SCREENING REQUIRED
 transformation        : bool*2, dropdown, num*2, [dropdown or str?]
 overnight-culture     : bool*2, num*5, [dropdown or str?]
 miniprep-gs           : bool, num
@@ -69,7 +69,8 @@ export let services: Service[] = [
     {
         id: 'seq',
         name: 'Send Sample to Sequencing',
-        icon: 'https://drive.google.com/uc?id=1KwchGg3_H3REm_jv5vf6IIUDmTupIPVs',
+        // icon: 'https://drive.google.com/uc?id=1KwchGg3_H3REm_jv5vf6IIUDmTupIPVs',
+        icon: 'https://drive.google.com/thumbnail?id=15LMIjlt73eu-wI5VfTJcXEybfuWRm8bd',
         // Name of item, type (plasmid, purified PCR, unpurified PCR, cosmid, BAC, Genomic DNA, Colony, RCA), size (kb), concentration (ng/ul), premixed? (yes/no), sequencing primer (with name), concentration of sequencing primer (uM)
         parameters: [
             {
@@ -99,7 +100,8 @@ export let services: Service[] = [
     {
         id: 'gene',
         name: 'Order Gene Fragment',
-        icon: 'https://drive.google.com/uc?id=1Zj4BohScCf6NNgebjrzDazseNSGN4CI9',
+        // icon: 'https://drive.google.com/uc?id=1Zj4BohScCf6NNgebjrzDazseNSGN4CI9',
+        icon: 'https://drive.google.com/thumbnail?id=1rhLeDV-7egQjsgrAcGBxzRhCqNkZNIxK',
         parameters: [
             {
                 id: 'fragment-sequence',
@@ -165,7 +167,8 @@ export let services: Service[] = [
     {
         id: 'rehydrate-primer',
         name: 'Rehydrate Primers',
-        icon: 'https://drive.google.com/uc?id=1r3Jk3Y1P-YMmp1CNryY0-5nFCIYLc7Wy',
+        // icon: 'https://drive.google.com/uc?id=1r3Jk3Y1P-YMmp1CNryY0-5nFCIYLc7Wy',
+        icon: 'https://drive.google.com/thumbnail?id=14s7ceqCUIrQpJF4dzO62fAq3T4KrDqd7',
         parameters: [
             {
                 id: 'buffer',
@@ -184,7 +187,8 @@ export let services: Service[] = [
     {
         id: 'pcr',
         name: 'PCR',
-        icon: 'https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt',
+        // icon: 'https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt',
+        icon: 'https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM',
         description: 'Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.',
         parameters: [
             {
@@ -254,7 +258,8 @@ export let services: Service[] = [
         id: 'gel-electrophoresis',
         name: 'Gel Electrophoresis',
         description: 'Gel electrophoresis is a laboratory method used to separate mixtures of DNA, RNA, or proteins according to molecular size. In gel electrophoresis, the molecules to be separated are pushed by an electrical field through a gel that contains small pores.',
-        icon: 'https://drive.google.com/uc?id=1lIq60MG4kdCmu4iJrNZikAc60TUlta5M', // find real icon
+        // icon: 'https://drive.google.com/uc?id=1lIq60MG4kdCmu4iJrNZikAc60TUlta5M', // find real icon
+        icon: 'https://drive.google.com/thumbnail?id=1QzCvaWYcw7hwXhxjDbcYcbIvvft6sqv8',
         parameters: [
             {
                 id: 'gel-type',
@@ -351,9 +356,11 @@ export let services: Service[] = [
         categories: ['dna-assembly-cloning'],
     },
     {
-        id: 'gibson-assembly',
+        id: 'gibson-assembly',  // PRODUCES DNA; SCREENING REQUIRED
         name: 'Gibson Assembly',
-        icon: 'https://drive.google.com/uc?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I',
+        // icon: 'https://drive.google.com/thumbnail?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I',
+        // icon: 'https://raw.githubusercontent.com/hicsail/damplab-ui/691ace7a9955f4539add30fe641a3dcc82cba31a/public/gibson-assembly.svg',
+        icon: 'https://drive.google.com/thumbnail?id=1S9H5ydQhe9jyFmRtz09yExg4a8j36-Mp',
         description: 'Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously.',
         parameters: [
             {
@@ -377,6 +384,20 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: false
+            },
+            {
+                id: 'gibson-insert',
+                name: 'Gibson Insert',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'gibson-vector',
+                name: 'Gibson Vector',
+                type: 'string',
+                paramType: 'input',
+                required: true
             },
         ],
         allowedConnections: [
@@ -547,9 +568,10 @@ export let services: Service[] = [
         categories: ['dna-rna']
     },
     {
-        id: 'm-cloning',
+        id: 'm-cloning',  // PRODUCES DNA; SCREENING REQUIRED
         name: 'Modular Cloning',
         icon: 'https://cdn-icons-png.flaticon.com/512/1974/1974478.png',
+        // icon: 'https://github.com/hicsail/damplab-ui/blob/biosecurity-basics/public/modular-cloning.png?raw=true',
         resultParams: [
             'forward-primer-flow', 'reverse-primer-flow',
         ],
@@ -597,7 +619,22 @@ export let services: Service[] = [
                 paramType: 'result',
                 required: true
             },
-
+            {
+                id: 'moclo-insert',
+                name: 'MoClo Insert',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'moclo-vector',
+                name: 'MoClo Vector',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
         ],
         allowedConnections: [
             'transformation'
@@ -611,7 +648,8 @@ export let services: Service[] = [
     {
         id: 'transformation',
         name: 'Transformation',
-        icon: 'https://drive.google.com/uc?id=1JRRNNrprfVjobLCnNRUUvCcRiJ0TkVI0',
+        // icon: 'https://drive.google.com/uc?id=1JRRNNrprfVjobLCnNRUUvCcRiJ0TkVI0',
+        icon: 'https://drive.google.com/thumbnail?id=1KGDyxffZiehRFKSaPwaZWFjixXHrA84P',
         description: 'Transform cells with DNA',
         resultParams: ['m-cloning-product', 'antibiotic-workflow'],
         parameters: [
@@ -705,7 +743,8 @@ export let services: Service[] = [
     {
         id: 'overnight-culture',
         name: 'Overnight Inoculum',
-        icon: 'https://drive.google.com/uc?id=1Wckp8P3GwvJw-7_tb1DevtSVCFPaevcG',
+        // icon: 'https://drive.google.com/uc?id=1Wckp8P3GwvJw-7_tb1DevtSVCFPaevcG',
+        icon: 'https://drive.google.com/thumbnail?id=1XOCFkGHslF5T5EEOHygIR9YaKBKkMoYp',
         description: 'Grow cells overnight',
         resultParams: ['transformation-product', 'antibiotic-workflow'],
         parameters: [
@@ -804,7 +843,8 @@ export let services: Service[] = [
     {
         id: 'miniprep-gs',
         name: 'Miniprep and Glycerol Stock',
-        icon: 'https://drive.google.com/uc?id=1Lam_nDy2e5CwjAK_TU6L1zPAEAeZGRqw',
+        // icon: 'https://drive.google.com/uc?id=1Lam_nDy2e5CwjAK_TU6L1zPAEAeZGRqw',
+        icon: 'https://drive.google.com/thumbnail?id=1P1kSBdfCJ-ewj_st9ZusnNmSyWQMFG_7',
         description: 'We use thermofisher, no charge spin switch',
         resultParams: ['overnight-culture-product'],
         parameters: [
@@ -847,7 +887,8 @@ export let services: Service[] = [
     {
         id: 'eth-perc',
         name: 'DNA/RNA Ethanol Precipitation',
-        icon: 'https://drive.google.com/uc?id=1Gdv5OByXeIQET13AowTdKAEKrC-687TH',
+        // icon: 'https://drive.google.com/uc?id=1Gdv5OByXeIQET13AowTdKAEKrC-687TH',
+        icon: 'https://drive.google.com/thumbnail?id=1JQ8VUAGGOZa9-dROZfS_thEHcNLvKB7L',
         categories: ['dna-rna'],
         allowedConnections: [
             'bioanalyzer', 'rna-extraction', 'gel'
@@ -870,7 +911,8 @@ export let services: Service[] = [
     {
         id: 'bioanalyzer',
         name: 'Bioanalyzer',
-        icon: 'https://drive.google.com/uc?id=1L2wX2D0Vhlq6UpU3VnA4FGKaDq259LXk',
+        // icon: 'https://drive.google.com/uc?id=1L2wX2D0Vhlq6UpU3VnA4FGKaDq259LXk',
+        icon: 'https://drive.google.com/thumbnail?id=1wiL_-GBWMi7M5hty9CWcf4mbmJhW4k8E',
         categories: ['transcriptomics'],
         allowedConnections: [
             'library-prep', 'seq', 'eth-perc'
@@ -900,7 +942,8 @@ export let services: Service[] = [
     {
         id: 'mRNA-enrichment',
         name: 'mRNA Enrichment',
-        icon: 'https://drive.google.com/uc?id=15Dg7u9OWhZjVQ8lGYszIYDo7FcTQkkOW',
+        // icon: 'https://drive.google.com/uc?id=15Dg7u9OWhZjVQ8lGYszIYDo7FcTQkkOW',
+        icon: 'https://drive.google.com/thumbnail?id=1l4AoRs0ieidpFy566BFmOmUOJnIcT5hj',
         categories: ['transcriptomics'],
         allowedConnections: [
             'rna-extraction', 'library-prep', 'bioanalyzer'
@@ -923,7 +966,8 @@ export let services: Service[] = [
     {
         id: 'library-prep',
         name: 'Library Prep',
-        icon: 'https://drive.google.com/uc?id=1aQ-sXASGWS_ZjBR-ROIdlsbg7mhg2Yk7',
+        // icon: 'https://drive.google.com/uc?id=1aQ-sXASGWS_ZjBR-ROIdlsbg7mhg2Yk7',
+        icon: 'https://drive.google.com/thumbnail?id=1qhvrFaX_Ujq3fUAzKP-HgNX3fqSC7jmT',
         categories: ['transcriptomics'],
         allowedConnections: [
             'seq', 'mRNA-enrichment', 'bioanalyzer'
@@ -946,7 +990,8 @@ export let services: Service[] = [
     {
         id: 'seq',
         name: 'NGS Sequencing',
-        icon: 'https://drive.google.com/uc?id=1oiZLiBOUJqFPI_46_YCtk9mrYNkkfFLL',
+        // icon: 'https://drive.google.com/uc?id=1oiZLiBOUJqFPI_46_YCtk9mrYNkkfFLL',
+        icon: 'https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se',
         categories: ['transcriptomics'],
         allowedConnections: [
             'bioanalyzer'
@@ -971,7 +1016,8 @@ export let services: Service[] = [
     {
         id: 'cell-culture-induction',
         name: 'Cell Culture Induction and Selection',
-        icon: 'https://drive.google.com/uc?id=1f7fX9OQzpzq6q66p6Rn-ednSCQysE14o', // Cell Culture.svg
+        // icon: 'https://drive.google.com/uc?id=1f7fX9OQzpzq6q66p6Rn-ednSCQysE14o', // Cell Culture.svg
+        icon: 'https://drive.google.com/thumbnail?id=1IgSzmw5D4RpweYeWl0jnLCw5XWqOgCcp',
         categories: ['culturing-media'],
         allowedConnections: [
             'plate-reader',
@@ -996,7 +1042,8 @@ export let services: Service[] = [
     {
         id: 'cell-lysate',
         name: 'Cell Lysate Production',
-        icon: 'https://drive.google.com/uc?id=13aVzjB_unTVcr-3GsNLJeEDy63LE-yZ4', // Cell Lysate Production.svg
+        // icon: 'https://drive.google.com/uc?id=13aVzjB_unTVcr-3GsNLJeEDy63LE-yZ4', // Cell Lysate Production.svg
+        icon: 'https://drive.google.com/thumbnail?id=1cym6zJ4AwCNtES8KCrTdj2PvCTuqdwmX',
         categories: ['culturing-media'],
         allowedConnections: [
             'plate-reader',
@@ -1021,7 +1068,8 @@ export let services: Service[] = [
     {
         id: 'protein-production',
         name: 'Protein Production and Purification from Cell Lysate',
-        icon: 'https://drive.google.com/uc?id=1r0uMBqqugBe-KqkdZacY5w1RqyL5ijh5', // Protein Production.svg
+        // icon: 'https://drive.google.com/uc?id=1r0uMBqqugBe-KqkdZacY5w1RqyL5ijh5', // Protein Production.svg
+        icon: 'https://drive.google.com/thumbnail?id=1joahDEPtnzTGs5wGOMu2TNc32ld9J0WL',
         categories: ['culturing-media'],
         allowedConnections: [
             'plate-reader',
@@ -1047,7 +1095,8 @@ export let services: Service[] = [
     {
         id: 'storage',
         name: "Overnight Innoculums of Bacteria Cell Culture Storage",
-        icon: 'https://drive.google.com/uc?id=1DfUSEFooEi-C4FPUD6Snu-c-tPLzppwp', // Storage Bacteria.svg
+        // icon: 'https://drive.google.com/uc?id=1DfUSEFooEi-C4FPUD6Snu-c-tPLzppwp', // Storage Bacteria.svg
+        icon: 'https://drive.google.com/thumbnail?id=1XOCFkGHslF5T5EEOHygIR9YaKBKkMoYp',
         categories: ['storage'],
         allowedConnections: [
             'overnight-culture',

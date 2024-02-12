@@ -76,17 +76,16 @@ export default function ({ activeNode }: ParamFormProps) {
 
     return (
         <div>
-            <Typography variant='h4'>
+            <h3>
                 Parameters
-            </Typography>
-            <div className='formik-errors'>
+            </h3>
+            <div className='formik-errors' style={{marginLeft: 20}}>
                 <ul style={{ background: 'pink', fontSize: 10 }}>
                     {
                         Object.keys(paramErrors).map((key: any) => {
                             let name = activeNode.data.formData.find((obj: any) => obj.id === key)?.name;
-
                             return (
-                                <li key={key}>
+                                <li key={key} style={{ position: 'relative', left: -25 }}>
                                     {name}: {paramErrors[key]}
                                 </li>
                             )
@@ -95,13 +94,13 @@ export default function ({ activeNode }: ParamFormProps) {
                 </ul>
             </div>
             <form onSubmit={formik.handleSubmit}>
-                <div className='input-params'>
+                <div className='input-params' style={{marginLeft: 20}}>
                     {
                         activeNode.data.formData.map((param: any) => {
                             if (param.paramType !== 'result') {
                                 if (param.type === "dropdown") {
                                     return (
-                                        <FormControl size='small' sx={{ mt: 1, width: '20ch' }} key={param.id}>
+                                        <FormControl size='small' sx={{ mt: 1, width: '26ch' }} key={param.id}>
                                             <InputLabel>{param.name}</InputLabel>
                                             <Select
                                                 name={param.id}
@@ -130,7 +129,7 @@ export default function ({ activeNode }: ParamFormProps) {
                                             name={param.id}
                                             onChange={formik.handleChange}
                                             onBlur={formik.handleBlur}
-                                            sx={{ mt: 1, width: '20ch' }}
+                                            sx={{ mt: 1, width: '26ch' }}
                                         />
                                     );
                                 }
@@ -138,12 +137,12 @@ export default function ({ activeNode }: ParamFormProps) {
                         })
                     }
                 </div>
-                <div className="result-parms">
+                <div className="result-parms" style={{marginLeft: 20}}>
                     {
                         // check if there are any result params and display info if there are
                         activeNode.data.formData.find((obj: any) => obj.paramType === 'result') &&
                         <div>
-                            Result Paramaters
+                            Result Parameters
                             <IconButton onClick={() => {
                                 alert('Result parameteres are results of experiments that were previously run in the workflow. By default we will use their outputs, if you would like to specify a different input, you can deselect and enter what we should use.')
                             }}>
@@ -174,7 +173,11 @@ export default function ({ activeNode }: ParamFormProps) {
                                                 <label>
                                                     Result Alternative
                                                 </label>
-                                                <input type={param.type} value={formik.values[`resultParamValue${param.id}`] ? formik.values[`resultParamValue${param.id}`] : null} name={`resultParamValue${param.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                                                <input type={param.type} 
+                                                value={formik.values[`resultParamValue${param.id}`] 
+                                                    ? formik.values[`resultParamValue${param.id}`] 
+                                                    : null} 
+                                                name={`resultParamValue${param.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
                                             </div>
                                         }
                                     </div>
@@ -183,8 +186,12 @@ export default function ({ activeNode }: ParamFormProps) {
                         })
                     }
                 </div>
-                <div className="add-instructs">
-                    <TextField multiline sx={{ mt: 5 }} label="Additional Instructions" value={formik.values[`addinst${activeNode?.data.id}`] ? formik.values[`addinst${activeNode?.data.id}`] : ""} name={`addinst${activeNode?.data.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                <div className="add-instructs" style={{marginLeft: 20}}>
+                    <TextField multiline sx={{ mt: 5, width: '26ch' }} label="Additional Instructions" rows={3}
+                    value={formik.values[`addinst${activeNode?.data.id}`] 
+                        ? formik.values[`addinst${activeNode?.data.id}`] 
+                        : ""} 
+                    name={`addinst${activeNode?.data.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
                 </div>
             </form>
         </div>

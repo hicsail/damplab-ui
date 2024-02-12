@@ -4,7 +4,7 @@ mutation {
       {
         id: "seq"
         name: "Send Sample to Sequencing"
-        icon: "https://drive.google.com/uc?id=1KwchGg3_H3REm_jv5vf6IIUDmTupIPVs"
+        icon: "https://drive.google.com/thumbnail?id=15LMIjlt73eu-wI5VfTJcXEybfuWRm8bd"
         parameters: [
           {
             id: "sample"
@@ -22,7 +22,7 @@ mutation {
             required: true
           }
         ]
-        description: "This is a description for Sending Sample to Sequencing"
+        description: ""
         allowedConnections: ["gene", "storage", "design-primers"]
         categories: ["dna-rna"]
         result: null
@@ -30,7 +30,7 @@ mutation {
       {
         id: "gene"
         name: "Order Gene Fragment"
-        icon: "https://drive.google.com/uc?id=1Zj4BohScCf6NNgebjrzDazseNSGN4CI9"
+        icon: "https://drive.google.com/thumbnail?id=1rhLeDV-7egQjsgrAcGBxzRhCqNkZNIxK"
         description: ""
         parameters: [
           {
@@ -93,7 +93,7 @@ mutation {
       {
         id: "rehydrate-primer"
         name: "Rehydrate Primers"
-        icon: "https://drive.google.com/uc?id=1r3Jk3Y1P-YMmp1CNryY0-5nFCIYLc7Wy"
+        icon: "https://drive.google.com/thumbnail?id=14s7ceqCUIrQpJF4dzO62fAq3T4KrDqd7"
         description: ""
         parameters: [
           {
@@ -111,7 +111,7 @@ mutation {
       {
         id: "pcr"
         name: "PCR"
-        icon: "https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt"
+        icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM"
         description: "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment."
         parameters: [
           {
@@ -164,7 +164,7 @@ mutation {
             required: true
           }
         ]
-        allowedConnections: ["run-gel", "dpn1", "gel-electrophoresis", "gibson-assembly"]
+        allowedConnections: ["run-gel", "dpn1", "gel-electrophoresis"]
         categories: ["dna-assembly-cloning"]
         result: {
           id: "pcr-product"
@@ -176,7 +176,7 @@ mutation {
         id: "gel-electrophoresis"
         name: "Gel Electrophoresis"
         description: "Gel electrophoresis is a laboratory method used to separate mixtures of DNA, RNA, or proteins according to molecular size. In gel electrophoresis, the molecules to be separated are pushed by an electrical field through a gel that contains small pores."
-        icon: "https://drive.google.com/uc?id=1lIq60MG4kdCmu4iJrNZikAc60TUlta5M"
+        icon: "https://drive.google.com/thumbnail?id=1QzCvaWYcw7hwXhxjDbcYcbIvvft6sqv8"
         categories: []
         parameters: [
           {
@@ -261,7 +261,7 @@ mutation {
       {
         id: "gibson-assembly"
         name: "Gibson Assembly"
-        icon: "https://drive.google.com/uc?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I"
+        icon: "https://drive.google.com/thumbnail?id=1S9H5ydQhe9jyFmRtz09yExg4a8j36-Mp"
         description: "Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously."
         parameters: [
           {
@@ -286,6 +286,22 @@ mutation {
             paramType: "input"
             required: false
           }
+          {
+            id: "dna-warning"
+            name: "Gibson Vector"
+            description: ""
+            type: "boolean"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "gibson-insert"
+            name: "Gibsons Insert"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
         ]
         allowedConnections: ["transformation", "dna-storage"]
         categories: []
@@ -293,7 +309,7 @@ mutation {
       {
         id: "restriction-digest"
         name: "Restriction Digest"
-        icon: "https://drive.google.com/uc?id=1oKt6iHg0TI8Zb0X8maZhML7bsSmg0MPK"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
         parameters: [
           {
             id: "template-dna"
@@ -317,7 +333,7 @@ mutation {
       {
         id: "restriction-ligation"
         name: "Restriction Ligation"
-        icon: "https://drive.google.com/uc?id=1nohYUt-euRxY0RwpHdHPE2mGBPoxTAyP"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
         parameters: [
           {
             id: "digest-dna"
@@ -345,7 +361,7 @@ mutation {
       {
         id: "clean-up"
         name: "Clean Up and Concentrate DNA"
-        icon: "https://drive.google.com/uc?id=1BtuvQbiI0TXv1M59ZvLDb3Nc7_b2UMoy"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
         parameters: [
           {
             id: "template-dna"
@@ -369,7 +385,7 @@ mutation {
       {
         id: "dna-storage"
         name: "Plasmid, DNA fragment, or oligo storage"
-        icon: "https://drive.google.com/uc?id=1G03_rChZoFaJO30opPW-x_XTE1FI68q9"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
         parameters: [
           {
             id: "dna-types"
@@ -502,6 +518,22 @@ mutation {
             paramType: "result"
             required: true
           }
+          {
+            id: "moclo-insert"
+            name: "MoClo Insert"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "moclo-vector"
+            name: "MoClo Vector"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
         ]
         allowedConnections: ["transformation"]
         categories: ["fluorescence-based-assays"]
@@ -510,7 +542,7 @@ mutation {
       {
         id: "transformation"
         name: "Transformation"
-        icon: "https://drive.google.com/uc?id=1JRRNNrprfVjobLCnNRUUvCcRiJ0TkVI0"
+        icon: "https://drive.google.com/thumbnail?id=1KGDyxffZiehRFKSaPwaZWFjixXHrA84P"
         description: "Transform cells with DNA"
         resultParams: ["m-cloning-product", "antibiotic-workflow"]
         parameters: [
@@ -579,7 +611,7 @@ mutation {
       {
         id: "overnight-culture"
         name: "Overnight Inoculum"
-        icon: "https://drive.google.com/uc?id=1Wckp8P3GwvJw-7_tb1DevtSVCFPaevcG"
+        icon: "https://drive.google.com/thumbnail?id=1XOCFkGHslF5T5EEOHygIR9YaKBKkMoYp"
         description: "Grow cells overnight"
         resultParams: ["transformation-product", "antibiotic-workflow"]
         parameters: [
@@ -661,7 +693,7 @@ mutation {
       {
         id: "miniprep-gs"
         name: "Miniprep and Glycerol Stock"
-        icon: "https://drive.google.com/uc?id=1Lam_nDy2e5CwjAK_TU6L1zPAEAeZGRqw"
+        icon: "https://drive.google.com/thumbnail?id=1P1kSBdfCJ-ewj_st9ZusnNmSyWQMFG_7"
         description: "We use thermofisher, no charge spin switch"
         resultParams: ["overnight-culture-product"]
         parameters: [
@@ -701,7 +733,7 @@ mutation {
       {
         id: "eth-perc"
         name: "DNA/RNA Ethanol Precipitation"
-        icon: "https://drive.google.com/uc?id=1Gdv5OByXeIQET13AowTdKAEKrC-687TH"
+        icon: "https://drive.google.com/thumbnail?id=1JQ8VUAGGOZa9-dROZfS_thEHcNLvKB7L"
         categories: ["dna-rna"]
         description: ""
         allowedConnections: ["bioanalyzer"]
@@ -723,7 +755,7 @@ mutation {
       {
         id: "bioanalyzer"
         name: "Bioanalyzer"
-        icon: "https://drive.google.com/uc?id=1L2wX2D0Vhlq6UpU3VnA4FGKaDq259LXk"
+        icon: "https://drive.google.com/thumbnail?id=1wiL_-GBWMi7M5hty9CWcf4mbmJhW4k8E"
         categories: ["transcriptomics"]
         allowedConnections: ["library-prep", "seq", "eth-perc"]
         description: ""
@@ -752,7 +784,7 @@ mutation {
       {
         id: "mRNA-enrichment"
         name: "mRNA Enrichment"
-        icon: "https://drive.google.com/uc?id=15Dg7u9OWhZjVQ8lGYszIYDo7FcTQkkOW"
+        icon: "https://drive.google.com/thumbnail?id=1l4AoRs0ieidpFy566BFmOmUOJnIcT5hj"
         categories: ["transcriptomics"]
         allowedConnections: ["library-prep", "bioanalyzer"]
         parameters: [
@@ -774,7 +806,7 @@ mutation {
       {
         id: "library-prep"
         name: "Library Prep"
-        icon: "https://drive.google.com/uc?id=1aQ-sXASGWS_ZjBR-ROIdlsbg7mhg2Yk7"
+        icon: "https://drive.google.com/thumbnail?id=1qhvrFaX_Ujq3fUAzKP-HgNX3fqSC7jmT"
         categories: ["transcriptomics"]
         allowedConnections: ["seq", "mRNA-enrichment", "bioanalyzer"]
         description: ""
@@ -796,7 +828,7 @@ mutation {
       {
         id: "seq"
         name: "NGS Sequencing"
-        icon: "https://drive.google.com/uc?id=1oiZLiBOUJqFPI_46_YCtk9mrYNkkfFLL"
+        icon: "https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se"
         categories: ["transcriptomics"]
         allowedConnections: ["bioanalyzer"]
         description: ""
@@ -818,7 +850,7 @@ mutation {
       {
         id: "cell-culture-induction"
         name: "Cell Culture Induction and Selection"
-        icon: "https://drive.google.com/uc?id=1f7fX9OQzpzq6q66p6Rn-ednSCQysE14o"
+        icon: "https://drive.google.com/thumbnail?id=1IgSzmw5D4RpweYeWl0jnLCw5XWqOgCcp"
         categories: ["culturing-media"]
         allowedConnections: ["storage"]
         description: ""
@@ -840,7 +872,7 @@ mutation {
       {
         id: "cell-lysate"
         name: "Cell Lysate Production"
-        icon: "https://drive.google.com/uc?id=13aVzjB_unTVcr-3GsNLJeEDy63LE-yZ4"
+        icon: "https://drive.google.com/thumbnail?id=1cym6zJ4AwCNtES8KCrTdj2PvCTuqdwmX"
         categories: ["culturing-media"]
         description: ""
         allowedConnections: ["storage", "cell-culture-induction"]
@@ -862,7 +894,7 @@ mutation {
       {
         id: "protein-production"
         name: "Protein Production and Purification from Cell Lysate"
-        icon: "https://drive.google.com/uc?id=1r0uMBqqugBe-KqkdZacY5w1RqyL5ijh5"
+        icon: "https://drive.google.com/thumbnail?id=1joahDEPtnzTGs5wGOMu2TNc32ld9J0WL"
         categories: ["culturing-media"]
         description: ""
         allowedConnections: ["storage", "cell-lysate", "cell-culture-induction"]
@@ -884,7 +916,7 @@ mutation {
       {
         id: "storage"
         name: "Overnight Innoculums of Bacteria Cell Culture Storage"
-        icon: "https://drive.google.com/uc?id=1DfUSEFooEi-C4FPUD6Snu-c-tPLzppwp"
+        icon: "https://drive.google.com/thumbnail?id=1XOCFkGHslF5T5EEOHygIR9YaKBKkMoYp"
         categories: ["storage"]
         allowedConnections: ["overnight-culture"]
         description: ""
@@ -903,28 +935,6 @@ mutation {
           name: "Overnight Bacterial Culture Storage Result"
         }
       }
-      {
-        id: "rna-extraction"
-        name: "RNA Extraction"
-        icon: "https://drive.google.com/uc?id=1_WxT_oj_D6EuXPYLwb_y2U1cALx6CVlZ"
-        description: ""
-        parameters : [
-          {
-            id: "sample"
-            name: "Sample"
-            type: "string"
-            paramType: "input"
-            required: true
-          }
-        ]
-        categories: ["dna-rna"]
-        allowedConnections: ["pcr"]
-        result : {
-          id: "rna-extraction-product"
-          type: "RNAExtractionResult"
-          name: "RNA Extraction Result"
-        }
-      }
     ]
     categories: [
       { id: "dna-rna", label: "DNA and RNA" }
@@ -938,7 +948,7 @@ mutation {
       {
         id: "modular-cloning-ordering"
         label: "Modular Assembly and Cloning with Ordering"
-        icon: "https://drive.google.com/uc?id=1rsXIFQsWknecXVkMIOFrm80YFgNYlkUg"
+        icon: "https://drive.google.com/thumbnail?id=1jIPi2_w650pbpCFcdhOL0KXEYPWgFWPn"
         services: [
           "seq"
           "gene"
@@ -957,7 +967,7 @@ mutation {
       {
         id: "modular-cloning-provided"
         label: "Modular Assembly and Cloning with Provided DNA"
-        icon: "https://drive.google.com/uc?id=1rsXIFQsWknecXVkMIOFrm80YFgNYlkUg"
+        icon: "https://drive.google.com/thumbnail?id=1TOGeovPsTLZiAsVkc1205nk9w9yTyYkj"
         services: [
           "seq"
           "design-primers"
@@ -975,7 +985,7 @@ mutation {
       {
         id: "rna-seq"
         label: "RNA Sequencing"
-        icon: "https://drive.google.com/uc?id=1mbl2UEtWGdybUuS5gImE_BLqqT3SE7d6"
+        icon: "https://drive.google.com/thumbnail?id=17GlfivFCDd6OMK__6MOmpA9tf3joX2Ft"
         services: [
           "miniprep-gs"
           "glyc-storage"
@@ -989,7 +999,7 @@ mutation {
       {
         id: "protein-production"
         label: "Protein Production, Purification, and Induction Bundle"
-        icon: "https://drive.google.com/uc?id=1-eu6BfldPqDK2aSrsvwmX_uyZ40K7Ddo"
+        icon: "https://drive.google.com/thumbnail?id=1ziGsSXzM0tGpjfhIiVLv8Q6IbZ5UF-nK"
         services: [
           "cell-culture-induction"
           "cell-lysate"
