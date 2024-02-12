@@ -5,7 +5,7 @@ import { getServiceFromId } from '../controllers/GraphHelpers';
 import { Button } from '@mui/material';
 import Snackbar from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
-import { WarningRounded } from '@mui/icons-material/';
+import { GppMaybe, WarningRounded } from '@mui/icons-material/';
 import CloseIcon from '@mui/icons-material/Close';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -65,8 +65,7 @@ export default function ContextTestComponent() {
             <div>
                 {
                     hazards.includes(activeNode?.data.label) 
-                    ? (<p style={{color: 'red'}}>
-                        <WarningRounded style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                    ? (<p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
                         sequences provided below or produced by the process will undergo a safety screening.</p>)
                     : ""
                 }

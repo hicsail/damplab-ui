@@ -26,7 +26,7 @@ export default () => {
 
   const buttonElementStyle = {
     padding: 10,
-    borderColor: '#8bbae8',
+    // borderColor: '#8bbae8',
   };
 
   const borderStyles = {
@@ -140,7 +140,7 @@ export default () => {
                   <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} 
                   className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
                     <Button variant="outlined" title={bundle.label}  
-                    style={{ width: 180, display: 'flow', justifyContent: 'space-around', fontWeight: 'bold' }}
+                    style={{ width: 180, display: 'flow', justifyContent: 'space-around' }}
                     onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>
                         <img src={bundle.icon} alt=" " style={{ height: 60 }} />
