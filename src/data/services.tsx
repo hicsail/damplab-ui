@@ -399,6 +399,22 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true
             },
+            {
+                id: 'gibson-restriction-site-first',
+                name: 'Gibsons First Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'gibson-restriction-site-second',
+                name: 'Gibsons Second Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
         ],
         allowedConnections: [
             'transformation', 'ordering-dna-fragments', 'dna-storage', 'mutagenesis', 'mutagenesis-by-inverse-pcr',
@@ -620,6 +636,14 @@ export let services: Service[] = [
                 required: true
             },
             {
+                id: 'moclo-vector',
+                name: 'MoClo Vector',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
                 id: 'moclo-insert',
                 name: 'MoClo Insert',
                 description: '',
@@ -628,8 +652,16 @@ export let services: Service[] = [
                 required: true
             },
             {
-                id: 'moclo-vector',
-                name: 'MoClo Vector',
+                id: 'moclo-restriction-site-first',
+                name: 'MoClo First Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'moclo-restriction-site-second',
+                name: 'MoClo Second Restriction Site',
                 description: '',
                 type: 'string',
                 paramType: 'input',

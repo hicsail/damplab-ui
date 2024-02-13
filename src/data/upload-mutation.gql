@@ -296,7 +296,23 @@ mutation {
           }
           {
             id: "gibson-insert"
-            name: "Gibsons Insert"
+            name: "Gibson Insert"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "gibson-restriction-site-first"
+            name: "Gibsons First Restriction Site"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "gibson-restriction-site-second"
+            name: "Gibsons Second Restriction Site"
             description: ""
             type: "string"
             paramType: "input"
@@ -519,6 +535,14 @@ mutation {
             required: true
           }
           {
+            id: "moclo-vector"
+            name: "MoClo Vector"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
             id: "moclo-insert"
             name: "MoClo Insert"
             description: ""
@@ -527,8 +551,16 @@ mutation {
             required: true
           }
           {
-            id: "moclo-vector"
-            name: "MoClo Vector"
+            id: "moclo-restriction-site-first"
+            name: "MoClo First Restriction Site"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "moclo-restriction-site-second"
+            name: "MoClo Second Restriction Site"
             description: ""
             type: "string"
             paramType: "input"
