@@ -104,7 +104,9 @@ export default function WorkflowStepper(workflow: any) {
                                             disableRestoreFocus
                                         >
                                             <Typography sx={{ px: 2 }}>
+                                                <p>This service requires a biosecurity screening...</p>
                                                 <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
+                                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Pending</p>
                                                 <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
                                             </Typography>
                                         </Popover>
@@ -142,6 +144,15 @@ export default function WorkflowStepper(workflow: any) {
                 <DialogContent>
                     <Box style={{ height: 300, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
+                            {
+                                hazards.includes(workflow.workflow[activeStep].data.label) 
+                                ? (
+                                    <>
+                                        <p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                                        sequences provided below or produced by the process will undergo a safety screening.</p>
+                                    </>)
+                                : ""
+                            }
                             {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
                                 return (
                                     <div className='parameter' style={{ display: 'flex', marginBottom: 3 }} key={Math.random()}>
@@ -158,19 +169,6 @@ export default function WorkflowStepper(workflow: any) {
                                     </div>
                                 )
                             })}
-                            {
-                                hazards.includes(workflow.workflow[activeStep].data.label) 
-                                ? (
-                                    <>
-                                        <p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
-                                        sequences provided above or produced by the process will undergo a safety screening.</p>
-                                        <Typography>
-                                            <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
-                                            <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
-                                        </Typography>
-                                    </>)
-                                : ""
-                            }
                         </div>
                     </Box>
                 </DialogContent>

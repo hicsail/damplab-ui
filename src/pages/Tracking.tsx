@@ -72,7 +72,7 @@ export default function Tracking() {
                     <CardContent>
                         <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
                             <Typography sx={{ fontSize: 15 }} color="text.secondary" align="left">{workflow.name}</Typography>
-                            <Typography sx={{ fontSize: 15 }} color="text.secondary" align="right">{workflow.id}</Typography>
+                            <Typography sx={{ fontSize: 13 }} color="text.secondary" align="right">{workflow.id}</Typography>
                         </Box>
                         <Typography sx={{ fontSize: 13 }} color="text.secondary" align="left">{workflow.state.replace('_', ' ')}</Typography>
                         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
@@ -98,7 +98,7 @@ export default function Tracking() {
                             {jobStatusIcon}
                         </Typography>
                         <Typography style={{textAlign: 'right'}}>
-                            <b>Job ID:</b> {id}
+                            {id}
                         </Typography>
                     </Box>
                     <Typography>

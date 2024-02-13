@@ -132,12 +132,12 @@ export default function Checkout() {
                                                     // value={namesTemp[workflow.id]}
                                                     // onChange={(e) => { handleNameChange(e, workflow.id)}}
                                                 />
-                                                {
+                                                {/* {
                                                     hazard === true 
                                                         ? <p><GppMaybe style={{ color: "grey", verticalAlign:"middle", paddingLeft:20 }}/>
                                                             &nbsp;Note: This workflow includes a service with sequences that will undergo a security screening.</p> 
                                                         : <p/>
-                                                }
+                                                } */}
                                             </Box>
                                             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, marginTop: 3 }}>
                                                 <CheckoutStepper workflow={workflow.nodes} name={workflow.name} parent="checkout" />

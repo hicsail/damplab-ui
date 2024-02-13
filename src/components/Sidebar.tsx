@@ -139,7 +139,7 @@ export default () => {
                 return (
                   <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} 
                   className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
-                    <Button variant="outlined" title={bundle.label}  
+                    <Button variant="outlined" title={bundle.label}  sx={{boxShadow: 2}}
                     style={{ width: 180, display: 'flow', justifyContent: 'space-around' }}
                     onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>
