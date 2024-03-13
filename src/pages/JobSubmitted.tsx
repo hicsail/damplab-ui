@@ -7,7 +7,7 @@ export default function JobSubmitted() {
   // get job id from navigation state
   const location = useLocation();
   const [jobId, setJobId] = useState(location.state.id);
-  const [value, setValue] = useState(`https://damplab.sail.codes/tracking/${jobId}`);
+  const [value, setValue] = useState(`https://damplab.sail.codes/client_view/${jobId}`);
 
   return (
     <div>

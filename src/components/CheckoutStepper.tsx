@@ -104,10 +104,7 @@ export default function WorkflowStepper(workflow: any) {
                                             disableRestoreFocus
                                         >
                                             <Typography sx={{ px: 2 }}>
-                                                <p>This service requires a biosecurity screening...</p>
-                                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
-                                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Pending</p>
-                                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
+                                                This service requires a biosecurity screening...
                                             </Typography>
                                         </Popover>
                                     </div>
@@ -142,14 +139,14 @@ export default function WorkflowStepper(workflow: any) {
                     </div>
                 </DialogTitle>
                 <DialogContent>
-                    <Box style={{ height: 300, overflow: 'auto' }}>
+                    <Box style={{ height: 400, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
                             {
                                 hazards.includes(workflow.workflow[activeStep].data.label) 
                                 ? (
                                     <>
-                                        <p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
-                                        sequences provided below or produced by the process will undergo a safety screening.</p>
+                                        <p><GppMaybe style={{color: "grey", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                                        sequences provided below or produced by the process will undergo a safety screening.<br/><br/></p>
                                     </>)
                                 : ""
                             }

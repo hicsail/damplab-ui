@@ -3,7 +3,7 @@ import './App.css';
 import './styles/dominos.css';
 import MainFlow from './pages/MainFlow';
 import Checkout from './pages/Checkout';
-import Submitted from './pages/Submitted';
+import Submitted from './pages/TechnicianView';
 import Dominos from "./pages/Dominos";
 import { BrowserRouter, Routes, Route, } from "react-router-dom";
 import HeaderBar from './components/HeaderBar';
@@ -15,7 +15,8 @@ import Accepted from './pages/Accepted';
 import JobSubmitted from './pages/JobSubmitted';
 import ELabs from './pages/ELabs';
 import { searchForEndService } from './controllers/GraphHelpers';
-import Tracking from './pages/Tracking';
+import Tracking from './pages/ClientView';
+// import Login from './pages/Login';
 
 function App() {
 
@@ -71,13 +72,14 @@ function App() {
                     <Route path="/" element={<MainFlow /*services={services}*//>} />
                     <Route path="/resubmission/:id" element={<MainFlow client={client} /*services={services}*//>} />
                     <Route path="/checkout" element={<Checkout />} />
-                    <Route path="/submitted/:id" element={<Submitted />} />
+                    <Route path="/technician_view/:id" element={<Submitted />} />
                     <Route path="/submitted" element={<JobSubmitted />} />
-                    <Route path="/tracking/:id" element={<Tracking />} />
+                    <Route path="/client_view/:id" element={<Tracking />} />
                     <Route path="/accepted" element={<Accepted />} />
                     <Route path="/dominos" element={<Dominos />} />
                     <Route path="/elabs" element={<ELabs />} />
                     <Route path="/callback" element={<ELabs />} />
+                    {/* <Route path="/login" element={<Login />} /> */}
                     <Route path="/*" element={<div>404 Route not found</div>} />
                   </Routes>
                 </div>

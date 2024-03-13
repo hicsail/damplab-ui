@@ -44,8 +44,8 @@ export default function Tracking() {
     const jobStatus = () => {
         const submitText = "Your job has been submitted to the DAMP lab and is awaiting review. Once the review is done, you will see the updated state over here.";
         const createText = "Your job is currently being created. Once the job is created, you will see the updated state over here.";
-        const acceptText = "Your job has been reviewed by the DAMP lab, and has been accepted. You will receive a SOW to review and sign here once it has been generated.";
-        const rejectText=  "Your job has been reviewed by the DAMP lab, and has been accepted. Please complete any necessary modifications and resubmit your job.";
+        const acceptText = "Your job has been reviewed by the DAMP lab and has been accepted. You will receive a SOW to review and sign here once it has been generated.";
+        const rejectText=  "Your job has been reviewed by the DAMP lab and has been accepted. Please complete any necessary modifications and resubmit your job.";
         const defaultText = "Invalid Case";
         switch (jobState) {
             case 'SUBMITTED':
@@ -87,7 +87,6 @@ export default function Tracking() {
     return (
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
-            <Typography>(Client View)</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}

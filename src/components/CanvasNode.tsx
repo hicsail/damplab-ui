@@ -63,9 +63,9 @@ export default memo((input: Input) => {
 
     return (
         <div>
-            <Box style={{background : background}}>
-                <Button variant="outlined" title={data.data.label} onClick={handleOpen} 
-                style={{ width: 250, display: 'flex', justifyContent: 'space-around' }}>
+            <Box>
+                <Button variant="outlined" title={data.data.label} onClick={handleOpen} sx={{boxShadow: 2}} 
+                style={{ width: 250, display: 'flex', justifyContent: 'space-around', background : background }}>
                     <div>
                         <img src={data.data.icon} alt=" " style={{ width: 30 }} />
                     </div>

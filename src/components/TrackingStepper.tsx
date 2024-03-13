@@ -133,7 +133,7 @@ export default function TrackingStepper(workflow: any) {
                   
                 </DialogTitle>
                 <DialogContent>
-                    <Box style={{ height: 300, overflow: 'auto' }}>
+                    <Box style={{ height: 400, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
                             {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
                                 return (
@@ -153,7 +153,7 @@ export default function TrackingStepper(workflow: any) {
                             {
                                 hazards.includes(workflow.workflow[activeStep].name) 
                                 ? (<>
-                                        <p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                                        <p><GppMaybe style={{color: "grey", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
                                         sequences provided above or produced by the process will undergo a safety screening.</p>
                                         <Typography>
                                             <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>

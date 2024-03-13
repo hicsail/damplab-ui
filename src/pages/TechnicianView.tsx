@@ -169,7 +169,6 @@ export default function Submitted() {
     return (
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
-            <Typography>(Technician View)</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}
