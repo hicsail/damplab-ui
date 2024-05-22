@@ -1,6 +1,9 @@
-<<<<<<< HEAD
 # damplab-ui
-=======
+
+## About
+
+This tool is being developed for the Design Automation Manufacturing Processes (DAMP) lab to facilitate the submission, management, and tracking of orders for labwork (DNA assembly/cloning, PCR, fluoresence-bassed assays, transcriptomics/NGS, culturing, etc.)
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
@@ -47,4 +50,3 @@ You don’t have to ever use `eject`. The curated feature set is suitable for sm
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
 To learn React, check out the [React documentation](https://reactjs.org/).
->>>>>>> ad4b92fd3128a6f31943a986257423c657390588
