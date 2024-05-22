@@ -1,11 +1,15 @@
-import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
 import React, { useContext, useEffect, useState, useRef } from 'react'
-import LoopIcon from '@mui/icons-material/Loop';
-import DoneIcon from '@mui/icons-material/Done';
-import PendingIcon from '@mui/icons-material/Pending';
-import { Popover, Badge } from '@mui/material';
+
+import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
 import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
-import { AppContext } from '../contexts/App';
+import LoopIcon    from '@mui/icons-material/Loop';
+import DoneIcon    from '@mui/icons-material/Done';
+import PendingIcon from '@mui/icons-material/Pending';
+
+import { AppContext }         from '../contexts/App';
+import { ImagesServicesDict } from '../assets/icons';
+
+
 // the purpose of this component is to showcase nodes in a workflow and their details
 export default function TrackingStepper(workflow: any) {
     
@@ -45,10 +49,6 @@ export default function TrackingStepper(workflow: any) {
     const handlePopoverClose = () => {setAnchorEl(null);};
     const open = Boolean(anchorEl);
     
-    // useEffect(() => {
-    //     console.log(workflow);
-    // }, [workflow]);
-
     function getStepIcon(state: any) {
         switch (state) {
             case 'QUEUED':
@@ -122,7 +122,10 @@ export default function TrackingStepper(workflow: any) {
                 <DialogTitle id="alert-dialog-title">
                     <div className='name-and-icon' style={{ display: 'flex', justifyContent: 'flex-start', margin: 5 }}>
                         <div className='icon' style={{ marginRight: 10 }} title={workflow.workflow[activeStep].name}>
-                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} alt=" " />
+                            {/* URL (e.g. to Google Drive) from the DB... */}
+                            {/* <img src={workflow.workflow[activeStep].data.icon} alt=" " style={{ width: 20 }} /> */}
+                            {/* Local files in src/assets/icons folder... */}
+                            <img src={ImagesServicesDict[workflow.workflow[activeStep].data.name]} alt=" " style={{ width: 20 }} />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>

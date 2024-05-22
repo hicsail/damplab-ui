@@ -16,26 +16,26 @@ import { AppContext } from '../contexts/App';
 
 export default function Checkout() {
 
-    const val = useContext(CanvasContext);
-    const navigate = useNavigate();
+    const val         = useContext(CanvasContext);
+    const navigate    = useNavigate();
     const { hazards } = useContext(AppContext);
 
     // ui states
-    const [open, setOpen] = useState(false);
+    const [open, setOpen]         = useState(false);
     const [expanded, setExpanded] = useState(true);
 
     // workflow states
-    const [workflows, setWorkflows] = useState(getWorkflowsFromGraph(val.nodes, val.edges));
-    const [workflowNames, setWorkflowNames] = useState<any>({});
+    const [workflows,        setWorkflows]        = useState(getWorkflowsFromGraph(val.nodes, val.edges));
+    const [workflowNames,    setWorkflowNames]    = useState<any>({});
     const [checkoutWorkflow, setCheckoutWorkflow] = useState<any>([]);
 
     // refs for workflows
-    const myRefs= useRef<any>([]);
-    const jobRef = useRef<any>(null);
-    const userRef = useRef<any>(null);
+    const myRefs         = useRef<any>([]);
+    const jobRef         = useRef<any>(null);
+    const userRef        = useRef<any>(null);
     const institutionRef = useRef<any>(null);
-    const emailRef = useRef<any>(null);
-    const notesRef = useRef<any>(null);
+    const emailRef       = useRef<any>(null);
+    const notesRef       = useRef<any>(null);
 
     const [createJob] = useMutation(CREATE_JOB, {
         onCompleted: (data) => {
@@ -93,6 +93,25 @@ export default function Checkout() {
         return workflows;
     }
     
+    const handleSubmit = (e: any) => {
+        e.preventDefault();
+        if (e.target.checkValidity()) {
+          const date = new Date(Date.now()).toString();
+          const data = { 
+            name     : jobRef.current.value,
+            username : userRef.current.value,
+            institute: institutionRef.current.value,
+            email    : emailRef.current.value,
+            workflows: getGQLWorkflows(),
+            // submitted: date
+        };
+          createJob({ variables: { createJobInput: data }});
+          console.log(getGQLWorkflows());
+        } else {
+          alert("Form is incomplete.  Please fill out all required fields...");
+        }
+    };
+
     return (
         <div>
             <div>
@@ -129,7 +148,7 @@ export default function Checkout() {
                                                     variant="outlined"
                                                     inputRef={(el) => (myRefs.current[index] = el)}
                                                     style={{width: '40ch'}}
-                                                    // value={namesTemp[workflow.id]}
+                                                    defaultValue={`Workflow_${index + 1}`}
                                                     // onChange={(e) => { handleNameChange(e, workflow.id)}}
                                                 />
                                                 {/* {
@@ -151,25 +170,16 @@ export default function Checkout() {
                 </div>
                 <div style={{ padding: 30 }}>
                     <Typography variant='body1'>Your Information</Typography>
-                    <FormControl>
-                        <TextField label = "Job Name" margin       = "dense" variant = "outlined" inputRef = {jobRef}  required />
-                        <TextField label = "Submitter Name" margin = "dense" variant = "outlined" inputRef = {userRef}  required />
-                        <TextField label = "Institution" margin    = "dense" variant = "outlined" inputRef = {institutionRef}  required />
-                        <TextField label = "Email" margin          = "dense" variant = "outlined" inputRef = {emailRef} required />
-                        <TextField label = "Notes" margin          = "dense" variant = "outlined" inputRef = {notesRef} required />
-                        <Button variant="contained" onClick={() => {
-                            console.log('submitting job');
-                            const data = { 
-                                name: jobRef.current.value, 
-                                username: userRef.current.value, 
-                                institute: institutionRef.current.value, 
-                                email: emailRef.current.value, 
-                                workflows: getGQLWorkflows(), 
-                            };
-                            console.log(getGQLWorkflows());
-                            createJob({ variables: { createJobInput: data }});
+                    <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <TextField required label = "Job Name"       margin = "dense" variant = "outlined" inputRef = {jobRef} />
+                        <TextField required label = "Submitter Name" margin = "dense" variant = "outlined" inputRef = {userRef} />
+                        <TextField required label = "Institution"    margin = "dense" variant = "outlined" inputRef = {institutionRef} />
+                        <TextField required label = "Email"          margin = "dense" variant = "outlined" inputRef = {emailRef} />
+                        <TextField          label = "Notes"          margin = "dense" variant = "outlined" inputRef = {notesRef} />
+                        <Button variant="contained" type="submit" onClick={() => {
+                            console.log('Check form completion...');
                         }} style={{padding:20, marginTop: 10, fontSize:15}}>Submit</Button>
-                    </FormControl>
+                    </Box>
                 </div>
             </div>
             <Snackbar

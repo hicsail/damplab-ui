@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react'
-import { useQuery, useMutation } from '@apollo/client';
 import { useParams } from 'react-router-dom';
-import { GET_JOB_BY_ID, } from '../gql/queries';
+import { useQuery, useMutation } from '@apollo/client';
+
+import { Box, Button, Card, CardContent, Typography } from '@mui/material';
+import { AccessTime, Publish, NotInterested, Check }  from '@mui/icons-material';
+
+import { GET_JOB_BY_ID, }        from '../gql/queries';
 import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
-import { Box, Button, Card, CardContent, Typography, colors } from '@mui/material';
-import { AccessTime, Publish, NotInterested, Check } from '@mui/icons-material';
-import WorkflowStepper from '../components/WorkflowStepper';
-import JobFeedbackModal from '../components/JobFeedbackModal';
+
+import WorkflowStepper            from '../components/WorkflowStepper';
+import JobFeedbackModal           from '../components/JobFeedbackModal';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 
 
-export default function Submitted() {
+export default function TechnicianView() {
 
     const { id } = useParams();
     const [workflowName, setWorkflowName] = useState('');
@@ -148,9 +151,9 @@ export default function Submitted() {
     // );
 
     const workflowCard = (
-        workflows.map((workflow: any) => {
+        workflows.map((workflow: any, index: number) => {
             return (
-                <Card sx={{m:1, boxShadow: 2}}>
+                <Card key={index} sx={{m:1, boxShadow: 2}}>
                     <CardContent>
                         <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
                             <Typography sx={{ fontSize: 15 }} color="text.secondary" align="left">{workflowName}</Typography>

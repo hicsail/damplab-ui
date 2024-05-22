@@ -1,18 +1,17 @@
 import React, { useState, useEffect, MouseEvent, useContext } from 'react';
-import Button from '@mui/material/Button';
-import { Service } from '../types/Service';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import FormControl from '@mui/material/FormControl';
+import { useQuery } from '@apollo/client';
+
+import { Box, Button, FormControl, InputLabel, MenuItem, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+
+import { GET_CATEGORIES }             from '../gql/queries';
 import { addNodesAndEdgesFromBundle } from '../controllers/GraphHelpers';
+
+import { Service }       from '../types/Service';
 import { CanvasContext } from '../contexts/Canvas';
-import { useQuery, gql } from '@apollo/client';
-import { GET_CATEGORIES } from '../gql/queries';
-import { AppContext } from '../contexts/App';
-import Box from '@mui/material/Box';
+import { AppContext }    from '../contexts/App';
+
+import {ImagesBundlesDict, ImagesServicesDict} from '../assets/icons';
 
 
 export default () => {
@@ -73,7 +72,7 @@ export default () => {
   }, [category, services]);
 
   return (
-    <aside style={{ padding: 20, height: '80vh', overflow: 'scroll' }}>
+    <aside style={{ padding: 30, height: '80vh', overflow: 'scroll' }}>
       <ToggleButtonGroup
         color="primary"
         value={alignment}
@@ -108,6 +107,9 @@ export default () => {
                 </Select>
               </FormControl>
             </div>
+            <div>
+              Drag services to the canvas to construct workflows.
+            </div>
             {
               filteredServices.map((service: Service) => {
                 return (
@@ -116,7 +118,10 @@ export default () => {
                   sx={{ display: 'flow', justifyContent: 'space-around', alignItems: 'center', ...borderStyles }} 
                   onDragStart={(event) => onDragStart(event, JSON.stringify(service))} draggable>
                       <div>
-                        <img src={service.icon} alt=" " style={{ height: 40 }} />  
+                        {/* URL (e.g. to Google Drive) from the DB... */}
+                        {/* <img src = {service.icon} alt = " " style = {{ height: 60 }} /> */}
+                        {/* Local files in src/assets/icons folder... */}
+                        <img src = {ImagesServicesDict[service.name]} alt = " " style = {{ height: 60 }} /> 
                       </div>
                       <div style={{padding: 5}}>
                         {service.name}
@@ -130,7 +135,7 @@ export default () => {
           <div>
             <div>
                 <br/>
-                Click on a bundle to add all services to the graph.
+                Click on a bundle to add all services as a workflow.
                 <br/>
                 <br/>
             </div>
@@ -143,7 +148,10 @@ export default () => {
                     style={{ width: 180, display: 'flow', justifyContent: 'space-around' }}
                     onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>
-                        <img src={bundle.icon} alt=" " style={{ height: 60 }} />
+                        {/* URL (e.g. to Google Drive) from the DB... */}
+                        {/* <img src = {bundle.icon} alt = " " style = {{ height: 100 }} /> */}
+                        {/* Local files in src/assets/icons folder... */}
+                        <img src={ImagesBundlesDict[bundle.label]} alt=" " style={{ height: 100 }} />
                       </div>
                       {bundle.label}
                     </Button>

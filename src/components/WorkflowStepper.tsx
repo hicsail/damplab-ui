@@ -1,14 +1,19 @@
-import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import React, { useContext, useEffect, useState, useRef } from 'react'
 import { useMutation } from '@apollo/client';
-import LoopIcon from '@mui/icons-material/Loop';
-import DoneIcon from '@mui/icons-material/Done';
-import PendingIcon from '@mui/icons-material/Pending';
-import { MUTATE_NODE_STATUS } from '../gql/mutations';
-import { Popover, Badge } from '@mui/material';
+
+import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
-import { AppContext } from '../contexts/App';
+import LoopIcon    from '@mui/icons-material/Loop';
+import DoneIcon    from '@mui/icons-material/Done';
+import PendingIcon from '@mui/icons-material/Pending';
+
+import { MUTATE_NODE_STATUS } from '../gql/mutations';
 import { returnValidIndices, returnCleavedVectors, returnValidNewVector, sequenceScreenPassed } from '../controllers/SequenceScreener'; 
+
+import { AppContext }         from '../contexts/App';
+import { ImagesServicesDict } from '../assets/icons';
+
+
 // the purpose of this component is to showcase nodes in a workflow and their details
 export default function WorkflowStepper(workflow: any) {
 
@@ -89,28 +94,68 @@ export default function WorkflowStepper(workflow: any) {
     }
 
     const prepScreening = (service: any) => {
-
         let vector: string = '';
         let insert: string = '';
         let site_one: string = '';
         let site_two: string = '';
+
         {service.data.formData.map((parameter: any) => {
-            if (['Gibson Vector', 'MoClo Vector'].includes(parameter.name)) {vector = parameter.value;}
-            if (['Gibson Insert', 'MoClo Insert'].includes(parameter.name)) {insert = parameter.value;}
-            if (['Gibson First Restriction Site', 'MoClo First Restriction Site'].includes(parameter.name)) {site_one = parameter.value;}
-            if (['Gibson Second Restriction Site', 'MoClo Second Restriction Site'].includes(parameter.name)) {site_two = parameter.value;}
+            if (['Vector'].includes(parameter.name)) {vector = parameter.value;}
+            if (['Insert'].includes(parameter.name)) {insert = parameter.value;}
+            if (['First Restriction Site'].includes(parameter.name))  {site_one = parameter.value;}
+            if (['Second Restriction Site'].includes(parameter.name)) {site_two = parameter.value;}
         })}
     
-        const indices: any = returnValidIndices(vector, site_one, site_two);
+        const indices: any      = returnValidIndices(vector, site_one, site_two);
         const vectors: string[] = returnCleavedVectors(vector, indices[0], indices[1]);
-        const new_vector: any = returnValidNewVector(vectors[0], 'over', vectors[1], 'over', insert);
+        const new_vector: any   = returnValidNewVector(vectors[0], 'over', vectors[1], 'over', insert);
     
-        const vector_passed: boolean = sequenceScreenPassed(vector);
-        const insert_passed: boolean = sequenceScreenPassed(insert);
+        const vector_passed:     boolean = sequenceScreenPassed(vector);
+        const insert_passed:     boolean = sequenceScreenPassed(insert);
         const new_vector_passed: boolean = sequenceScreenPassed(new_vector);
 
         return [indices, new_vector, vector_passed, insert_passed, new_vector_passed];
     }
+
+    function prepare_for_screening() {
+        // Pick this back up when have Kernel integration...
+        // !prepScreening(workflow.workflow[activeStep])[0] || !prepScreening(workflow.workflow[activeStep])[1]
+        // ? <div>
+        //     <p><HelpRounded style={{color:'orange', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Error</p>
+        //     <p style={{paddingLeft: 30}}>Restriction sites are invalid or the overhangs are incompatible...</p>
+        //   </div>
+        // : prepScreening(workflow.workflow[activeStep])[4]
+        // ? <div>
+        //     <p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Passed<b/></p>
+        //     <p style={{paddingLeft: 30}}>Restriction sites are valid</p>
+        //     <p style={{paddingLeft: 30}}>Overhangs are compatible and aligned</p>
+        //     <p style={{paddingLeft: 30}}>New vector formulated</p>
+        //     <p style={{paddingLeft: 30}}>Screening passed</p>
+        //   </div>
+        // : <div>
+        //     <p><DangerousRounded style={{color:'red', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Failed<b/></p>
+        //     <p style={{paddingLeft: 30}}>Screen of new sequence failed...</p>
+        //   </div>
+    }
+
+    function demo_prep_screen(stage: string, value: string) {
+        // Stage options...
+        // Screening of predicted sequences
+
+        // const value = workflow.workflow[activeStep].data.formData[0].value;  // First field is 'Vector'
+
+        return(
+            <>{ value == "CAT"
+                ? <div><CheckCircleRounded style={{color:'green',  verticalAlign:'bottom'}}/>&nbsp;{stage}: Passed</div>
+                : value == "TAC"
+                ? <div><DangerousRounded   style={{color:'red',    verticalAlign:'bottom'}}/>&nbsp;{stage}: Failed</div>
+                : value == "ACT"
+                ? <div><HelpRounded        style={{color:'orange', verticalAlign:'bottom'}}/>&nbsp;{stage}: Error</div>
+                : <div><WarningRounded     style={{color:'grey',   verticalAlign:'bottom'}}/>&nbsp;{stage}: Pending</div>
+            }</>
+        )
+    }
+
 
     return (
         <div>
@@ -133,17 +178,10 @@ export default function WorkflowStepper(workflow: any) {
                                                 aria-haspopup="true"
                                                 onMouseEnter={handlePopoverOpen}
                                                 onMouseLeave={handlePopoverClose}
-                                            >
+                                            >                                                              {/* BADGE */}
                                                 <sup>{
                                                     hazards.includes(service.name) ? (
-                                                        service.name == 'Gibson Assembly'
-                                                        ? <GppMaybeTwoTone style={{color:'red'}}/> 
-                                                        : <GppMaybeTwoTone style={{color:'orange'}}/> 
-                                                        // !prepScreening(service)[2] || !prepScreening(service)[3] 
-                                                        // ? <GppMaybeTwoTone style={{color:'red'}}/> 
-                                                        // : !prepScreening(service)[0] || !prepScreening(service)[1]
-                                                        // ? <GppMaybeTwoTone style={{color:'orange'}}/> 
-                                                        // : <GppMaybeTwoTone style={{color:'grey'}}/> 
+                                                        <GppMaybeTwoTone style={{color:'grey'}}/>
                                                     ) : <p/>
                                                 }</sup>
                                             </Typography>
@@ -157,23 +195,10 @@ export default function WorkflowStepper(workflow: any) {
                                                 onClose={handlePopoverClose}
                                                 disableRestoreFocus
                                             >
-                                                <Typography sx={{ px: 2 }}>
-                                                    {
-                                                        // !prepScreening(service)[2] || !prepScreening(service)[3] ?
-                                                        <p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Passed<b/></p>
-                                                        // : <p><DangerousRounded style={{color:'red',  verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Failed</p>
-                                                    }
-                                                    {
-                                                        service.name == 'Gibson Assembly'
-                                                        ? <p><DangerousRounded style={{color:'red',  verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Failed</p>
-                                                        : <p><HelpRounded style={{color:'orange', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Error</p>
-                                                        // !prepScreening(service)[0] || !prepScreening(service)[1]
-                                                        // ? <p><HelpRounded style={{color:'orange', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Error</p>
-                                                        // : prepScreening(service)[4]
-                                                        // ? <p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Passed<b/></p>
-                                                        // : <p><WarningRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending<b/></p>
-                                                    }
-                                                    <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
+                                                <Typography sx={{ px: 2}} >                              {/* POPOVER */}
+                                                    {<p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Passed</p>}
+                                                    {<p>{demo_prep_screen('Screening of predicted sequences', workflow.workflow[activeStep].data.formData[0].value)}</p>}
+                                                    {<p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>}
                                                 </Typography>
                                             </Popover>
                                         </div>
@@ -197,8 +222,10 @@ export default function WorkflowStepper(workflow: any) {
                     <div className='name-and-icon' title={workflow.workflow[activeStep].name} 
                     style={{ display: 'flex', justifyContent: 'flex-start', margin: 5 }}>
                         <div className='icon' style={{ marginRight: 10 }}>
-                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} 
-                            alt=" " />
+                            {/* URL (e.g. to Google Drive) from the DB... */}
+                            {/* <img src={workflow.workflow[activeStep].data.icon} alt=" " style={{ width: 20 }} /> */}
+                            {/* Local files in src/assets/icons folder... */}
+                            <img src={ImagesServicesDict[workflow.workflow[activeStep].data.name]} alt=" " style={{ width: 20 }} />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>
@@ -227,52 +254,16 @@ export default function WorkflowStepper(workflow: any) {
                                 )
                             })}
                             {
-                                hazards.includes(workflow.workflow[activeStep].name) 
+                                hazards.includes(workflow.workflow[activeStep].name)  // if includes Gibson or Moclo...
                                 ? (
-                                    <>  {
-                                            workflow.workflow[activeStep].name == "Gibson Assembly"
-                                            ? <p><GppMaybe style={{color: "red", verticalAlign:"bottom"}}/>&nbsp;Biosecurity screenings...</p>
-                                            : <p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Biosecurity screenings...</p>
-                                        }
-                                        <Typography>
-                                            {
-                                                prepScreening(workflow.workflow[activeStep])[2] && prepScreening(workflow.workflow[activeStep])[3]
-                                                ? <div>
-                                                    <p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Passed<b/></p>
-                                                    <p style={{paddingLeft: 30}}>Screening of Vector: Passed</p>
-                                                    <p style={{paddingLeft: 30}}>Screening of Insert: Passed</p>
-                                                  </div>
-                                                : <p><DangerousRounded style={{color:'red',  verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Failed</p>
-                                            }
-                                            {
-                                                workflow.workflow[activeStep].name == "Gibson Assembly"
-                                                ? <div>
-                                                    <p><DangerousRounded style={{color:'red',  verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Failed</p>
-                                                    <p style={{paddingLeft: 30}}>Screen of new sequence failed...</p>
-                                                  </div>
-                                                : <div>
-                                                    <p><HelpRounded style={{color:'orange', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Error</p>
-                                                    <p style={{paddingLeft: 30}}>Restriction sites are invalid or the overhangs are incompatible...</p>
-                                                  </div>
-                                                // !prepScreening(workflow.workflow[activeStep])[0] || !prepScreening(workflow.workflow[activeStep])[1]
-                                                // ? <div>
-                                                //     <p><HelpRounded style={{color:'orange', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Error</p>
-                                                //     <p style={{paddingLeft: 30}}>Restriction sites are invalid or the overhangs are incompatible...</p>
-                                                //   </div>
-                                                // : prepScreening(workflow.workflow[activeStep])[4]
-                                                // ? <div>
-                                                //     <p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of predicted sequences: Passed<b/></p>
-                                                //     <p style={{paddingLeft: 30}}>Restriction sites are valid</p>
-                                                //     <p style={{paddingLeft: 30}}>Overhangs are compatible and aligned</p>
-                                                //     <p style={{paddingLeft: 30}}>New vector formulated</p>
-                                                //     <p style={{paddingLeft: 30}}>Screening passed</p>
-                                                //   </div>
-                                                // : <div>
-                                                //     <p><DangerousRounded style={{color:'red', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Failed<b/></p>
-                                                //     <p style={{paddingLeft: 30}}>Screen of new sequence failed...</p>
-                                                //   </div>
-                                            }
-                                            <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
+                                    <> 
+                                        {/* {console.log('Vector: ', workflow.workflow[activeStep].data.formData[0].value)}; */}
+                                        {/* {console.log('Screening Prep Vars: ', prepScreening(workflow.workflow[activeStep]))}; */}
+                                        
+                                        <Typography>                                                       {/* MODAL */}
+                                            {<p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Passed</p>}
+                                            {<p>{demo_prep_screen('Screening of predicted sequences', workflow.workflow[activeStep].data.formData[0].value)}</p>}
+                                            {<p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>}
                                         </Typography>
                                     </>)
                                 : <p>{workflow.workflow[activeStep].data.label}</p>

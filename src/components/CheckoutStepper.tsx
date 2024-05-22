@@ -1,10 +1,13 @@
-import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import React, { useContext, useEffect, useState, useRef } from 'react'
 import { useMutation } from '@apollo/client';
-import { Popover, Badge } from '@mui/material';
+
+import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
+
 import { MUTATE_NODE_STATUS } from '../gql/mutations';
-import { AppContext } from '../contexts/App';
+import { AppContext }         from '../contexts/App';
+import { ImagesServicesDict } from '../assets/icons';
+
 
 // the purpose of this component is to showcase nodes in a workflow and their details
 export default function WorkflowStepper(workflow: any) {
@@ -79,7 +82,7 @@ export default function WorkflowStepper(workflow: any) {
                 {workflowServices.map((service: any, index: number) => (
                     <Step key={service.id} style={{ maxWidth: 250, minWidth: 50, paddingLeft: 50, paddingRight: 50 }}>
                         <StepButton onClick={selectStep(index)}>
-                            <StepLabel StepIconComponent={() => <img src={service.data.icon} height="50"/>}>
+                            <StepLabel StepIconComponent={() => <img src={ImagesServicesDict[service.name]} height="50"/>}>
                                 <div style={{display: 'flex', alignItems: 'end' }}>
                                 <Badge   anchorOrigin={{vertical: 'top', horizontal: 'right'}} badgeContent={
                                     <div>
@@ -128,8 +131,10 @@ export default function WorkflowStepper(workflow: any) {
                     <div className='name-and-icon' title={workflow.workflow[activeStep].name} 
                     style={{ display: 'flex', justifyContent: 'flex-start', margin: 5 }}>
                         <div className='icon' style={{ marginRight: 10 }}>
-                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} 
-                            alt=" " />
+                            {/* URL (e.g. to Google Drive) from the DB... */}
+                            {/* <img src={workflow.workflow[activeStep].data.icon} alt=" " style={{ width: 20 }} /> */}
+                            {/* Local files in src/assets/icons folder... */}
+                            <img src={ImagesServicesDict[workflow.workflow[activeStep].data.name]} alt=" " style={{ width: 20 }} />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>

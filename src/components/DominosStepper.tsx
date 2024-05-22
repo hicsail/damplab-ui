@@ -1,9 +1,13 @@
 import { useEffect, useState, useMemo } from "react";
-import { Stepper, Step, StepButton, StepIconProps, StepLabel } from "@mui/material";
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { useMutation } from "@apollo/client";
-import { MUTATE_NODE_STATUS, MUTATE_WORKFLOW_STATE } from "../gql/mutations";
+
+import { Stepper, Step, StepButton, StepIconProps, StepLabel } from "@mui/material";
+import CheckCircleOutlineIcon                                  from '@mui/icons-material/CheckCircleOutline';
+
+import { MUTATE_NODE_STATUS, MUTATE_WORKFLOW_STATE }                           from "../gql/mutations";
 import { ColorlibStepIconRoot, atLeastOneServiceActive, allServicesCompleted } from "../controllers/StepperHelpers"
+import { ImagesServicesDict } from '../assets/icons';
+
 
 export default function DominosStepper({ id, nodes, workflowState, refetchQueued, refetchInProgress, refetchComplete }: any) {
     const [serviceNames] = useState(nodes.map((node: any) => {return node.name;}));
@@ -105,14 +109,18 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
         let image: any;
         const imageCached: any = useMemo(() => 
             {return(<img className={className}
-            src={nodes[Number(props.icon)-1].icon}
+            // src={nodes[Number(props.icon)-1].icon}
+            src={ImagesServicesDict[nodes[Number(props.icon)-1].name]}
             height="50" 
             alt=" "
-            referrerPolicy="no-referrer" />)}, [nodes[Number(props.icon)-1].icon]);
+            referrerPolicy="no-referrer" />)}, 
+            // [nodes[Number(props.icon)-1].icon]);
+            [ImagesServicesDict[nodes[Number(props.icon)-1].name]]);
         completed 
             ? image = <CheckCircleOutlineIcon fontSize="large" sx={{color: "white"}}/>
             : image = <img className={className}
-                           src={nodes[Number(props.icon)-1].icon}
+                        //    src={nodes[Number(props.icon)-1].icon}
+                           src={ImagesServicesDict[nodes[Number(props.icon)-1].name]}
                            height="50" />
         return (
             <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>
@@ -128,7 +136,7 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
             // activeStep usually scalar; here array; get warning; doesn't seem to cause probs
             activeStep = {active}
             style={{ overflowX: "auto", padding: "25px", textAlign: 'center', 
-                        fontSize: "11px",  lineHeight: "1.2" }}
+                     fontSize: "11px",  lineHeight: "1.2" }}
             connector={null}
         > 
             {serviceNames.map((label: string, index: number) => (

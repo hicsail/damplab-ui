@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { useLocation } from 'react-router-dom';
-import QRCode from "react-qr-code";
+import React, { useState }    from 'react'
+import        { useLocation } from 'react-router-dom';
+// import QRCode from "react-qr-code";
 
 export default function JobSubmitted() {
 
@@ -13,14 +13,17 @@ export default function JobSubmitted() {
     <div>
       <h1>Job Submitted</h1>
       <p>Job ID: {jobId}</p>
-      <div style={{ height: "auto", margin: "0 auto", maxWidth: 256, width: "100%" }}>
+
+      {/* Functional but disabled for now... */}
+      {/* <div style={{ height: "auto", margin: "0 auto", maxWidth: 256, width: "100%" }}>
         <QRCode
           size={512}
           style={{ height: "auto", maxWidth: "100%", width: "100%" }}
           value={value}
           viewBox={`0 0 256 256`}
         />
-      </div>
+      </div> */}
+      
     </div>
   )
 }

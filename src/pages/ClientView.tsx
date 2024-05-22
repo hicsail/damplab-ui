@@ -1,11 +1,15 @@
-import { useQuery } from '@apollo/client';
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useParams } from 'react-router-dom';
-import { GET_JOB_BY_ID } from '../gql/queries';
-import { Box, Card, CardContent, Typography } from '@mui/material';
+import { useQuery } from '@apollo/client';
+
+import { Box, Card, CardContent, Typography }        from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check } from '@mui/icons-material';
+
+import { GET_JOB_BY_ID } from '../gql/queries';
+
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
-import TrackingStepper from '../components/TrackingStepper';
+import TrackingStepper            from '../components/TrackingStepper';
+
 
 export default function Tracking() {
 

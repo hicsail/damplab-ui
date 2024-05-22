@@ -178,11 +178,9 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
         const service = getServiceFromId(services, serviceId);
         // if index === 0, add node to canvas with edge
         if (index === 0) {
-            // calculate random position on visible screen
-            // x = random between 0 and 1000
-            // y = random between 0 and 1000
+            // calculate random position on canvas
             baseX = Math.floor(Math.random() * 1000);
-            baseY = Math.floor(Math.random() * 1000);
+            baseY = Math.floor(Math.random() * 1);
             const sourcePosition = { x: baseX, y: baseY};
             
             previousNodeId = addNodeToCanvasWithEdge(services, 'source', service, setNodes, setEdges, sourcePosition, null);
@@ -195,7 +193,6 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
 }
 
 export const addNodesAndEdgesFromBundle = (bundle: any, services: any, setNodes: any, setEdges: any) => {
-
     // get serviceIds from bundle
     const serviceIds = bundle.services.map((service: any) => service.id);
     addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges);

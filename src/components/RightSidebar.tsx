@@ -13,6 +13,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import { AppContext } from '../contexts/App';
 import Params from './Params';
+import { ImagesServicesDict } from '../assets/icons';
 
 export default function ContextTestComponent() {
 
@@ -153,7 +154,7 @@ export default function ContextTestComponent() {
                 }
             </div>
             <div>
-                <Button onClick={ ()=> console.log(JSON.stringify(val.nodes), JSON.stringify(val.edges))}><br/>Print</Button>
+                {/* <Button onClick={ ()=> console.log(JSON.stringify(val.nodes), JSON.stringify(val.edges))}><br/>Print</Button> */}
             </div>
         </div>
     )

@@ -119,7 +119,7 @@ export default function Accepted() {
     <h4>Accepted Workflows</h4>
     <TextField id="outlined-basic" label="Search workflows" variant="outlined" onChange={(e)=> searchWorkflows(e.target.value)} fullWidth/>
     {
-        displayWorkflows.map((workflow: any) => (
+        workflows.map((workflow: any) => (
             <div key={workflow.id + Math.random} style={{ textAlign: 'left',border: '1px solid grey', borderRadius: 5, margin: 5, padding: 5 }}>
                 <div className='nodes' key={workflow.id + Math.random}>
                     <Typography variant='body1'>Workflow ID: {workflow.id}</Typography>

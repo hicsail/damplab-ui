@@ -4,6 +4,8 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { CanvasContext } from '../contexts/Canvas';
 import WarningIcon from '@mui/icons-material/Warning';
+import { ImagesServicesDict } from '../assets/icons';
+
 
 type Input = {
     isConnectable: boolean;
@@ -67,7 +69,10 @@ export default memo((input: Input) => {
                 <Button variant="outlined" title={data.data.label} onClick={handleOpen} sx={{boxShadow: 2}} 
                 style={{ width: 250, display: 'flex', justifyContent: 'space-around', background : background }}>
                     <div>
-                        <img src={data.data.icon} alt=" " style={{ width: 30 }} />
+                        {/* URL (e.g. to Google Drive) from the DB... */}
+                        {/* <img src={data.data.icon} alt=" " style={{ width: 30 }} /> */}
+                        {/* Local files in src/assets/icons folder... */}
+                        <img src={ImagesServicesDict[data.data.label]} alt=" " style={{ width: 30 }} />
                     </div>
                     <p style={{ fontSize: 12, marginLeft: 5, marginRight: 5 }}>
                         {data.data.label}
