@@ -95,6 +95,32 @@ export const GET_JOB_BY_ID = gql`
     }
 `;
 
+// get workflows from gql
+export const GET_WORKFLOWS_BY_STATE = gql`
+    query GetWorkflowsByState($state: WorkflowState!) {
+        getWorkflowByState(state: $state) {
+                id
+                state
+                name
+                nodes {
+                    service {
+                        name
+                        icon
+                    }
+                    formData
+                }
+                edges {
+                    source {
+                        id
+                    }
+                    target {
+                        id
+                    }
+                }
+        }
+    }
+`;
+
 // workflow retrieval by state:(QUEUED | IN_PROGRESS | COMPLETE)
 export const GET_WORKFLOWS_FOR_DOMINOS = gql`
     query GetWorkflowByState($state: WorkflowState!) {
@@ -115,6 +141,21 @@ export const GET_WORKFLOWS_FOR_DOMINOS = gql`
                     icon
                 }
             }
+        }
+    }
+`;
+
+export const GET_JOB_BY_WORKFLOW_ID = gql`
+    query JobByWorkflowId($id: ID!) {
+        jobByWorkflowId(workflow: $id) {
+            id
+            name
+            username
+            institute
+            email
+            submitted
+            notes
+            state
         }
     }
 `;

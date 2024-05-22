@@ -1,21 +1,29 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
+
+import { CanvasContext }             from './contexts/Canvas';
+import { AppContext }                from './contexts/App';
+import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
+// import { searchForEndService } from './controllers/GraphHelpers';
+
+import HeaderBar          from './components/HeaderBar';
+import LoginForm          from './components/LoginForm';
+import PrivateRouteAdmin  from './components/PrivateRouteAdmin';
+import PrivateRouteClient from './components/PrivateRouteClient';
+import MainFlow       from './pages/MainFlow';
+import Checkout       from './pages/Checkout';
+import TechnicianView from './pages/TechnicianView';
+import Dominos        from './pages/Dominos';
+import Dashboard      from './pages/Dashboard';
+import JobSubmitted   from './pages/JobSubmitted';
+import ELabs          from './pages/ELabs';
+import Kernel         from './pages/Kernel';
+// import Tracking       from './pages/ClientView';
+// import Accepted       from './pages/Accepted';
+
 import './App.css';
 import './styles/dominos.css';
-import MainFlow from './pages/MainFlow';
-import Checkout from './pages/Checkout';
-import Submitted from './pages/Submitted';
-import Dominos from "./pages/Dominos";
-import { BrowserRouter, Routes, Route, } from "react-router-dom";
-import HeaderBar from './components/HeaderBar';
-import { CanvasContext } from './contexts/Canvas';
-import { AppContext } from './contexts/App';
-import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery } from '@apollo/client';
-import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
-import Accepted from './pages/Accepted';
-import JobSubmitted from './pages/JobSubmitted';
-import ELabs from './pages/ELabs';
-import { searchForEndService } from './controllers/GraphHelpers';
-import Tracking from './pages/Tracking';
 
 function App() {
 
@@ -34,6 +42,7 @@ function App() {
 
   // initial load of services and bundles
   useEffect(() => {
+
     client.query({ query: GET_SERVICES }).then((result) => {
       console.log('services loaded successfully on app', result);
       setServices(result.data.services);
@@ -53,7 +62,9 @@ function App() {
     // TODO: Change hazards to a service attribute...
     // Matches to 'activeNode?.data.label in RightSideBar
     setHazards(['Gibson Assembly', 'Modular Cloning']);
+
   }, []);
+
 
   return (
     <div className="App">
@@ -68,17 +79,27 @@ function App() {
                 <HeaderBar />
                 <div style={{ padding: 20 }}>
                   <Routes>
-                    <Route path="/" element={<MainFlow /*services={services}*//>} />
-                    <Route path="/resubmission/:id" element={<MainFlow client={client} /*services={services}*//>} />
-                    <Route path="/checkout" element={<Checkout />} />
-                    <Route path="/submitted/:id" element={<Submitted />} />
-                    <Route path="/submitted" element={<JobSubmitted />} />
-                    <Route path="/tracking/:id" element={<Tracking />} />
-                    <Route path="/accepted" element={<Accepted />} />
-                    <Route path="/dominos" element={<Dominos />} />
-                    <Route path="/elabs" element={<ELabs />} />
-                    <Route path="/callback" element={<ELabs />} />
-                    <Route path="/*" element={<div>404 Route not found</div>} />
+
+                    <Route path = "/"                    element = {<LoginForm />} />
+                    <Route path = "/login"               element = {<LoginForm />} />
+
+                    <Route path = "/canvas"              element = {<PrivateRouteClient> <MainFlow />                 </PrivateRouteClient>} />
+                    <Route path = "/resubmission/:id"    element = {<PrivateRouteClient> <MainFlow client={client} /> </PrivateRouteClient>} />
+                    <Route path = "/checkout"            element = {<PrivateRouteClient> <Checkout />                 </PrivateRouteClient>} />
+                    <Route path = "/submitted"           element = {<PrivateRouteClient> <JobSubmitted />             </PrivateRouteClient>} />
+
+                    <Route path = "/technician_view/:id" element = {<PrivateRouteAdmin> <TechnicianView />            </PrivateRouteAdmin>} />
+                    <Route path = "/dashboard"           element = {<PrivateRouteAdmin> <Dashboard client={client} /> </PrivateRouteAdmin>} />
+                    <Route path = "/dominos"             element = {<PrivateRouteAdmin> <Dominos />                   </PrivateRouteAdmin>} />
+                    <Route path = "/elabs"               element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} />
+                    <Route path = "/kernel"              element = {<PrivateRouteAdmin> <Kernel />                    </PrivateRouteAdmin>} />
+
+                    <Route path = "/*"                   element = {<div>404 Route not found</div>} />
+
+                    {/* <Route path = "/client_view/:id"     element = {<PrivateRouteAdmin> <Tracking />                  </PrivateRouteAdmin>} /> */}
+                    {/* <Route path = "/callback"            element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} /> */}
+                    {/* <Route path="/accepted" element={wrapPrivateRoute(<Accepted />, isLoggedIn, 'accepted')} /> */}
+
                   </Routes>
                 </div>
               </BrowserRouter>

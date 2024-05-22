@@ -13,6 +13,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import { AppContext } from '../contexts/App';
 import Params from './Params';
+import { ImagesServicesDict } from '../assets/icons';
 
 export default function ContextTestComponent() {
 
@@ -65,7 +66,7 @@ export default function ContextTestComponent() {
             <div>
                 {
                     hazards.includes(activeNode?.data.label) 
-                    ? (<p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                    ? (<p><GppMaybe style={{color: "grey", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
                         sequences provided below or produced by the process will undergo a safety screening.</p>)
                     : ""
                 }
@@ -85,7 +86,7 @@ export default function ContextTestComponent() {
             {
                 activeNode?.data.formData ? (
                     <div>
-                        <Params activeNode={activeNode} />
+                        <Params activeNode={activeNode}/>
                     </div>
                 ) : null
             }
@@ -153,7 +154,7 @@ export default function ContextTestComponent() {
                 }
             </div>
             <div>
-                <Button onClick={ ()=> console.log(JSON.stringify(val.nodes), JSON.stringify(val.edges))}><br/>Print</Button>
+                {/* <Button onClick={ ()=> console.log(JSON.stringify(val.nodes), JSON.stringify(val.edges))}><br/>Print</Button> */}
             </div>
         </div>
     )

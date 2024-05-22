@@ -124,7 +124,8 @@ export let services: Service[] = [
     {
         id: 'design-primers',
         name: 'Design and Order Primers',
-        icon: 'https://cdn-icons-png.flaticon.com/512/1087/1087532.png',
+        // icon: 'https://cdn-icons-png.flaticon.com/512/1087/1087532.png',
+        icon: 'https://drive.google.com/thumbnail?id=1l6Dfi3oc3KD26-oqEN9jylPw7X6guVZU',
         parameters: [
             {
                 id: 'target-gene',
@@ -364,6 +365,38 @@ export let services: Service[] = [
         description: 'Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously.',
         parameters: [
             {
+                id: 'vector',
+                name: 'Vector',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'insert',
+                name: 'Insert',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'restriction-site-first',
+                name: 'First Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'restriction-site-second',
+                name: 'Second Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
                 id: 'template-dna',
                 name: 'Template DNA',
                 type: 'boolean',
@@ -385,20 +418,6 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: false
             },
-            {
-                id: 'gibson-insert',
-                name: 'Gibson Insert',
-                type: 'string',
-                paramType: 'input',
-                required: true
-            },
-            {
-                id: 'gibson-vector',
-                name: 'Gibson Vector',
-                type: 'string',
-                paramType: 'input',
-                required: true
-            },
         ],
         allowedConnections: [
             'transformation', 'ordering-dna-fragments', 'dna-storage', 'mutagenesis', 'mutagenesis-by-inverse-pcr',
@@ -408,7 +427,8 @@ export let services: Service[] = [
     {
         id: 'restriction-digest',
         name: 'Restriction Digest',
-        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        // icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        icon: 'https://drive.google.com/thumbnail?id=1wl-Qpt_7NNb7dlzEQwCfmkPvPI3DuPbk',
         parameters: [
             {
                 id: 'template-dna',
@@ -432,7 +452,8 @@ export let services: Service[] = [
     {
         id: 'restriction-ligation',
         name: 'Restriction Ligation',
-        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        // icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        icon: 'https://drive.google.com/thumbnail?id=1T3ZL5y6GQ0CEk-labTl7NC4J4n9Rca3R',
         parameters: [
             {
                 id: 'digest-dna',
@@ -456,7 +477,8 @@ export let services: Service[] = [
     {
         id: 'clean-up',
         name: 'Clean Up and Concentrate DNA',
-        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        // icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        icon: 'https://drive.google.com/thumbnail?id=1ss8znCImp6aCvw8dwrvaiJ4FWRuWr2zd',
         parameters: [
             {
                 id: 'template-dna',
@@ -478,7 +500,8 @@ export let services: Service[] = [
     {
         id: 'dna-storage',
         name: 'Plasmid, DNA fragment, or oligo storage',
-        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        // icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
+        icon: 'https://drive.google.com/thumbnail?id=1vW2wN9f41ZNgP2zYOm1AJDgIud8WYAGR',
         parameters: [
             {
                 id: 'dna-types',
@@ -551,7 +574,8 @@ export let services: Service[] = [
     {
         id: 'dna-gel',
         name: 'Purify DNA from Agarose Gel Extraction',
-        icon: 'https://cdn-icons-png.flaticon.com/512/3182/3182554.png',
+        // icon: 'https://cdn-icons-png.flaticon.com/512/3182/3182554.png',
+        icon: 'https://drive.google.com/thumbnail?id=11mSlGkU_cesN_RiUbc1xiO6fv9qCzeE6',
         resultParams: ['gel-product'],
         parameters: [
             {
@@ -570,12 +594,45 @@ export let services: Service[] = [
     {
         id: 'm-cloning',  // PRODUCES DNA; SCREENING REQUIRED
         name: 'Modular Cloning',
-        icon: 'https://cdn-icons-png.flaticon.com/512/1974/1974478.png',
+        // icon: 'https://cdn-icons-png.flaticon.com/512/1974/1974478.png',
         // icon: 'https://github.com/hicsail/damplab-ui/blob/biosecurity-basics/public/modular-cloning.png?raw=true',
+        icon: 'https://drive.google.com/thumbnail?id=1d4Wx887qXWI9Z7JZ9JQLFndQUly6E3Gi',
         resultParams: [
             'forward-primer-flow', 'reverse-primer-flow',
         ],
         parameters: [
+            {
+                id: 'vector',
+                name: 'Vector',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'insert',
+                name: 'Insert',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'restriction-site-first',
+                name: 'First Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'restriction-site-second',
+                name: 'Second Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
             {
                 id: 'antibiotic',
                 name: 'Antibiotic',
@@ -617,22 +674,6 @@ export let services: Service[] = [
                 name: 'Reverse Primer Flow Result',
                 type: 'boolean',
                 paramType: 'result',
-                required: true
-            },
-            {
-                id: 'moclo-insert',
-                name: 'MoClo Insert',
-                description: '',
-                type: 'string',
-                paramType: 'input',
-                required: true
-            },
-            {
-                id: 'moclo-vector',
-                name: 'MoClo Vector',
-                description: '',
-                type: 'string',
-                paramType: 'input',
                 required: true
             },
         ],
@@ -875,7 +916,8 @@ export let services: Service[] = [
     {
         id: 'glyc-storage',
         name: 'Glycerol Stock Storage',
-        icon: 'https://cdn-icons-png.flaticon.com/512/4352/4352975.png',
+        // icon: 'https://cdn-icons-png.flaticon.com/512/4352/4352975.png',
+        icon: 'https://drive.google.com/thumbnail?id=11k4WLbBrmWvGwvNa30qFK6y2IcnEePQj',
         categories: ['pcr-reactions'],
         parameters: [],
         result: {
@@ -888,7 +930,8 @@ export let services: Service[] = [
         id: 'eth-perc',
         name: 'DNA/RNA Ethanol Precipitation',
         // icon: 'https://drive.google.com/uc?id=1Gdv5OByXeIQET13AowTdKAEKrC-687TH',
-        icon: 'https://drive.google.com/thumbnail?id=1JQ8VUAGGOZa9-dROZfS_thEHcNLvKB7L',
+        // icon: 'https://drive.google.com/thumbnail?id=1JQ8VUAGGOZa9-dROZfS_thEHcNLvKB7L',
+        icon: 'https://drive.google.com/thumbnail?id=1bnuf6-ZD79X7ZJ6X6dm26apEh8IU9BX7',
         categories: ['dna-rna'],
         allowedConnections: [
             'bioanalyzer', 'rna-extraction', 'gel'

@@ -1,10 +1,13 @@
-import { Box, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import React, { useContext, useEffect, useState, useRef } from 'react'
 import { useMutation } from '@apollo/client';
-import { Popover, Badge } from '@mui/material';
+
+import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
+
 import { MUTATE_NODE_STATUS } from '../gql/mutations';
-import { AppContext } from '../contexts/App';
+import { AppContext }         from '../contexts/App';
+import { ImagesServicesDict } from '../assets/icons';
+
 
 // the purpose of this component is to showcase nodes in a workflow and their details
 export default function WorkflowStepper(workflow: any) {
@@ -77,10 +80,10 @@ export default function WorkflowStepper(workflow: any) {
             <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} 
             orientation={isSmall ? 'vertical' : 'horizontal'}>
                 {workflowServices.map((service: any, index: number) => (
-                    <Step key={service.id} style={{ maxWidth: 250, minWidth: 150, paddingLeft: 50, paddingRight: 50}}>
+                    <Step key={service.id} style={{ maxWidth: 250, minWidth: 50, paddingLeft: 50, paddingRight: 50 }}>
                         <StepButton onClick={selectStep(index)}>
-                            <StepLabel StepIconComponent={() => <img src={service.data.icon} height="50"/>}>
-                                <div style={{display: 'flex', alignItems: 'end'}}>
+                            <StepLabel StepIconComponent={() => <img src={ImagesServicesDict[service.name]} height="50"/>}>
+                                <div style={{display: 'flex', alignItems: 'end' }}>
                                 <Badge   anchorOrigin={{vertical: 'top', horizontal: 'right'}} badgeContent={
                                     <div>
                                         <Typography
@@ -103,9 +106,8 @@ export default function WorkflowStepper(workflow: any) {
                                             onClose={handlePopoverClose}
                                             disableRestoreFocus
                                         >
-                                            <Typography sx={{ p: 1 }}>
-                                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
-                                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
+                                            <Typography sx={{ px: 2 }}>
+                                                This service requires a biosecurity screening...
                                             </Typography>
                                         </Popover>
                                     </div>
@@ -129,8 +131,10 @@ export default function WorkflowStepper(workflow: any) {
                     <div className='name-and-icon' title={workflow.workflow[activeStep].name} 
                     style={{ display: 'flex', justifyContent: 'flex-start', margin: 5 }}>
                         <div className='icon' style={{ marginRight: 10 }}>
-                            <img style={{ width: 20 }} src={workflow.workflow[activeStep].data.icon} 
-                            alt=" " />
+                            {/* URL (e.g. to Google Drive) from the DB... */}
+                            {/* <img src={workflow.workflow[activeStep].data.icon} alt=" " style={{ width: 20 }} /> */}
+                            {/* Local files in src/assets/icons folder... */}
+                            <img src={ImagesServicesDict[workflow.workflow[activeStep].data.name]} alt=" " style={{ width: 20 }} />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>
@@ -140,8 +144,17 @@ export default function WorkflowStepper(workflow: any) {
                     </div>
                 </DialogTitle>
                 <DialogContent>
-                    <Box sx={{}} style={{ height: 300, overflow: 'auto' }}>
+                    <Box style={{ height: 400, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
+                            {
+                                hazards.includes(workflow.workflow[activeStep].data.label) 
+                                ? (
+                                    <>
+                                        <p><GppMaybe style={{color: "grey", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
+                                        sequences provided below or produced by the process will undergo a safety screening.<br/><br/></p>
+                                    </>)
+                                : ""
+                            }
                             {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
                                 return (
                                     <div className='parameter' style={{ display: 'flex', marginBottom: 3 }} key={Math.random()}>
@@ -158,16 +171,6 @@ export default function WorkflowStepper(workflow: any) {
                                     </div>
                                 )
                             })}
-                            {
-                                hazards.includes(workflow.workflow[activeStep].data.label) 
-                                ? (<p><GppMaybe style={{color: "orange", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
-                                    sequences provided above or produced by the process will undergo a safety screening.</p>)
-                                : ""
-                            }
-                            <Typography>
-                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Pending</p>
-                                <p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>
-                            </Typography>
                         </div>
                     </Box>
                 </DialogContent>
