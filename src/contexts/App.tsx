@@ -1,14 +1,10 @@
-import { createContext, useState } from "react";
+import { createContext } from "react";
+
 
 type AppContext = {
     services: any[];
-    //setServices: any;
-    bundles: any[];
-    //setBundles: any;
-    hazards: Array<string>;
-    //setHazards: any;
-    // loggedIn: boolean;
-    // setLoggedIn: any;
+    bundles : any[];
+    hazards : Array<string>;
 }
 
 export const AppContext  = createContext({} as AppContext);

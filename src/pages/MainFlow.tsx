@@ -1,31 +1,22 @@
 import { useState, useCallback, useRef, useEffect, useContext } from 'react';
-import ReactFlow, {
-    ReactFlowProvider,
-    Controls,
-    Background,
-    addEdge,
-    FitViewOptions,
-    applyNodeChanges,
-    applyEdgeChanges,
-    NodeChange,
-    EdgeChange,
-    Connection,
-} from 'reactflow';
+import { useParams } from 'react-router-dom';
+import { useMutation } from '@apollo/client';
+import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOptions, 
+                    applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection } from 'reactflow';
 import 'reactflow/dist/style.css';
+
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
-import Sidebar from '../components/Sidebar';
+import { isValidConnection }                            from '../controllers/GraphHelpers';
+import { addNodesAndEdgesFromServiceIdsAlt }            from '../controllers/ResubmissionHelpers';
+import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
-import RightSidebar from '../components/RightSidebar';
+import RightSidebar   from '../components/RightSidebar';
+import { GET_JOB_BY_ID }    from '../gql/queries';
+import { MUTATE_JOB_STATE } from '../gql/mutations';
+import { AppContext }    from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import '../styles/sidebar.css';
-import { isValidConnection } from '../controllers/GraphHelpers';
-import { AppContext } from '../contexts/App';
-import { useParams } from 'react-router-dom';
-import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery, useLazyQuery, useMutation } from '@apollo/client';
-import { GET_JOB_BY_ID } from '../gql/queries';
-import { MUTATE_JOB_STATE } from '../gql/mutations';
-import { addNodesAndEdgesFromServiceIdsAlt } from '../controllers/ResubmissionHelpers';
 
 
 const nodeTypes = {
@@ -36,13 +27,14 @@ const fitViewOptions: FitViewOptions = {
     padding: 0.2,   
 };
 
+
 export default function MainFlow( client: any /*data: any*/) {
-    const { id } = useParams();
-    const reactFlowWrapper = useRef<HTMLDivElement>(null);
-    const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-    let {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
-    let {services} = useContext(AppContext);
-    let workflows: any[] = [];
+    const { id }                                                   = useParams();
+    const reactFlowWrapper                                         = useRef<HTMLDivElement>(null);
+    const [reactFlowInstance, setReactFlowInstance]                = useState<any>(null);
+    let   {nodes, edges, setNodes, setEdges, setActiveComponentId} = useContext(CanvasContext);
+    let   {services}                                               = useContext(AppContext);
+    let   workflows: any[]                                         = [];
     // const [services, setServices] = useState(data.services);
 
     const onNodesChange = useCallback(
@@ -72,11 +64,14 @@ export default function MainFlow( client: any /*data: any*/) {
 
         event.preventDefault();
         const reactFlowBounds = reactFlowWrapper.current!.getBoundingClientRect();
+
         let type = event.dataTransfer.getData('application/reactflow');
-        type = JSON.parse(type);
+            type = JSON.parse(type);
         console.log(type)
+        
         const serviceId = type.id
-        const name = type.name;
+        const name      = type.name;
+        
         // check if the dropped element is valid
         if (typeof type === 'undefined' || !type) {
             return;
@@ -137,31 +132,38 @@ export default function MainFlow( client: any /*data: any*/) {
             <div style={{ height: '100vh' }}>
                 <ReactFlowProvider>
                     <div className="reactflow-wrapper" style={{ height: '85vh', display: 'flex' }} ref={reactFlowWrapper}>
+                        
                         <div style={{ maxWidth: '15%', textAlign: 'center', minWidth: 250, borderRight: 'solid 1px' }}>
                             <Sidebar />
                         </div>
+
                         <ReactFlow
-                            nodes={nodes}
-                            edges={edges}
-                            onNodesChange={onNodesChange}
-                            onEdgesChange={onEdgesChange}
-                            onConnect={onConnect}
-                            onInit={setReactFlowInstance}
-                            onDrop={onDrop}
-                            //snapToGrid={true}
-                            snapGrid={[25, 25]}
-                            nodeTypes={nodeTypes}
-                            onDragOver={onDragOver}
+                            nodes          = {nodes}
+                            edges          = {edges}
+                            onNodesChange  = {onNodesChange}
+                            onEdgesChange  = {onEdgesChange}
+                            onConnect      = {onConnect}
+                            onInit         = {setReactFlowInstance}
+                            onDrop         = {onDrop}
+                            // snapToGrid     = {true}
+                            snapGrid       = {[25, 25]}
+                            nodeTypes      = {nodeTypes}
+                            onDragOver     = {onDragOver}
                             fitView
-                            fitViewOptions={fitViewOptions}
-                            style={{ width: '70%', height: '100%'}}
+                            fitViewOptions = {fitViewOptions}
+                            style          = {{ width: '70%', height: '100%'}}
                         >
+
                             <Background />
+
                             <Controls />
+
                         </ReactFlow>
+
                         <div style={{ minWidth: '10%', width: 550, borderLeft: 'solid 1px' }}>
                             <RightSidebar />
                         </div>
+                        
                     </div>
                 </ReactFlowProvider>
             </div>

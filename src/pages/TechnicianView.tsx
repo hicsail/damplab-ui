@@ -5,26 +5,26 @@ import { useQuery, useMutation } from '@apollo/client';
 import { Box, Button, Card, CardContent, Typography } from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check }  from '@mui/icons-material';
 
-import { GET_JOB_BY_ID, }        from '../gql/queries';
-import { UPDATE_WORKFLOW_STATE } from '../gql/mutations';
+import { GET_JOB_BY_ID, }         from '../gql/queries';
+import { UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
+import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 
 import WorkflowStepper            from '../components/WorkflowStepper';
 import JobFeedbackModal           from '../components/JobFeedbackModal';
-import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 
 
 export default function TechnicianView() {
 
-    const { id } = useParams();
-    const [workflowName, setWorkflowName] = useState('');
-    const [workflowState, setWorkflowState] = useState('');
-    const [jobName, setJobName] = useState('');
-    const [jobState, setJobState] = useState('');
-    const [jobTime, setJobTime] = useState('');
-    const [workflowUsername, setWorkflowUsername] = useState('');
+    const { id }                                        = useParams();
+    const [workflowName, setWorkflowName]               = useState('');
+    const [workflowState, setWorkflowState]             = useState('');
+    const [jobName, setJobName]                         = useState('');
+    const [jobState, setJobState]                       = useState('');
+    const [jobTime, setJobTime]                         = useState('');
+    const [workflowUsername, setWorkflowUsername]       = useState('');
     const [workflowInstitution, setWorkflowInstitution] = useState('');
-    const [workflowEmail, setWorkflowEmail] = useState('');
-    const [workflows, setWorklows] = useState([]); // ▶ URLSearchParams {}
+    const [workflowEmail, setWorkflowEmail]             = useState('');
+    const [workflows, setWorklows]                      = useState([]);  // ▶ URLSearchParams {}
 
     const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },

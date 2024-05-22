@@ -1,7 +1,8 @@
-import { services } from '../data/services';
 import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
+
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
-import { Service } from '../types/Service';
+import { Service }                 from '../types/Service';
+import { services }                from '../data/services';
 
 
 export const addNodesAndEdgesFromServiceIdsAlt = (services: any[], 
@@ -101,13 +102,13 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
         // console.log('setactivecomponentid set');
     }
     // console.log('nodeId: ', nodeId);
+
     return nodeId;
 }
 
 
 export const createNodeObjectAlt = (id: string, name: string, type: string, 
                                     position: any, data: NodeData) => {
-
   const newNode = {
         id      : id,
         name,
@@ -117,6 +118,7 @@ export const createNodeObjectAlt = (id: string, name: string, type: string,
         data    : data,
     };
     // console.log('newNode: ', newNode);
+
     return newNode;
 }
 
@@ -124,20 +126,21 @@ export const createNodeObjectAlt = (id: string, name: string, type: string,
 export const generateFormDataFromParamsAlt = (paramsData: any, nodeId: string): NodeParameter[] => {
 
     const formData : NodeParameter[] = [];
+
     for (let i = 0; i < paramsData.length; i++) {
         const parameter = paramsData[i];
-        const formId = Math.random().toString(36).substring(2, 9);
+        const formId    = Math.random().toString(36).substring(2, 9);
         formData.push({
-            id: formId,
-            nodeId: nodeId,
-            name: parameter.name,
-            type: parameter.type,
-            options: parameter.options ? parameter.options : null,
-            description: parameter.description,
-            paramType: parameter.paramType ? parameter.paramType : null,
+            id              : formId,
+            nodeId          : nodeId,
+            name            : parameter.name,
+            type            : parameter.type,
+            options         : parameter.options ? parameter.options    : null,
+            description     : parameter.description,
+            paramType       : parameter.paramType ? parameter.paramType: null,
             resultParamValue: "",
-            value: null,
-            required: true // parameter.required,
+            value           : null,
+            required        : true  // parameter.required,
         });
     }
 

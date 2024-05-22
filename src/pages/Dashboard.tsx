@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from '@apollo/client'
-
 import { Box, Button, Typography} from '@mui/material';
 
 import { bodyText, StyledContainer } from "../styles/themes";

@@ -1,9 +1,9 @@
 import React, { memo, useContext, useEffect, useState } from 'react';
 import { Handle, Position } from 'reactflow';
-import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
+import { Box, Button } from '@mui/material';
+import WarningIcon     from '@mui/icons-material/Warning';
+
 import { CanvasContext } from '../contexts/Canvas';
-import WarningIcon from '@mui/icons-material/Warning';
 import { ImagesServicesDict } from '../assets/icons';
 
 

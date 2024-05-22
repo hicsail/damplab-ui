@@ -1,7 +1,8 @@
-import { services } from '../data/services';
 import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
+
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
-import { Service } from '../types/Service';
+import { Service }                 from '../types/Service';
+import { services }                from '../data/services';
 
 
 export const getServiceFromId = (services: any, id: string) => {
@@ -32,45 +33,42 @@ export const isValidConnection = (services: any, nodes: any, sourceId: any, targ
 export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, service: any, setNodes: any, setEdges: any, sourcePosition: any, setActiveComponentId: any) => {
     
     const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
-    const nodeId = Math.random().toString(36).substring(2, 9);  // CK: IDs are very similar; onetime had identical workflow IDs in different jobs...
+    const nodeId = Math.random().toString(36).substring(2, 9);  // Sufficient variance?
     const formData: NodeParameter[] = generateFormDataFromParams(service.parameters, nodeId);
     
     const nodeData = {
-        id: nodeId,
-        label: service.name,
-        allowedConnections: service.allowedConnections,
-        icon: service.icon,
-        parameters: service.parameters,
+        id                    : nodeId,
+        label                 : service.name,
+        allowedConnections    : service.allowedConnections,
+        icon                  : service.icon,
+        parameters            : service.parameters,
         additionalInstructions: "",
-        formData: formData,
-        serviceId: service.id
+        formData              : formData,
+        serviceId             : service.id
     }
     
     const newNode = createNodeObject(nodeId, service.name, 'selectorNode', position, nodeData);
     
     // create new edge
     if (sourceId !== 'source'){
-
         const newEdge = {
-            id: Math.random().toString(36).substring(2, 9),
-            source: sourceId,
-            target: nodeId,
-            animated: true,
+            id           : Math.random().toString(36).substring(2, 9),
+            source       : sourceId,
+            target       : nodeId,
+            animated     : true,
             arrowHeadType: 'arrowclosed',
+            labelStyle   : { fill: '#f6ab6c', fontWeight: 700 },
+            style        : { stroke: 'green' },
             //label: 'added w click',
-            labelStyle: { fill: '#f6ab6c', fontWeight: 700 },
-            style: { stroke: 'green' },
             //type: 'smoothstep',
         };
         setEdges((eds: any) => eds.concat(newEdge));
-
     }
 
     setNodes((nds: any) => nds.concat(newNode));
-    
     if (setActiveComponentId) setActiveComponentId(nodeId);
+
     return nodeId;
-    
 }
 
 export const getWorkflowsFromGraph = (nodes: any, edges: any) => {
@@ -104,8 +102,6 @@ export const getWorkflowsFromGraph = (nodes: any, edges: any) => {
         }
     });
 
-
-
     // loop over start nodes and create workflows
     let workflows: any = [];
     startNodes.forEach((startNode: any) => {
@@ -134,10 +130,10 @@ export const transformNodesToGQL = (nodes: any) => {
     let gqlNodes: any = [];
 
     nodes.forEach((node: any) => {
-        let gqlNode: any = {};
-        gqlNode = { ...node.data };
+        let gqlNode: any  = {};
+        gqlNode           = { ...node.data };
         gqlNode.reactNode = node;
-        gqlNode.serviceId = node.data.serviceId // random value for now 
+        gqlNode.serviceId = node.data.serviceId  // random value for now 
         // remove allowedConnections
         delete gqlNode.allowedConnections;
         delete gqlNode.icon;
@@ -146,8 +142,8 @@ export const transformNodesToGQL = (nodes: any) => {
         delete gqlNode.description;
         gqlNodes.push(gqlNode);
     });
-    return gqlNodes;
 
+    return gqlNodes;
 }
 
 export const transformEdgesToGQL = (edges: any) => {
@@ -155,13 +151,14 @@ export const transformEdgesToGQL = (edges: any) => {
     let gqlEdges: any = [];
 
     edges.forEach((edge: any) => {
-        let gqlEdge: any = {};
-        gqlEdge.source = edge.source;
-        gqlEdge.target = edge.target;
+        let gqlEdge: any  = {};
+        gqlEdge.source    = edge.source;
+        gqlEdge.target    = edge.target;
         gqlEdge.reactEdge = edge;
-        gqlEdge.id = "hello world" + Math.random() // random value for now 
+        gqlEdge.id        = "hello world" + Math.random() // random value for now 
         gqlEdges.push(gqlEdge);
     });
+
     return gqlEdges;
 }
 
@@ -182,7 +179,6 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
             baseX = Math.floor(Math.random() * 1000);
             baseY = Math.floor(Math.random() * 1);
             const sourcePosition = { x: baseX, y: baseY};
-            
             previousNodeId = addNodeToCanvasWithEdge(services, 'source', service, setNodes, setEdges, sourcePosition, null);
         } else {
             // else, add node to canvas
@@ -206,6 +202,7 @@ export const paramsFilledOnNode = (node: any) : Boolean => {
             allFilled = false;
         }
     });
+
     return allFilled;
 }
 
@@ -225,13 +222,13 @@ export const searchForEndService : any = (serviceId : string, endServiceId: stri
       return service;
     }
     if (service.allowedConnections) {
-    for (const connection of service.allowedConnections) {
-      const connectedService = services.find(s => s.id === connection);
-      const result = searchForEndService(connectedService, endServiceId, visited);
-      if (result) {
-        return result;
-      }
-    }
+        for (const connection of service.allowedConnections) {
+        const connectedService = services.find(s => s.id === connection);
+        const result = searchForEndService(connectedService, endServiceId, visited);
+        if (result) {
+            return result;
+        }
+        }
     }
   
     return null;
@@ -244,8 +241,8 @@ export const transformGQLforDominos = (workflow: any) => {
             globalId: node._id,
             name    : node.label,
             state   : node.state,
-                // technicianFirst: node.technicianFirst,
-                // technicianLast: node.technicianLast,
+            // technicianFirst: node.technicianFirst,
+            // technicianLast:  node.technicianLast,
             icon: node.service.icon,
         };
     });
@@ -256,6 +253,7 @@ export const transformGQLforDominos = (workflow: any) => {
         state: workflow.state,
         nodes: nodes,
     };
+
     return val;
 };
 
@@ -263,12 +261,12 @@ export const transformGQLToWorkflow = (workflow: any) => {
     console.log(workflow);
     let nodes = workflow.nodes.map((node: any) => {
         return {
-            id: node._id,
-            name: node.service.name,
-            state: node.state,
+            id         : node._id,
+            name       : node.service.name,
+            state      : node.state,
             description: node.description,
             data: {
-                icon: node.service.icon,
+                icon    : node.service.icon,
                 formData: node.formData
             },
 
@@ -283,11 +281,12 @@ export const transformGQLToWorkflow = (workflow: any) => {
     });
 
     const val = {
-        id: workflow.id,
+        id   : workflow.id,
         state: workflow.state,
-        name: workflow.name,
+        name : workflow.name,
         nodes: nodes,
         edges: edges
     }
+
     return val;
 }

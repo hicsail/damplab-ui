@@ -1,34 +1,30 @@
 import React, { useContext, useEffect, useState, useRef } from 'react'
-import { Accordion, Box, Paper, Snackbar, TextField, Typography } from '@mui/material';
 import { useNavigate } from "react-router-dom";
+import { useMutation } from '@apollo/client';
+import { Accordion, Box, Button, Snackbar, TextField, Typography } from '@mui/material';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { GppMaybe, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
-import Button from '@mui/material/Button';
-import { CanvasContext } from '../contexts/Canvas'
-import { useMutation } from '@apollo/client';
+import ExpandMoreIcon   from '@mui/icons-material/ExpandMore';
+
 import { getWorkflowsFromGraph, transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
 import { CREATE_JOB, CREATE_WORKFLOW } from '../gql/mutations';
-import CheckoutStepper from '../components/CheckoutStepper';
-import FormControl from '@mui/material/FormControl';
-import { AppContext } from '../contexts/App';
+import CheckoutStepper   from '../components/CheckoutStepper';
+import { CanvasContext } from '../contexts/Canvas'
+import { AppContext }    from '../contexts/App';
+
 
 export default function Checkout() {
 
+    // contexts
     const val         = useContext(CanvasContext);
-    const navigate    = useNavigate();
     const { hazards } = useContext(AppContext);
-
     // ui states
     const [open, setOpen]         = useState(false);
     const [expanded, setExpanded] = useState(true);
-
     // workflow states
     const [workflows,        setWorkflows]        = useState(getWorkflowsFromGraph(val.nodes, val.edges));
     const [workflowNames,    setWorkflowNames]    = useState<any>({});
     const [checkoutWorkflow, setCheckoutWorkflow] = useState<any>([]);
-
     // refs for workflows
     const myRefs         = useRef<any>([]);
     const jobRef         = useRef<any>(null);
@@ -36,6 +32,8 @@ export default function Checkout() {
     const institutionRef = useRef<any>(null);
     const emailRef       = useRef<any>(null);
     const notesRef       = useRef<any>(null);
+
+    const navigate    = useNavigate();
 
     const [createJob] = useMutation(CREATE_JOB, {
         onCompleted: (data) => {
@@ -59,8 +57,8 @@ export default function Checkout() {
             // add id and value object to workflowNames state
             setWorkflowNames({ ...workflowNames, [workflow.id]: "" });
             let obj = {
-                id: id,
-                name: "",
+                id   : id,
+                name : "",
                 nodes: workflow
             }
             workflowObjs.push(obj);
@@ -78,12 +76,12 @@ export default function Checkout() {
 
             let edges = val.edges.filter((edge: any) => {
                 return workflow.find((node: any) => node.id === edge.source) 
-                && workflow.find((node: any) => node.id === edge.target);
+                    && workflow.find((node: any) => node.id === edge.target);
             });
             let gqlEdges: any = transformEdgesToGQL(edges);
 
             let gqlWorkflow = {
-                name: myRefs.current[index].value,  //workflowNames[flow.id],
+                name:  myRefs.current[index].value,  // workflowNames[flow.id],
                 nodes: gqlWorkflows,
                 edges: gqlEdges
             }
@@ -119,10 +117,10 @@ export default function Checkout() {
                     <Typography variant='h4' sx={{ m: 2 }}>Checkout</Typography>
                     <Accordion key={Math.random() * 100} expanded={expanded}>
                         <AccordionSummary
-                            expandIcon={<ExpandMoreIcon />}
-                            aria-controls="panel1a-content"
-                            id="panel1a-header"
-                            onClick={() => setExpanded(!expanded)}
+                            expandIcon    = {<ExpandMoreIcon />}
+                            aria-controls = "panel1a-content"
+                            id            = "panel1a-header"
+                            onClick       = {() => setExpanded(!expanded)}
                         >
                             <Typography variant='h5'>Job Summary</Typography>
                         </AccordionSummary>
@@ -143,12 +141,12 @@ export default function Checkout() {
                                         borderRadius: 5, margin: 5, }}>
                                             <Box sx={{ display: 'flex' }}>
                                                 <TextField
-                                                    id={workflow.id}
-                                                    label="Workflow Name"
-                                                    variant="outlined"
-                                                    inputRef={(el) => (myRefs.current[index] = el)}
-                                                    style={{width: '40ch'}}
-                                                    defaultValue={`Workflow_${index + 1}`}
+                                                    id           = {workflow.id}
+                                                    label        = "Workflow Name"
+                                                    variant      = "outlined"
+                                                    inputRef     = {(el) => (myRefs.current[index] = el)}
+                                                    style        = {{width: '40ch'}}
+                                                    defaultValue = {`Workflow_${index + 1}`}
                                                     // onChange={(e) => { handleNameChange(e, workflow.id)}}
                                                 />
                                                 {/* {
