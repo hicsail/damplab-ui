@@ -138,17 +138,17 @@ export default function HeaderBar() {
 
                     <div style={alignRight}>
                         
-                        <IconButton onClick={handleLoadOpen} title="Load canvas" aria-control='menu-appbar' aria-haspopup='true'>
+                        <IconButton onClick={handleLoadOpen} title="Load canvas" aria-controls='menu-appbar' aria-haspopup='true'>
                             <UploadFileIcon style={{color: 'white'}}/>
                         </IconButton>
 
-                        <IconButton onClick={handleClickOpen} title="Save canvas" aria-control='menu-appbar' aria-haspopup='true'>
+                        <IconButton onClick={handleClickOpen} title="Save canvas" aria-controls='menu-appbar' aria-haspopup='true'>
                             <SaveOutlined style={{color: 'white'}}/>
                         </IconButton>
 
                         {window.location.href.includes('resubmission')
                         ? <Link to="/checkout" className="a a--hover a--active">Resubmit...</Link>
-                        : <IconButton title="Checkout page" aria-control='menu-appbar' aria-haspopup='true'>
+                        : <IconButton title="Checkout page" aria-controls='menu-appbar' aria-haspopup='true'>
                             <Link to="/checkout">
                                 <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
                             </Link> 

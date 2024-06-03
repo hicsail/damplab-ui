@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, TextField } from '@mui/material';
 
+let creds = require('../credentials.json');
+
 
 export default function LoginForm() {
-  const demo_admin  = { username: 'admin',     password: 'drafty-shotgun-exorcist', role: 'admin' };
-  const demo_client = { username: 'demo_user', password: 'demo_user_password',      role: 'client' };
+  // const demo_admin  = { username: 'admin',     password: 'drafty-shotgun-exorcist', role: 'admin' };
+  // const demo_client = { username: 'demo_user', password: 'demo_user_password',      role: 'client' };
+  const demo_admin  = { username: creds[0]['admin-username'],  password: creds[0]['admin-password'],  role: 'admin' };
+  const demo_client = { username: creds[1]['client-username'], password: creds[1]['client-password'], role: 'client' };
 
   const navigate = useNavigate();
 
@@ -107,7 +111,7 @@ export default function LoginForm() {
       </div>
       {role === 'admin' && loggedIn === true ?
         <div style={{textAlign: 'left', color: 'grey'}}>
-          <br/><br/><br/><br/><br/>
+          {/* <br/><br/><br/><br/><br/>
           <p><b>Notes for DAMP Lab Technicians and Admins: </b></p>
           <ul>
             <li>There is a client login and an admin login. If you're seeing this, you're logged in as an admin.</li>
@@ -119,7 +123,7 @@ export default function LoginForm() {
             <li>'CAT' resolves to 'Passed'.  'TAC' resolves to 'Failed'.  'ACT' resolves to 'Error'.  All others resolve to 'Pending'.</li>
             <br/>
             <li>If you have any questions/suggestions/issues regarding the site, please contact Chris Krenz at ckrenz@bu.edu.</li>
-          </ul>
+          </ul> */}
         </div>
         : ''
       }
