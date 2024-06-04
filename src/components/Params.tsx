@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useFormik, } from 'formik';
+import { FormControl, FormHelperText, IconButton, InputLabel, MenuItem, Select, TextField } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { FormControl, FormHelperText, IconButton, InputLabel, MenuItem, Select, TextField, Typography } from '@mui/material';
+
 
 interface ParamFormProps {
-    activeNode: any; // Replace 'any' with the appropriate type for activeNode
+    activeNode: any;  // Replace 'any' with the appropriate type for activeNode
 }
+
 
 export default function ({ activeNode }: ParamFormProps) {
     const [paramErrors, setParamErrors]: any = useState([]);
@@ -16,14 +18,15 @@ export default function ({ activeNode }: ParamFormProps) {
         let initValues: any = {};
         activeNode.data.formData.forEach((obj: any) => {
             if (obj.paramType === 'result') {
-                obj.value = obj.value !== null ? obj.value : true;
-                initValues[obj.id] = obj.value !== null ? obj.value : true;
+                obj.value            = obj.value !== null   ? obj.value            : true;
+                initValues[obj.id]   = obj.value !== null   ? obj.value            : true;
                 obj.resultParamValue = obj.resultParamValue ? obj.resultParamValue : '';
                 initValues[`resultParamValue${obj.id}`] = obj.resultParamValue ? obj.resultParamValue : '';
             }
             else initValues[obj.id] = obj.value ? obj.value : '';
         });
         initValues[`addinst${activeNode?.data.id}`] = activeNode?.data.additionalInstructions ? activeNode?.data.additionalInstructions : '';
+        
         return initValues;
     }
 
@@ -54,9 +57,9 @@ export default function ({ activeNode }: ParamFormProps) {
 
     // formik hook init
     const formik = useFormik({
-        initialValues: initValues(),
+        initialValues     : initValues(),
         enableReinitialize: true,
-        validate: validate,
+        validate          : validate,
         onSubmit: (values: any) => {
             copyFormikValuesToNodeData(values);
         },
@@ -103,10 +106,10 @@ export default function ({ activeNode }: ParamFormProps) {
                                         <FormControl size='small' sx={{ mt: 3, width: '26ch' }} key={param.id}>
                                             <InputLabel>{param.name}</InputLabel>
                                             <Select
-                                                name={param.id}
-                                                value={formik.values[param.id] ? formik.values[param.id] : ""}
-                                                onChange={formik.handleChange}
-                                                onBlur={formik.handleBlur}
+                                                name     = {param.id}
+                                                value    = {formik.values[param.id] ? formik.values[param.id] : ""}
+                                                onChange = {formik.handleChange}
+                                                onBlur   = {formik.handleBlur}
                                             >
                                                 {param.options.map((option: any) => (
                                                     <MenuItem key={option.id} value={option.id}>
@@ -120,16 +123,16 @@ export default function ({ activeNode }: ParamFormProps) {
                                 } else {
                                     return (
                                         <TextField
-                                            helperText={param.description ? param.description : null}
-                                            size='small'
-                                            key={param.id}
-                                            label={param.name}
-                                            type={param.type}
-                                            value={formik.values[param.id] ? formik.values[param.id] : ""}
-                                            name={param.id}
-                                            onChange={formik.handleChange}
-                                            onBlur={formik.handleBlur}
-                                            sx={{ mt: 3, width: '26ch' }}
+                                            helperText = {param.description ? param.description : null}
+                                            size       = 'small'
+                                            key        = {param.id}
+                                            label      = {param.name}
+                                            type       = {param.type}
+                                            value      = {formik.values[param.id] ? formik.values[param.id] : ""}
+                                            name       = {param.id}
+                                            onChange   = {formik.handleChange}
+                                            onBlur     = {formik.handleBlur}
+                                            sx         = {{ mt: 3, width: '26ch' }}
                                         />
                                     );
                                 }
@@ -161,10 +164,10 @@ export default function ({ activeNode }: ParamFormProps) {
                                             {param.name}
                                         </label>
                                         <input
-                                            type="checkbox"
-                                            checked={formik.values[param.id]}
-                                            onChange={formik.handleChange}
-                                            name={param.id}
+                                            type     = "checkbox"
+                                            checked  = {formik.values[param.id]}
+                                            onChange = {formik.handleChange}
+                                            name     = {param.id}
                                         />
                                         {
                                             // add input if not checked      
@@ -175,9 +178,11 @@ export default function ({ activeNode }: ParamFormProps) {
                                                 </label>
                                                 <input type={param.type} 
                                                 value={formik.values[`resultParamValue${param.id}`] 
-                                                    ? formik.values[`resultParamValue${param.id}`] 
-                                                    : null} 
-                                                name={`resultParamValue${param.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                                                     ? formik.values[`resultParamValue${param.id}`] 
+                                                     : null} 
+                                                name     = {`resultParamValue${param.id}`}
+                                                onChange = {formik.handleChange}
+                                                onBlur   = {formik.handleBlur} />
                                             </div>
                                         }
                                     </div>
@@ -189,9 +194,11 @@ export default function ({ activeNode }: ParamFormProps) {
                 <div className="add-instructs" style={{marginLeft: 20, marginBottom: 10}}>
                     <TextField multiline sx={{ mt: 3, width: '26ch' }} label="Additional Instructions" rows={3}
                     value={formik.values[`addinst${activeNode?.data.id}`] 
-                        ? formik.values[`addinst${activeNode?.data.id}`] 
-                        : ""} 
-                    name={`addinst${activeNode?.data.id}`} onChange={formik.handleChange} onBlur={formik.handleBlur} />
+                         ? formik.values[`addinst${activeNode?.data.id}`] 
+                         : ""} 
+                    name     = {`addinst${activeNode?.data.id}`}
+                    onChange = {formik.handleChange}
+                    onBlur   = {formik.handleBlur} />
                 </div>
             </form>
         </div>

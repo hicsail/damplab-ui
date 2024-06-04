@@ -2,51 +2,93 @@
 
 ## About
 
-This tool is being developed for the Design Automation Manufacturing Processes (DAMP) lab to facilitate the submission, management, and tracking of orders for labwork (DNA assembly/cloning, PCR, fluoresence-bassed assays, transcriptomics/NGS, culturing, etc.)
+This tool is being developed for the Design Automation Manufacturing Processes (DAMP) lab to facilitate the submission, management, and tracking of orders for labwork (e.g. DNA assembly/cloning, PCR, fluoresence-bassed assays, transcriptomics/NGS, culturing, etc.)
 
-# Getting Started with Create React App
+## Usage
+
+### Website
+
+As of mid 2024, a demo of the website--with a login required--is available at: 
+
+https://damplab.sail.codes/
+
+Connect with a contributor below or a [DAMP Lab](https://www.damplab.org/) representative to see about getting access....
+
+### Running from Source
+
+To run locally for development and real-time updates...
+
+First, you can clone this repo.  (If necessary, you can [install git](https://docs.github.com/en/get-started/getting-started-with-git/set-up-git) and learn more about [cloning a git repo](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) at the linked instructions.)
+
+Clone the repo with the following command: 
+
+```console
+git clone git@github.com:hicsail/damplab-ui.git
+cd damplab-ui
+```
+
+If necessary, install Node.js and npm (Node Package Manager) (tested on v18.16.0): 
+
+ - [Node.js and npm install instructions](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm#using-a-node-version-manager-to-install-nodejs-and-npm)
+
+
+You can then install the dependencies and launch the program in development mode by running the following from the root folder: 
+
+```console
+run npm install --legacy-peer-deps
+npm start
+```
+
+
+## Features
+
+In the currently supported use case, a user can construct workflows (sequence of services) on a canvas and submit those workflows as a job.  Technicians can then see the submitted job and choose whether to approve the job or request additional changes.  Technicians (and ultimately clients) can acces a page to the see the details associated with a given job, including the constituent workflows/services/parameters, and the current status of the job.
+
+Ultimately, the tool will have a wide variety of other features, such as a biosecurity screening, eLabs integration, etc. 
+
+
+### Pages currently available to Clients/Customers (and all users)
+
+ - Canvas (for creating workflows that contain a sequence of connected services/nodes and their associated parameters)
+ - Checkout (for submitting a job, which consists of the set of workflows, i.e. sets of conneted nodes, created on the canvas)
+ - (Currently Disabled) Client_View (for a detailed list of all workflows and associated services in a job)
+
+
+ ### Pages currently available to Techs/Admins
+
+ - Dashboard (for showing a list of all submitted jobs, each of which links to the more detailed technician view)
+ - Technician_View (for a detailed list of all workflows and associated services in a job)
+ - Dominos (for a broad listing of all current workflows, across all jobs, intended for display on a laboratory screen)
+ - Elabs and Kernel (simply links to the associated services)
+
+
+### To Do List
+
+ - Finish Kernel integration and associated sequence formation logic 
+ - Email (or other) updates/notifications
+ - Proper OAuth for individuals to create personal accounts
+ - Branching path workflows/stages (re-implementation)
+
+
+## Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## Available Scripts
-
-In the project directory, you can run:
-
-### `npm start`
-
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
-
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
+### Learn More
 
 You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
 To learn React, check out the [React documentation](https://reactjs.org/).
+
+
+## Credit
+
+ - [Asad Malik](https://github.com/am5815)
+ - [Chris Krenz](https://github.com/chris-krenz) (primary contact as of mid 2024)
+ - [Rishi Shah](https://github.com/ShahRishi)
+ - [Greg Frasco](https://github.com/gregfrasco)
+ 
+
+## License
+
+[MIT License](LICENSE)

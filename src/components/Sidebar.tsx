@@ -1,27 +1,24 @@
 import React, { useState, useEffect, MouseEvent, useContext } from 'react';
 import { useQuery } from '@apollo/client';
-
 import { Box, Button, FormControl, InputLabel, MenuItem, ToggleButton, ToggleButtonGroup } from '@mui/material';
 import Select, { SelectChangeEvent } from '@mui/material/Select';
 
 import { GET_CATEGORIES }             from '../gql/queries';
 import { addNodesAndEdgesFromBundle } from '../controllers/GraphHelpers';
-
 import { Service }       from '../types/Service';
 import { CanvasContext } from '../contexts/Canvas';
 import { AppContext }    from '../contexts/App';
-
 import {ImagesBundlesDict, ImagesServicesDict} from '../assets/icons';
 
 
 export default () => {
-
-  const [category, setCategory] = useState('');
-  const [categories, setCategories] = useState<any>([]);
-  const [alignment, setAlignment] = useState('bundles');
-  const {services, bundles} = useContext(AppContext);
-  const [filteredServices, setFilteredServices] = useState(services);
+  const {services, bundles}  = useContext(AppContext);
   const {setNodes, setEdges} = useContext(CanvasContext);
+
+  const [category,         setCategory]         = useState('');
+  const [categories,       setCategories]       = useState<any>([]);
+  const [alignment,        setAlignment]        = useState('bundles');
+  const [filteredServices, setFilteredServices] = useState(services);
 
   const buttonElementStyle = {
     padding: 10,
@@ -74,11 +71,11 @@ export default () => {
   return (
     <aside style={{ padding: 30, height: '80vh', overflow: 'scroll' }}>
       <ToggleButtonGroup
-        color="primary"
-        value={alignment}
+        value      = {alignment}
+        onChange   = {handleToggleChange}
+        color      = "primary"
+        aria-label = "Platform"
         exclusive
-        onChange={handleToggleChange}
-        aria-label="Platform"
       >
         <ToggleButton value="bundles">Bundles</ToggleButton>
         <ToggleButton value="services">Services</ToggleButton>
@@ -90,18 +87,16 @@ export default () => {
               <FormControl fullWidth>
                 <InputLabel id="demo-simple-select-label">Category</InputLabel>
                 <Select
-                  labelId="demo-simple-select-label"
-                  id="demo-simple-select"
-                  value={category}
-                  label="Category"
-                  onChange={handleChange}
+                  value    = {category}
+                  onChange = {handleChange}
+                  labelId  = "demo-simple-select-label"
+                  id       = "demo-simple-select"
+                  label    = "Category"
                 >
-                  <MenuItem key={2343} value={''}>{'All'}
-                  </MenuItem>
+                  <MenuItem key={2343} value={''}>{'All'}</MenuItem>
                   {
                     categories.map((category: any) => {
-                      return <MenuItem key={category.id} value={category.id}>{category.label}
-                      </MenuItem>
+                      return <MenuItem key={category.id} value={category.id}>{category.label}</MenuItem>
                     })
                   }
                 </Select>
@@ -142,8 +137,9 @@ export default () => {
             {
               bundles.map((bundle: any) => {
                 return (
-                  <div key={Math.random().toString(36).substring(2, 9)} style={buttonElementStyle} 
-                  className="dndnode output" onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
+                  <div key={Math.random().toString(36).substring(2, 9)} 
+                  style={buttonElementStyle} className="dndnode output" 
+                  onDragStart={(event) => onDragStart(event, JSON.stringify(bundle))} draggable>
                     <Button variant="outlined" title={bundle.label}  sx={{boxShadow: 2}}
                     style={{ width: 180, display: 'flow', justifyContent: 'space-around' }}
                     onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>

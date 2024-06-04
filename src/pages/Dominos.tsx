@@ -1,20 +1,22 @@
 import { Component, useState } from "react";
 import { useQuery, useMutation } from "@apollo/client";
-import DominosStepper from "../components/DominosStepper";
-import { GET_WORKFLOWS_FOR_DOMINOS } from "../gql/queries";
-import { MUTATE_NODE_STATUS, MUTATE_WORKFLOW_STATE } from "../gql/mutations";
-import {transformGQLforDominos} from "../controllers/GraphHelpers";
 import { Typography } from "@mui/material";
 import { ThemeProvider } from "@emotion/react";
-import "../styles/dominos.css";
+
+import { GET_WORKFLOWS_FOR_DOMINOS }                 from "../gql/queries";
+import { MUTATE_NODE_STATUS, MUTATE_WORKFLOW_STATE } from "../gql/mutations";
+import {transformGQLforDominos} from "../controllers/GraphHelpers";
+import DominosStepper           from "../components/DominosStepper";
 import { bodyText, StyledContainer } from "../styles/themes";
+import "../styles/dominos.css";
+
 
 export default function Dominos() {
+    
     const [queuedWorkflows,     setQueuedWorkflows]     = useState([]);
     const [inProgressWorkflows, setInProgressWorkflows] = useState([]);
     const [completedWorkflows,  setCompletedWorkflows]  = useState([]);
 
-    // TODO: set up interval polling or refetching
     const useQueries = ($state: string, $setterFunc: Function) => {
         const { loading, error, data, refetch } = useQuery(GET_WORKFLOWS_FOR_DOMINOS, {  // TODO: setup date/technician fields on gql
             variables: { state: $state },
@@ -33,7 +35,7 @@ export default function Dominos() {
     
     const refetchQueued     = useQueries("QUEUED",      setQueuedWorkflows);
     const refetchInProgress = useQueries("IN_PROGRESS", setInProgressWorkflows);
-    const refetchComplete   = useQueries("COMPLETE",    setCompletedWorkflows);   // TODO: limit to recent 5
+    const refetchComplete   = useQueries("COMPLETE",    setCompletedWorkflows);   // TODO: limit to ~5 most recent?
 
     const mutateServiceStatus = (globalId: string, status: string) => {
         mutateNodeStatus({

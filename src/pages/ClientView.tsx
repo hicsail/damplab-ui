@@ -1,42 +1,42 @@
 import React, { useState } from 'react'
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
-
 import { Box, Card, CardContent, Typography }        from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check } from '@mui/icons-material';
 
 import { GET_JOB_BY_ID } from '../gql/queries';
-
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 import TrackingStepper            from '../components/TrackingStepper';
 
 
 export default function Tracking() {
 
-    const { id } = useParams();
-    const [workflowName, setWorkflowName] = useState('');
-    const [workflowState, setWorkflowState] = useState('');
-    const [jobName, setJobName] = useState('');
-    const [jobState, setJobState] = useState('');
-    const [jobTime, setJobTime] = useState('');
-    const [workflowUsername, setWorkflowUsername] = useState('');
+    const { id }                                        = useParams();
+
+    const [workflowName,        setWorkflowName]        = useState('');
+    const [workflowState,       setWorkflowState]       = useState('');
+    const [jobName,             setJobName]             = useState('');
+    const [jobState,            setJobState]            = useState('');
+    const [jobTime,             setJobTime]             = useState('');
+    const [workflowUsername,    setWorkflowUsername]    = useState('');
     const [workflowInstitution, setWorkflowInstitution] = useState('');
-    const [workflowEmail, setWorkflowEmail] = useState('');// ▶ URLSearchParams {}
-    const [workflows, setWorklows] = useState([]); // ▶ URLSearchParams {}
+    const [workflowEmail,       setWorkflowEmail]       = useState('');  // ▶ URLSearchParams {}
+    const [workflows,           setWorklows]            = useState([]);  // ▶ URLSearchParams {}
 
     const { loading, error } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
         onCompleted: (data) => {
             console.log('job successfully loaded: ', data);
-            setWorkflowName(data.jobById.workflows[0].name);
-            setWorkflowState(data.jobById.workflows[0].state);
-            setJobName(data.jobById.name);
-            setJobState(data.jobById.state);
-            setJobTime(data.jobById.submitted);
-            setWorkflowUsername(data.jobById.username);
+
+            setWorkflowName(       data.jobById.workflows[0].name);
+            setWorkflowState(      data.jobById.workflows[0].state);
+            setJobName(            data.jobById.name);
+            setJobState(           data.jobById.state);
+            setJobTime(            data.jobById.submitted);
+            setWorkflowUsername(   data.jobById.username);
             setWorkflowInstitution(data.jobById.institute);
-            setWorkflowEmail(data.jobById.email);
-            setWorklows(data.jobById.workflows);
+            setWorkflowEmail(      data.jobById.email);
+            setWorklows(           data.jobById.workflows);
         },
         onError: (error: any) => {
             console.log(error.networkError?.result?.errors);
@@ -49,8 +49,9 @@ export default function Tracking() {
         const submitText = "Your job has been submitted to the DAMP lab and is awaiting review. Once the review is done, you will see the updated state over here.";
         const createText = "Your job is currently being created. Once the job is created, you will see the updated state over here.";
         const acceptText = "Your job has been reviewed by the DAMP lab and has been accepted. You will receive a SOW to review and sign here once it has been generated.";
-        const rejectText=  "Your job has been reviewed by the DAMP lab and has been accepted. Please complete any necessary modifications and resubmit your job.";
+        const rejectText = "Your job has been reviewed by the DAMP lab and has been accepted. Please complete any necessary modifications and resubmit your job.";
         const defaultText = "Invalid Case";
+
         switch (jobState) {
             case 'SUBMITTED':
                 return ['rgba(256, 256, 0, 0.5)', <Publish />, submitText]
@@ -64,11 +65,11 @@ export default function Tracking() {
                 return ['rgb(0, 0, 0, 0)', <NotInterested />, defaultText];
         }
     }
-    const jobStatusColor = jobStatus()[0];
-    const jobStatusIcon = jobStatus()[1];
-    const jobStatusText = jobStatus()[2];
 
- 
+    const jobStatusColor = jobStatus()[0];
+    const jobStatusIcon  = jobStatus()[1];
+    const jobStatusText  = jobStatus()[2];
+
     const workflowCard = (
         workflows.map((workflow: any) => {
             return (
@@ -97,23 +98,15 @@ export default function Tracking() {
                 </Typography>
                 <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', ml: -0.5 }}>
-                        <Typography>
-                            {jobStatusIcon}
-                        </Typography>
-                        <Typography style={{textAlign: 'right'}}>
-                            {id}
-                        </Typography>
+                        <Typography>                              {jobStatusIcon} </Typography>
+                        <Typography style={{textAlign: 'right'}}> {id}            </Typography>
                     </Box>
-                    <Typography>
-                        <b>{jobState}</b>
-                    </Typography>
-                    <Typography sx={{ fontSize: 13, mt: 1 }}>
-                        <i>{jobStatusText}</i>
-                    </Typography>
+                    <Typography>                             <b> {jobState}      </b></Typography>
+                    <Typography sx={{ fontSize: 13, mt: 1 }}><i> {jobStatusText} </i></Typography>
                 </Box>
                 <Box sx={{ mx: 3, fontSize: 13 }}>
-                    <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
-                    <p><b>User:</b> {workflowUsername} ({workflowEmail})</p>
+                    <p><b>Time:</b>         {jobTime.slice(0, 16).replace('T', ' ')}</p>
+                    <p><b>User:</b>         {workflowUsername} ({workflowEmail})</p>
                     <p><b>Organization:</b> {workflowInstitution}</p>
                 </Box>
                 <Box>

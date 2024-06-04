@@ -1,6 +1,5 @@
 import { styled } from "@mui/material";
-import { useQuery, useLazyQuery, useMutation, gql } from "@apollo/client";
-import { UPDATE_WORKFLOW_STATE, MUTATE_NODE_STATUS, MUTATE_WORKFLOW_STATE } from "../gql/mutations";
+
 
 // Used with ColorlibStepIcon in DominosStepper to set custom icons/backgrounds
 export const ColorlibStepIconRoot = styled('div')<{
@@ -8,9 +7,9 @@ export const ColorlibStepIconRoot = styled('div')<{
   }>(({ theme, ownerState }) => ({
     backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : '#aaa',
     zIndex: 1,
-    width: 65,              height: 65,
-    display: 'flex',        justifyContent: 'center',   alignItems: 'center',
-    borderRadius: '50%',    boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
+    width: 65, height: 65,
+    display: 'flex', justifyContent: 'center',   alignItems: 'center',
+    borderRadius: '50%', boxShadow: '0 4px 10px 0 rgba(0,0,0,.35)',
     ...(ownerState.active && {backgroundImage:
         'linear-gradient( 136deg, rgb(128,128,255) 0%, rgb(64,64,255) 50%, rgb(0,0,255) 100%)',
     }),
@@ -19,17 +18,21 @@ export const ColorlibStepIconRoot = styled('div')<{
     })
 }));
 
+
 // Check statuses of steps in the workflow in the DominosStepper
 export const atLeastOneServiceActive = (serviceStatuses: any) => {
     for (var val of Object.entries(serviceStatuses)) {
         if (val[1] === 'in_progress' || val[1] === 'complete') return true; 
     }
+
     return false;
 };
+
 
 export const allServicesCompleted = (serviceStatuses: any) => {
     for (var val of Object.entries(serviceStatuses)) {
         if (val[1] !== 'complete') return false;
     }
+
     return true;
 };

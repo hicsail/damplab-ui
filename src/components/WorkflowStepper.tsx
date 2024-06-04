@@ -1,15 +1,13 @@
 import React, { useContext, useEffect, useState, useRef } from 'react'
 import { useMutation } from '@apollo/client';
-
 import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
 import LoopIcon    from '@mui/icons-material/Loop';
 import DoneIcon    from '@mui/icons-material/Done';
 import PendingIcon from '@mui/icons-material/Pending';
 
-import { MUTATE_NODE_STATUS } from '../gql/mutations';
 import { returnValidIndices, returnCleavedVectors, returnValidNewVector, sequenceScreenPassed } from '../controllers/SequenceScreener'; 
-
+import { MUTATE_NODE_STATUS } from '../gql/mutations';
 import { AppContext }         from '../contexts/App';
 import { ImagesServicesDict } from '../assets/icons';
 

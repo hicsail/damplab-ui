@@ -145,6 +145,7 @@ export const GET_WORKFLOWS_FOR_DOMINOS = gql`
     }
 `;
 
+// generally run with IDs retrieved from GetWorkflowsByState; needed for Dashboard (which displays all submitted jobs)
 export const GET_JOB_BY_WORKFLOW_ID = gql`
     query JobByWorkflowId($id: ID!) {
         jobByWorkflowId(workflow: $id) {

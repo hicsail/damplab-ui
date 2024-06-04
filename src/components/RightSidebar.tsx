@@ -1,27 +1,25 @@
 import React, { useState, useContext, useEffect } from 'react'
-import { CanvasContext } from '../contexts/Canvas'
-import NodeButton from './AllowedConnectionButton';
-import { getServiceFromId } from '../controllers/GraphHelpers';
-import { Button } from '@mui/material';
-import Snackbar from '@mui/material/Snackbar';
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText } from '@mui/material';
+import Snackbar   from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
+import CloseIcon  from '@mui/icons-material/Close';
 import { GppMaybe, WarningRounded } from '@mui/icons-material/';
-import CloseIcon from '@mui/icons-material/Close';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import { AppContext } from '../contexts/App';
+
+import { getServiceFromId } from '../controllers/GraphHelpers';
 import Params from './Params';
-import { ImagesServicesDict } from '../assets/icons';
+import NodeButton from './AllowedConnectionButton';
+import { AppContext }    from '../contexts/App';
+import { CanvasContext } from '../contexts/Canvas'
+
 
 export default function ContextTestComponent() {
 
-    const val = useContext(CanvasContext);
+    const val                   = useContext(CanvasContext);
     const { services, hazards } = useContext(AppContext);
+
     const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
-    const [openToast, setOpenToast] = useState(false);
-    const [open, setOpen] = useState(false);
+    const [openToast,  setOpenToast]  = useState(false);
+    const [open,       setOpen]       = useState(false);
 
     const handleClose = () => {
         // put logic to discard changes here
@@ -33,11 +31,6 @@ export default function ContextTestComponent() {
         setOpenToast(true);
     };
 
-    useEffect(() => {
-        // if (compare()) {
-        setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
-    }, [val.activeComponentId]);
-
     const handleCloseToast = (event: React.SyntheticEvent | Event, reason?: string) => {
         if (reason === 'clickaway') {
             return;
@@ -45,17 +38,16 @@ export default function ContextTestComponent() {
         setOpenToast(false);
     };
 
+    useEffect(() => {
+        setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
+    }, [val.activeComponentId]);
+
     const action = (
         <React.Fragment>
-            <Button color="secondary" size="small" onClick={handleCloseToast}>
+            <Button onClick={handleCloseToast} color="secondary" size="small">
                 UNDO
             </Button>
-            <IconButton
-                size="small"
-                aria-label="close"
-                color="inherit"
-                onClick={handleCloseToast}
-            >
+            <IconButton onClick={handleCloseToast} size="small" color="inherit" aria-label="close">
                 <CloseIcon fontSize="small" />
             </IconButton>
         </React.Fragment>
@@ -67,7 +59,7 @@ export default function ContextTestComponent() {
                 {
                     hazards.includes(activeNode?.data.label) 
                     ? (<p><GppMaybe style={{color: "grey", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
-                        sequences provided below or produced by the process will undergo a safety screening.</p>)
+                       sequences provided below or produced by the process will undergo a safety screening.</p>)
                     : ""
                 }
                 <h2>
@@ -76,28 +68,22 @@ export default function ContextTestComponent() {
             </div>
             <div>
                 {
-                    activeNode?.data.description ? (
-                        <p>
-                            {activeNode?.data.description}
-                        </p>
-                    ) : null
+                    activeNode?.data.description 
+                    ? <p>{activeNode?.data.description}</p>
+                    : null
                 }
             </div>
             {
-                activeNode?.data.formData ? (
-                    <div>
-                        <Params activeNode={activeNode}/>
-                    </div>
-                ) : null
+                activeNode?.data.formData 
+                ? <div><Params activeNode={activeNode}/></div>
+                : null
             }
             <div>
                 {
                     // return header with text Allowed Connections if allowedConnections list is not empty
-                    activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 ? (
-                        <h3>
-                            Allowed Connections
-                        </h3>
-                    ) : null
+                    activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 
+                    ? <h3>Allowed Connections</h3>
+                    : null
                 }
                 {
                     activeNode 
@@ -105,33 +91,39 @@ export default function ContextTestComponent() {
                     && activeNode.data.allowedConnections.length > 0 
                     ? (activeNode.data.allowedConnections.map((connection: any) => {
                         return (
-                            <NodeButton key={Math.random().toString(36).substring(2, 9)} 
-                            node={getServiceFromId(services, connection.id)} 
-                            sourceId={val.activeComponentId} setNodes={val.setNodes} 
-                            setEdges={val.setEdges} sourcePosition={activeNode.position} 
-                            setActiveComponentId={val.setActiveComponentId}/>
+                            <NodeButton 
+                                key                  = {Math.random().toString(36).substring(2, 9)}
+                                node                 = {getServiceFromId(services, connection.id)}
+                                sourceId             = {val.activeComponentId}
+                                setNodes             = {val.setNodes}
+                                setEdges             = {val.setEdges}
+                                sourcePosition       = {activeNode.position}
+                                setActiveComponentId = {val.setActiveComponentId}
+                            />
                         )
-                    })) : null
+                    })) 
+                    : null
                 }
             </div>
             <div>
                 {
-                    activeNode ? (
+                    activeNode 
+                    ? (
                         <>
                             <Snackbar
-                                open={openToast}
-                                autoHideDuration={3000}
-                                onClose={handleCloseToast}
-                                message="Parameters Saved"
-                                action={action}
-                                key={'bottom' + 'right'}
-                                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                                open             = {openToast}
+                                autoHideDuration = {3000}
+                                onClose          = {handleCloseToast}
+                                message          = "Parameters Saved"
+                                action           = {action}
+                                key              = {'bottom' + 'right'}
+                                anchorOrigin     = {{ vertical: 'bottom', horizontal: 'right' }}
                             />
                             <Dialog
-                                open={open}
-                                onClose={handleClose}
-                                aria-labelledby="alert-dialog-title"
-                                aria-describedby="alert-dialog-description"
+                                open             = {open}
+                                onClose          = {handleClose}
+                                aria-labelledby  = "alert-dialog-title"
+                                aria-describedby = "alert-dialog-description"
                             >
                                 <DialogContent>
                                     <DialogContentText id="alert-dialog-description">
@@ -146,11 +138,8 @@ export default function ContextTestComponent() {
                                 </DialogActions>
                             </Dialog>
                         </>
-                    ) : (
-                        <div>
-                            Drag a node from the left to the canvas to see its properties here.
-                        </div>
-                    )
+                    ) 
+                    : <div>Drag a node from the left to the canvas to see its properties here.</div>
                 }
             </div>
             <div>

@@ -1,17 +1,11 @@
 import React, { useState, useContext } from 'react'
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
+import { Link } from "react-router-dom";
+import { AppBar, Button, Dialog, DialogTitle, IconButton, TextField, Toolbar, } from '@mui/material';
+import { SaveOutlined }         from '@mui/icons-material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
-import IconButton from '@mui/material/IconButton';
-import { Outlet, Link } from "react-router-dom";
-import { SaveOutlined } from '@mui/icons-material';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
-import Button from '@mui/material/Button';
-import DialogTitle from '@mui/material/DialogTitle';
-import Dialog from '@mui/material/Dialog';
-import { TextField } from '@mui/material';
+import UploadFileIcon           from '@mui/icons-material/UploadFile';
+
 import { CanvasContext } from '../contexts/Canvas';
-import { useParams } from 'react-router-dom';
 import "../styles/resubmit.css";
 
 
@@ -32,7 +26,7 @@ export default function HeaderBar() {
         setLoadOpen? : any;
     }
 
-    const [open, setOpen] = useState(false);
+    const [open, setOpen]         = useState(false);
     const [loadOpen, setLoadOpen] = useState(false);
 
     const { setNodes, setEdges, nodes, edges } = useContext(CanvasContext);
@@ -68,19 +62,16 @@ export default function HeaderBar() {
           onClose(value);
         };
     
-      
-
-
         return (
           <Dialog onClose={handleClose} open={open}>
             <div style={{width: 300, height: 200, padding: 10}}>
-            <DialogTitle>Save Progress</DialogTitle>
-            <div>
-            <TextField id="outlined-basic" label="File name" variant="outlined" onChange={(e)=> setFileName(e.target.value)}/>
-            </div>
-            <div style={{ margin: 20 }}>
-            <Button variant="contained" onClick={handleClose}>Save</Button>
-            </div>
+                <DialogTitle>Save Progress</DialogTitle>
+                <div>
+                    <TextField id="outlined-basic" label="File name" variant="outlined" onChange={(e)=> setFileName(e.target.value)}/>
+                </div>
+                <div style={{ margin: 20 }}>
+                    <Button variant="contained" onClick={handleClose}>Save</Button>
+                </div>
             </div>
           </Dialog>
         );
@@ -129,68 +120,59 @@ export default function HeaderBar() {
         );
     }
 
+
     return (
         <div>
             <AppBar position="static">
+
                 <Toolbar style={{background: 'black'}}>
+
                     <Link to={"/"} style={{ textDecoration: 'none', color: 'white' }}>
-                    <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png" style={{width: 300}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
+                        <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png" 
+                             style={{width: 300}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
                     </Link>
+
                     <div>
-                            v1.0
-                        </div>
+                        v1.0
+                    </div>
+
                     <div style={alignRight}>
                         
-                    <IconButton
-                        size="large"
-                        aria-label="account of current user"
-                        aria-controls="menu-appbar"
-                        aria-haspopup="true"
-                        color="inherit"
-                        onClick={handleLoadOpen}
-                    >
-            
+                        <IconButton onClick={handleLoadOpen} title="Load canvas" aria-controls='menu-appbar' aria-haspopup='true'>
                             <UploadFileIcon style={{color: 'white'}}/>
-                        
-                    </IconButton>
-                    <IconButton
-                        size="large"
-                        aria-label="account of current user"
-                        aria-controls="menu-appbar"
-                        aria-haspopup="true"
-                        color="inherit"
-                        onClick={handleClickOpen}
-                    >
-            
+                        </IconButton>
+
+                        <IconButton onClick={handleClickOpen} title="Save canvas" aria-controls='menu-appbar' aria-haspopup='true'>
                             <SaveOutlined style={{color: 'white'}}/>
-                        
-                    </IconButton>
+                        </IconButton>
+
                         {window.location.href.includes('resubmission')
                         ? <Link to="/checkout" className="a a--hover a--active">Resubmit...</Link>
-                        : <IconButton 
-                            size="large"
-                            aria-label="account of current user"
-                            aria-controls="menu-appbar"
-                            aria-haspopup="true"
-                            color="inherit"
-                        >
-                            <Link to="/checkout"><ShoppingCartOutlinedIcon style={{color: 'white'}}/></Link> 
-                        </IconButton>}
+                        : <IconButton title="Checkout page" aria-controls='menu-appbar' aria-haspopup='true'>
+                            <Link to="/checkout">
+                                <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
+                            </Link> 
+                          </IconButton>}
+
                     </div>
+
                 </Toolbar>
+
                 <SimpleDialog
-                    selectedValue={'test'}
-                    open={open}
-                    onClose={handleClose}
+                    selectedValue = {'test'}
+                    open          = {open}
+                    onClose       = {handleClose}
                 />
+                
                 <LoadDialog
-                    selectedValue={'test'}
-                    open={loadOpen}
-                    setLoadOpen={setLoadOpen}
-                    onClose={handleClose}
-                    setNodes={setNodes}
-                    setEdges={setEdges}
+                    selectedValue = {'test'}
+                    open          = {loadOpen}
+                    setLoadOpen   = {setLoadOpen}
+                    onClose       = {handleClose}
+                    setNodes      = {setNodes}
+                    setEdges      = {setEdges}
                 />
+
             </AppBar>
         </div>
     )

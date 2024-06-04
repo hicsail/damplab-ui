@@ -6,7 +6,6 @@ import { CanvasContext }             from './contexts/Canvas';
 import { AppContext }                from './contexts/App';
 import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 // import { searchForEndService } from './controllers/GraphHelpers';
-
 import HeaderBar          from './components/HeaderBar';
 import LoginForm          from './components/LoginForm';
 import PrivateRouteAdmin  from './components/PrivateRouteAdmin';
@@ -19,9 +18,9 @@ import Dashboard      from './pages/Dashboard';
 import JobSubmitted   from './pages/JobSubmitted';
 import ELabs          from './pages/ELabs';
 import Kernel         from './pages/Kernel';
-// import Tracking       from './pages/ClientView';
+import TestPage       from './pages/TestPage';
+import Tracking       from './pages/ClientView';
 // import Accepted       from './pages/Accepted';
-
 import './App.css';
 import './styles/dominos.css';
 
@@ -37,6 +36,7 @@ function App() {
 
   const client = new ApolloClient({
     uri: 'https://damplab-test.sail.codes/graphql',
+    // uri: 'localhost:27017/damplab',
     cache: new InMemoryCache(),
   });
 
@@ -70,14 +70,16 @@ function App() {
     <div className="App">
       <ApolloProvider client={client}>
         <AppContext.Provider value={{ services: services, bundles: bundles, hazards: hazards }}>
-          <CanvasContext.Provider value={{ nodes: nodes, edges: edges, 
-                                           setNodes: setNodes, setEdges: setEdges, 
-                                           activeComponentId: activeComponentId, 
-                                           setActiveComponentId: setActiveComponentId, 
+          <CanvasContext.Provider value={{ nodes: nodes, setNodes: setNodes, 
+                                           edges: edges, setEdges: setEdges, 
+                                           activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId, 
                                            nodeParams: nodeParams, setNodeParams: setNodeParams }}>
               <BrowserRouter>
+
                 <HeaderBar />
+
                 <div style={{ padding: 20 }}>
+
                   <Routes>
 
                     <Route path = "/"                    element = {<LoginForm />} />
@@ -94,13 +96,15 @@ function App() {
                     <Route path = "/elabs"               element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} />
                     <Route path = "/kernel"              element = {<PrivateRouteAdmin> <Kernel />                    </PrivateRouteAdmin>} />
 
-                    <Route path = "/*"                   element = {<div>404 Route not found</div>} />
+                    <Route path = "/test_page"           element = {<PrivateRouteAdmin> <TestPage />                  </PrivateRouteAdmin>} />
+                    <Route path = "/*"                   element = {<div>Sorry, we can't find this page at the moment (404). Please double check the URL or try again later.</div>} />
 
                     {/* <Route path = "/client_view/:id"     element = {<PrivateRouteAdmin> <Tracking />                  </PrivateRouteAdmin>} /> */}
                     {/* <Route path = "/callback"            element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} /> */}
                     {/* <Route path="/accepted" element={wrapPrivateRoute(<Accepted />, isLoggedIn, 'accepted')} /> */}
 
                   </Routes>
+
                 </div>
               </BrowserRouter>
           </CanvasContext.Provider>

@@ -1,8 +1,8 @@
-import React, { useContext } from 'react'
 import { Button } from '@mui/material';
-import { CanvasContext } from '../contexts/Canvas';
+
 import { addNodeToCanvasWithEdge } from '../controllers/GraphHelpers';
-import { ImagesServicesDict } from '../assets/icons';
+import { ImagesServicesDict }      from '../assets/icons';
+
 
 export default function NodeButton(data: any) {
     if (!data.node) return null;

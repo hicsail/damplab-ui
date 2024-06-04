@@ -1,5 +1,6 @@
 import React from 'react'
 
+
 export default function ELabs() {
 
   const handleAuth = () => {
@@ -10,10 +11,15 @@ export default function ELabs() {
 
   return (
     <div>
+
       <h2>
         ELabs
       </h2>
-      <button onClick={handleAuth}>Login</button>
+
+      <button onClick={handleAuth}>
+        Login
+      </button>
+      
     </div>
   )
 }
