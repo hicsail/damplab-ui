@@ -7,7 +7,10 @@ COPY . .
 RUN npm install --legacy-peer-deps
 RUN npm run build
 
-FROM nginx
+FROM registry.access.redhat.com/ubi7/nginx-120
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /usr/src/app/build /usr/share/nginx/html
+COPY --from=builder /usr/src/app/build .
+
+ADD ./nginx.conf "${NGINX_CONF_PATH}"
+
+CMD nginx -g "daemon off;"
