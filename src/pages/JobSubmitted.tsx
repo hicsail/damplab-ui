@@ -23,6 +23,10 @@ export default function JobSubmitted() {
         Job ID: {jobId}
       </p>
 
+      <p>
+        Data transferred to MPI for record: 10
+      </p>
+
       {/* Functional but disabled for now... */}
       {/* <div style={{ height: "auto", margin: "0 auto", maxWidth: 256, width: "100%" }}>
         <QRCode

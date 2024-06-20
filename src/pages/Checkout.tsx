@@ -32,6 +32,7 @@ export default function Checkout() {
     const institutionRef = useRef<any>(null);
     const emailRef       = useRef<any>(null);
     const notesRef       = useRef<any>(null);
+    const mpi            = useRef<any>(null);
 
     const navigate    = useNavigate();
 
@@ -174,6 +175,7 @@ export default function Checkout() {
                         <TextField required label = "Institution"    margin = "dense" variant = "outlined" inputRef = {institutionRef} />
                         <TextField required label = "Email"          margin = "dense" variant = "outlined" inputRef = {emailRef} />
                         <TextField          label = "Notes"          margin = "dense" variant = "outlined" inputRef = {notesRef} />
+                        <TextField          label = "MPI ID"         margin = "dense" variant = "outlined" inputRef = {mpi} />
                         <Button variant="contained" type="submit" onClick={() => {
                             console.log('Check form completion...');
                         }} style={{padding:20, marginTop: 10, fontSize:15}}>Submit</Button>
