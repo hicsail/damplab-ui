@@ -35,9 +35,16 @@ jobs:
       - name: Build & Push Docker Build
         uses: docker/build-push-action@v4
         with:
+          context: .
+          file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            REACT_APP_ADMIN_USERNAME=${{ secrets.REACT_APP_ADMIN_USERNAME }}
+            REACT_APP_ADMIN_PASSWORD=${{ secrets.REACT_APP_ADMIN_PASSWORD }}
+            REACT_APP_CLIENT_USERNAME=${{ secrets.REACT_APP_CLIENT_USERNAME }}
+            REACT_APP_CLIENT_PASSWORD=${{ secrets.REACT_APP_CLIENT_PASSWORD }}
       - name: Push to Staging
         uses: fjogeleit/http-request-action@v1
         if: github.ref == 'refs/heads/main'

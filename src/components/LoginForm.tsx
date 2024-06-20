@@ -6,11 +6,19 @@ let creds = require('../credentials.json');
 
 
 export default function LoginForm() {
-  // const demo_admin  = { username: 'admin',     password: 'drafty-shotgun-exorcist', role: 'admin' };
-  // const demo_client = { username: 'demo_user', password: 'demo_user_password',      role: 'client' };
-  const demo_admin  = { username: creds[0]['admin-username'],  password: creds[0]['admin-password'],  role: 'admin' };
-  const demo_client = { username: creds[1]['client-username'], password: creds[1]['client-password'], role: 'client' };
-
+  // const demo_admin  = { username: creds[0]['admin-username'],  password: creds[0]['admin-password'],  role: 'admin' };
+  // const demo_client = { username: creds[1]['client-username'], password: creds[1]['client-password'], role: 'client' };
+  const demo_admin = {
+    username: process.env.REACT_APP_ADMIN_USERNAME || '',
+    password: process.env.REACT_APP_ADMIN_PASSWORD || '',
+    role: 'admin'
+  };
+  const demo_client = {
+    username: process.env.REACT_APP_CLIENT_USERNAME || '',
+    password: process.env.REACT_APP_CLIENT_PASSWORD || '',
+    role: 'client'
+  };
+  
   const navigate = useNavigate();
 
   const [message,  setMessage]  = useState('');
