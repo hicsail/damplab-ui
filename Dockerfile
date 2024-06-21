@@ -1,5 +1,9 @@
 FROM node:18-alpine as builder
 
+ARG REACT_APP_BACKEND
+
+ENV REACT_APP_BACKEND ${REACT_APP_BACKEND}
+
 WORKDIR /usr/src/app
 
 COPY . .

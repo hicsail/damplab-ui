@@ -35,7 +35,7 @@ function App() {
   const [hazards, setHazards] = useState(Array<string>);
 
   const client = new ApolloClient({
-    uri: 'https://damplab-backend-damp-lab-canvas-242df1.apps.shift.nerc.mghpcc.org/graphql',
+    uri: process.env.REACT_APP_BACKEND,
     cache: new InMemoryCache(),
   });
 
