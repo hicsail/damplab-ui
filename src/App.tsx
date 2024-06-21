@@ -35,8 +35,7 @@ function App() {
   const [hazards, setHazards] = useState(Array<string>);
 
   const client = new ApolloClient({
-    uri: 'https://damplab-test.sail.codes/graphql',
-    // uri: 'localhost:27017/damplab',
+    uri: 'https://damplab-backend-damp-lab-canvas-242df1.apps.shift.nerc.mghpcc.org/graphql',
     cache: new InMemoryCache(),
   });
 
@@ -70,9 +69,9 @@ function App() {
     <div className="App">
       <ApolloProvider client={client}>
         <AppContext.Provider value={{ services: services, bundles: bundles, hazards: hazards }}>
-          <CanvasContext.Provider value={{ nodes: nodes, setNodes: setNodes, 
-                                           edges: edges, setEdges: setEdges, 
-                                           activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId, 
+          <CanvasContext.Provider value={{ nodes: nodes, setNodes: setNodes,
+                                           edges: edges, setEdges: setEdges,
+                                           activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId,
                                            nodeParams: nodeParams, setNodeParams: setNodeParams }}>
               <BrowserRouter>
 
