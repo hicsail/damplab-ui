@@ -56,7 +56,7 @@ export default function Dashboard( {...props} ) {
 
     return (
         <div>
-            <Typography variant="h4" sx={{ mt: 2, mb: 2 }}>All Submitted Jobs</Typography>
+            <Typography variant="h4" sx={{ mt: 2, mb: 2 }}>Submitted Jobs</Typography>
                 {jobs.map((job, index) => (
                     <Button key={index} variant="outlined" title={job.name}  sx={{boxShadow: 2}} 
                     style={{ textAlign: 'left', borderRadius: 5, margin: 20, padding: 5, display: 'flow', justifyContent: 'space-around' }}
