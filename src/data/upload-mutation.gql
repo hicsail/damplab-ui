@@ -164,7 +164,7 @@ mutation {
             required: true
           }
         ]
-        allowedConnections: ["run-gel", "dpn1", "gel-electrophoresis"]
+        allowedConnections: ["gel-electrophoresis"]
         categories: ["dna-assembly-cloning"]
         result: {
           id: "pcr-product"
@@ -233,30 +233,7 @@ mutation {
             required: false
           }
         ]
-        allowedConnections: ["column-purification", "pcr", "gibson-assembly"]
-      }
-      {
-        id: "dpn1"
-        name: "Digest with Dpn1"
-        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
-        resultParams: ["pcr-product"]
-        parameters: [
-          {
-            id: "pcr-product-param"
-            name: "PCR Product Result"
-            type: "boolean"
-            paramType: "result"
-            required: true
-          }
-        ]
-        allowedConnections: ["run-gel", "column-purification"]
-        result: {
-          id: "dpn1-product"
-          type: "Dpn1Result"
-          result: { id: "dpn1-result", amount: "number" }
-        }
-        categories: ["dna-assembly-cloning"]
-        description: ""
+        allowedConnections: ["pcr", "gibson-assembly"]
       }
       {
         id: "gibson-assembly"
@@ -413,57 +390,6 @@ mutation {
         ]
         categories: ["dna-assembly-cloning"]
         allowedConnections: []
-        description: ""
-      }
-      {
-        id: "run-gel"
-        name: "Run Agarose Gel"
-        icon: "https://cdn-icons-png.flaticon.com/512/2222/2222661.png"
-        resultParams: ["pcr-product"]
-        description: ""
-        parameters: [
-          {
-            id: "ladder"
-            name: "Ladder"
-            type: "string"
-            paramType: "input"
-            required: true
-          }
-          {
-            id: "pcr-product-param"
-            name: "PCR Product Result"
-            type: "boolean"
-            paramType: "result"
-            required: true
-          }
-        ]
-        allowedConnections: ["column-purification"]
-        categories: ["dna-rna"]
-        result: { id: "gel-product", type: "GelResult" }
-      }
-      {
-        id: "column-purification"
-        name: "Column Purification"
-        icon: "https://cdn-icons-png.flaticon.com/512/4192/4192130.png"
-        resultParams: ["dpn1-product"]
-        parameters: [
-          {
-            id: "desired-concentration"
-            name: "Desired Concentration"
-            type: "number"
-            paramType: "input"
-            required: true
-          }
-          {
-            id: "dpn1-product-param"
-            name: "Dpn1 Product Result"
-            type: "boolean"
-            paramType: "result"
-            required: true
-          }
-        ]
-        allowedConnections: ["dna-gel"]
-        categories: ["dna-rna"]
         description: ""
       }
       {
@@ -768,7 +694,7 @@ mutation {
         icon: "https://drive.google.com/thumbnail?id=1bnuf6-ZD79X7ZJ6X6dm26apEh8IU9BX7"
         categories: ["dna-rna"]
         description: ""
-        allowedConnections: ["bioanalyzer"]
+        allowedConnections: ["frag-analyzer"]
         parameters: [
           {
             id: "pcr-product-param"
@@ -785,84 +711,40 @@ mutation {
         }
       }
       {
-        id: "bioanalyzer"
-        name: "Bioanalyzer"
+        id: "frag-analyzer"
+        name: "Fragment Analyzer"
         icon: "https://drive.google.com/thumbnail?id=1wiL_-GBWMi7M5hty9CWcf4mbmJhW4k8E"
         categories: ["transcriptomics"]
-        allowedConnections: ["library-prep", "seq", "eth-perc"]
+        allowedConnections: ["seq", "eth-perc"]
         description: ""
         parameters: [
           {
-            id: "eth-perc-product"
-            name: "Ethanol Precipitation Result"
+            id: "concentration"
+            name: "Concentration"
             type: "string"
             paramType: "input"
             required: true
           }
           {
-            id: "control"
-            name: "Control Type"
-            type: "string"
+            id: "num-samples"
+            name: "Number of Samples"
+            type: "number"
             paramType: "input"
             required: true
           }
         ]
         result: {
-          id: "bioanalyzer-product"
-          type: "BioanalyzerResult"
-          name: "Bioanalyzer Result"
-        }
-      }
-      {
-        id: "mRNA-enrichment"
-        name: "mRNA Enrichment"
-        icon: "https://drive.google.com/thumbnail?id=1l4AoRs0ieidpFy566BFmOmUOJnIcT5hj"
-        categories: ["transcriptomics"]
-        allowedConnections: ["library-prep", "bioanalyzer"]
-        parameters: [
-          {
-            id: "bioanalyzer-product"
-            name: "Bioanalyzer Result"
-            type: "string"
-            paramType: "result"
-            required: true
-          }
-        ]
-        result: {
-          id: "mRNA-enrichment-product"
-          type: "MRnaEnrichmentResult"
-          name: "mRNA Enrichment Result"
-        }
-        description: ""
-      }
-      {
-        id: "library-prep"
-        name: "Library Prep"
-        icon: "https://drive.google.com/thumbnail?id=1qhvrFaX_Ujq3fUAzKP-HgNX3fqSC7jmT"
-        categories: ["transcriptomics"]
-        allowedConnections: ["seq", "mRNA-enrichment", "bioanalyzer"]
-        description: ""
-        parameters: [
-          {
-            id: "mRNA-enrichment-product"
-            name: "mRNA Enrichment Result"
-            type: "string"
-            paramType: "result"
-            required: true
-          }
-        ]
-        result: {
-          id: "library-prep-product"
-          type: "LibraryPrepResult"
-          name: "Library Prep Result"
+          id: "frag-analyzer-product"
+          type: "FragAnalyzerResult"
+          name: "Frag Analyzer Result"
         }
       }
       {
         id: "seq"
-        name: "NGS Sequencing"
+        name: "Next Generation Sequencing"
         icon: "https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se"
         categories: ["transcriptomics"]
-        allowedConnections: ["bioanalyzer"]
+        allowedConnections: ["frag-analyzer"]
         description: ""
         parameters: [
           {
@@ -887,6 +769,13 @@ mutation {
         allowedConnections: ["storage"]
         description: ""
         parameters: [
+          {
+            id: "inducer"
+            name: "Inducer"
+            type: "string"
+            paramType: "input"
+            required: true
+          },
           {
             id: "induction-culture"
             name: "Overnight Bacterial Culture"
@@ -987,9 +876,6 @@ mutation {
           "design-primers"
           "rehydrate-primer"
           "pcr"
-          "dpn1"
-          "run-gel"
-          "column-purification"
           "dna-gel"
           "m-cloning"
           "transformation"
@@ -1005,9 +891,6 @@ mutation {
           "design-primers"
           "rehydrate-primer"
           "pcr"
-          "dpn1"
-          "run-gel"
-          "column-purification"
           "dna-gel"
           "m-cloning"
           "transformation"
@@ -1022,9 +905,7 @@ mutation {
           "miniprep-gs"
           "glyc-storage"
           "eth-perc"
-          "bioanalyzer"
-          "mRNA-enrichment"
-          "library-prep"
+          "frag-analyzer"
           "seq"
         ]
       }

@@ -8,14 +8,11 @@ design-primers        : str*4
 rehydrate-primer      : str
 pcr                   : bool*3, num*3, str
 gel-electrophoresis   : dropdown, num*4, str
-dpn1                  : bool
 gibson-assembly       : bool, str*2          // PRODUCES DNA; SCREENING REQUIRED
 restriction-digest    : bool, str
 restriction-ligation  : bool, str
 clean-up              : bool, num
 dna-storage           : [ENUM?]
-run-gel               : bool, str
-column-purification   : bool, num
 dna-gel               : bool
 m-cloning             : bool*2, num, str*3   // PRODUCES DNA; SCREENING REQUIRED
 transformation        : bool*2, dropdown, num*2, [dropdown or str?]
@@ -23,9 +20,8 @@ overnight-culture     : bool*2, num*5, [dropdown or str?]
 miniprep-gs           : bool, num
 glyc-storage          : [none]
 eth-perc              : str
-bioanalyzer           : str*2
+frag-analyzer         : str*2
 mRNA-enrichment       : str
-library-prep          : str
 seq [DUPLICATE]       : str
 cell-culture-induction: str
 cell-lysate           : str
@@ -38,27 +34,23 @@ seq                   : gene, storage, design-primers
 gene                  : design-primers
 design-primers        : rehydrate-primer
 rehydrate-primer      : pcr
-pcr                   : run-gel, dpn1, gel-electrophoresis
-gel-electrophoresis   : column-purification, mutagenesis, inverse-pcr, pcr, qpcr, colony-pcr, temperature-gradient-test, colony-pcr, gibson-assembly
-dpn1                  : run-gel, column-purification
+pcr                   : gel-electrophoresis
+gel-electrophoresis   : mutagenesis, inverse-pcr, pcr, qpcr, colony-pcr, temperature-gradient-test, colony-pcr, gibson-assembly
 gibson-assembly       : transformation, ordering-dna-fragments, dna-storage, mutagenesis, mutagenesis-by-inverse-pcr, temperature-gradient-test,
 restriction-digest    : clean-up, dna-storage, gel-electrodsgfasd, restriction-ligation
 restriction-ligation  : transformation, ordering-dna-fragment, dna-storage, restriction-digest
 clean-up              : [need to add allowed connections]
 dna-storage           : [need to add allowed connections]
-run-gel               : column-purification
-column-purification   : assembly, dna-gel
 dna-gel               : dna-storage, gel-electrophoresis
 m-cloning             : transformation
 transformation        : overnight-culture, plate-storage, overnight-culture
 overnight-culture     : miniprep, storage, miniprep-gs
 miniprep-gs           : storage, seq
 glyc-storage          : [none?]
-eth-perc              : bioanalyzer, rna-extraction, gel
-bioanalyzer           : library-prep, seq, eth-perc
-mRNA-enrichment       : rna-extraction, library-prep, bioanalyzer
-library-prep          : seq, mRNA-enrichment, bioanalyzer
-seq                   : bioanalyzer
+eth-perc              : frag-analyzer, rna-extraction, gel
+frag-analyzer         : library-prep, seq, eth-perc
+mRNA-enrichment       : rna-extraction, library-prep, frag-analyzer
+seq                   : frag-analyzer
 cell-culture-induction: plate-reader, storage, flow-cytometry,
 cell-lysate           : plate-reader, storage, cell-culture-induction,
 protein-production    : plate-reader, storage, cell-lysate, cell-culture-induction
@@ -243,7 +235,7 @@ export let services: Service[] = [
             }
         ],
         allowedConnections: [
-            'run-gel', 'dpn1', 'gel-electrophoresis'
+            'gel-electrophoresis'
         ],
         categories: ['dna-assembly-cloning'],
         result: {
@@ -326,35 +318,8 @@ export let services: Service[] = [
         ],
         // allowed connections : purified dna from agrose gel extraction, mutagenesis, mutagensis by inverse pcr, perform pcr reaction, perform qpcr reaction, colony pcr,temperatue gradient test, colony PCR
         allowedConnections: [
-            'column-purification', 'mutagenesis', 'inverse-pcr', 'pcr', 'qpcr', 'colony-pcr', 'temperature-gradient-test', 'colony-pcr', 'gibson-assembly'
+            'mutagenesis', 'inverse-pcr', 'pcr', 'qpcr', 'colony-pcr', 'temperature-gradient-test', 'colony-pcr', 'gibson-assembly'
         ],
-    },
-    {
-        id: 'dpn1',
-        name: 'Digest with Dpn1',
-        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png',
-        resultParams: ['pcr-product'],
-        parameters: [
-            {
-                id: 'pcr-product-param',
-                name: 'PCR Product Result',
-                type: 'boolean',
-                paramType: 'result',
-                required: true
-            }
-        ],
-        allowedConnections: [
-            'run-gel', 'column-purification'
-        ],
-        result: {
-            id: 'dpn1-product',
-            type: 'Dpn1Result',
-            result: {
-                id: 'dpn1-result',
-                amount: 'number', // pcr result - gel amount
-            }
-        },
-        categories: ['dna-assembly-cloning'],
     },
     {
         id: 'gibson-assembly',  // PRODUCES DNA; SCREENING REQUIRED
@@ -514,62 +479,6 @@ export let services: Service[] = [
         categories: ['dna-assembly-cloning']
         // add allowed connections
 
-    },
-    {
-        id: 'run-gel',
-        name: 'Run Agarose Gel',
-        icon: 'https://cdn-icons-png.flaticon.com/512/2222/2222661.png',
-        resultParams: ['pcr-product'],
-        parameters: [
-            {
-                id: 'ladder',
-                name: 'Ladder',
-                type: 'string',
-                paramType: 'input',
-                required: true
-            },
-            {
-                id: 'pcr-product-param',
-                name: 'PCR Product Result',
-                type: 'boolean',
-                paramType: 'result',
-                required: true
-            }
-        ],
-        allowedConnections: [
-            'column-purification'
-        ],
-        categories: ['dna-rna'],
-        result: {
-            id: 'gel-product',
-            type: 'GelResult',
-        }
-    },
-    {
-        id: 'column-purification',
-        name: 'Column Purification',
-        icon: 'https://cdn-icons-png.flaticon.com/512/4192/4192130.png',
-        resultParams: ['dpn1-product'],
-        parameters: [
-            {
-                id: 'desired-concentration',
-                name: 'Desired Concentration',
-                type: 'number',
-                paramType: 'input',
-                required: true
-            },
-            {
-                id: 'dpn1-product-param',
-                name: 'Dpn1 Product Result',
-                type: 'boolean',
-                paramType: 'result',
-                required: true
-            }
-        ],
-        allowedConnections: [
-            'assembly', 'dna-gel'
-        ],
-        categories: ['dna-rna']
     },
     {
         id: 'dna-gel',
@@ -934,7 +843,7 @@ export let services: Service[] = [
         icon: 'https://drive.google.com/thumbnail?id=1bnuf6-ZD79X7ZJ6X6dm26apEh8IU9BX7',
         categories: ['dna-rna'],
         allowedConnections: [
-            'bioanalyzer', 'rna-extraction', 'gel'
+            'frag-analyzer', 'rna-extraction', 'gel'
         ],
         parameters: [
             {
@@ -952,34 +861,34 @@ export let services: Service[] = [
         }
     },
     {
-        id: 'bioanalyzer',
-        name: 'Bioanalyzer',
+        id: 'frag-analyzer',
+        name: 'Fragment Analyzer',
         // icon: 'https://drive.google.com/uc?id=1L2wX2D0Vhlq6UpU3VnA4FGKaDq259LXk',
         icon: 'https://drive.google.com/thumbnail?id=1wiL_-GBWMi7M5hty9CWcf4mbmJhW4k8E',
         categories: ['transcriptomics'],
         allowedConnections: [
-            'library-prep', 'seq', 'eth-perc'
+            'seq', 'eth-perc'
         ],
         parameters: [
             {
-                id: 'eth-perc-product',
-                name: 'Ethanol Precipitation Result',
+                id: 'concentration',
+                name: 'Concentration',
                 type: 'string',
                 paramType: 'input',
                 required: true
             },
             {
-                id: 'control',
-                name: 'Control Type',
-                type: 'string',
+                id: 'num-samples',
+                name: 'Number of Samples',
+                type: 'number',
                 paramType: 'input',
                 required: true
             }
         ],
         result: {
-            id: 'bioanalyzer-product',
-            type: 'BioanalyzerResult',
-            name: 'Bioanalyzer Result',
+            id: 'frag-analyzer-product',
+            type: 'FragAnalyzerResult',
+            name: 'Fragment Analyzer Result',
         }
     },
     {
@@ -989,12 +898,12 @@ export let services: Service[] = [
         icon: 'https://drive.google.com/thumbnail?id=1l4AoRs0ieidpFy566BFmOmUOJnIcT5hj',
         categories: ['transcriptomics'],
         allowedConnections: [
-            'rna-extraction', 'library-prep', 'bioanalyzer'
+            'rna-extraction', 'frag-analyzer'
         ],
         parameters: [
             {
-                id: 'bioanalyzer-product',
-                name: 'Bioanalyzer Result',
+                id: 'frag-analyzer-product',
+                name: 'Fragment Analyzer Result',
                 type: 'string',
                 paramType: 'result',
                 required: true
@@ -1007,37 +916,13 @@ export let services: Service[] = [
         }
     },
     {
-        id: 'library-prep',
-        name: 'Library Prep',
-        // icon: 'https://drive.google.com/uc?id=1aQ-sXASGWS_ZjBR-ROIdlsbg7mhg2Yk7',
-        icon: 'https://drive.google.com/thumbnail?id=1qhvrFaX_Ujq3fUAzKP-HgNX3fqSC7jmT',
-        categories: ['transcriptomics'],
-        allowedConnections: [
-            'seq', 'mRNA-enrichment', 'bioanalyzer'
-        ],
-        parameters: [
-            {
-                id: 'mRNA-enrichment-product',
-                name: 'mRNA Enrichment Result',
-                type: 'string',
-                paramType: 'result',
-                required: true
-            },
-        ],
-        result: {
-            id: 'library-prep-product',
-            type: 'LibraryPrepResult',
-            name: 'Library Prep Result',
-        }
-    },
-    {
         id: 'seq',
-        name: 'NGS Sequencing',
+        name: 'Next Generation Sequencing',
         // icon: 'https://drive.google.com/uc?id=1oiZLiBOUJqFPI_46_YCtk9mrYNkkfFLL',
         icon: 'https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se',
         categories: ['transcriptomics'],
         allowedConnections: [
-            'bioanalyzer'
+            'frag-analyzer'
         ],
         parameters: [
             {
@@ -1069,12 +954,19 @@ export let services: Service[] = [
         ],
         parameters: [
             {
+                id: 'inducer',
+                name: 'Inducer',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
                 id: 'induction-culture',
                 name: 'Overnight Bacterial Culture',
                 type: 'string',
                 paramType: 'input',
                 required: true
-            },
+            }
         ],
         result: {
             id: 'induced-sample',
