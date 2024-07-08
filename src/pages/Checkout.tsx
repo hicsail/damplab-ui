@@ -39,6 +39,13 @@ export default function Checkout() {
         onCompleted: (data) => {
             console.log('successfully created job:', data);
             navigate('/submitted', { state: { id: data.createJob.id } });
+            let fileName = `${data.createJob.id}_${new Date().toLocaleString()}`;
+            let file = {
+              fileName: fileName,
+              nodes: val.nodes,
+              edges: val.edges,
+            };
+            localStorage.setItem(fileName, JSON.stringify(file));
         },
         onError: (error: any) => {
             console.log('error creating job', error.networkError?.result?.errors);
@@ -100,9 +107,10 @@ export default function Checkout() {
             username : userRef.current.value,
             institute: institutionRef.current.value,
             email    : emailRef.current.value,
+            notes    : notesRef.current.value,
             workflows: getGQLWorkflows(),
             // submitted: date
-        };
+          };
           createJob({ variables: { createJobInput: data }});
           console.log(getGQLWorkflows());
         } else {

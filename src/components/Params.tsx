@@ -25,7 +25,8 @@ export default function ({ activeNode }: ParamFormProps) {
             }
             else initValues[obj.id] = obj.value ? obj.value : '';
         });
-        initValues[`addinst${activeNode?.data.id}`] = activeNode?.data.additionalInstructions ? activeNode?.data.additionalInstructions : '';
+        // Now a dedicated field in each service (should always accompany other params)
+        // initValues[`addinst${activeNode?.data.id}`] = activeNode?.data.additionalInstructions ? activeNode?.data.additionalInstructions : '';
         
         return initValues;
     }
@@ -52,7 +53,8 @@ export default function ({ activeNode }: ParamFormProps) {
                 obj.resultParamValue = values[`resultParamValue${obj.id}`];
             }
         });
-        activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
+        // Now a dedicated field in each service (should always accompany other params)
+        // activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
     }
 
     // formik hook init
@@ -123,6 +125,7 @@ export default function ({ activeNode }: ParamFormProps) {
                                 } else {
                                     return (
                                         <TextField
+                                            multiline  = {param.name === 'Additional Notes' ? true : false}
                                             helperText = {param.description ? param.description : null}
                                             size       = 'small'
                                             key        = {param.id}
@@ -191,7 +194,8 @@ export default function ({ activeNode }: ParamFormProps) {
                         })
                     }
                 </div>
-                <div className="add-instructs" style={{marginLeft: 20, marginBottom: 10}}>
+                {/* Now a dedicated field in each service (should always accompany other params) */}
+                {/* <div className="add-instructs" style={{marginLeft: 20, marginBottom: 10}}>
                     <TextField multiline sx={{ mt: 3, width: '26ch' }} label="Additional Instructions" rows={3}
                     value={formik.values[`addinst${activeNode?.data.id}`] 
                          ? formik.values[`addinst${activeNode?.data.id}`] 
@@ -199,7 +203,7 @@ export default function ({ activeNode }: ParamFormProps) {
                     name     = {`addinst${activeNode?.data.id}`}
                     onChange = {formik.handleChange}
                     onBlur   = {formik.handleBlur} />
-                </div>
+                </div> */}
             </form>
         </div>
     )

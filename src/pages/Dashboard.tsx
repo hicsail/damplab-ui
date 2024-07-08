@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from '@apollo/client'
 import { Box, Button, Typography} from '@mui/material';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { bodyText, StyledContainer } from "../styles/themes";
 import { GET_WORKFLOWS_BY_STATE, GET_JOB_BY_WORKFLOW_ID } from "../gql/queries";
+import JobPDFDocument from '../components/JobPDFDocument';
 
 
 export default function Dashboard( {...props} ) {

@@ -121,6 +121,8 @@ export type Job = {
   submitted: Scalars['DateTime'];
   /** Username of the person who submitted the job */
   username: Scalars['String'];
+  /** Notes from the person who submitted the job */
+  notes: Scalars['String'];
   /** The workflows that were submitted together */
   workflows: Array<Workflow>;
 };

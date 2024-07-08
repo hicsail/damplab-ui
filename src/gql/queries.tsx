@@ -60,6 +60,7 @@ export const GET_JOB_BY_ID = gql`
             email
             state
             submitted
+            notes
             workflows {
                 id
                 state
