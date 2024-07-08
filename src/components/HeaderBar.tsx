@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react'
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AppBar, Button, Dialog, DialogTitle, IconButton, TextField, Toolbar, } from '@mui/material';
-import { SaveOutlined }         from '@mui/icons-material';
+import { AlignHorizontalCenter, SaveOutlined }         from '@mui/icons-material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import UploadFileIcon           from '@mui/icons-material/UploadFile';
 
@@ -10,6 +10,8 @@ import "../styles/resubmit.css";
 
 
 export default function HeaderBar() {
+
+    const navigate = useNavigate();
 
     const alignRight = {
         marginLeft: 'auto',
@@ -41,6 +43,7 @@ export default function HeaderBar() {
     };
 
     const handleLoadOpen = () => { 
+        navigate('/canvas');
         setLoadOpen(true);
     }
 
@@ -65,7 +68,7 @@ export default function HeaderBar() {
         return (
           <Dialog onClose={handleClose} open={open}>
             <div style={{width: 300, height: 200, padding: 10}}>
-                <DialogTitle>Save Progress</DialogTitle>
+                <DialogTitle>Save Canvas</DialogTitle>
                 <div>
                     <TextField id="outlined-basic" label="File name" variant="outlined" onChange={(e)=> setFileName(e.target.value)}/>
                 </div>
@@ -104,8 +107,8 @@ export default function HeaderBar() {
 
         return (
           <Dialog onClose={handleClose} open={open}>
-            <DialogTitle>Load Draft</DialogTitle>
-            <div style={{width: 300, height: 200, padding: 10}}>
+            <DialogTitle>Load Canvas</DialogTitle>
+            <div style={{width: 450, height: 200, padding: 10}}>
             {
                 files.map((file) => {
                     return (
@@ -123,18 +126,24 @@ export default function HeaderBar() {
 
     return (
         <div>
-            <AppBar position="static">
+            <AppBar position="fixed">
 
                 <Toolbar style={{background: 'black'}}>
 
-                    <Link to={"/"} style={{ textDecoration: 'none', color: 'white' }}>
+                    <Button onClick={() => window.location.href = "https://damplab.org/services"} style={{ textDecoration: 'none', color: 'white', marginRight: 'auto' }}>
                         <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png" 
-                             style={{width: 300}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
-                    </Link>
+                             style={{width: 250}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
+                    </Button>
 
-                    <div>
-                        v1.0
-                    </div>
+                    <Button onClick={() => navigate("/")} style={{ textDecoration: 'none', color: 'white', textTransform: 'none'}}>
+                        <img src="damp-white-text.svg" style={{height: '45px'}}/>
+                        <span style={{marginLeft: '15px', fontSize: 21, fontWeight: 'bold', color: '#8fb5ba', marginBottom: '-2px'}}>  {/*cyan: #8fb5ba, pink: #e04462*/}
+                            WORKFLOW<span style={{fontWeight: '200'}}>designer</span>
+                        </span>
+                        <span style={{fontSize: 15, marginLeft: '10px', marginBottom: '-7px'}}>
+                            v1.0
+                        </span>
+                    </Button>
 
                     <div style={alignRight}>
                         
@@ -148,10 +157,8 @@ export default function HeaderBar() {
 
                         {window.location.href.includes('resubmission')
                         ? <Link to="/checkout" className="a a--hover a--active">Resubmit...</Link>
-                        : <IconButton title="Checkout page" aria-controls='menu-appbar' aria-haspopup='true'>
-                            <Link to="/checkout">
-                                <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
-                            </Link> 
+                        : <IconButton onClick={() => navigate("/checkout")} title="Checkout page" aria-controls='menu-appbar' aria-haspopup='true'>
+                            <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
                           </IconButton>}
 
                     </div>
@@ -174,6 +181,7 @@ export default function HeaderBar() {
                 />
 
             </AppBar>
+            <Toolbar /> 
         </div>
     )
 }
