@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, TextField } from '@mui/material';
 
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+
 
 export default function LoginForm() {
   const demo_admin = {
@@ -53,9 +56,9 @@ export default function LoginForm() {
     setRole(loginInfo.role);
     setMessage(loginInfo.loggedIn ? 'Login Succeeded' : 'Login Failed');
 
-    if (loginInfo.loggedIn) {
-      navigate(loginInfo.role === 'admin' ? '/dashboard' : '/canvas');
-    }
+    // if (loginInfo.loggedIn) {
+    //   navigate(loginInfo.role === 'admin' ? '/dashboard' : '/canvas');
+    // }
   };
 
   const clickedLogout = () => {
@@ -72,7 +75,7 @@ export default function LoginForm() {
   };
 
   return (
-    <Box sx={{ display: 'flow', justifyContent: 'center', textAlign: 'center' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
       {!loggedIn ? (
         <>
           <div>
@@ -84,53 +87,40 @@ export default function LoginForm() {
               onKeyDown={(e) => enterKeyCheck(e)} onChange={(entry) => setPassword(entry.target.value)} />
           </div>
           <div style={{ margin: 20 }}>
-            <Button variant="contained" onClick={clickedLogin} type="submit">Login</Button>
+            <Button variant="contained" color="success" onClick={clickedLogin} type="submit">Login</Button>
           </div>
         </>
       ) : (
         <>
-          <div>
+          <Box sx={{ width: '300px' }}>
             <p>You are logged in as {role}.</p>
             {/* <Button variant="contained" onClick={() => navigate(role === 'admin' ? '/dashboard' : '/canvas')} style={{ marginRight: 10 }}>
               Go to {role === 'admin' ? 'Dashboard' : 'Canvas'}
             </Button> */}
-            <Button variant="contained" onClick={() => navigate('/canvas')} style={{ marginRight: 10 }}>
-              Go to Canvas
+            <Button variant="contained" onClick={() => window.location.href = "https://www.damplab.org/services"} sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+              <img src='/damp-white.svg' height='30px' style={{margin: 1, marginLeft: -25, marginRight: 10}}/>DAMPLab Site<br/>(See Service Prices)
+            </Button>
+            <Button variant="contained" onClick={() => navigate('/canvas')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+              <AccountTreeIcon sx={{m:1, ml:-4}}/>CANVAS<br/>(Design Workflows)
             </Button>
             {role === 'admin' ? 
               <>
-                <Button variant="contained" onClick={() => navigate('/dashboard')} style={{ marginRight: 10 }}>Go to Dashboard Page</Button> 
-                {/* <Button variant="contained" onClick={() => navigate('/dominos')}   style={{ marginRight: 10 }}>Go to Dominos Page</Button> 
-                <Button variant="contained" onClick={() => navigate('/elabs')}     style={{ marginRight: 10 }}>Go to eLabs Site</Button> 
-                <Button variant="contained" onClick={() => navigate('/kernel')}    style={{ marginRight: 10 }}>Go to Kernel Site</Button>  */}
+                <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+                  <FormatListBulletedIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
+                </Button> 
+                {/* <Button variant="contained" onClick={() => navigate('/dominos')} sx={{ m: 2 }}>Go to Dominos Page</Button> 
+                <Button variant="contained" onClick={() => navigate('/elabs')} sx={{ m: 2 }}>Go to eLabs Site</Button> 
+                <Button variant="contained" onClick={() => navigate('/kernel')} sx={{ m: 2 }}>Go to Kernel Site</Button>  */}
               </>
               : ''
             }
-            <Button variant="contained" onClick={clickedLogout}>Logout</Button>
-          </div>
+            <Button variant="contained" color="error" onClick={clickedLogout}  sx={{ m: 5 }}>Logout</Button>
+          </Box>
         </>
       )}
       <div>
         {message}
       </div>
-      {role === 'admin' && loggedIn === true ?
-        <div style={{textAlign: 'left', color: 'grey'}}>
-          {/* <br/><br/><br/><br/><br/>
-          <p><b>Notes for DAMP Lab Technicians and Admins: </b></p>
-          <ul>
-            <li>There is a client login and an admin login. If you're seeing this, you're logged in as an admin.</li>
-            <li>Currently, clients can only access the canvas, checkout, and submission confirmation screens.</li>
-            <li>Admins can access all pages, including the dashboard, which links to a detailed view for every submitted job.</li>
-            <br/>
-            <li>The Kernel API is still not available or integrated, so most of the biosecurity screening is faked.</li>
-            <li>For demo purposes, the result of the intermediate screening step is determined by the 'Vector' parameter.</li>
-            <li>'CAT' resolves to 'Passed'.  'TAC' resolves to 'Failed'.  'ACT' resolves to 'Error'.  All others resolve to 'Pending'.</li>
-            <br/>
-            <li>If you have any questions/suggestions/issues regarding the site, please contact Chris Krenz at ckrenz@bu.edu.</li>
-          </ul> */}
-        </div>
-        : ''
-      }
     </Box>
   );
 }

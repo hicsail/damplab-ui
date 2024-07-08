@@ -28,6 +28,6 @@ export const ImagesServicesDict: { [id: string] : string; } = {
     'Rehydrate Primers'                                    : require("./services/Rehydrate DNA Oligo.png"),
     'Restriction Digest'                                   : require("./services/Restriction Digestion.png"),
     'Restriction Ligation'                                 : require("./services/Restriction Ligation.png"),
-    'NGS Sequencing'                                       : require("./services/RNA-Sequencing.png"),
+    'Next Generation Sequencing'                           : require("./services/RNA-Sequencing.png"),
     'Send Sample to Sequencing'                            : require("./services/Send Sample to Sequencing.png")
 };
