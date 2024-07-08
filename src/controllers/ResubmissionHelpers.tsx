@@ -5,6 +5,8 @@ import { Service }                 from '../types/Service';
 import { services }                from '../data/services';
 
 
+// TODO: Resubmission process not fully implemented
+
 export const addNodesAndEdgesFromServiceIdsAlt = (services: any[], 
                                                   serviceIds: string[], 
                                                   setNodes: any, 
@@ -72,6 +74,7 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
     const nodeData = {
         id: nodeId,
         label: service.service.name,
+        description: service.description,
         allowedConnections: service.service.allowedConnections,
         icon: service.service.icon,
         parameters: service.service.parameters,
