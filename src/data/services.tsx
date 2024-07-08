@@ -79,6 +79,13 @@ export let services: Service[] = [
                 paramType: 'flow',
                 flowId: 'plasmid-flow',
                 required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
 
@@ -102,6 +109,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         allowedConnections: [
             'design-primers',
@@ -149,6 +163,13 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         categories: ['dna-assembly-cloning'],
@@ -170,6 +191,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         allowedConnections: [
             'pcr'
@@ -232,6 +260,13 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         allowedConnections: [
@@ -314,6 +349,13 @@ export let services: Service[] = [
                 type: 'number',
                 paramType: 'input',
                 required: false
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         // allowed connections : purified dna from agrose gel extraction, mutagenesis, mutagensis by inverse pcr, perform pcr reaction, perform qpcr reaction, colony pcr,temperatue gradient test, colony PCR
@@ -346,22 +388,6 @@ export let services: Service[] = [
                 required: true
             },
             {
-                id: 'restriction-site-first',
-                name: 'First Restriction Site',
-                description: '',
-                type: 'string',
-                paramType: 'input',
-                required: true
-            },
-            {
-                id: 'restriction-site-second',
-                name: 'Second Restriction Site',
-                description: '',
-                type: 'string',
-                paramType: 'input',
-                required: true
-            },
-            {
                 id: 'template-dna',
                 name: 'Template DNA',
                 type: 'boolean',
@@ -383,6 +409,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: false
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         allowedConnections: [
             'transformation', 'ordering-dna-fragments', 'dna-storage', 'mutagenesis', 'mutagenesis-by-inverse-pcr',
@@ -408,6 +441,29 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true
+            },
+            {
+                id: 'restriction-site-first',
+                name: 'First Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: 'restriction-site-second',
+                name: 'Second Restriction Site',
+                description: '',
+                type: 'string',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         allowedConnections: [
@@ -433,6 +489,13 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         allowedConnections: [
@@ -459,6 +522,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         // add allowed connections
     },
@@ -475,6 +545,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         categories: ['dna-assembly-cloning']
         // add allowed connections
@@ -493,6 +570,13 @@ export let services: Service[] = [
                 type: 'boolean',
                 paramType: 'result',
                 required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         allowedConnections: [
@@ -585,6 +669,13 @@ export let services: Service[] = [
                 paramType: 'result',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         allowedConnections: [
             'transformation'
@@ -679,6 +770,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true,
                 description: 'default is 37 degrees C and 250RPM, range is 30 - 42 degrees C'
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         allowedConnections: [
@@ -777,6 +875,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true,
                 description: 'default is 16 hours, range is 10 - 48 hours'
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         allowedConnections: [
@@ -812,6 +917,13 @@ export let services: Service[] = [
                 paramType: 'result',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         categories: ['dna-rna'],
         allowedConnections: [
@@ -828,7 +940,15 @@ export let services: Service[] = [
         // icon: 'https://cdn-icons-png.flaticon.com/512/4352/4352975.png',
         icon: 'https://drive.google.com/thumbnail?id=11k4WLbBrmWvGwvNa30qFK6y2IcnEePQj',
         categories: ['pcr-reactions'],
-        parameters: [],
+        parameters: [
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
+        ],
         result: {
             id: 'glyc-storage-product',
             type: 'GlycStorageResult',
@@ -853,6 +973,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         result: {
             id: 'eth-perc-product',
@@ -865,7 +992,7 @@ export let services: Service[] = [
         name: 'Fragment Analyzer',
         // icon: 'https://drive.google.com/uc?id=1L2wX2D0Vhlq6UpU3VnA4FGKaDq259LXk',
         icon: 'https://drive.google.com/thumbnail?id=1wiL_-GBWMi7M5hty9CWcf4mbmJhW4k8E',
-        categories: ['transcriptomics'],
+        categories: ['next-gen-seq', 'dna-rna'],
         allowedConnections: [
             'seq', 'eth-perc'
         ],
@@ -883,6 +1010,13 @@ export let services: Service[] = [
                 type: 'number',
                 paramType: 'input',
                 required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         result: {
@@ -892,11 +1026,11 @@ export let services: Service[] = [
         }
     },
     {
-        id: 'mRNA-enrichment',
+        id: 'mRNA-enrichment',  // Removed temporarily from database/upload-mutation.gql; may re-add in future...
         name: 'mRNA Enrichment',
         // icon: 'https://drive.google.com/uc?id=15Dg7u9OWhZjVQ8lGYszIYDo7FcTQkkOW',
         icon: 'https://drive.google.com/thumbnail?id=1l4AoRs0ieidpFy566BFmOmUOJnIcT5hj',
-        categories: ['transcriptomics'],
+        categories: ['next-gen-seq'],
         allowedConnections: [
             'rna-extraction', 'frag-analyzer'
         ],
@@ -908,6 +1042,13 @@ export let services: Service[] = [
                 paramType: 'result',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         result: {
             id: 'mRNA-enrichment-product',
@@ -920,7 +1061,7 @@ export let services: Service[] = [
         name: 'Next Generation Sequencing',
         // icon: 'https://drive.google.com/uc?id=1oiZLiBOUJqFPI_46_YCtk9mrYNkkfFLL',
         icon: 'https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se',
-        categories: ['transcriptomics'],
+        categories: ['next-gen-seq'],
         allowedConnections: [
             'frag-analyzer'
         ],
@@ -932,6 +1073,13 @@ export let services: Service[] = [
                 paramType: 'result',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
 
             // add more
         ],
@@ -966,6 +1114,13 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
             }
         ],
         result: {
@@ -993,6 +1148,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         result: {
             id: 'cell-lysate-product',
@@ -1020,6 +1182,13 @@ export let services: Service[] = [
                 paramType: 'input',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         result: {
             id: 'lysate-protein',
@@ -1044,6 +1213,13 @@ export let services: Service[] = [
                 paramType: 'result',
                 required: true
             },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
         ],
         result: {
             id: 'overnight-culture-storage',

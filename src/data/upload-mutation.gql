@@ -1,3 +1,5 @@
+CAUTION: SUBMITTING THIS MUTATION WILL ERASE ALL SUBMITTED JOBS!
+
 mutation {
   loadData(
     services: [
@@ -21,6 +23,13 @@ mutation {
             flowId: "plasmid-flow"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         description: ""
         allowedConnections: ["gene", "storage", "design-primers"]
@@ -39,6 +48,13 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         allowedConnections: ["design-primers"]
@@ -85,6 +101,13 @@ mutation {
             paramType: "input"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         categories: ["dna-assembly-cloning"]
         allowedConnections: ["rehydrate-primer"]
@@ -102,6 +125,13 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         allowedConnections: ["pcr"]
@@ -162,6 +192,13 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         allowedConnections: ["gel-electrophoresis"]
@@ -232,6 +269,13 @@ mutation {
             paramType: "input"
             required: false
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         allowedConnections: ["pcr", "gibson-assembly"]
       }
@@ -252,22 +296,6 @@ mutation {
           {
             id: "insert",
             name: "Insert",
-            description: "",
-            type: "string",
-            paramType: "input",
-            required: true
-          }
-          {
-            id: "restriction-site-first",
-            name: "First Restriction Site",
-            description: "",
-            type: "string",
-            paramType: "input",
-            required: true
-          }
-          {
-            id: "restriction-site-second",
-            name: "Second Restriction Site",
             description: "",
             type: "string",
             paramType: "input",
@@ -295,6 +323,13 @@ mutation {
             paramType: "input"
             required: false
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         allowedConnections: ["transformation", "dna-storage"]
         categories: []
@@ -317,6 +352,29 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
+          }
+          {
+            id: "restriction-site-first",
+            name: "First Restriction Site",
+            description: "",
+            type: "string",
+            paramType: "input",
+            required: true
+          }
+          {
+            id: "restriction-site-second",
+            name: "Second Restriction Site",
+            description: "",
+            type: "string",
+            paramType: "input",
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         allowedConnections: ["clean-up", "dna-storage", "restriction-ligation"]
@@ -341,6 +399,13 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         allowedConnections: [
@@ -370,6 +435,13 @@ mutation {
             paramType: "input"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         allowedConnections: []
         categories: []
@@ -386,6 +458,13 @@ mutation {
             type: "ENUM"
             paramType: "input"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         categories: ["dna-assembly-cloning"]
@@ -404,6 +483,13 @@ mutation {
             type: "boolean"
             paramType: "result"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         allowedConnections: ["dna-storage", "gel-electrophoresis"]
@@ -492,6 +578,13 @@ mutation {
             paramType: "result"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         allowedConnections: ["transformation"]
         categories: ["fluorescence-based-assays"]
@@ -560,6 +653,13 @@ mutation {
             paramType: "input"
             required: true
             description: "default is 37 degrees C and 250RPM, range is 30 - 42 degrees C"
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         allowedConnections: ["overnight-culture", "overnight-culture"]
@@ -640,6 +740,13 @@ mutation {
             required: true
             description: "default is 16 hours, range is 10 - 48 hours"
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         allowedConnections: ["storage", "miniprep-gs"]
         categories: ["culturing-media"]
@@ -669,6 +776,13 @@ mutation {
             paramType: "result"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         categories: ["dna-rna"]
         allowedConnections: ["storage", "seq"]
@@ -680,7 +794,15 @@ mutation {
         icon: "https://drive.google.com/thumbnail?id=11k4WLbBrmWvGwvNa30qFK6y2IcnEePQj"
         description: ""
         categories: ["pcr-reactions"]
-        parameters: []
+        parameters: [
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
         result: {
           id: "glyc-storage-product"
           type: "GlycStorageResult"
@@ -703,6 +825,13 @@ mutation {
             paramType: "input"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         result: {
           id: "eth-perc-product"
@@ -714,7 +843,7 @@ mutation {
         id: "frag-analyzer"
         name: "Fragment Analyzer"
         icon: "https://drive.google.com/thumbnail?id=1wiL_-GBWMi7M5hty9CWcf4mbmJhW4k8E"
-        categories: ["transcriptomics"]
+        categories: ["next-gen-seq", "dna-rna"]
         allowedConnections: ["seq", "eth-perc"]
         description: ""
         parameters: [
@@ -732,6 +861,13 @@ mutation {
             paramType: "input"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         result: {
           id: "frag-analyzer-product"
@@ -743,7 +879,7 @@ mutation {
         id: "seq"
         name: "Next Generation Sequencing"
         icon: "https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se"
-        categories: ["transcriptomics"]
+        categories: ["next-gen-seq"]
         allowedConnections: ["frag-analyzer"]
         description: ""
         parameters: [
@@ -753,6 +889,13 @@ mutation {
             type: "string"
             paramType: "result"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         result: {
@@ -775,13 +918,20 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
-          },
+          }
           {
             id: "induction-culture"
             name: "Overnight Bacterial Culture"
             type: "string"
             paramType: "input"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         result: {
@@ -805,6 +955,13 @@ mutation {
             paramType: "input"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         result: {
           id: "cell-lysate-product"
@@ -826,6 +983,13 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
           }
         ]
         result: {
@@ -849,6 +1013,13 @@ mutation {
             paramType: "result"
             required: true
           }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
         ]
         result: {
           id: "overnight-culture-storage"
@@ -861,8 +1032,8 @@ mutation {
       { id: "dna-rna", label: "DNA and RNA" }
       { id: "dna-assembly-cloning", label: "DNA Assembly and Cloning" }
       { id: "fluorescence-based-assays", label: "Fluorescence-Based Assays" }
-      { id: "culturing-media", label: "Culturing Media" }
-      { id: "transcriptomics", label: "Transcriptomics" }
+      { id: "culturing-media", label: "Culturing/Media" }
+      { id: "next-gen-seq", label: "Next Generation Sequencing" }
       { id: "storage", label: "Materials Repository and Storage" }
     ]
     bundles: [
@@ -923,3 +1094,4 @@ mutation {
   )
 }
 
+CAUTION: SUBMITTING THIS MUTATION WILL ERASE ALL SUBMITTED JOBS!
