@@ -101,7 +101,7 @@ export default function LoginForm() {
               <img src='/damp-white.svg' height='30px' style={{margin: 1, marginLeft: -25, marginRight: 10}}/>DAMPLab Site<br/>(See Service Prices)
             </Button>
             <Button variant="contained" onClick={() => navigate('/canvas')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-              <AccountTreeIcon sx={{m:1, ml:-4}}/>CANVAS<br/>(Design Workflows)
+              <AccountTreeIcon sx={{m:1, ml:-4, transform: "rotate(90deg) scaleY(-1)"}}/>CANVAS<br/>(Design Workflows)
             </Button>
             {role === 'admin' ? 
               <>
