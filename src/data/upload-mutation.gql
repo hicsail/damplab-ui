@@ -201,7 +201,7 @@ mutation {
             required: false
           }
         ]
-        allowedConnections: ["gel-electrophoresis"]
+        allowedConnections: ["gel-electrophoresis", "dpn1"]
         categories: ["dna-assembly-cloning"]
         result: {
           id: "pcr-product"
@@ -333,6 +333,30 @@ mutation {
         ]
         allowedConnections: ["transformation", "dna-storage"]
         categories: []
+      }
+      {
+        id: "dpn1"
+        name: "Digest with Dpn1"
+        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
+        resultParams: ["pcr-product"]
+        parameters: [
+          {
+            id: "pcr-product-param"
+            name: "PCR Product Result"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+        ]
+        allowedConnections: ["run-gel", "column-purification"]
+        result: {
+          id: "dpn1-product"
+          type: "Dpn1Result"
+          result: { id: "dpn1-result", amount: "number" }
+        }
+        categories: ["dna-assembly-cloning"]
+        description: ""
+        allowedConnections: ["pcr", "gibson-assembly"]
       }
       {
         id: "restriction-digest"
@@ -1047,6 +1071,7 @@ mutation {
           "design-primers"
           "rehydrate-primer"
           "pcr"
+          "dpn1"
           "dna-gel"
           "m-cloning"
           "transformation"
@@ -1062,6 +1087,7 @@ mutation {
           "design-primers"
           "rehydrate-primer"
           "pcr"
+          "dpn1"
           "dna-gel"
           "m-cloning"
           "transformation"

@@ -1,61 +1,6 @@
 import { Description } from "@mui/icons-material";
 import { Service } from "../types/Service";
 
-/* Static prop types legend (6/1/23)
-seq [DUPLICATE]       : str*2
-gene                  : str
-design-primers        : str*4
-rehydrate-primer      : str
-pcr                   : bool*3, num*3, str
-gel-electrophoresis   : dropdown, num*4, str
-gibson-assembly       : bool, str*2          // PRODUCES DNA; SCREENING REQUIRED
-restriction-digest    : bool, str
-restriction-ligation  : bool, str
-clean-up              : bool, num
-dna-storage           : [ENUM?]
-dna-gel               : bool
-m-cloning             : bool*2, num, str*3   // PRODUCES DNA; SCREENING REQUIRED
-transformation        : bool*2, dropdown, num*2, [dropdown or str?]
-overnight-culture     : bool*2, num*5, [dropdown or str?]
-miniprep-gs           : bool, num
-glyc-storage          : [none]
-eth-perc              : str
-frag-analyzer         : str*2
-mRNA-enrichment       : str
-seq [DUPLICATE]       : str
-cell-culture-induction: str
-cell-lysate           : str
-protein-production    : str
-storage               : str
-*/
-
-/* Static allowed connections legend (6/1/23)
-seq                   : gene, storage, design-primers
-gene                  : design-primers
-design-primers        : rehydrate-primer
-rehydrate-primer      : pcr
-pcr                   : gel-electrophoresis
-gel-electrophoresis   : mutagenesis, inverse-pcr, pcr, qpcr, colony-pcr, temperature-gradient-test, colony-pcr, gibson-assembly
-gibson-assembly       : transformation, ordering-dna-fragments, dna-storage, mutagenesis, mutagenesis-by-inverse-pcr, temperature-gradient-test,
-restriction-digest    : clean-up, dna-storage, gel-electrodsgfasd, restriction-ligation
-restriction-ligation  : transformation, ordering-dna-fragment, dna-storage, restriction-digest
-clean-up              : [need to add allowed connections]
-dna-storage           : [need to add allowed connections]
-dna-gel               : dna-storage, gel-electrophoresis
-m-cloning             : transformation
-transformation        : overnight-culture, plate-storage, overnight-culture
-overnight-culture     : miniprep, storage, miniprep-gs
-miniprep-gs           : storage, seq
-glyc-storage          : [none?]
-eth-perc              : frag-analyzer, rna-extraction, gel
-frag-analyzer         : library-prep, seq, eth-perc
-mRNA-enrichment       : rna-extraction, library-prep, frag-analyzer
-seq                   : frag-analyzer
-cell-culture-induction: plate-reader, storage, flow-cytometry,
-cell-lysate           : plate-reader, storage, cell-culture-induction,
-protein-production    : plate-reader, storage, cell-lysate, cell-culture-induction
-storage               : overnight-culture
-*/
 
 export let services: Service[] = [
     {
@@ -270,7 +215,7 @@ export let services: Service[] = [
             }
         ],
         allowedConnections: [
-            'gel-electrophoresis'
+            'gel-electrophoresis', 'dpn1',
         ],
         categories: ['dna-assembly-cloning'],
         result: {
@@ -362,6 +307,33 @@ export let services: Service[] = [
         allowedConnections: [
             'mutagenesis', 'inverse-pcr', 'pcr', 'qpcr', 'colony-pcr', 'temperature-gradient-test', 'colony-pcr', 'gibson-assembly'
         ],
+    },
+    {
+        id: 'dpn1',
+        name: 'Digest with Dpn1',
+        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png',
+        resultParams: ['pcr-product'],
+        parameters: [
+            {
+                id: 'pcr-product-param',
+                name: 'PCR Product Result',
+                type: 'boolean',
+                paramType: 'result',
+                required: true
+            }
+        ],
+        allowedConnections: [
+            'run-gel', 'column-purification'
+        ],
+        result: {
+            id: 'dpn1-product',
+            type: 'Dpn1Result',
+            result: {
+                id: 'dpn1-result',
+                amount: 'number', // pcr result - gel amount
+            }
+        },
+        categories: ['dna-assembly-cloning'],
     },
     {
         id: 'gibson-assembly',  // PRODUCES DNA; SCREENING REQUIRED
