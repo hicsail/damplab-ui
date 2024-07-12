@@ -1,20 +1,4 @@
 export let bundles = [
-    {
-        id: 'modular-cloning-ordering',
-        label: 'Modular Assembly and Cloning with Ordering',
-        // icon: 'https://drive.google.com/uc?id=1rsXIFQsWknecXVkMIOFrm80YFgNYlkUg',
-        icon: 'https://drive.google.com/thumbnail?id=1jIPi2_w650pbpCFcdhOL0KXEYPWgFWPn',
-        services: ['seq', 'gene', 'design-primers', 'rehydrate-primer', 'pcr', 'dpn1', 'run-gel', 
-            'dna-gel', 'm-cloning', 'transformation', 'overnight-culture'],    
-    },
-    {
-        id: 'modular-cloning-provided',
-        label: 'Modular Assembly and Cloning with Provided DNA',
-        // icon: 'https://drive.google.com/uc?id=1rsXIFQsWknecXVkMIOFrm80YFgNYlkUg',
-        icon: 'https://drive.google.com/thumbnail?id=1TOGeovPsTLZiAsVkc1205nk9w9yTyYkj',
-        services: ['seq', 'design-primers', 'rehydrate-primer', 'pcr', 'dpn1', 'dna-gel', 'm-cloning', 
-            'transformation', 'overnight-culture'],
-    },
     // {
     //     id: 'rna-seq',
     //     label: 'RNA Sequencing',
@@ -52,6 +36,22 @@ export let bundles = [
         label: 'DNA/RNA Extraction and qPCR',
         icon: '',
         services: ['dna-rna-extraction', 'qpcr'],
+    },
+    {
+        id: 'modular-cloning-ordering',
+        label: 'Modular Assembly and Cloning with Ordering',
+        // icon: 'https://drive.google.com/uc?id=1rsXIFQsWknecXVkMIOFrm80YFgNYlkUg',
+        icon: 'https://drive.google.com/thumbnail?id=1jIPi2_w650pbpCFcdhOL0KXEYPWgFWPn',
+        services: ['seq', 'gene', 'design-primers', 'rehydrate-primer', 'pcr', 'dpn1', 'run-gel', 
+            'dna-gel', 'm-cloning', 'transformation', 'overnight-culture'],    
+    },
+    {
+        id: 'modular-cloning-provided',
+        label: 'Modular Assembly and Cloning with Provided DNA',
+        // icon: 'https://drive.google.com/uc?id=1rsXIFQsWknecXVkMIOFrm80YFgNYlkUg',
+        icon: 'https://drive.google.com/thumbnail?id=1TOGeovPsTLZiAsVkc1205nk9w9yTyYkj',
+        services: ['seq', 'design-primers', 'rehydrate-primer', 'pcr', 'dpn1', 'dna-gel', 'm-cloning', 
+            'transformation', 'overnight-culture'],
     }
 ];
 
