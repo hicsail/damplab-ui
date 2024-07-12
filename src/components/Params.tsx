@@ -107,7 +107,7 @@ export default function ({ activeNode }: ParamFormProps) {
                                 if (param.type === "dropdown") {
                                     return (
                                         <FormControl size='small' sx={{ mt: 3, width: '26ch' }} key={param.id}>
-                                            <InputLabel>{param.name}</InputLabel>
+                                            <InputLabel sx={{backgroundColor: 'white'}}>{param.name}</InputLabel>
                                             <Select
                                                 name     = {param.id}
                                                 value    = {formik.values[param.id] ? formik.values[param.id] : ""}
@@ -137,6 +137,7 @@ export default function ({ activeNode }: ParamFormProps) {
                                             onChange   = {formik.handleChange}
                                             onBlur     = {formik.handleBlur}
                                             sx         = {{ mt: 3, width: '26ch' }}
+                                            InputLabelProps={{ shrink: true }} 
                                         />
                                     );
                                 }
