@@ -51,11 +51,11 @@ export default memo((input: Input) => {
         let filled = true;
         formData.forEach((obj: any) => {
             if (obj.paramType === 'result') {
-                if (obj.value === false && ( obj.resultParamValue=== null || obj.resultParamValue === '')) {
+                if (obj.value === false && obj.required === true && ( obj.resultParamValue=== null || obj.resultParamValue === '')) {
                     filled = false;
                 }
             }
-            else if (obj.value === '' || obj.value === undefined || obj.value === null) {
+            else if (obj.required === true && (obj.value === '' || obj.value === undefined || obj.value === null)) {
                 filled = false;
             }
         });

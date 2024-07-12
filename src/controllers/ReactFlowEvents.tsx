@@ -19,7 +19,7 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string): Nod
             paramType       : parameter.paramType ? parameter.paramType: null,
             resultParamValue: "",
             value           : null,
-            required        : true  // parameter.required,
+            required        : parameter.required,
         });
     }
 
