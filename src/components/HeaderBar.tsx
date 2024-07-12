@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react'
 import { Link, useNavigate } from "react-router-dom";
 import { AppBar, Button, Dialog, DialogTitle, IconButton, TextField, Toolbar, Hidden } from '@mui/material';
-import { AlignHorizontalCenter, SaveOutlined }         from '@mui/icons-material';
+import { SaveOutlined }         from '@mui/icons-material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import UploadFileIcon           from '@mui/icons-material/UploadFile';
 
@@ -61,9 +61,9 @@ export default function HeaderBar() {
             onClose(selectedValue);
         };
       
-        const handleListItemClick = (value: string) => {
-          onClose(value);
-        };
+        // const handleListItemClick = (value: string) => {
+        //   onClose(value);
+        // };
     
         return (
           <Dialog onClose={handleClose} open={open}>
@@ -95,9 +95,9 @@ export default function HeaderBar() {
             setLoadOpen(false);
         };
       
-        const handleListItemClick = (value: string) => {
-          onClose(value);
-        };
+        // const handleListItemClick = (value: string) => {
+        //   onClose(value);
+        // };
 
         // get list of saved files from local storage
         let files = [];
@@ -138,7 +138,7 @@ export default function HeaderBar() {
                     </Hidden>
 
                     <Button onClick={() => navigate("/")} style={{ textDecoration: 'none', color: 'white', textTransform: 'none'}}>
-                        <img src="damp-white-text.svg" style={{height: '45px'}}/>
+                        <img src="damp-white-text.svg" style={{height: '45px'}} alt="DAMP Logo"/>
                         <span style={{marginLeft: '15px', fontSize: 21, fontWeight: 'bold', color: '#8fb5ba', marginBottom: '-2px'}}>  {/*cyan: #8fb5ba, pink: #e04462*/}
                             WORKFLOW<span style={{fontWeight: '200'}}>designer</span>
                         </span>

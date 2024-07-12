@@ -120,7 +120,7 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
             : image = <img className={className}
                         //    src={nodes[Number(props.icon)-1].icon}
                            src={ImagesServicesDict[nodes[Number(props.icon)-1].name]}
-                           height="50" />
+                           height="50" alt="Service icon" />
         return (
             <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>
                 {image}

@@ -1,8 +1,7 @@
 import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 
-import { NodeData, NodeParameter } from '../types/CanvasTypes';
-import { Service }                 from '../types/Service';
-import { services }                from '../data/services';
+import { NodeParameter } from '../types/CanvasTypes';
+import { services } from '../data/services';
 import { bundles as bundleServiceOrders } from '../data/bundles';
 import { services as serviceNames } from '../data/services';
 

@@ -12,21 +12,21 @@ type Input = {
     data: any;
 };
 
-const style = {
-    position: 'absolute' as 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: 400,
-    bgcolor: 'background.paper',
-    border: '2px solid #000',
-    boxShadow: 24,
-    p: 4,
-};
-
+// const style = {
+//     position: 'absolute' as 'absolute',
+//     top: '50%',
+//     left: '50%',
+//     transform: 'translate(-50%, -50%)',
+//     width: 400,
+//     bgcolor: 'background.paper',
+//     border: '2px solid #000',
+//     boxShadow: 24,
+//     p: 4,
+// };
+ 
 export default memo((input: Input) => {
 
-    const { setActiveComponentId, activeComponentId, nodes } = useContext(CanvasContext);
+    const { setActiveComponentId, activeComponentId } = useContext(CanvasContext);
     const [background, setBackground] = useState('white');
     const [allFilled, setAllFilled] = useState(false);
     const isConnectable = input.isConnectable;

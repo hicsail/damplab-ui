@@ -20,7 +20,7 @@ import ELabs          from './pages/ELabs';
 import Kernel         from './pages/Kernel';
 import ReleaseNotes   from './pages/ReleaseNotes';
 import TestPage       from './pages/TestPage';
-import Tracking       from './pages/ClientView';
+// import Tracking       from './pages/ClientView';
 // import Accepted       from './pages/Accepted';
 import './App.css';
 import './styles/dominos.css';

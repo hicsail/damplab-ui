@@ -75,7 +75,7 @@ export default function ({ activeNode }: ParamFormProps) {
         if (Object.keys(errors).length > 0) {
             formik.setErrors(errors);
         };
-        if (Object(errors).length != paramErrors.length) {
+        if (Object(errors).length !== paramErrors.length) {
             setParamErrors(errors);
         };
     }, [formik.values]);
@@ -141,6 +141,8 @@ export default function ({ activeNode }: ParamFormProps) {
                                         />
                                     );
                                 }
+                            } else {
+                                return null;
                             }
                         })
                     }
@@ -192,6 +194,8 @@ export default function ({ activeNode }: ParamFormProps) {
                                         }
                                     </div>
                                 )
+                            } else {
+                                return null;
                             }
                         })
                     }

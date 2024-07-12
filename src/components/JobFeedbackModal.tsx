@@ -31,14 +31,14 @@ const FeedbackField = styled(TextField)`
 
 
 export default function JobFeedbackModal(props: any) {
-  const { open, onClose, id } = props;
+  const { onClose, id } = props;
   
   const [feedbackType,      setFeedbackType]      = useState("");
   const [feedbackMessage,   setFeedbackMessage]   = useState("");
-  const [newState,          setNewState]          = useState("");
+  // const [newState,          setNewState]          = useState("");
   const [mutationCompleted, setMutationCompleted] = useState(false);
 
-  const [mutateJobState, { loading, error, data }] = useMutation(MUTATE_JOB_STATE);
+  const [mutateJobState] = useMutation(MUTATE_JOB_STATE);
 
   useEffect(() => {
     if (mutationCompleted) {
@@ -56,7 +56,7 @@ export default function JobFeedbackModal(props: any) {
   };
   
   const handleSubmit = async () => {
-    feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
+    // feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
     
     const updatedState = feedbackType === "looks-good" ? "ACCEPTED" : "REJECTED";
     try {

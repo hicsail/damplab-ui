@@ -3,7 +3,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText } 
 import Snackbar   from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon  from '@mui/icons-material/Close';
-import { GppMaybe, WarningRounded } from '@mui/icons-material/';
+import { GppMaybe } from '@mui/icons-material/';
 
 import { getServiceFromId } from '../controllers/GraphHelpers';
 import Params from './Params';
@@ -148,7 +148,7 @@ export default function ContextTestComponent() {
             <b>Sample/Pool Info</b> <br />
             <div>{textArray.map((field: any, index: number) => {
                     // console.log('active node label: ', activeNode?.data.label)
-                    if (activeNode?.data.label == 'NGS Sequencing') {
+                    if (activeNode?.data.label === 'NGS Sequencing') {
                         return(
                             <div style={{ margin: 20 }}>
                                 <label>
@@ -158,6 +158,8 @@ export default function ContextTestComponent() {
                                 </label>
                             </div>
                         )
+                    } else {
+                        return null;
                     }
             })}</div>
             <b>Library Info</b> <br /><br />
@@ -228,7 +230,7 @@ export default function ContextTestComponent() {
                                 onClose          = {handleCloseToast}
                                 message          = "Parameters Saved"
                                 action           = {action}
-                                key              = {'bottom' + 'right'}
+                                key              = {'bottomright'}
                                 anchorOrigin     = {{ vertical: 'bottom', horizontal: 'right' }}
                             />
                             <Dialog

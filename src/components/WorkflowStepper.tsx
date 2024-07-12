@@ -1,12 +1,12 @@
 import React, { useContext, useEffect, useState, useRef } from 'react'
 import { useMutation } from '@apollo/client';
 import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
-import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
+import { GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
 import LoopIcon    from '@mui/icons-material/Loop';
 import DoneIcon    from '@mui/icons-material/Done';
 import PendingIcon from '@mui/icons-material/Pending';
 
-import { returnValidIndices, returnCleavedVectors, returnValidNewVector, sequenceScreenPassed } from '../controllers/SequenceScreener'; 
+// import { returnValidIndices, returnCleavedVectors, returnValidNewVector, sequenceScreenPassed } from '../controllers/SequenceScreener'; 
 import { MUTATE_NODE_STATUS } from '../gql/mutations';
 import { AppContext }         from '../contexts/App';
 import { ImagesServicesDict } from '../assets/icons';
@@ -19,11 +19,9 @@ export default function WorkflowStepper(workflow: any) {
     const windowSize = useRef([window.innerWidth, window.innerHeight]);
     const [isSmall, setIsSmall] = useState(false);
     const [activeStep, setActiveStep] = useState(0);
-    const [workflowServices, setWorkflowServices] = useState(workflow.workflow.map((service: any) => {
-        return service;
-    }));
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [mutateNodeStatus, { loading, error }] = useMutation(MUTATE_NODE_STATUS);
+    const workflowServices = workflow.workflow.map((service: any) => {return service;});
+    const [mutateNodeStatus] = useMutation(MUTATE_NODE_STATUS);
 
     const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
     const handlePopoverOpen = (event: React.MouseEvent<HTMLElement>) => {setAnchorEl(event.currentTarget);};
@@ -45,9 +43,9 @@ export default function WorkflowStepper(workflow: any) {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const handleDialogOpen = () => {
-        setDialogOpen(true);
-    };
+    // const handleDialogOpen = () => {
+    //     setDialogOpen(true);
+    // };
 
     const handleClose = () => {
         setDialogOpen(false);
@@ -91,31 +89,31 @@ export default function WorkflowStepper(workflow: any) {
         }
     }
 
-    const prepScreening = (service: any) => {
-        let vector: string = '';
-        let insert: string = '';
-        let site_one: string = '';
-        let site_two: string = '';
+    // const prepScreening = (service: any) => {
+    //     let vector: string = '';
+    //     let insert: string = '';
+    //     let site_one: string = '';
+    //     let site_two: string = '';
 
-        {service.data.formData.map((parameter: any) => {
-            if (['Vector'].includes(parameter.name)) {vector = parameter.value;}
-            if (['Insert'].includes(parameter.name)) {insert = parameter.value;}
-            if (['First Restriction Site'].includes(parameter.name))  {site_one = parameter.value;}
-            if (['Second Restriction Site'].includes(parameter.name)) {site_two = parameter.value;}
-        })}
+    //     {service.data.formData.map((parameter: any) => {
+    //         if (['Vector'].includes(parameter.name)) {vector = parameter.value;}
+    //         if (['Insert'].includes(parameter.name)) {insert = parameter.value;}
+    //         if (['First Restriction Site'].includes(parameter.name))  {site_one = parameter.value;}
+    //         if (['Second Restriction Site'].includes(parameter.name)) {site_two = parameter.value;}
+    //     })}
     
-        const indices: any      = returnValidIndices(vector, site_one, site_two);
-        const vectors: string[] = returnCleavedVectors(vector, indices[0], indices[1]);
-        const new_vector: any   = returnValidNewVector(vectors[0], 'over', vectors[1], 'over', insert);
+    //     const indices: any      = returnValidIndices(vector, site_one, site_two);
+    //     const vectors: string[] = returnCleavedVectors(vector, indices[0], indices[1]);
+    //     const new_vector: any   = returnValidNewVector(vectors[0], 'over', vectors[1], 'over', insert);
     
-        const vector_passed:     boolean = sequenceScreenPassed(vector);
-        const insert_passed:     boolean = sequenceScreenPassed(insert);
-        const new_vector_passed: boolean = sequenceScreenPassed(new_vector);
+    //     const vector_passed:     boolean = sequenceScreenPassed(vector);
+    //     const insert_passed:     boolean = sequenceScreenPassed(insert);
+    //     const new_vector_passed: boolean = sequenceScreenPassed(new_vector);
 
-        return [indices, new_vector, vector_passed, insert_passed, new_vector_passed];
-    }
+    //     return [indices, new_vector, vector_passed, insert_passed, new_vector_passed];
+    // }
 
-    function prepare_for_screening() {
+    // function prepare_for_screening() {
         // Pick this back up when have Kernel integration...
         // !prepScreening(workflow.workflow[activeStep])[0] || !prepScreening(workflow.workflow[activeStep])[1]
         // ? <div>
@@ -134,7 +132,7 @@ export default function WorkflowStepper(workflow: any) {
         //     <p><DangerousRounded style={{color:'red', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Failed<b/></p>
         //     <p style={{paddingLeft: 30}}>Screen of new sequence failed...</p>
         //   </div>
-    }
+    // }
 
     function demo_prep_screen(stage: string, value: string) {
         // Stage options...
@@ -143,11 +141,11 @@ export default function WorkflowStepper(workflow: any) {
         // const value = workflow.workflow[activeStep].data.formData[0].value;  // First field is 'Vector'
 
         return(
-            <>{ value == "CAT"
+            <>{ value === "CAT"
                 ? <div><CheckCircleRounded style={{color:'green',  verticalAlign:'bottom'}}/>&nbsp;{stage}: Passed</div>
-                : value == "TAC"
+                : value === "TAC"
                 ? <div><DangerousRounded   style={{color:'red',    verticalAlign:'bottom'}}/>&nbsp;{stage}: Failed</div>
-                : value == "ACT"
+                : value === "ACT"
                 ? <div><HelpRounded        style={{color:'orange', verticalAlign:'bottom'}}/>&nbsp;{stage}: Error</div>
                 : <div><WarningRounded     style={{color:'grey',   verticalAlign:'bottom'}}/>&nbsp;{stage}: Pending</div>
             }</>

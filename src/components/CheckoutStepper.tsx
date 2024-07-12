@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useState, useRef } from 'react'
-import { useMutation } from '@apollo/client';
-import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
-import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material/';
+// import { useMutation } from '@apollo/client';
+import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
+import { GppMaybe, GppMaybeTwoTone } from '@mui/icons-material/';
 
-import { MUTATE_NODE_STATUS } from '../gql/mutations';
+// import { MUTATE_NODE_STATUS } from '../gql/mutations';
 import { AppContext }         from '../contexts/App';
 import { ImagesServicesDict } from '../assets/icons';
 
@@ -15,11 +15,9 @@ export default function WorkflowStepper(workflow: any) {
     const windowSize = useRef([window.innerWidth, window.innerHeight]);
     const [isSmall, setIsSmall] = useState(false);
     const [activeStep, setActiveStep] = useState(0);
-    const [workflowServices, setWorkflowServices] = useState(workflow.workflow.map((service: any) => {
-        return service;
-    }));
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [mutateNodeStatus, { loading, error }] = useMutation(MUTATE_NODE_STATUS);
+    // const [mutateNodeStatus, { loading, error }] = useMutation(MUTATE_NODE_STATUS);
+    const workflowServices = workflow.workflow.map((service: any) => {return service;});
 
 
     useEffect(() => {
@@ -37,7 +35,7 @@ export default function WorkflowStepper(workflow: any) {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const handleDialogOpen = () => {setDialogOpen(true);};
+    // const handleDialogOpen = () => {setDialogOpen(true);};
     const handleClose = () => {setDialogOpen(false);};
     const selectStep = (index: number) => () => {
         setActiveStep(index);
@@ -49,21 +47,21 @@ export default function WorkflowStepper(workflow: any) {
     const handlePopoverClose = () => {setAnchorEl(null);};
     const open = Boolean(anchorEl);
 
-    const updateWorkflowNode = (newState: string) => () => {
-        // why is it workflow.workflow and not workflow.nodes?
-        mutateNodeStatus({
-            variables: {
-                _ID: workflow.workflow[activeStep].id,
-                State: newState,
-            },
-            onError: (error: any) => {
-                console.log(error.networkError?.result?.errors);
-            },
-            onCompleted: () => {
-                window.location.reload();
-            }
-        });   
-    }
+    // const updateWorkflowNode = (newState: string) => () => {
+    //     // why is it workflow.workflow and not workflow.nodes?
+    //     mutateNodeStatus({
+    //         variables: {
+    //             _ID: workflow.workflow[activeStep].id,
+    //             State: newState,
+    //         },
+    //         onError: (error: any) => {
+    //             console.log(error.networkError?.result?.errors);
+    //         },
+    //         onCompleted: () => {
+    //             window.location.reload();
+    //         }
+    //     });   
+    // }
 
     useEffect(() => {
         console.log(workflow);
@@ -81,7 +79,7 @@ export default function WorkflowStepper(workflow: any) {
                 {workflowServices.map((service: any, index: number) => (
                     <Step key={service.id} style={{ maxWidth: 250, minWidth: 50, paddingLeft: 50, paddingRight: 50 }}>
                         <StepButton onClick={selectStep(index)}>
-                            <StepLabel StepIconComponent={() => <img src={ImagesServicesDict[service.name]} height="50"/>}>
+                            <StepLabel StepIconComponent={() => <img src={ImagesServicesDict[service.name]} height="50" alt="Service icon"/>}>
                                 <div style={{display: 'flex', alignItems: 'end' }}>
                                 <Badge   anchorOrigin={{vertical: 'top', horizontal: 'right'}} badgeContent={
                                     <div>
