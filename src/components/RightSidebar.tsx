@@ -128,70 +128,72 @@ export default function ContextTestComponent() {
                     : null
                 }
             </div>
-            <Box sx={ { flexDirection:'column', textAlign: 'left' } }>
-                <input name = "id" onChange = { e => { console.log(e.target.value); setID(e.target.value); }} />
-                <Button onClick = {() => { ID ? get() : console.log('No ID set...') }}>Retrieve Record</ Button>
-            </Box>
-            <div style = {{ textAlign: "left", fontSize: 16, width: 100, margin: 5, minHeight: 100 }}>
-                <pre className={"data"}>ID: {record?record.id:''}</pre>
-                <pre className={"data"}>Name: {trunc(record?.sequence?.name ?? '')}</pre>
-                <pre className={"data"}>Type: {trunc(record?.sequence?.type ?? '')}</pre>
-                <pre className={"data"}>Sequence: {trunc(record?.sequence?.seq ?? '')}</pre>
-                <pre className={"data"}>Annotations: {trunc(JSON.stringify(record?.sequence?.annotations ?? ''))}</pre>
-            </div>
             {
                 activeNode?.data.formData 
                 ? <div><Params activeNode={activeNode}/></div>
                 : null
             }
                        <br />
-            <b>Sample/Pool Info</b> <br />
-            <div>{textArray.map((field: any, index: number) => {
-                    // console.log('active node label: ', activeNode?.data.label)
-                    if (activeNode?.data.label === 'NGS Sequencing') {
-                        return(
-                            <div style={{ margin: 20 }}>
-                                <label>
-                                    {field} &nbsp;
-                                    <input type = "text" value = {fieldArray[index]} style={{marginTop: 5}}
-                                            onChange = {(e) => setterArray[index](e.target.value)} />
-                                </label>
-                            </div>
-                        )
-                    } else {
-                        return null;
-                    }
-            })}</div>
-            <b>Library Info</b> <br /><br />
-            <div style={{marginLeft: 20}}>
-                <label>Pool Name: <br />
-                    <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
-                </label><br />
-                <label>Library Name: <br />
-                    <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
-                </label><br />
-                <label>i7 Index Seq: <br />
-                    <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
-                </label><br />
-                <label>i5 Index Seq: <br />
-                    <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
-                </label><br />
-                <label>Custom Read 1: <br />
-                    <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
-                </label><br />
-                <label>Custom Read 2: <br />
-                    <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
-                </label><br />
-                <label>Custom Index 1: <br />
-                    <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
-                </label><br />
-                <label>Custom Index 2: <br />
-                    <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
-                </label>
-            </div>
-            <Button onClick = {() => { }} sx = {{ ml: 2 }}>+ Add Library</ Button>
-            <br />
-            <Button variant='contained' onClick = {() => { put() }} sx = {{ ml: 2 }}>Send to MPI Record {ID}</ Button>
+            <Box hidden={activeNode?.data.label === 'Next Generation Sequencing' ? false : true}>
+                <b>Sample/Pool Info</b> <br />
+                <div>{textArray.map((field: any, index: number) => {
+                        // console.log('active node label: ', activeNode?.data.label)
+                        if (activeNode?.data.label === 'Next Generation Sequencing') {
+                            return(
+                                <div style={{ margin: 20 }}>
+                                    <label>
+                                        {field} &nbsp;
+                                        <input type = "text" value = {fieldArray[index]} style={{marginTop: 5}}
+                                                onChange = {(e) => setterArray[index](e.target.value)} />
+                                    </label>
+                                </div>
+                            )
+                        } else {
+                            return null;
+                        }
+                })}</div>
+                <Box sx={ { flexDirection:'column', textAlign: 'left' } }>
+                    <input name = "id" onChange = { e => { console.log(e.target.value); setID(e.target.value); }} />
+                    <Button onClick = {() => { ID ? get() : console.log('No ID set...') }}>Retrieve Record</ Button>
+                </Box>
+                <div style = {{ textAlign: "left", fontSize: 16, width: 100, margin: 5, minHeight: 100 }}>
+                    <pre className={"data"}>ID: {record?record.id:''}</pre>
+                    <pre className={"data"}>Name: {trunc(record?.sequence?.name ?? '')}</pre>
+                    <pre className={"data"}>Type: {trunc(record?.sequence?.type ?? '')}</pre>
+                    <pre className={"data"}>Sequence: {trunc(record?.sequence?.seq ?? '')}</pre>
+                    <pre className={"data"}>Annotations: {trunc(JSON.stringify(record?.sequence?.annotations ?? ''))}</pre>
+                </div>
+                <b>Library Info</b> <br /><br />
+                <div style={{marginLeft: 20}}>
+                    <label>Pool Name: <br />
+                        <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
+                    </label><br />
+                    <label>Library Name: <br />
+                        <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
+                    </label><br />
+                    <label>i7 Index Seq: <br />
+                        <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
+                    </label><br />
+                    <label>i5 Index Seq: <br />
+                        <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
+                    </label><br />
+                    <label>Custom Read 1: <br />
+                        <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
+                    </label><br />
+                    <label>Custom Read 2: <br />
+                        <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
+                    </label><br />
+                    <label>Custom Index 1: <br />
+                        <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
+                    </label><br />
+                    <label>Custom Index 2: <br />
+                        <input type = "text" onChange = {(e) => {}} style={{marginTop: 5}}/>
+                    </label>
+                </div>
+                <Button onClick = {() => { }} sx = {{ ml: 2 }}>+ Add Library</ Button>
+                <br />
+                <Button variant='contained' onClick = {() => { put() }} sx = {{ ml: 2 }}>Send to MPI Record {ID}</ Button>
+            </Box>
             <div>
                 {
                     // return header with text Allowed Connections if allowedConnections list is not empty
