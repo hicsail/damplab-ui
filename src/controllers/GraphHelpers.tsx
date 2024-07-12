@@ -1,8 +1,9 @@
 import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 
-import { NodeData, NodeParameter } from '../types/CanvasTypes';
-import { Service }                 from '../types/Service';
-import { services }                from '../data/services';
+import { NodeParameter } from '../types/CanvasTypes';
+import { services } from '../data/services';
+import { bundles as bundleServiceOrders } from '../data/bundles';
+import { services as serviceNames } from '../data/services';
 
 
 export const getServiceFromId = (services: any, id: string) => {
@@ -164,14 +165,14 @@ export const transformEdgesToGQL = (edges: any) => {
 }
 
 
-export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: string[], setNodes: any, setEdges: any) => {
+export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: string[] | undefined, setNodes: any, setEdges: any) => {
 
     // loop over serviceIds
     let previousNodeId : any = null;
     let baseX = 0;
     let baseY = 0;
     
-    serviceIds.forEach((serviceId: string, index: number) => {
+    serviceIds?.forEach((serviceId: string, index: number) => {
         // get service from serviceId
         const service = getServiceFromId(services, serviceId);
         // if index === 0, add node to canvas with edge
@@ -189,9 +190,14 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
     });
 }
 
+// TODO: Change bundle data structure to preserve service order!  Needing to check bundles.tsx just to get the correct service order...
 export const addNodesAndEdgesFromBundle = (bundle: any, services: any, setNodes: any, setEdges: any) => {
     // get serviceIds from bundle
-    const serviceIds = bundle.services.map((service: any) => service.id);
+    const bundleServices = bundleServiceOrders.find(b => b.label === bundle.label)?.services;
+    const bundleServiceNames = bundleServices?.map(service => serviceNames.find(s => s.id === service)?.name);
+    const serviceIds = bundleServiceNames?.map(service => bundle.services.find((s: any) => s.name === service)?.id ?? '');
+    // console.log('test: ', test);
+    // const serviceIds = bundle.services.map((service: any) => service.id);
     addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges);
 }
 

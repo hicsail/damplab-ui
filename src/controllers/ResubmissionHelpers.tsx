@@ -1,8 +1,8 @@
-import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
+// import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
-import { Service }                 from '../types/Service';
-import { services }                from '../data/services';
+// import { Service }                 from '../types/Service';
+// import { services }                from '../data/services';
 
 
 // TODO: Resubmission process not fully implemented

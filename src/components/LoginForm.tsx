@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, TextField } from '@mui/material';
 
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import AccountTreeIcon        from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import ViewStreamIcon         from '@mui/icons-material/ViewStream';
 
 
 export default function LoginForm() {
@@ -98,15 +99,18 @@ export default function LoginForm() {
               Go to {role === 'admin' ? 'Dashboard' : 'Canvas'}
             </Button> */}
             <Button variant="contained" onClick={() => window.location.href = "https://www.damplab.org/services"} sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-              <img src='/damp-white.svg' height='30px' style={{margin: 1, marginLeft: -25, marginRight: 10}}/>DAMPLab Site<br/>(See Service Prices)
+              <img src='/damp-white.svg' height='30px' style={{margin: 1, marginLeft: -25, marginRight: 10}} alt="DAMP Logo"/>DAMPLab Site<br/>(See Service Prices)
             </Button>
             <Button variant="contained" onClick={() => navigate('/canvas')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-              <AccountTreeIcon sx={{m:1, ml:-4}}/>CANVAS<br/>(Design Workflows)
+              <AccountTreeIcon sx={{m:1, ml:-4, transform: "rotate(90deg) scaleY(-1)"}}/>CANVAS<br/>(Design Workflows)
             </Button>
             {role === 'admin' ? 
               <>
                 <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-                  <FormatListBulletedIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
+                  <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
+                </Button> 
+                <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+                  <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Release Notes<br/>(+ Other Admin Info)
                 </Button> 
                 {/* <Button variant="contained" onClick={() => navigate('/dominos')} sx={{ m: 2 }}>Go to Dominos Page</Button> 
                 <Button variant="contained" onClick={() => navigate('/elabs')} sx={{ m: 2 }}>Go to eLabs Site</Button> 

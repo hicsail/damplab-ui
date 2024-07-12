@@ -8,7 +8,7 @@ import { addNodesAndEdgesFromBundle } from '../controllers/GraphHelpers';
 import { Service }       from '../types/Service';
 import { CanvasContext } from '../contexts/Canvas';
 import { AppContext }    from '../contexts/App';
-import {ImagesBundlesDict, ImagesServicesDict} from '../assets/icons';
+import { ImagesBundlesDict, ImagesServicesDict } from '../assets/icons';
 
 
 export default () => {
@@ -135,6 +135,7 @@ export default () => {
                 <br/>
             </div>
             {
+              // TODO: Change bundle data structure to preserve service order!  Needing to check bundles.tsx just to get the correct service order...
               bundles.map((bundle: any) => {
                 return (
                   <div key={Math.random().toString(36).substring(2, 9)} 

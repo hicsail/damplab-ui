@@ -12,21 +12,21 @@ type Input = {
     data: any;
 };
 
-const style = {
-    position: 'absolute' as 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: 400,
-    bgcolor: 'background.paper',
-    border: '2px solid #000',
-    boxShadow: 24,
-    p: 4,
-};
-
+// const style = {
+//     position: 'absolute' as 'absolute',
+//     top: '50%',
+//     left: '50%',
+//     transform: 'translate(-50%, -50%)',
+//     width: 400,
+//     bgcolor: 'background.paper',
+//     border: '2px solid #000',
+//     boxShadow: 24,
+//     p: 4,
+// };
+ 
 export default memo((input: Input) => {
 
-    const { setActiveComponentId, activeComponentId, nodes } = useContext(CanvasContext);
+    const { setActiveComponentId, activeComponentId } = useContext(CanvasContext);
     const [background, setBackground] = useState('white');
     const [allFilled, setAllFilled] = useState(false);
     const isConnectable = input.isConnectable;
@@ -51,11 +51,11 @@ export default memo((input: Input) => {
         let filled = true;
         formData.forEach((obj: any) => {
             if (obj.paramType === 'result') {
-                if (obj.value === false && ( obj.resultParamValue=== null || obj.resultParamValue === '')) {
+                if (obj.value === false && obj.required === true && ( obj.resultParamValue=== null || obj.resultParamValue === '')) {
                     filled = false;
                 }
             }
-            else if (obj.value === '' || obj.value === undefined || obj.value === null) {
+            else if (obj.required === true && (obj.value === '' || obj.value === undefined || obj.value === null)) {
                 filled = false;
             }
         });

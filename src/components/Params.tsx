@@ -38,7 +38,8 @@ export default function ({ activeNode }: ParamFormProps) {
         for (let key in values) {
             if ((values[key] === '' || values[key] === undefined || values[key] === null)) {
                 // if key is an id of a param in formdata, then it is a required field
-                if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
+                if (activeNode.data.formData.find((obj: any) => obj.id === key)?.required === true) errors[key] = 'Required';
+                // if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
             }
         }
         setParamErrors(errors);
@@ -74,7 +75,7 @@ export default function ({ activeNode }: ParamFormProps) {
         if (Object.keys(errors).length > 0) {
             formik.setErrors(errors);
         };
-        if (Object(errors).length != paramErrors.length) {
+        if (Object(errors).length !== paramErrors.length) {
             setParamErrors(errors);
         };
     }, [formik.values]);
@@ -106,7 +107,7 @@ export default function ({ activeNode }: ParamFormProps) {
                                 if (param.type === "dropdown") {
                                     return (
                                         <FormControl size='small' sx={{ mt: 3, width: '26ch' }} key={param.id}>
-                                            <InputLabel>{param.name}</InputLabel>
+                                            <InputLabel sx={{backgroundColor: 'white'}}>{param.name}</InputLabel>
                                             <Select
                                                 name     = {param.id}
                                                 value    = {formik.values[param.id] ? formik.values[param.id] : ""}
@@ -136,9 +137,12 @@ export default function ({ activeNode }: ParamFormProps) {
                                             onChange   = {formik.handleChange}
                                             onBlur     = {formik.handleBlur}
                                             sx         = {{ mt: 3, width: '26ch' }}
+                                            InputLabelProps={{ shrink: true }} 
                                         />
                                     );
                                 }
+                            } else {
+                                return null;
                             }
                         })
                     }
@@ -190,6 +194,8 @@ export default function ({ activeNode }: ParamFormProps) {
                                         }
                                     </div>
                                 )
+                            } else {
+                                return null;
                             }
                         })
                     }

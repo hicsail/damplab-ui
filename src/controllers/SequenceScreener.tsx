@@ -1,8 +1,8 @@
-import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
+// import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 
-import { NodeData, NodeParameter } from '../types/CanvasTypes';
-import { Service }                 from '../types/Service';
-import { services }                from '../data/services';
+// import { NodeData, NodeParameter } from '../types/CanvasTypes';
+// import { Service }                 from '../types/Service';
+// import { services }                from '../data/services';
 
 // WILL BE USING KERNEL INSTEAD!
 // PlasMapper API accessible via cURL POST request; example...
@@ -68,24 +68,24 @@ export const returnValidNewVector = (vector_one: string, hang_one: string, vecto
 
     // Faking overhang check until get requisite data from PlasMapper
     if (hang_one === 'over') {
-        if (vec_one != ins_one) {
+        if (vec_one !== ins_one) {
             return false;
         }
         new_vector = vector_one.concat(insert.slice(3, insert.length));
     } else {
-        if (vec_one == ins_one) {  // Fix logic to check for complement
+        if (vec_one === ins_one) {  // Fix logic to check for complement
             return false;
         }
         new_vector = vector_one.slice(0, vector_one.length-3).concat(insert);
     }
 
     if (hang_two === 'over') {
-        if (vec_two == ins_two) {
+        if (vec_two === ins_two) {
             return false;
         }
         new_vector = new_vector.slice(0, new_vector.length-3).concat(vector_two);
     } else {
-        if (vec_two != ins_two) {  // Fix logic to check for complement
+        if (vec_two !== ins_two) {  // Fix logic to check for complement
             return false;
         }
         new_vector = new_vector.concat(vector_two.slice(3, vector_two.length));
@@ -98,7 +98,7 @@ export const returnValidNewVector = (vector_one: string, hang_one: string, vecto
 export const sequenceScreenPassed = (sequence: string) => {
 
     // Faking security screening until DAMP/SAIL have more resources/time to develop system
-    if (sequence == '') {
+    if (sequence === '') {
         return false;
     }
 
