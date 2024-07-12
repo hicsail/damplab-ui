@@ -11,10 +11,12 @@ Font.register({ family: 'Courier-New', fonts: [{ src: '/fonts/Courier-New.ttf' }
 const styles = StyleSheet.create({
   page: {
     padding: 30,
+    position: 'relative'
   },
   section: {
     margin: 15,
     padding: 15,
+    wrap: false
   },
   jobParam: {
     margin: 10,
@@ -23,7 +25,7 @@ const styles = StyleSheet.create({
   workflow: {
     fontSize: 20,
     padding: 30,
-    paddingBottom: -20,
+    // paddingBottom: -20,
   },
   service: {
     marginBottom: 10,
