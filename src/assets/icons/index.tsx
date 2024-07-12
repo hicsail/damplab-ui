@@ -6,7 +6,7 @@ export const ImagesBundlesDict: { [id: string] : string; } = {
     'DNA/RNA Extraction and qPCR'                            : require("./bundles/DNA Exract and qPCR.png"),
     'Gibson Assembly and Cloning with Provided DNA'          : require("./bundles/Gibson Assem and Cloning.png"),
     'Gibson Assembly and Cloning with Ordering'              : require("./bundles/Gibson Assem and Cloning.png"),
-    'Library Prep (16S, ITS)'                                : require("./bundles/RNA Sequencing.png"),
+    'Library Prep (16S,ITS)'                                 : require("./bundles/RNA Sequencing.png"),
   };
 
 export const ImagesServicesDict: { [id: string] : string; } = {

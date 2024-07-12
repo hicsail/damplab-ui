@@ -20,7 +20,7 @@ export let bundles = [
     },
     {
         id: 'library-prep',
-        label: 'Library Prep (16S, ITS)',
+        label: 'Library Prep (16S,ITS)',
         icon: '',
         services: ['pcr', 'gel-electrophoresis', 'clean-up', 'spectro'],
     },
