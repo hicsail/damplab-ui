@@ -273,7 +273,7 @@ export let services: Service[] = [
             {
                 id: 'ladder',
                 name: 'Ladder',
-                description: 'select from dropdown',
+                description: '',
                 options: [
                     {
                         id: '100-bp-ladder',
@@ -608,7 +608,7 @@ export let services: Service[] = [
             {
                 id: 'normalization',
                 name: 'Normalization and Pooling',
-                description: 'select from dropdown',
+                description: '',
                 options: [
                     {
                         id: 'yes',
@@ -694,7 +694,7 @@ export let services: Service[] = [
             {
                 id: 'dpn1-digest',
                 name: 'Dpn1 Digest',
-                description: 'select from dropdown',
+                description: '',
                 options: [
                     {
                         id: 'yes',
@@ -787,7 +787,7 @@ export let services: Service[] = [
             {
                 id: 'dpn1-digest',
                 name: 'Dpn1 Digest',
-                description: 'select from dropdown',
+                description: '',
                 options: [
                     {
                         id: 'yes',
@@ -1016,7 +1016,7 @@ export let services: Service[] = [
                 type: 'dropdown',
                 paramType: 'input',
                 required: true,
-                description: 'select from dropdown defauly is DH5alpha',
+                description: 'select from dropdown, default is DH5alpha',
                 options : [
                     {
                         id: 'DH5alpha',
@@ -1039,7 +1039,7 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true,
-                description: 'select from dropdown default is SOC',
+                description: 'select from dropdown, default is SOC',
                 // <- other option is LBE <- capture amount as well default is 10x reaction volume 198mL, range is 50-900'
                 options : [
                     {
@@ -1123,7 +1123,7 @@ export let services: Service[] = [
                 type: 'string',
                 paramType: 'input',
                 required: true,
-                description: 'select from dropdown',
+                description: '',
                 // default is LBE <- other option is SOC or TB or M9 <- capture amount as well default is 10x reaction volume 198mL, range is 50-900
                 options : [
                     {

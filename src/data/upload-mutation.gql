@@ -255,7 +255,7 @@ mutation {
           {
             id: "ladder"
             name: "Ladder"
-            description: "select from dropdown"
+            description: ""
             options: [
               { id: "100-bp-ladder", name: "100 bp ladder" }
               { id: "1-kb-ladder", name: "1 kb ladder" }
@@ -560,7 +560,7 @@ mutation {
             {
                 id: "normalization"
                 name: "Normalization and Pooling"
-                description: "select from dropdown"
+                description: ""
                 options: [
                     {
                         id: "yes",
@@ -646,7 +646,7 @@ mutation {
           {
             id: "dpn1-digest"
             name: "Dpn1 Digest"
-            description: "select from dropdown"
+            description: ""
             options: [
                 {
                     id: "yes",
@@ -871,7 +871,7 @@ mutation {
             type: "dropdown"
             paramType: "input"
             required: true
-            description: "select from dropdown defauly is DH5alpha"
+            description: "select from dropdown, default is DH5alpha"
             options: [
               { id: "DH5alpha", name: "DH5alpha" }
               { id: "DH10B", name: "DH10B" }
@@ -884,7 +884,7 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
-            description: "select from dropdown default is SOC"
+            description: "select from dropdown, default is SOC"
             options: [
               { id: "SOC", name: "SOC" }
               { id: "LBE", name: "LBE" }
@@ -952,7 +952,7 @@ mutation {
             type: "string"
             paramType: "input"
             required: true
-            description: "select from dropdown"
+            description: ""
             options: [
               { id: "LBE", name: "LBE" }
               { id: "SOC", name: "SOC" }

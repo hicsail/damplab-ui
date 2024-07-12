@@ -156,9 +156,17 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
         {workflow.nodes.map((service, ind) => (
           <View key={ind} style={styles.section}>
             <Text style={styles.service}>{service.label}</Text>
-            {service.formData.map((parameter: any, i: number) => (
-              <Text key={i} style={styles.parameter}>{parameter.name}: {parameter.value}</Text>
-            ))}
+            {service.formData.map((parameter: any, i: number) => {
+              if (parameter.type === 'boolean') {
+                if (parameter.value === true) {
+                  return(<Text key={i} style={styles.parameter}>{parameter.name}: true</Text>)
+                } else {
+                  return(<Text key={i} style={styles.parameter}>{parameter.name}: {parameter.resultParamValue}</Text>)
+                }
+              } else {
+                return(<Text key={i} style={styles.parameter}>{parameter.name}: {parameter.value}</Text>)
+              }
+            })}
           </View>
         ))}
         <Text key={index} style={styles.footer} fixed >DAMP Lab © | Job Submission Summary</Text>
