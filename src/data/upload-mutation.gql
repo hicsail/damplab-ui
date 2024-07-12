@@ -194,6 +194,13 @@ mutation {
             required: true
           }
           {
+            id: "dpn1-digest"
+            name: "Dpn1 Digest"
+            type: "boolean"
+            paramType: "input"
+            required: true
+          }
+          {
             id: "additional-notes"
             name: "Additional Notes"
             type: "string"
@@ -201,12 +208,29 @@ mutation {
             required: false
           }
         ]
-        allowedConnections: ["gel-electrophoresis", "dpn1"]
+        allowedConnections: ["gel-electrophoresis"]
         categories: ["dna-assembly-cloning"]
         result: {
           id: "pcr-product"
           type: "PCRResult"
           result: { id: "pcr-result", amount: "number" }
+        }
+      }
+      {
+        id: "qpcr"
+        name: "qPCR"
+        icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM"
+        description: ""
+        parameters: []
+        allowedConnections: []
+        categories: ["dna-assembly-cloning"]
+        result: {
+            id: "qpcr-product"
+            type: "qPCRResult"
+            result: {
+                id: "qpcr-result"
+                amount: "number"
+            }
         }
       }
       {
@@ -277,7 +301,7 @@ mutation {
             required: false
           }
         ]
-        allowedConnections: ["pcr", "gibson-assembly"]
+        allowedConnections: ["clean-up", "pcr", "gibson-assembly"]
       }
       {
         id: "gibson-assembly"
@@ -333,30 +357,6 @@ mutation {
         ]
         allowedConnections: ["transformation", "dna-storage"]
         categories: []
-      }
-      {
-        id: "dpn1"
-        name: "Digest with Dpn1"
-        icon: "https://cdn-icons-png.flaticon.com/512/647/647370.png"
-        resultParams: ["pcr-product"]
-        parameters: [
-          {
-            id: "pcr-product-param"
-            name: "PCR Product Result"
-            type: "boolean"
-            paramType: "result"
-            required: true
-          }
-        ]
-        allowedConnections: ["run-gel", "column-purification"]
-        result: {
-          id: "dpn1-product"
-          type: "Dpn1Result"
-          result: { id: "dpn1-result", amount: "number" }
-        }
-        categories: ["dna-assembly-cloning"]
-        description: ""
-        allowedConnections: ["pcr", "gibson-assembly"]
       }
       {
         id: "restriction-digest"
@@ -517,6 +517,24 @@ mutation {
           }
         ]
         allowedConnections: ["dna-storage", "gel-electrophoresis"]
+        categories: ["dna-rna"]
+        description: ""
+      }
+      {
+        id: "dna-rna-extraction"
+        name: "DNA RNA Extraction"
+        icon: "https://drive.google.com/thumbnail?id=11mSlGkU_cesN_RiUbc1xiO6fv9qCzeE6"
+        resultParams: []
+        parameters: [
+            {
+                id: "additional-notes"
+                name: "Additional Notes"
+                type: "string"
+                paramType: "input"
+                required: false
+            }
+        ]
+        allowedConnections: ["qpcr"]
         categories: ["dna-rna"]
         description: ""
       }
@@ -900,7 +918,36 @@ mutation {
         }
       }
       {
-        id: "seq"
+        id: "spectro"
+        name: "Spectrophotometric Assay"
+        icon: ""
+        categories: ["next-gen-seq"]
+        allowedConnections: ["clean-up", "next-gen-seq", "seq"]
+        description: ""
+        parameters: [
+            {
+                id: "normalization"
+                name: "Normalization and Pooling"
+                type: "boolean"
+                paramType: "input"
+                required: true
+            }
+            {
+                id: "additional-notes"
+                name: "Additional Notes"
+                type: "string"
+                paramType: "input"
+                required: false
+            }
+        ]
+        result: {
+            id: "spectro-product"
+            type: "SpectroResult"
+            name: "Spectrophotometric Assay Result"
+        }
+      }
+      {
+        id: "next-gen-seq"
         name: "Next Generation Sequencing"
         icon: "https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se"
         categories: ["next-gen-seq"]
@@ -1071,7 +1118,6 @@ mutation {
           "design-primers"
           "rehydrate-primer"
           "pcr"
-          "dpn1"
           "dna-gel"
           "m-cloning"
           "transformation"
@@ -1087,7 +1133,6 @@ mutation {
           "design-primers"
           "rehydrate-primer"
           "pcr"
-          "dpn1"
           "dna-gel"
           "m-cloning"
           "transformation"
@@ -1095,16 +1140,22 @@ mutation {
         ]
       }
       {
-        id: "rna-seq"
-        label: "RNA Sequencing"
-        icon: "https://drive.google.com/thumbnail?id=17GlfivFCDd6OMK__6MOmpA9tf3joX2Ft"
-        services: [
-          "miniprep-gs"
-          "glyc-storage"
-          "eth-perc"
-          "frag-analyzer"
-          "seq"
-        ]
+        id: "gibson-assembly-provided"
+        label: "Gibson Assembly and Cloning with Provided DNA"
+        icon: ""
+        services: ["seq", "design-primers", "rehydrate-primer", "pcr", "gel-electrophoresis", "dna-gel", "gibson-assembly", "transformation", "overnight-culture", "miniprep-gs", "glyc-storage", "seq"]
+      }
+      {
+          id: "gibson-assembly-ordering"
+          label: "Gibson Assembly and Cloning with Ordering"
+          icon: ""
+          services: ["gene", "design-primers", "rehydrate-primer", "pcr", "gel-electrophoresis", "dna-rna-extraction", "dna-gel", "gibson-assembly", "transformation", "overnight-culture", "miniprep-gs", "glyc-storage", "seq"]
+      }
+      {
+        id: "library-prep"
+        label: "Library Prep (16S, ITS)"
+        icon: ""
+        services: ["pcr", "gel-electrophoresis", "clean-up", "spectro"]
       }
       {
         id: "protein-production"
@@ -1115,6 +1166,12 @@ mutation {
           "cell-lysate"
           "protein-production"
         ]
+      }
+      {
+        id: "dna-rna-extract-and-qpcr"
+        label: "DNA/RNA Extraction and qPCR"
+        icon: ""
+        services: ["dna-rna-extraction", "qpcr"]
       }
     ]
   )

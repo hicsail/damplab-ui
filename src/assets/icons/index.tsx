@@ -5,7 +5,8 @@ export const ImagesBundlesDict: { [id: string] : string; } = {
     'Protein Production, Purification, and Induction Bundle' : require("./bundles/Protein Production, Purification, and Induction Bundle.png"),
     'DNA/RNA Extraction and qPCR'                            : require("./bundles/DNA Exract and qPCR.png"),
     'Gibson Assembly and Cloning with Provided DNA'          : require("./bundles/Gibson Assem and Cloning.png"),
-    'Gibson Assembly and Cloning with Ordering'              : require("./bundles/Gibson Assem and Cloning.png")
+    'Gibson Assembly and Cloning with Ordering'              : require("./bundles/Gibson Assem and Cloning.png"),
+    'Library Prep (16S, ITS)'                                : require("./bundles/RNA Sequencing.png"),
   };
 
 export const ImagesServicesDict: { [id: string] : string; } = {
@@ -15,8 +16,8 @@ export const ImagesServicesDict: { [id: string] : string; } = {
     'Clean Up and Concentrate DNA'                          : require("./services/Clean Up and Concentrate DNA.png"),
     'Design and Order Primers'                              : require("./services/Design and Order Primers from Third Party.png"),
     'Digest with Dpn1'                                      : require("./services/Digest with Dpn1.png"),
-    'DNA/RNA Ethanol Precipitation'                         : require("./services/DNA RNA Ethanol Precipitation.png"),
-    'DNA Extraction'                                        : require("./services/DNA Extraction.png"),
+    'DNA RNA Ethanol Precipitation'                         : require("./services/DNA RNA Ethanol Precipitation.png"),
+    'DNA RNA Extraction'                                    : require("./services/DNA RNA Extraction.png"),
     'Gibson Assembly'                                       : require("./services/Gibson Assembly.png"),
     'Glycerol Stock Storage'                                : require("./services/Glycerol Stock Creation.png"),
     'Fragment Analyzer'                                     : require("./services/Library.png"),
@@ -26,7 +27,7 @@ export const ImagesServicesDict: { [id: string] : string; } = {
     'Gel Electrophoresis'                                   : require("./services/Perform Gel Electrophoresis.png"),
     'PCR'                                                   : require("./services/Perform PCR.png"),
     'qPCR'                                                  : require("./services/qPCR.png"),
-    'Spectrophotometric'                                    : require("./services/Spectrophotometric.png"),
+    'Spectrophotometric Assay'                              : require("./services/Spectrophotometric.png"),
     'Miniprep and Glycerol Stock'                           : require("./services/Plasmid DNA Miniprep.png"),
     'Plasmid, DNA fragment, or oligo storage'               : require("./services/Plasmid DNA RNA Fragments and Oligos Storage.png"),
     'Overnight Inoculum'                                    : require("./services/Prepare Liquid Overnight.png"),

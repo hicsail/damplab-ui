@@ -38,7 +38,7 @@ export default function ({ activeNode }: ParamFormProps) {
         for (let key in values) {
             if ((values[key] === '' || values[key] === undefined || values[key] === null)) {
                 // if key is an id of a param in formdata, then it is a required field
-                if (activeNode.data.formData.find((obj: any) => obj.id === key).required === true) errors[key] = 'Required';
+                if (activeNode.data.formData.find((obj: any) => obj.id === key)?.required === true) errors[key] = 'Required';
                 // if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
             }
         }

@@ -15,12 +15,30 @@ export let bundles = [
         services: ['seq', 'design-primers', 'rehydrate-primer', 'pcr', 'dpn1', 'dna-gel', 'm-cloning', 
             'transformation', 'overnight-culture'],
     },
+    // {
+    //     id: 'rna-seq',
+    //     label: 'RNA Sequencing',
+    //     // icon: 'https://drive.google.com/uc?id=1mbl2UEtWGdybUuS5gImE_BLqqT3SE7d6',
+    //     icon: 'https://drive.google.com/thumbnail?id=17GlfivFCDd6OMK__6MOmpA9tf3joX2Ft',
+    //     services: ['miniprep-gs', 'glyc-storage', 'eth-perc', 'frag-analyzer', 'mRNA-enrichment', 'seq'],
+    // },
     {
-        id: 'rna-seq',
-        label: 'RNA Sequencing',
-        // icon: 'https://drive.google.com/uc?id=1mbl2UEtWGdybUuS5gImE_BLqqT3SE7d6',
-        icon: 'https://drive.google.com/thumbnail?id=17GlfivFCDd6OMK__6MOmpA9tf3joX2Ft',
-        services: ['miniprep-gs', 'glyc-storage', 'eth-perc', 'frag-analyzer', 'mRNA-enrichment', 'seq'],
+        id: 'gibson-assembly-provided',
+        label: 'Gibson Assembly and Cloning with Provided DNA',
+        icon: '',
+        services: ['seq', 'design-primers', 'rehydrate-primer', 'pcr', 'gel-electrophoresis', 'dna-gel', 'gibson-assembly', 'transformation', 'overnight-culture', 'miniprep-gs', 'glyc-storage', 'seq'],
+    },
+    {
+        id: 'gibson-assembly-ordering',
+        label: 'Gibson Assembly and Cloning with Ordering',
+        icon: '',
+        services: ['gene', 'design-primers', 'rehydrate-primer', 'pcr', 'gel-electrophoresis', 'dna-rna-extraction', 'dna-gel', 'gibson-assembly', 'transformation', 'overnight-culture', 'miniprep-gs', 'glyc-storage', 'seq'],
+    },
+    {
+        id: 'library-prep',
+        label: 'Library Prep (16S, ITS)',
+        icon: '',
+        services: ['pcr', 'gel-electrophoresis', 'clean-up', 'spectro'],
     },
     {
         id: 'protein-production',
@@ -30,22 +48,10 @@ export let bundles = [
         services: ['cell-culture-induction', 'cell-lysate', 'protein-production'],
     },
     {
-        id: 'gibson-assembly-provided',
-        label: 'Gibson Assembly and Cloning with Provided DNA',
-        icon: '',
-        services: ['seq', 'design-primers', 'rehydrate-primer', 'pcr', 'dpn1', 'gel-electrophoresis', '', '', '', '', '', '', ''],
-    },
-    {
-        id: 'gibson-assembly-ordering',
-        label: 'Gibson Assembly and Cloning with Ordering',
-        icon: '',
-        services: ['cell-culture-induction', 'cell-lysate', 'protein-production'],
-    },
-    {
-        id: 'dna-rna-extraction',
+        id: 'dna-rna-extract-and-qpcr',
         label: 'DNA/RNA Extraction and qPCR',
         icon: '',
-        services: ['cell-culture-induction', 'cell-lysate', 'protein-production'],
+        services: ['dna-rna-extraction', 'qpcr'],
     }
 ];
 

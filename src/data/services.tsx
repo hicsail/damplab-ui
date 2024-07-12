@@ -2,6 +2,9 @@ import { Description } from "@mui/icons-material";
 import { Service } from "../types/Service";
 
 
+// NOTE: For now, I moved away from using the icon parameters; instead, all of the icons are in the assets folder.
+// They're identified via names listed in the assets folder index.
+
 export let services: Service[] = [
     {
         id: 'seq',
@@ -207,6 +210,13 @@ export let services: Service[] = [
                 required: true
             },
             {
+                id: 'dpn1-digest',
+                name: 'Dpn1 Digest',
+                type: 'boolean',
+                paramType: 'input',
+                required: true
+            },
+            {
                 id: "additional-notes",
                 name: "Additional Notes",
                 type: "string",
@@ -215,7 +225,7 @@ export let services: Service[] = [
             }
         ],
         allowedConnections: [
-            'gel-electrophoresis', 'dpn1',
+            'gel-electrophoresis', 
         ],
         categories: ['dna-assembly-cloning'],
         result: {
@@ -223,6 +233,24 @@ export let services: Service[] = [
             type: 'PCRResult',
             result: {
                 id: 'pcr-result',
+                amount: 'number', // this will be equal to reaction volume number
+            }
+        }
+    },
+    {
+        id: 'qpcr',
+        name: 'qPCR',
+        // icon: 'https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt',
+        icon: 'https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM',
+        description: '',
+        parameters: [],
+        allowedConnections: [],
+        categories: ['dna-assembly-cloning'],
+        result: {
+            id: 'qpcr-product',
+            type: 'qPCRResult',
+            result: {
+                id: 'qpcr-result',
                 amount: 'number', // this will be equal to reaction volume number
             }
         }
@@ -305,35 +333,8 @@ export let services: Service[] = [
         ],
         // allowed connections : purified dna from agrose gel extraction, mutagenesis, mutagensis by inverse pcr, perform pcr reaction, perform qpcr reaction, colony pcr,temperatue gradient test, colony PCR
         allowedConnections: [
-            'mutagenesis', 'inverse-pcr', 'pcr', 'qpcr', 'colony-pcr', 'temperature-gradient-test', 'colony-pcr', 'gibson-assembly'
+            'clean-up', 'mutagenesis', 'inverse-pcr', 'pcr', 'qpcr', 'colony-pcr', 'temperature-gradient-test', 'colony-pcr', 'gibson-assembly'
         ],
-    },
-    {
-        id: 'dpn1',
-        name: 'Digest with Dpn1',
-        icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png',
-        resultParams: ['pcr-product'],
-        parameters: [
-            {
-                id: 'pcr-product-param',
-                name: 'PCR Product Result',
-                type: 'boolean',
-                paramType: 'result',
-                required: true
-            }
-        ],
-        allowedConnections: [
-            'run-gel', 'column-purification'
-        ],
-        result: {
-            id: 'dpn1-product',
-            type: 'Dpn1Result',
-            result: {
-                id: 'dpn1-result',
-                amount: 'number', // pcr result - gel amount
-            }
-        },
-        categories: ['dna-assembly-cloning'],
     },
     {
         id: 'gibson-assembly',  // PRODUCES DNA; SCREENING REQUIRED
@@ -555,6 +556,25 @@ export let services: Service[] = [
             'dna-storage', 'gel-electrophoresis'
         ],
         categories: ['dna-rna']
+    },
+    {
+        id: 'dna-rna-extraction',
+        name: 'DNA RNA Extraction',
+        // icon: 'https://cdn-icons-png.flaticon.com/512/3182/3182554.png',
+        icon: 'https://drive.google.com/thumbnail?id=11mSlGkU_cesN_RiUbc1xiO6fv9qCzeE6',
+        resultParams: [],
+        parameters: [
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
+        ],
+        allowedConnections: ['qpcr'],
+        categories: ['dna-rna'],
+        description: ''
     },
     {
         id: 'm-cloning',  // PRODUCES DNA; SCREENING REQUIRED
@@ -935,7 +955,7 @@ export let services: Service[] = [
         icon: 'https://drive.google.com/thumbnail?id=1bnuf6-ZD79X7ZJ6X6dm26apEh8IU9BX7',
         categories: ['dna-rna'],
         allowedConnections: [
-            'frag-analyzer', 'rna-extraction', 'gel'
+            'frag-analyzer', 'dna-rna-extraction', 'gel'
         ],
         parameters: [
             {
@@ -1004,7 +1024,7 @@ export let services: Service[] = [
         icon: 'https://drive.google.com/thumbnail?id=1l4AoRs0ieidpFy566BFmOmUOJnIcT5hj',
         categories: ['next-gen-seq'],
         allowedConnections: [
-            'rna-extraction', 'frag-analyzer'
+            'dna-rna-extraction', 'frag-analyzer'
         ],
         parameters: [
             {
@@ -1029,7 +1049,38 @@ export let services: Service[] = [
         }
     },
     {
-        id: 'seq',
+        id: 'spectro', 
+        name: 'Spectrophotometric Assay',
+        icon: '',
+        categories: ['next-gen-seq'],
+        allowedConnections: [
+            'clean-up', 'next-gen-seq', 'seq'
+        ],
+        description: "",
+        parameters: [
+            {
+                id: 'normalization',
+                name: 'Normalization and Pooling',
+                type: 'boolean',
+                paramType: 'input',
+                required: true
+            },
+            {
+                id: "additional-notes",
+                name: "Additional Notes",
+                type: "string",
+                paramType: "input",
+                required: false
+            }
+        ],
+        result: {
+            id: 'spectro-product',
+            type: 'SpectroResult',
+            name: 'Spectrophotometric Assay Result',
+        }
+    },
+    {
+        id: 'next-gen-seq',
         name: 'Next Generation Sequencing',
         // icon: 'https://drive.google.com/uc?id=1oiZLiBOUJqFPI_46_YCtk9mrYNkkfFLL',
         icon: 'https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se',
