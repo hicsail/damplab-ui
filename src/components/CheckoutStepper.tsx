@@ -19,6 +19,7 @@ export default function WorkflowStepper(workflow: any) {
     // const [mutateNodeStatus, { loading, error }] = useMutation(MUTATE_NODE_STATUS);
     const workflowServices = workflow.workflow.map((service: any) => {return service;});
 
+    
 
     useEffect(() => {
         function handleResize() {

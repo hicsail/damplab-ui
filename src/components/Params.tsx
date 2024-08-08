@@ -103,7 +103,16 @@ export default function ({ activeNode }: ParamFormProps) {
                 <div className='input-params' style={{marginLeft: 20}}>
                     {
                         activeNode.data.formData.map((param: any) => {
-                            console.log(param.name, param.description, param.description);
+                            console.log(param);
+                            param.dynamicAdd
+                            && 
+                            <div>
+                                <button onClick={() => {
+                                    console.log('clicked');
+                                }}>
+                                    Add
+                                </button>
+                            </div>  
                             if (param.paramType !== 'result') {
                                 if (param.type === "dropdown") {
                                     return (

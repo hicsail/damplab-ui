@@ -22,4 +22,5 @@ export type NodeParameter = {
     resultParamValue: string;
     value: any;
     required: boolean;
+    dynamicAdd: boolean;
 }
