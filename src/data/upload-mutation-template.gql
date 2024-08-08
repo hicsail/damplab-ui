@@ -1,0 +1,1390 @@
+mutation {
+  loadData(
+    services: [
+      {
+        id: "gibson-assembly"
+        name: "Gibson Assembly"
+        icon: "https://drive.google.com/thumbnail?id=1S9H5ydQhe9jyFmRtz09yExg4a8j36-Mp"
+        description: "Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously."
+        parameters: [
+          {
+            id: "vector"
+            name: "Vector"
+            description: ""
+            type: "file"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "incubation-time"
+            name: "Incubation time"
+            description: "value in minutes"
+            type: "number"
+            paramType: "input"
+            required: false
+            defaultValue: 60
+          }
+          {
+            id: "incubation-temp"
+            name: "Incubation temperature"
+            description: "value in degrees celcius"
+            type: "number"
+            paramType: "input"
+            required: false
+            defaultValue: 50
+          }
+          {
+            id: "insert"
+            name: "Insert"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "plasmid-map"
+            name: "Full plasmid map"
+            description: "upload full annotated file of design including vectors, inserts and primers"
+            type: "file"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "master-mix"
+            name: "Master Mix"
+            type: "string"
+            paramType: "input"
+            required: false
+            defaultValue: "NEB Hifi Assembly"
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: [
+          "transformation"
+          "dna-storage"
+
+          
+         
+        ]
+        categories: []
+      }
+      {
+        id: "m-cloning"
+        name: "Modular Cloning"
+        icon: "https://drive.google.com/thumbnail?id=1d4Wx887qXWI9Z7JZ9JQLFndQUly6E3Gi"
+        description: ""
+        parameters: [
+          {
+            id: "vector"
+            name: "Vector"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "insert"
+            name: "Insert"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "restriction-site-first"
+            name: "First Restriction Site"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "restriction-site-second"
+            name: "Second Restriction Site"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "antibiotic"
+            name: "Antibiotic"
+            type: "string"
+            workflowId: "antibiotic-workflow"
+            paramType: "flow"
+            required: true
+          }
+          {
+            id: "buffer"
+            name: "Buffer"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "desired-concentration"
+            name: "Desired Concentration"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "ladder"
+            name: "Ladder"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "forward-primer-flow-param"
+            name: "Forward Primer Flow Result"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "reverse-primer-flow-param"
+            name: "Reverse Primer Flow Result"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: ["transformation"]
+        categories: ["fluorescence-based-assays"]
+        resultParams: ["forward-primer-flow", "reverse-primer-flow"]
+        result: { id: "m-cloning-product", type: "MCloningResult" }
+      }
+      {
+        id: "restriction-digest"
+        name: "Restriction Digest"
+        icon: "https://drive.google.com/thumbnail?id=1wl-Qpt_7NNb7dlzEQwCfmkPvPI3DuPbk"
+        description: ""
+        parameters: [
+          {
+            id: "template-dna"
+            name: "Template DNA"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "restriction-enzyme"
+            name: "Restriction Enzyme"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "restriction-site-first"
+            name: "First Restriction Site"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "restriction-site-second"
+            name: "Second Restriction Site"
+            description: ""
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: [
+          "clean-up"
+          "dna-storage"
+          "gel-electrophoresis"
+          "restriction-ligation"
+        ]
+        categories: []
+      }
+      {
+        id: "restriction-ligation"
+        name: "Restriction Ligation"
+        icon: "https://drive.google.com/thumbnail?id=1T3ZL5y6GQ0CEk-labTl7NC4J4n9Rca3R"
+        description: ""
+        parameters: [
+          {
+            id: "digest-dna"
+            name: "Digest DNA"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "dna-ligase"
+            name: "DNA Ligase"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: [
+          "transformation"
+        
+          "dna-storage"
+          "restriction-digest"
+        ]
+        categories: []
+      }
+      {
+        id: "gel-electrophoresis"
+        name: "Gel Electrophoresis"
+        description: "Gel electrophoresis is a laboratory method used to separate mixtures of DNA, RNA, or proteins according to molecular size. In gel electrophoresis, the molecules to be separated are pushed by an electrical field through a gel that contains small pores."
+        icon: "https://drive.google.com/thumbnail?id=1QzCvaWYcw7hwXhxjDbcYcbIvvft6sqv8"
+        parameters: [
+          {
+            id: "gel-type"
+            name: "Gel Percentage"
+            description: "Provide a number between 0.5% and 3.0%"
+            type: "number"
+            paramType: "input"
+            required: false
+            defaultValue: 1
+          }
+          {
+            id: "sample-length"
+            name: "Sample Length"
+            description: "Numbers and base pairs 50bp - 10000bp"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "ladder"
+            name: "Ladder"
+            description: ""
+            options: [
+              { id: "100-bp-ladder", name: "100 bp ladder" }
+              { id: "1-kb-ladder", name: "1 kb ladder" }
+              { id: "1-kb-plus-ladder", name: "1 kb plus ladder" }
+            ]
+            type: "dropdown"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "dye"
+            name: "Dye"
+            defaultValue: "SYBR safe"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "voltage"
+            name: "Voltage"
+            description: "Numbers and volts 50 - 200"
+            type: "number"
+            paramType: "input"
+            required: false
+            defaultValue: 120
+          }
+          {
+            id: "time"
+            name: "Time"
+            description: "Provide minutes 10 - 90"
+            type: "number"
+            paramType: "input"
+            required: false
+            defaultValue: 45
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: [
+          "clean-up"
+     
+          
+          "pcr"
+          "qpcr"
+    
+       
+          
+          "gibson-assembly"
+        ]
+        categories: []
+      }
+      {
+        id: "dna-gel"
+        name: "Purify DNA from Agarose Gel Extraction"
+        icon: "https://drive.google.com/thumbnail?id=11mSlGkU_cesN_RiUbc1xiO6fv9qCzeE6"
+        resultParams: ["gel-product"]
+        description: ""
+        parameters: [
+          {
+            id: "gel-product-param"
+            name: "Gel Product Result"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: ["dna-storage", "gel-electrophoresis"]
+        categories: ["dna-rna"]
+      }
+      {
+        id: "clean-up"
+        name: "Clean Up and Concentrate DNA"
+        icon: "https://drive.google.com/thumbnail?id=1ss8znCImp6aCvw8dwrvaiJ4FWRuWr2zd"
+        description: ""
+        parameters: [
+          {
+            id: "template-dna"
+            name: "Template DNA"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "concentration"
+            name: "Concentration"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: []
+        categories: []
+      }
+      {
+        id: "eth-perc"
+        name: "DNA/RNA Ethanol Precipitation"
+        icon: "https://drive.google.com/thumbnail?id=1bnuf6-ZD79X7ZJ6X6dm26apEh8IU9BX7"
+        description: ""
+        categories: ["dna-rna"]
+        allowedConnections: ["frag-analyzer", "dna-rna-extraction"]
+        parameters: [
+          {
+            id: "pcr-product-param"
+            name: "PCR Product Result"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "eth-perc-product"
+          type: "EthPercResult"
+          name: "Ethanol Precipitation Result"
+        }
+      }
+      {
+        id: "dna-rna-extraction"
+        name: "DNA RNA Extraction"
+        icon: "https://drive.google.com/thumbnail?id=11mSlGkU_cesN_RiUbc1xiO6fv9qCzeE6"
+        description: ""
+        resultParams: []
+        parameters: [
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: ["qpcr"]
+        categories: ["dna-rna"]
+      }
+      {
+        id: "miniprep-gs"
+        name: "Miniprep and Glycerol Stock"
+        icon: "https://drive.google.com/thumbnail?id=1P1kSBdfCJ-ewj_st9ZusnNmSyWQMFG_7"
+        description: ""
+        resultParams: ["overnight-culture-product"]
+        parameters: [
+          {
+            id: "overnight-culture-product-param"
+            name: "Overnight Culture Product Result"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        categories: ["dna-rna"]
+        allowedConnections: ["storage", "seq"]
+        result: { id: "miniprep-gs-product", type: "MiniprepGSResult" }
+      }
+      {
+        id: "glyc-storage"
+        name: "Glycerol Stock Storage"
+        icon: "https://drive.google.com/thumbnail?id=11k4WLbBrmWvGwvNa30qFK6y2IcnEePQj"
+        description: ""
+        categories: ["pcr-reactions"]
+        allowedConnections: []
+        parameters: [
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "glyc-storage-product"
+          type: "GlycStorageResult"
+          name: "Glycerol Stock Storage Result"
+        }
+      }
+      {
+        id: "rehydrate-primer"
+        name: "Rehydrate Primers"
+        icon: "https://drive.google.com/thumbnail?id=14s7ceqCUIrQpJF4dzO62fAq3T4KrDqd7"
+        description: ""
+        parameters: [
+          {
+            id: "buffer"
+            name: "Buffer"
+            type: "select"
+            options: [
+              "Nucleus Free water"
+              "TE buffer"
+              "IDTE buffer "
+              "Other"
+            ]
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: ["pcr"]
+        categories: ["dna-assembly-cloning"]
+        result: null
+      }
+      {
+        id: "gene"
+        name: "Order Gene Fragment"
+        icon: "https://drive.google.com/thumbnail?id=1rhLeDV-7egQjsgrAcGBxzRhCqNkZNIxK"
+        description: ""
+        parameters: [
+          {
+            id: "fragment-sequence"
+            name: "Fragment Sequence"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: ["design-primers"]
+        categories: ["dna-assembly-cloning"]
+        result: {
+          id: "gene-fragment-result"
+          type: "GeneFragmentResult"
+          text: "DNA suspended in solution to standard concentration"
+        }
+      }
+      {
+        id: "design-primers"
+        name: "Design and Order Primers"
+        icon: "https://drive.google.com/thumbnail?id=1l6Dfi3oc3KD26-oqEN9jylPw7X6guVZU"
+        description: ""
+        parameters: [
+          {
+            id: "target-gene"
+            name: "Target Gene"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "forward-primer"
+            name: "Forward Primer 2"
+            type: "string"
+            paramType: "flow"
+            flowId: "forward-primer-flow"
+            required: false
+            description: "values between 15-35 base pairs"
+          }
+          {
+            id: "reverse-primer"
+            name: "Reverse Primer"
+            type: "string"
+            flowId: "reverse-primer-flow"
+            paramType: "flow"
+            required: true
+            description: "values between 15-35 base pairs"
+          }
+          {
+            id: "sequencing-primer"
+            name: "Sequencing Primer"
+            type: "string"
+            paramType: "input"
+            required: false
+            description: "values between 18-24 base pairs"
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        categories: ["dna-assembly-cloning"]
+        allowedConnections: ["rehydrate-primer"]
+        result: null
+      }
+      {
+        id: "spectro"
+        name: "Spectrophotometric Assay"
+        icon: ""
+        categories: ["next-gen-seq"]
+        allowedConnections: ["next-gen-seq", "clean-up"]
+        description: ""
+        parameters: [
+          {
+            id: "normalization"
+            name: "Normalization and Pooling"
+            description: ""
+            options: [{ id: "yes", name: "Yes" }, { id: "no", name: "No" }]
+            type: "dropdown"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "dilutent"
+            name: "Dilutent"
+            description: ""
+            options: [
+              { id: "nucleas-free-water", name: "Nucleas Free Wanter" }
+              { id: "other", name: "Other" }
+            ]
+            type: "dropdown"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "spectro-product"
+          type: "SpectroResult"
+          name: "Spectrophotometric Assay Result"
+        }
+      }
+      {
+        id: "sii"
+        name: "Sample Indexing Information"
+        icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM"
+        description: "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment."
+        parameters: [
+          {
+            id: "param"
+            name: "Sample Indexing Template"
+            type: "file"
+            paramType: "input"
+            required: true
+            templateFile: ""
+          }
+        ]
+        allowedConnections: []
+        categories: []
+      }
+      {
+        id: "pcr"
+        name: "PCR"
+        icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM"
+        description: "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment."
+        parameters: [
+          {
+            id: "melting-temp"
+            name: "Melting Temperature"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "cycle-time"
+            name: "Cycle Time"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "reaction-volume"
+            name: "Reaction Volume"
+            type: "number"
+            paramType: "input"
+            required: true
+            defaultValue: 25
+          }
+          {
+            id: "forward-primer"
+            name: "Forward Primer"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "reverse-primer"
+            name: "Reverse Primer"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "template-dna"
+            name: "Template DNA"
+            type: "result"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "polymerase"
+            name: "Polymerase"
+            type: "dropdown"
+            paramType: "input"
+            required: true
+            options: [
+              { id: "q5", name: "Q5 Master Mix" }
+              { id: "phusion", name: "Phusion Plus Master Mix" }
+              { id: "other", name: "Other" }
+            ]
+          }
+          {
+            id: "dpn1-digest"
+            name: "Dpn1 Digest"
+            description: ""
+            options: [{ id: "yes", name: "Yes" }, { id: "no", name: "No" }]
+            type: "dropdown"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: ["gel-electrophoresis"]
+        categories: ["dna-assembly-cloning"]
+        result: {
+          id: "pcr-product"
+          type: "PCRResult"
+          result: { id: "pcr-result", amount: "number" }
+        }
+      }
+      {
+        id: "pcr-clean-up"
+        name: "PCR clean up"
+        icon: ""
+        description: ""
+        parameters: [
+          {
+            id: "e-volume"
+            name: "elution volume"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "30-50"
+          }
+        ]
+        allowedConnections: []
+        categories: []
+      }
+      {
+        id: "qpcr"
+        name: "qPCR"
+        icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM"
+        description: ""
+        parameters: [
+          {
+            id: "melting-temp"
+            name: "Melting Temperature"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "cycle-time"
+            name: "Cycle Time"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "reaction-volume"
+            name: "Reaction Volume"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "forward-primer"
+            name: "Forward Primer"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "reverse-primer"
+            name: "Reverse Primer"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "template-dna"
+            name: "Template DNA"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "polymerase"
+            name: "Polymerase"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "dpn1-digest"
+            name: "Dpn1 Digest"
+            description: ""
+            options: [{ id: "yes", name: "Yes" }, { id: "no", name: "No" }]
+            type: "dropdown"
+            paramType: "input"
+            required: true
+          }
+        ]
+        allowedConnections: ["gel-electrophoresis"]
+        categories: ["dna-assembly-cloning"]
+        result: {
+          id: "qpcr-product"
+          type: "qPCRResult"
+          result: { id: "qpcr-result", amount: "number" }
+        }
+      }
+      {
+        id: "seq"
+        name: "Send Sample to Sequencing"
+        icon: "https://drive.google.com/thumbnail?id=15LMIjlt73eu-wI5VfTJcXEybfuWRm8bd"
+        description: ""
+        parameters: [
+          {
+            id: "sample"
+            name: "Sample Type"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: ""
+            name: "Sequencing type"
+            type: "dropdown"
+            options: [
+              { id: "sanger", name: "Sanger" }
+              { id: "whole-plasmid", name: "Whole plasmid" }
+            ]
+            paramType: "input"
+            required: true
+            description: "default is 37 degrees C and 250RPM, range is 30 - 42 degrees C"
+          }
+          {
+            id: "plasmid"
+            name: "Plasmid Name"
+            type: "string"
+            paramType: "flow"
+            flowId: "plasmid-flow"
+            required: true
+          }
+          {
+            id: "seq-prim"
+            name: "Sequencing primer"
+            type: "string"
+            paramType: "input"
+            required: true
+            description: "In between 5-25 uM"
+          }
+          {
+            id: "primaer-concentration"
+            name: "Primer Concentration"
+            type: "number"
+            paramType: "input"
+            required: false
+            description: "DEfault value get from Molly"
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: ["gene", "storage", "design-primers"]
+        categories: ["dna-rna"]
+        result: null
+      }
+      {
+        id: "next-gen-seq"
+        name: "Next Generation Sequencing"
+        icon: "https://drive.google.com/thumbnail?id=1_t3YCiglSyjYzdJMLgOSUex9eu0sM2Se"
+        description: ""
+        categories: ["next-gen-seq"]
+        allowedConnections: ["frag-analyzer"]
+        parameters: [
+          {
+            id: "library-prep-product"
+            name: "Library Prep Result"
+            type: "string"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "seq-product"
+          type: "SeqResult"
+          name: "NGS Sequencing Result"
+        }
+      }
+      {
+        id: "cell-culture-induction"
+        name: "Cell Culture Induction and Selection"
+        icon: "https://drive.google.com/thumbnail?id=1IgSzmw5D4RpweYeWl0jnLCw5XWqOgCcp"
+        description: ""
+        categories: ["culturing-media"]
+        allowedConnections: [ "storage"]
+        parameters: [
+          {
+            id: "inducer"
+            name: "Inducer"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "induction-culture"
+            name: "Overnight Bacterial Culture"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "induced-sample"
+          type: "InducedSampleResult"
+          name: "Induced Bacterial Culture Result"
+        }
+      }
+      {
+        id: "cell-lysate"
+        name: "Cell Lysate Production"
+        icon: "https://drive.google.com/thumbnail?id=1cym6zJ4AwCNtES8KCrTdj2PvCTuqdwmX"
+        description: ""
+        categories: ["culturing-media"]
+        allowedConnections: [
+          
+          "storage"
+          "cell-culture-induction"
+        ]
+        parameters: [
+          {
+            id: "lysate-bacterial-culture"
+            name: "Large Volume Bacterial Culture"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "cell-lysate-product"
+          type: "CellLysateResult"
+          name: "Cell Lysate Result"
+        }
+      }
+      {
+        id: "protein-production"
+        name: "Protein Production and Purification from Cell Lysate"
+        icon: "https://drive.google.com/thumbnail?id=1joahDEPtnzTGs5wGOMu2TNc32ld9J0WL"
+        categories: ["culturing-media"]
+        description: ""
+        allowedConnections: [
+         
+          "storage"
+          "cell-lysate"
+          "cell-culture-induction"
+        ]
+        parameters: [
+          {
+            id: "protein-bacterial-culture"
+            name: "Large Volume Bacterial Culture"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "lysate-protein"
+          type: "LysateProteinResult"
+          name: "Cell Lysate Containing Protein"
+        }
+      }
+      {
+        id: "transformation"
+        name: "Transformation"
+        icon: "https://drive.google.com/thumbnail?id=1KGDyxffZiehRFKSaPwaZWFjixXHrA84P"
+        description: "Transform cells with DNA"
+        resultParams: ["m-cloning-product", "antibiotic-workflow"]
+        parameters: [
+          {
+            id: "m-cloning-product-param"
+            name: "MCloning Product Result"
+            description: "Result from Gibson Assembly"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "antibiotic-workflow-product-param"
+            name: "Antibiotic Workflow Result"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "competent-cells"
+            name: "Competent Cells"
+            type: "dropdown"
+            paramType: "input"
+            required: true
+            description: "select from dropdown, default is DH5alpha"
+            options: [
+              { id: "DH5alpha", name: "DH5alpha" }
+              { id: "DH10B", name: "DH10B" }
+              { id: "other", name: "Other" }
+            ]
+          }
+          {
+            id: "recovery-media"
+            name: "Recovery Media"
+            type: "string"
+            paramType: "input"
+            required: true
+            description: "select from dropdown, default is SOC"
+            options: [
+              { id: "SOC", name: "SOC" }
+              { id: "LBE", name: "LBE" }
+              { id: "TB", name: "TB" }
+            ]
+            defaultValue: "SOC"
+          }
+          {
+            id: "recovery-time"
+            name: "Recovery Time"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "default is 1 hour, range is 0.5 - 2 hours"
+          }
+          {
+            id: "recovery-incubation-temp"
+            name: "Recovery Incubation Temperature"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "default is 37 degrees C and 250RPM, range is 30 - 42 degrees C"
+          }
+          {
+            id: "antibiotic"
+            name: "Antibiotic"
+            type: "dropdown"
+            options: [{ id: "test", name: "Test" }]
+            paramType: "input"
+            required: true
+            description: "anti biotic for agar plate"
+            dynamicAdd: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: [
+          "overnight-culture"
+       
+          "overnight-culture"
+        ]
+        categories: ["fluorescence-based-assays"]
+        result: { id: "transformation-product", type: "TransformationResult" }
+      }
+      {
+        id: "overnight-culture"
+        name: "Overnight Inoculum"
+        icon: "https://drive.google.com/thumbnail?id=1XOCFkGHslF5T5EEOHygIR9YaKBKkMoYp"
+        description: "Grow cells overnight"
+        resultParams: ["transformation-product", "antibiotic-workflow"]
+        parameters: [
+          {
+            id: "desired-volume"
+            name: "Desired Volume"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "repl"
+            name: "replicates"
+            type: "number"
+            paramType: "input"
+            required: false
+            description: "Default 1"
+          }
+          {
+            id: "transformation-product-param"
+            name: "Transformation Product Result"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "antibiotic-workflow-product-param"
+            name: "Antibiotic Workflow Result"
+            type: "boolean"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "growth-media"
+            name: "Growth Media"
+            type: "string"
+            paramType: "input"
+            required: true
+            description: ""
+            options: [
+              { id: "LBE", name: "LBE" }
+              { id: "SOC", name: "SOC" }
+              { id: "TB", name: "TB" }
+              { id: "M9", name: "M9" }
+            ]
+            defaultValue: "LBE"
+          }
+          {
+            id: "growth-tilt"
+            name: "Growth Tilt"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "0-45 degrees"
+          }
+          {
+            id: "rpm"
+            name: "RPM"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "default is 250RPM, range is 50-300"
+          }
+          {
+            id: "growth-temp"
+            name: "Growth Temperature"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "default is 37 degrees C, range is 30 - 42 degrees C"
+          }
+          {
+            id: "growth-time"
+            name: "Growth Time"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "default is 16 hours, range is 10 - 48 hours"
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        allowedConnections: ["storage", "miniprep-gs"]
+        categories: ["culturing-media"]
+        result: {
+          id: "overnight-culture-product"
+          type: "OvernightCultureResult"
+        }
+      }
+      {
+        id: "dna-storage"
+        name: "Plasmid, DNA fragment, or oligo storage"
+        icon: "https://drive.google.com/thumbnail?id=1vW2wN9f41ZNgP2zYOm1AJDgIud8WYAGR"
+        description: ""
+        parameters: [
+          {
+            id: "dna-types"
+            name: "Type"
+            type: "ENUM"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        categories: ["dna-assembly-cloning"]
+        allowedConnections: []
+      }
+      {
+        id: "storage"
+        name: "Overnight Innoculums of Bacteria Cell Culture Storage"
+        icon: "https://drive.google.com/thumbnail?id=1XOCFkGHslF5T5EEOHygIR9YaKBKkMoYp"
+        description: ""
+        categories: ["storage"]
+        allowedConnections: ["overnight-culture"]
+        parameters: [
+          {
+            id: "overnight-culture"
+            name: "Overnight Bacterial Culture"
+            type: "string"
+            paramType: "result"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "overnight-culture-storage"
+          type: "OvernightCultureStorageResult"
+          name: "Overnight Bacterial Culture Storage Result"
+        }
+      }
+      {
+        id: "frag-analyzer"
+        name: "Fragment Analyzer"
+        icon: "https://drive.google.com/thumbnail?id=1wiL_-GBWMi7M5hty9CWcf4mbmJhW4k8E"
+        description: ""
+        categories: ["next-gen-seq", "dna-rna"]
+        allowedConnections: ["seq", "eth-perc"]
+        parameters: [
+          {
+            id: "concentration"
+            name: "Concentration"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "num-samples"
+            name: "Number of Samples"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "additional-notes"
+            name: "Additional Notes"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+        ]
+        result: {
+          id: "frag-analyzer-product"
+          type: "FragAnalyzerResult"
+          name: "Fragment Analyzer Result"
+        }
+      }
+    ]
+    categories: [
+      { id: "dna-rna", label: "DNA and RNA" }
+      { id: "dna-assembly-cloning", label: "DNA Assembly and Cloning" }
+      { id: "fluorescence-based-assays", label: "Fluorescence-Based Assays" }
+      { id: "culturing-media", label: "Culturing/Media" }
+      { id: "next-gen-seq", label: "Next Generation Sequencing" }
+      { id: "storage", label: "Materials Repository and Storage" }
+    ]
+    bundles: [
+      {
+        id: "gibson-assembly-provided"
+        label: "Gibson Assembly and Cloning with Provided DNA"
+        icon: ""
+        services: ["seq", "design-primers", "rehydrate-primer", "pcr", "gel-electrophoresis", "dna-gel", "gibson-assembly", "transformation", "overnight-culture", "miniprep-gs", "glyc-storage", "seq"]
+      }
+      {
+          id: "gibson-assembly-ordering"
+          label: "Gibson Assembly and Cloning with Ordering"
+          icon: ""
+          services: ["gene", "design-primers", "rehydrate-primer", "pcr", "gel-electrophoresis", "dna-rna-extraction", "dna-gel", "gibson-assembly", "transformation", "overnight-culture", "miniprep-gs", "glyc-storage", "seq"]
+      }
+      {
+        id: "library-prep"
+        label: "Library Prep (16S,ITS)"
+        icon: ""
+        services: ["pcr", "gel-electrophoresis", "clean-up", "spectro"]
+      }
+      {
+        id: "protein-production"
+        label: "Protein Production, Purification, and Induction Bundle"
+        icon: "https://drive.google.com/thumbnail?id=1ziGsSXzM0tGpjfhIiVLv8Q6IbZ5UF-nK"
+        services: [
+          "cell-culture-induction"
+          "cell-lysate"
+          "protein-production"
+        ]
+      }
+      {
+        id: "dna-rna-extract-and-qpcr"
+        label: "DNA/RNA Extraction and qPCR"
+        icon: ""
+        services: ["dna-rna-extraction", "qpcr"]
+      }
+      {
+        id: "modular-cloning-ordering"
+        label: "Modular Assembly and Cloning with Ordering"
+        icon: "https://drive.google.com/thumbnail?id=1jIPi2_w650pbpCFcdhOL0KXEYPWgFWPn"
+        services: [
+          "seq"
+          "gene"
+          "design-primers"
+          "rehydrate-primer"
+          "pcr"
+          "dna-gel"
+          "m-cloning"
+          "transformation"
+          "overnight-culture"
+        ]
+      }
+      {
+        id: "modular-cloning-provided"
+        label: "Modular Assembly and Cloning with Provided DNA"
+        icon: "https://drive.google.com/thumbnail?id=1TOGeovPsTLZiAsVkc1205nk9w9yTyYkj"
+        services: [
+          "seq"
+          "design-primers"
+          "rehydrate-primer"
+          "pcr"
+          "dna-gel"
+          "m-cloning"
+          "transformation"
+          "overnight-culture"
+        ]
+      }
+    ]
+  )
+}

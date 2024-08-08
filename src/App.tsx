@@ -46,8 +46,7 @@ function App() {
     client.query({ query: GET_SERVICES }).then((result) => {
       console.log('services loaded successfully on app', result);
       setServices(result.data.services);
-      // let array: any = [];
-      // console.log(searchForEndService('seq', 'dpn1', result.data.services, array));
+      
     }).catch((error) => {
       console.log('error when loading services on app', error);
     });
@@ -99,7 +98,6 @@ function App() {
 
                     <Route path = "/test_page"           element = {<PrivateRouteAdmin> <TestPage />                  </PrivateRouteAdmin>} />
                     <Route path = "/*"                   element = {<div>Sorry, we can't find this page at the moment (404). Please double check the URL or try again later.</div>} />
-
                     {/* <Route path = "/client_view/:id"     element = {<PrivateRouteAdmin> <Tracking />                  </PrivateRouteAdmin>} /> */}
                     {/* <Route path = "/callback"            element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} /> */}
                     {/* <Route path="/accepted" element={wrapPrivateRoute(<Accepted />, isLoggedIn, 'accepted')} /> */}

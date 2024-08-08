@@ -7,10 +7,10 @@ export type Service = {
     // optional result params
     resultParams?: string[];
     parameters?: Parameter[];
-    allowedConnections?: string[];
+    allowedConnections: string[];
     result?: any;
-    categories?: string[];
-    description?: string;
+    categories: string[];
+    description: string;
 };  
 
 

@@ -8,4 +8,9 @@ export type Parameter = {
     workflowId?: string;
     description?: string;
     options?: any[];
+    defaultValue?: any;
+    rangeValueMin?: number;
+    rangeValueMax?: number;
+    dynamicAdd?: boolean;
+    templateFile? : string;
 };

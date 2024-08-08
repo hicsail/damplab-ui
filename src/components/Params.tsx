@@ -103,6 +103,7 @@ export default function ({ activeNode }: ParamFormProps) {
                 <div className='input-params' style={{marginLeft: 20}}>
                     {
                         activeNode.data.formData.map((param: any) => {
+                            console.log(param.name, param.description, param.description);
                             if (param.paramType !== 'result') {
                                 if (param.type === "dropdown") {
                                     return (
