@@ -10,7 +10,7 @@ import {
   TextField,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { PlusOne } from "@mui/icons-material";
+import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -139,6 +139,7 @@ export default function ({ activeNode }: ParamFormProps) {
                           value: "",
                           required: false,
                           dynamicAdd: false,
+                          addedDynamically: true,
                         };
                         // add new param to form data right after the current param
                         const newFormData = activeNode.data.formData;
@@ -155,6 +156,21 @@ export default function ({ activeNode }: ParamFormProps) {
                         <PlusOne />
                       </IconButton>
                     )}
+                    {
+                        // if added dynamically, show delete button
+                        param.addedDynamically && (
+                            <IconButton onClick={() => {
+                                // remove param from form data
+                                const newFormData = activeNode.data.formData;
+                                newFormData.splice(newFormData.indexOf(param), 1);
+                                activeNode.data.formData = newFormData;
+                                // update formik values
+                                formik.setValues(initValues());
+                            }}>
+                                <DeleteForeverSharp />
+                            </IconButton>
+                        )
+                    }
                     <InputLabel sx={{ backgroundColor: "white" }}>
                       {param.name}
                     </InputLabel>
