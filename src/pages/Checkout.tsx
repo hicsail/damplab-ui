@@ -24,6 +24,7 @@ import CheckoutStepper from "../components/CheckoutStepper";
 import { CanvasContext } from "../contexts/Canvas";
 import { AppContext } from "../contexts/App";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import ReactFlow, { ReactFlowProvider } from "reactflow";
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -136,6 +137,8 @@ export default function Checkout() {
         workflows: getGQLWorkflows(),
         // submitted: date
       };
+      console.log(data);
+      return;
       createJob({ variables: { createJobInput: data } });
       console.log(getGQLWorkflows());
     } else {
@@ -146,6 +149,16 @@ export default function Checkout() {
   return (
     <div>
       <div>
+        <div>
+          <ReactFlowProvider>
+            <div
+              className="reactflow-wrapper"
+              style={{ height: "80vh", display: "flex" }}
+            >
+              <ReactFlow nodes={val.nodes} edges={val.edges} fitView/>
+            </div>
+          </ReactFlowProvider>
+        </div>
         <div>
           <Typography variant="h4" sx={{ m: 2 }}>
             Checkout
