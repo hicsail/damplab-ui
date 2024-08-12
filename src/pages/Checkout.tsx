@@ -10,9 +10,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import AccordionSummary from "@mui/material/AccordionSummary";
-import AccordionDetails from "@mui/material/AccordionDetails";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 import {
   getWorkflowsFromGraph,
@@ -20,7 +17,6 @@ import {
   transformNodesToGQL,
 } from "../controllers/GraphHelpers";
 import { CREATE_JOB, CREATE_WORKFLOW } from "../gql/mutations";
-import CheckoutStepper from "../components/CheckoutStepper";
 import { CanvasContext } from "../contexts/Canvas";
 import { AppContext } from "../contexts/App";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
@@ -137,8 +133,6 @@ export default function Checkout() {
         workflows: getGQLWorkflows(),
         // submitted: date
       };
-      console.log(data);
-      return;
       createJob({ variables: { createJobInput: data } });
       console.log(getGQLWorkflows());
     } else {
@@ -148,103 +142,30 @@ export default function Checkout() {
 
   return (
     <div>
-      <div>
-        <div>
+      <div
+        style={{
+          display: "flex",
+        }}
+      >
+				 <div
+          style={{
+            width: "60%",
+          }}
+        >
           <ReactFlowProvider>
             <div
               className="reactflow-wrapper"
-              style={{ height: "80vh", display: "flex" }}
+              style={{ height: "80vh", display: "flex", width: "100%" }}
             >
-              <ReactFlow nodes={val.nodes} edges={val.edges} fitView/>
+              <ReactFlow nodes={val.nodes} edges={val.edges} fitView />
             </div>
           </ReactFlowProvider>
         </div>
-        <div>
-          <Typography variant="h4" sx={{ m: 2 }}>
-            Checkout
-          </Typography>
-          <Accordion key={Math.random() * 100} expanded={expanded}>
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon />}
-              aria-controls="panel1a-content"
-              id="panel1a-header"
-              onClick={() => setExpanded(!expanded)}
-            >
-              <Typography variant="h5">Job Summary</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              {checkoutWorkflow.map((workflow: any, index: number) => {
-                console.log(workflow);
-                let hazard: boolean = false;
-                for (let node of workflow.nodes) {
-                  if (hazards.includes(node.name)) {
-                    hazard = true;
-                    break;
-                  }
-                }
-                return (
-                  <div
-                    key={workflow.id}
-                    style={{
-                      textAlign: "start",
-                      padding: 25,
-                      overflowX: "auto",
-                      border: "1px solid grey",
-                      borderRadius: 5,
-                      margin: 5,
-                    }}
-                  >
-                    <Box sx={{ display: "flex" }}>
-                      <TextField
-                        id={workflow.id}
-                        label="Workflow Name"
-                        variant="outlined"
-                        inputRef={(el) => (myRefs.current[index] = el)}
-                        style={{ width: "40ch" }}
-                        defaultValue={`Workflow_${index + 1}`}
-                        // onChange={(e) => { handleNameChange(e, workflow.id)}}
-                      />
-                      <Button
-                        component="label"
-                        role={undefined}
-                        variant="contained"
-                        tabIndex={-1}
-                        startIcon={<CloudUploadIcon />}
-                        style={{ marginLeft: 10 }}
-                      >
-                        Upload optional file
-                        <VisuallyHiddenInput type="file" />
-                      </Button>
-                      {/* {
-                                                    hazard === true 
-                                                        ? <p><GppMaybe style={{ color: "grey", verticalAlign:"middle", paddingLeft:20 }}/>
-                                                            &nbsp;Note: This workflow includes a service with sequences that will undergo a security screening.</p> 
-                                                        : <p/>
-                                                } */}
-                    </Box>
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        flexDirection: "column",
-                        p: 1,
-                        marginTop: 3,
-                      }}
-                    >
-                      <CheckoutStepper
-                        workflow={workflow.nodes}
-                        name={workflow.name}
-                        parent="checkout"
-                      />
-                    </Box>
-                  </div>
-                );
-              })}
-            </AccordionDetails>
-          </Accordion>
-        </div>
-        <div style={{ padding: 30 }}>
+        <div style={{ padding: 30, textAlign: "center", alignItems: "center", width: "40%" }}>
+					<div style={{
+						marginLeft: 'auto',
+						marginRight: 'auto',
+					}}>
           <Typography variant="body1">Your Information</Typography>
           <Box
             component="form"
@@ -310,6 +231,7 @@ export default function Checkout() {
               Submit
             </Button>
           </Box>
+					</div>
         </div>
       </div>
       <Snackbar
