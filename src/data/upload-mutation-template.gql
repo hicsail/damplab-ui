@@ -441,25 +441,24 @@ mutation {
         description: ""
         parameters: [
           {
-            id: "template-dna"
-            name: "Template DNA"
-            type: "boolean"
-            paramType: "result"
-            required: true
-          }
-          {
-            id: "concentration"
-            name: "Concentration"
+            id: "elution-volume"
+            name: "Elution Volume"
             type: "number"
             paramType: "input"
             required: true
+            description: "30-50"
           }
           {
-            id: "additional-notes"
-            name: "Additional Notes"
-            type: "string"
+            id: "e-buffer"
+            name: "elution buffer"
+            type: "dropdown"
             paramType: "input"
-            required: false
+            required: true
+            options: [
+              { id: "nuclease-free-water", name: "Nuclease Free Water" }
+              { id: "IDTE-BUFFER", name: "IDTE BUFFER" }
+              { id: "kit-provided", name: "Kit Provided" }
+            ]
           }
         ]
         allowedConnections: []
@@ -739,6 +738,31 @@ mutation {
         description: "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment."
         parameters: [
           {
+            id: "sample-dilution"
+            name: "Sample Dilution"
+            type: "string"
+            paramType: "input"
+            required: false
+          }
+          {
+            id: "dilutent"
+            name: "Dilutent"
+            type: "dropdown"
+            paramType: "input"
+            required: false
+            options: [
+              { id: "nuclease-free-water", name: "Nuclease Free Water" }
+              { id: "IDTE-BUFFER", name: "IDTE BUFFER" }
+            ]
+          }
+          {
+            id: "final-volume"
+            name: "Final Volume"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
             id: "melting-temp"
             name: "Melting Temperature"
             type: "number"
@@ -782,14 +806,79 @@ mutation {
             required: true
           }
           {
+            id: "nuclease-free-water"
+            name: "Nuclease Free Water"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "reaction volume in uL"
+          }
+          {
+            id: "master-mix"
+            name: "Master Mix"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "reaction volume in uL"
+          }
+          {
+            id: "dntp"
+            name: "DNTP"
+            type: "dropdown"
+            paramType: "input"
+            required: true
+            options: [
+              { id: "dntp", name: "dNTP" }
+              { id: "dntp-mix", name: "dNTP Mix" }
+            ]
+          }
+          {
+            id: "buffer"
+            name: "Buffer"
+            type: "dropdown"
+            paramType: "input"
+            required: true
+            options: [
+              { id: "taq", name: "Standard Taq Buffer" }
+              { id: "phusion", name: "Phusion® HF Buffer" }
+              { id: "q5", name: "Q5® Reaction Buffer" }
+              { id: "thermo", name: "ThermoPol® Buffer" }
+            ]
+          }
+          {
             id: "polymerase"
             name: "Polymerase"
             type: "dropdown"
             paramType: "input"
             required: true
             options: [
-              { id: "q5", name: "Q5 Master Mix" }
+              {
+                id: "q5-high-fidelity"
+                name: "Q5® High-Fidelity DNA Polymerase"
+              }
+              { id: "taq", name: "Taq DNA Polymerase" }
+              {
+                id: "q5-hot"
+                name: "Q5® High-Fidelity DNA Polymerase Hot Start"
+              }
               { id: "phusion", name: "Phusion Plus Master Mix" }
+              { id: "luna", name: "Luna® Script RT Super Mix" }
+              { id: "other", name: "Other" }
+            ]
+          }
+          {
+            id: "other"
+            name: "Other"
+            type: "dropdown"
+            paramType: "input"
+            required: false
+            options: [
+              {
+                id: "recombinant-albumin"
+                name: "Recombinant Albumin, Molecular Biology Grade"
+              }
+              { id: "bsa", name: "Q5 High GC Enhancer" }
+              { id: "dms", name: "DMSO" }
               { id: "other", name: "Other" }
             ]
           }
