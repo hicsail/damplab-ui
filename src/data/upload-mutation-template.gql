@@ -2,6 +2,93 @@ mutation {
   loadData(
     services: [
       {
+        id: "normalization"
+        name: "Normalization"
+        icon: ""
+        description: ""
+        parameters: [
+          {
+            id: "final-concentration"
+            name: "Final Concentration"
+            type: "dropdown"
+            options: [{ id: "ng-ul", name: "ng/ul" }, { id: "nM", name: "nM" }]
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "final-volume"
+            name: "Final Volume"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "in uL"
+          }
+          {
+            id: "dilutent"
+            name: "Dilutent"
+            type: "dropdown"
+            paramType: "input"
+            required: false
+            options: [
+              { id: "nuclease-free-water", name: "Nuclease Free Water" }
+              { id: "IDTE-BUFFER", name: "IDTE BUFFER" }
+            ]
+          }
+        ]
+        allowedConnections: []
+        categories: []
+      }
+      {
+        id: "pooling"
+        name: "Pooling"
+        icon: ""
+        description: ""
+        parameters: [
+          {
+            id: "mass of dna desired in pool"
+            name: "Mass of DNA Desired in Pool"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "in ng or nM"
+          }
+          {
+            id: "unit-selection"
+            name: "Unit Selection"
+            type: "dropdown"
+            paramType: "input"
+            required: true
+            options: [{ id: "ng", name: "ng" }, { id: "nM", name: "nM" }]
+          }
+          {
+            id: "exclude-concentration-threshold"
+            name: "Exclude Concentration Threshold"
+            type: "number"
+            paramType: "input"
+            required: false
+            description: "Option to exclude samples below a certain concentration"
+          }
+          {
+            id: "cap-sample-volume"
+            name: "Cap Sample Volume"
+            type: "number"
+            paramType: "input"
+            required: false
+            description: "in uL, option to cap sample volume added to pool to a certain volume"
+          }
+          {
+            id: "dilute-final-pool"
+            name: "Dilute Final Pool to Other Concentration"
+            type: "number"
+            paramType: "input"
+            required: false
+            description: "in nM"
+          }
+        ]
+        allowedConnections: ["frag-analyzer"]
+        categories: []
+      }
+      {
         id: "gibson-assembly"
         name: "Gibson Assembly"
         icon: "https://drive.google.com/thumbnail?id=1S9H5ydQhe9jyFmRtz09yExg4a8j36-Mp"
@@ -65,13 +152,7 @@ mutation {
             required: false
           }
         ]
-        allowedConnections: [
-          "transformation"
-          "dna-storage"
-
-          
-         
-        ]
+        allowedConnections: ["transformation", "dna-storage"]
         categories: []
       }
       {
@@ -250,7 +331,6 @@ mutation {
         ]
         allowedConnections: [
           "transformation"
-        
           "dna-storage"
           "restriction-digest"
         ]
@@ -326,17 +406,7 @@ mutation {
             required: false
           }
         ]
-        allowedConnections: [
-          "clean-up"
-     
-          
-          "pcr"
-          "qpcr"
-    
-       
-          
-          "gibson-assembly"
-        ]
+        allowedConnections: ["clean-up", "pcr", "qpcr", "gibson-assembly"]
         categories: []
       }
       {
@@ -366,7 +436,7 @@ mutation {
       }
       {
         id: "clean-up"
-        name: "Clean Up and Concentrate DNA"
+        name: "Clean Up and Concentrate"
         icon: "https://drive.google.com/thumbnail?id=1ss8znCImp6aCvw8dwrvaiJ4FWRuWr2zd"
         description: ""
         parameters: [
@@ -935,7 +1005,7 @@ mutation {
         icon: "https://drive.google.com/thumbnail?id=1IgSzmw5D4RpweYeWl0jnLCw5XWqOgCcp"
         description: ""
         categories: ["culturing-media"]
-        allowedConnections: [ "storage"]
+        allowedConnections: ["storage"]
         parameters: [
           {
             id: "inducer"
@@ -971,11 +1041,7 @@ mutation {
         icon: "https://drive.google.com/thumbnail?id=1cym6zJ4AwCNtES8KCrTdj2PvCTuqdwmX"
         description: ""
         categories: ["culturing-media"]
-        allowedConnections: [
-          
-          "storage"
-          "cell-culture-induction"
-        ]
+        allowedConnections: ["storage", "cell-culture-induction"]
         parameters: [
           {
             id: "lysate-bacterial-culture"
@@ -1004,12 +1070,7 @@ mutation {
         icon: "https://drive.google.com/thumbnail?id=1joahDEPtnzTGs5wGOMu2TNc32ld9J0WL"
         categories: ["culturing-media"]
         description: ""
-        allowedConnections: [
-         
-          "storage"
-          "cell-lysate"
-          "cell-culture-induction"
-        ]
+        allowedConnections: ["storage", "cell-lysate", "cell-culture-induction"]
         parameters: [
           {
             id: "protein-bacterial-culture"
@@ -1115,11 +1176,7 @@ mutation {
             required: false
           }
         ]
-        allowedConnections: [
-          "overnight-culture"
-       
-          "overnight-culture"
-        ]
+        allowedConnections: ["overnight-culture", "overnight-culture"]
         categories: ["fluorescence-based-assays"]
         result: { id: "transformation-product", type: "TransformationResult" }
       }
@@ -1324,13 +1381,40 @@ mutation {
         id: "gibson-assembly-provided"
         label: "Gibson Assembly and Cloning with Provided DNA"
         icon: ""
-        services: ["seq", "design-primers", "rehydrate-primer", "pcr", "gel-electrophoresis", "dna-gel", "gibson-assembly", "transformation", "overnight-culture", "miniprep-gs", "glyc-storage", "seq"]
+        services: [
+          "seq"
+          "design-primers"
+          "rehydrate-primer"
+          "pcr"
+          "gel-electrophoresis"
+          "dna-gel"
+          "gibson-assembly"
+          "transformation"
+          "overnight-culture"
+          "miniprep-gs"
+          "glyc-storage"
+          "seq"
+        ]
       }
       {
-          id: "gibson-assembly-ordering"
-          label: "Gibson Assembly and Cloning with Ordering"
-          icon: ""
-          services: ["gene", "design-primers", "rehydrate-primer", "pcr", "gel-electrophoresis", "dna-rna-extraction", "dna-gel", "gibson-assembly", "transformation", "overnight-culture", "miniprep-gs", "glyc-storage", "seq"]
+        id: "gibson-assembly-ordering"
+        label: "Gibson Assembly and Cloning with Ordering"
+        icon: ""
+        services: [
+          "gene"
+          "design-primers"
+          "rehydrate-primer"
+          "pcr"
+          "gel-electrophoresis"
+          "dna-rna-extraction"
+          "dna-gel"
+          "gibson-assembly"
+          "transformation"
+          "overnight-culture"
+          "miniprep-gs"
+          "glyc-storage"
+          "seq"
+        ]
       }
       {
         id: "library-prep"

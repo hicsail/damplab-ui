@@ -399,7 +399,7 @@ export let services: Service[] = [
   },
   {
     id: "clean-up",
-    name: "Clean Up and Concentrate DNA",
+    name: "Clean Up and Concentrate",
     // icon: 'https://cdn-icons-png.flaticon.com/512/647/647370.png', // go find it
     icon: "https://drive.google.com/thumbnail?id=1ss8znCImp6aCvw8dwrvaiJ4FWRuWr2zd",
     description: "",
@@ -407,25 +407,33 @@ export let services: Service[] = [
     categories: [],
     parameters: [
       {
-        id: "template-dna",
-        name: "Template DNA",
-        type: "boolean",
-        paramType: "result",
-        required: true,
-      },
-      {
-        id: "concentration",
-        name: "Concentration",
+        id: "elution-volume",
+        name: "Elution Volume",
         type: "number",
         paramType: "input",
         required: true,
+        description: "30-50",
       },
       {
-        id: "additional-notes",
-        name: "Additional Notes",
-        type: "string",
+        id: "e-buffer",
+        name: "elution buffer",
+        type: "dropdown",
         paramType: "input",
-        required: false,
+        required: true,
+        options: [
+          {
+            id: "nuclease-free-water",
+            name: "Nuclease Free Water",
+          },
+          {
+            id: "IDTE-BUFFER",
+            name: "IDTE BUFFER",
+          },
+          {
+            id: "kit-provided",
+            name: "Kit Provided",
+          }
+        ]
       },
     ],
     // add allowed connections
@@ -803,6 +811,65 @@ export let services: Service[] = [
         required: true,
       },
       {
+        id: "nuclease-free-water",
+        name: "Nuclease Free Water",
+        type: "number",
+        paramType: "input",
+        required: true,
+        description: "reaction volume in uL",
+      },
+      {
+        id: "master-mix",
+        name: "Master Mix",
+        type: "number",
+        paramType: "input",
+        required: true,
+        description: "reaction volume in uL",
+      },
+      {
+        id: "dntp",
+        name: "DNTP",
+        type: "dropdown",
+        paramType: "input",
+        required: true,
+        options: [
+          {
+            id: "dntp",
+            name: "dNTP",
+          },
+          {
+            id: "dntp-mix",
+            name: "dNTP Mix",
+          }
+        ]
+
+      },
+      {
+        id: "buffer",
+        name: "Buffer",
+        type: "dropdown",
+        paramType: "input",
+        required: true,
+        options: [
+          {
+            id: "taq",
+            name: "Standard Taq Buffer"
+          },
+          {
+            id: "phusion",
+            name: "Phusion® HF Buffer"
+          },
+          {
+            id: "q5",
+            name: "Q5® Reaction Buffer"
+          },
+          {
+            id: "thermo",
+            name: "ThermoPol® Buffer"
+          }
+        ]
+      },
+      {
         id: "polymerase",
         name: "Polymerase",
         type: "dropdown",
@@ -810,18 +877,56 @@ export let services: Service[] = [
         required: true,
         options: [
           {
-            id: "q5",
-            name: "Q5 Master Mix",
+            id: "q5-high-fidelity",
+            name: "Q5® High-Fidelity DNA Polymerase",
+          },
+          {
+            id: "taq",
+            name: "Taq DNA Polymerase",
+          },
+          {
+            id: "q5-hot",
+            name: "Q5® High-Fidelity DNA Polymerase Hot Start"
           },
           {
             id: "phusion",
             name: "Phusion Plus Master Mix",
           },
           {
+            id: "luna",
+            name: "Luna® Script RT Super Mix",
+          },
+          {
             id: "other",
             name: "Other",
           },
         ],
+      },
+      {
+        id: "other",
+        name: "Other",
+        type: "dropdown",
+        paramType: "input",
+        required: false,
+        options: [
+          {
+            id: "recombinant-albumin",
+            name: "Recombinant Albumin, Molecular Biology Grade",
+          },
+          {
+            id: "bsa",
+            name: "Q5 High GC Enhancer",
+          },
+          {
+            id: "dms",
+            name: "DMSO",
+          },
+          {
+            id: "other",
+            name: "Other",
+          }
+        ],
+
       },
       {
         id: "dpn1-digest",

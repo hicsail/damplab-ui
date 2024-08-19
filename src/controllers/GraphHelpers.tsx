@@ -196,7 +196,9 @@ export const addNodesAndEdgesFromBundle = (bundle: any, services: any, setNodes:
     const bundleServices = bundleServiceOrders.find(b => b.label == bundle.label)?.services;
     
     const bundleServiceNames = bundleServices?.map(service => serviceNames.find(s => s.id === service)?.name);
+    
     const serviceIds = bundleServiceNames?.map(service => bundle.services.find((s: any) => s.name === service)?.id ?? '');
+    
     // console.log('test: ', test);
     // const serviceIds = bundle.services.map((service: any) => service.id);
     addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges);
