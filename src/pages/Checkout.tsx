@@ -16,7 +16,7 @@ import {
   transformEdgesToGQL,
   transformNodesToGQL,
 } from "../controllers/GraphHelpers";
-import { CREATE_JOB, CREATE_WORKFLOW } from "../gql/mutations";
+import { CREATE_JOB } from "../gql/mutations";
 import { CanvasContext } from "../contexts/Canvas";
 import { AppContext } from "../contexts/App";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
@@ -140,98 +140,136 @@ export default function Checkout() {
     }
   };
 
+  // function that returns list of parameters on services
+  const getParameters = (nodeId: string) => {
+    let service = val.nodes.find((node: any) => node.id === nodeId);
+    if (service && service.data) return service.data.formData;
+    else return [];
+  };
+
   return (
     <div>
       <div
         style={{
           display: "flex",
+          justifyContent: "left",
         }}
       >
-				 <div
+        <div
           style={{
             width: "60%",
           }}
         >
-          <ReactFlowProvider>
-            <div
-              className="reactflow-wrapper"
-              style={{ height: "80vh", display: "flex", width: "100%" }}
-            >
-              <ReactFlow nodes={val.nodes} edges={val.edges} fitView />
+          <div>
+            <Typography variant="h6">Review flow</Typography>
+          </div>
+          <div>
+            <ReactFlowProvider>
+              <div
+                className="reactflow-wrapper"
+                style={{ height: "80vh", display: "flex", width: "100%" }}
+              >
+                <ReactFlow nodes={val.nodes} edges={val.edges} fitView />
+                <div
+                  style={{
+                    width: "30%",
+                  }}
+                >
+                  <Typography>Hello world</Typography>
+                </div>
+              </div>
+            </ReactFlowProvider>
+            <div>
+              {val.nodes.map((node: any) => {
+                return (
+                  <Accordion key={node.id}>
+                    {node.data.label}
+                  </Accordion>
+                );
+              })}
             </div>
-          </ReactFlowProvider>
+          </div>
         </div>
-        <div style={{ padding: 30, textAlign: "center", alignItems: "center", width: "40%" }}>
-					<div style={{
-						marginLeft: 'auto',
-						marginRight: 'auto',
-					}}>
-          <Typography variant="body1">Your Information</Typography>
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
+        <div
+          style={{
+            padding: 30,
+            textAlign: "center",
+            alignItems: "center",
+            width: "40%",
+          }}
+        >
+          <div
+            style={{
+              marginLeft: "auto",
+              marginRight: "auto",
             }}
           >
-            <TextField
-              required
-              label="Job Name"
-              margin="dense"
-              variant="outlined"
-              inputRef={jobRef}
-            />
-            <TextField
-              required
-              label="Submitter Name"
-              margin="dense"
-              variant="outlined"
-              inputRef={userRef}
-            />
-            <TextField
-              required
-              label="Institution"
-              margin="dense"
-              variant="outlined"
-              inputRef={institutionRef}
-            />
-            <TextField
-              required
-              label="Email"
-              margin="dense"
-              variant="outlined"
-              inputRef={emailRef}
-            />
-            <TextField
-              label="Notes"
-              margin="dense"
-              variant="outlined"
-              inputRef={notesRef}
-            />
-            <Button
-              component="label"
-              role={undefined}
-              variant="contained"
-              tabIndex={-1}
-              startIcon={<CloudUploadIcon />}
-            >
-              Upload file
-              <VisuallyHiddenInput type="file" />
-            </Button>
-            <Button
-              variant="contained"
-              type="submit"
-              onClick={() => {
-                console.log("Check form completion...");
+            <Typography variant="body1">Your Information</Typography>
+            <Box
+              component="form"
+              onSubmit={handleSubmit}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
               }}
-              style={{ padding: 20, marginTop: 10, fontSize: 15 }}
             >
-              Submit
-            </Button>
-          </Box>
-					</div>
+              <TextField
+                required
+                label="Job Name"
+                margin="dense"
+                variant="outlined"
+                inputRef={jobRef}
+              />
+              <TextField
+                required
+                label="Submitter Name"
+                margin="dense"
+                variant="outlined"
+                inputRef={userRef}
+              />
+              <TextField
+                required
+                label="Institution"
+                margin="dense"
+                variant="outlined"
+                inputRef={institutionRef}
+              />
+              <TextField
+                required
+                label="Email"
+                margin="dense"
+                variant="outlined"
+                inputRef={emailRef}
+              />
+              <TextField
+                label="Notes"
+                margin="dense"
+                variant="outlined"
+                inputRef={notesRef}
+              />
+              <Button
+                component="label"
+                role={undefined}
+                variant="contained"
+                tabIndex={-1}
+                startIcon={<CloudUploadIcon />}
+              >
+                Upload file
+                <VisuallyHiddenInput type="file" />
+              </Button>
+              <Button
+                variant="contained"
+                type="submit"
+                onClick={() => {
+                  console.log("Check form completion...");
+                }}
+                style={{ padding: 20, marginTop: 10, fontSize: 15 }}
+              >
+                Submit
+              </Button>
+            </Box>
+          </div>
         </div>
       </div>
       <Snackbar

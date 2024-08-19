@@ -729,6 +729,37 @@ export let services: Service[] = [
       "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.",
     parameters: [
       {
+        id: "sample-dilution",
+        name: "Sample Dilution",
+        type: "string",
+        paramType: "input",
+        required: false,
+      },
+      {
+        id: "dilutent",
+        name: "Dilutent",
+        type: "dropdown",
+        paramType: "input",
+        required: false,
+        options: [
+          {
+            id: "nuclease-free-water",
+            name: "Nuclease Free Water",
+          },
+          {
+            id: "IDTE-BUFFER",
+            name: "IDTE BUFFER",
+          }
+        ],
+      },
+      {
+        id: 'final-volume',
+        name: 'Final Volume',
+        type: 'number',
+        paramType: 'input',
+        required: true,
+      },
+      {
         id: "melting-temp",
         name: "Melting Temperature",
         type: "number",
@@ -837,17 +868,152 @@ export let services: Service[] = [
     description: "",
     parameters: [
       {
-        id: "e-volume",
-        name: "elution volume",
+        id: "elution-volume",
+        name: "Elution Volume",
         type: "number",
         paramType: "input",
         required: true,
         description: "30-50",
       },
+      {
+        id: "e-buffer",
+        name: "elution buffer",
+        type: "dropdown",
+        paramType: "input",
+        required: true,
+        options: [
+          {
+            id: "nuclease-free-water",
+            name: "Nuclease Free Water",
+          },
+          {
+            id: "IDTE-BUFFER",
+            name: "IDTE BUFFER",
+          },
+          {
+            id: "kit-provided",
+            name: "Kit Provided",
+          }
+        ]
+      },
     ],
     categories: [],
     allowedConnections: [],
   },
+  {
+    id: "normalization",
+    name: "Normalization",
+    icon: "",
+    description: "",
+
+    parameters: [
+      {
+        id: "final-concentration",
+        name: "Final Concentration",
+        type: "dropdown",
+        options: [
+          {
+            id: "ng-ul",
+            name: "ng/ul",
+          },
+          {
+            id: "nM",
+            name: "nM",
+          },
+        ],
+        paramType: "input",
+        required: true,
+      },
+      {
+        id: "final-volume",
+        name: "Final Volume",
+        type: "number",
+        paramType: "input",
+        required: true,
+        description: "in uL",
+      },
+      {
+        id: "dilutent",
+        name: "Dilutent",
+        type: "dropdown",
+        paramType: "input",
+        required: false,
+        options: [
+          {
+            id: "nuclease-free-water",
+            name: "Nuclease Free Water",
+          },
+          {
+            id: "IDTE-BUFFER",
+            name: "IDTE BUFFER",
+          }
+        ],
+      },
+    ],
+    allowedConnections: [],
+    categories: [],
+  },
+  {
+    id: "pooling",
+    name: "Pooling",
+    icon: "",
+    description: "",
+    parameters: [
+      {
+        id: "mass of dna desired in pool",
+        name: "Mass of DNA Desired in Pool",
+        type: "number",
+        paramType: "input",
+        required: true,
+        description: "in ng or nM",
+      },
+      {
+        id: "unit-selection",
+        name: "Unit Selection",
+        type: "dropdown",
+        paramType: "input",
+        required: true,
+        options: [
+          {
+            id: "ng",
+            name: "ng",
+          },
+          {
+            id: "nM",
+            name: "nM",
+          },
+        ],
+      },
+      // exlude concentration? and if yes, enter threshold
+      {
+        id: "exclude-concentration-threshold",
+        name: "Exclude Concentration Threshold",
+        type: "number",
+        paramType: "input",
+        required: false,
+        description: "Option to exclude samples below a certain concentration",
+      },
+      {
+        id: 'cap-sample-volume',
+        name: 'Cap Sample Volume',
+        type: 'number',
+        paramType: 'input',
+        required: false,
+        description: 'in uL, option to cap sample volume added to pool to a certain volume',
+      },
+      {
+        id: "dilute-final-pool",
+        name: "Dilute Final Pool to Other Concentration",
+        type: "number",
+        paramType: "input",
+        required: false,
+        description: "in nM",
+      }
+    ],
+    allowedConnections: ['frag-analyzer'],
+    categories: [],
+  },
+
   {
     id: "qpcr",
     name: "qPCR",

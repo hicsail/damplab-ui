@@ -173,6 +173,7 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
     let baseY = 0;
     
     serviceIds?.forEach((serviceId: string, index: number) => {
+        console.log('serviceId: ', serviceId);
         // get service from serviceId
         const service = getServiceFromId(services, serviceId);
         // if index === 0, add node to canvas with edge
@@ -193,11 +194,14 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
 // TODO: Change bundle data structure to preserve service order!  Needing to check bundles.tsx just to get the correct service order...
 export const addNodesAndEdgesFromBundle = (bundle: any, services: any, setNodes: any, setEdges: any) => {
     // get serviceIds from bundle
-    const bundleServices = bundleServiceOrders.find(b => b.label === bundle.label)?.services;
+    const bundleServices = bundleServiceOrders.find(b => b.label == bundle.label)?.services;
+    console.log('bundleServices: ', bundleServices);
     const bundleServiceNames = bundleServices?.map(service => serviceNames.find(s => s.id === service)?.name);
     const serviceIds = bundleServiceNames?.map(service => bundle.services.find((s: any) => s.name === service)?.id ?? '');
     // console.log('test: ', test);
     // const serviceIds = bundle.services.map((service: any) => service.id);
+    console.log('serviceIds: ', serviceIds);
+    console.log('services: ', services);
     addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges);
 }
 
