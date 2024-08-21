@@ -11,8 +11,8 @@ import {
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
-import ExampleTableUsage from "./ExampleTableUsage";
-import ExampleDisplayTableUsage from "./ExampleDisplayTableUsage";
+import ParamTableOnForm from "./ParamTableOnForm";
+import ExampleDisplayTableUsage from "./ParamTableOnForm";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -123,7 +123,7 @@ export default function ({ activeNode }: ParamFormProps) {
                 console.log(param);
                 return (
                   <div key={param.id}>
-                    <ExampleDisplayTableUsage
+                    <ParamTableOnForm
                       title={param.name}
                       columns={param.tableData.columns}
                       rows={param.tableData.rows}

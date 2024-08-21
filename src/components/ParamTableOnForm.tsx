@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ParamTableDisplay from './ParamTableDisplay';
+import ParamTable from './ParamTable';
 
 interface Props {
   title: string;
@@ -7,7 +8,7 @@ interface Props {
   rows: any[];
 }
 
-const DisplayExample: React.FC<Props> = ({title, columns, rows: inputRows}) => {
+const ParamTableOnForm: React.FC<Props> = ({title, columns, rows: inputRows}) => {
   
   const [rows, setRows] = useState<any[]>(inputRows);
 
@@ -20,4 +21,4 @@ const DisplayExample: React.FC<Props> = ({title, columns, rows: inputRows}) => {
   );
 };
 
-export default DisplayExample;
+export default ParamTableOnForm;
