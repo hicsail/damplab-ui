@@ -744,6 +744,47 @@ export let services: Service[] = [
         required: false,
       },
       {
+        id: "kristen-table",
+        name: "Kristen Table",
+        type: "table",
+        paramType: "input",
+        required: false,
+        tableData: {
+          columns: [
+            { header: "Reagent", field: "reagent" },
+            { header: "Per Reaction", field: "per_reaction" },
+            { header: "Volume", field: "volume" },
+          ],
+          rows: [
+            {
+              reagent: "Master Mix",
+              per_reaction: "1x",
+              volume: "12.5",
+            },
+            {
+              reagent: "Forward Primer",
+              per_reaction: "0.5uM",
+              volume: "1",
+            },
+            {
+              reagent: "Reverse Primer",
+              per_reaction: "0.5uM",
+              volume: "1",
+            },
+            {
+              reagent: "Template DNA",
+              per_reaction: "1ng/ul",
+              volume: "1",
+            },
+            {
+              reagent: "Nuclease Free Water",
+              per_reaction: "to 25uL",
+              volume: "to 25uL",
+            }
+          ],
+        },
+      },
+      {
         id: "thermal-cycler",
         name: "Thermal Cycler Conditions",
         type: "table",
