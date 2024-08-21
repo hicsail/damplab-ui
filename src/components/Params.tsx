@@ -12,6 +12,7 @@ import {
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
 import ExampleTableUsage from "./ExampleTableUsage";
+import ExampleDisplayTableUsage from "./ExampleDisplayTableUsage";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -129,7 +130,7 @@ export default function ({ activeNode }: ParamFormProps) {
                     <div style={{
                       marginTop: 50,
                     }}>
-                    <ExampleTableUsage/>
+                    <ExampleDisplayTableUsage />
                     </div>
                     {param.dynamicAdd && (
                       <IconButton onClick={() => {
