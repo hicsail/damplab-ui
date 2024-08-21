@@ -1,24 +1,29 @@
 import React from 'react';
 import { TextField, Select, MenuItem, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
+type ColumnData = {
+  header: string;  // The column header
+  field: string;   // The field name to match in row data
+  isDropdown?: boolean;  // If true, this column will have a dropdown
+  options?: string[];    // Options for the dropdown, only if `isDropdown` is true
+};
+
 type RowData = {
-  label: string;
-  value: string | number; // Can be a string (for inputs) or a number (for quantities)
-  isDropdown?: boolean;  // If true, this field will be a dropdown
-  options?: string[];    // Dropdown options, only if `isDropdown` is true
+  [key: string]: string | number; // Allows dynamic fields in each row
 };
 
 type ParamTableProps = {
   title: string;
+  columns: ColumnData[];
   rows: RowData[];
   onChange: (rows: RowData[]) => void;  // Callback to pass updated rows back to the parent component
 };
 
-const ParamTable: React.FC<ParamTableProps> = ({ title, rows, onChange }) => {
+const ParamTable: React.FC<ParamTableProps> = ({ title, rows, onChange, columns }) => {
 
-  const handleInputChange = (index: number, value: string | number) => {
+  const handleInputChange = (rowIndex: number, field: string, value: string | number) => {
     const updatedRows = [...rows];
-    updatedRows[index].value = value;
+    updatedRows[rowIndex][field] = value;
     onChange(updatedRows);
   };
 
@@ -28,36 +33,49 @@ const ParamTable: React.FC<ParamTableProps> = ({ title, rows, onChange }) => {
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell>Label</TableCell>
-            <TableCell>Value</TableCell>
+            {columns.map((col, colIndex) => (
+              <TableCell key={colIndex}>{col.header}</TableCell>
+            ))}
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row, index) => (
-            <TableRow key={index}>
-              <TableCell>{row.label}</TableCell>
-              <TableCell>
-                {row.isDropdown ? (
-                  <Select
-                    value={row.value}
-                    onChange={(e) => handleInputChange(index, e.target.value as string)}
-                    fullWidth
-                  >
-                    {row.options?.map((option, optIndex) => (
-                      <MenuItem key={optIndex} value={option}>
-                        {option}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                ) : (
-                  <TextField
-                    type={typeof row.value === 'number' ? 'number' : 'text'}
-                    value={row.value}
-                    onChange={(e) => handleInputChange(index, e.target.value)}
-                    fullWidth
-                  />
-                )}
-              </TableCell>
+          {rows.map((row, rowIndex) => (
+            <TableRow key={rowIndex}>
+              {columns.map((col, colIndex) => (
+                <TableCell key={colIndex}>
+                  {col.isDropdown ? (
+                    <Select
+                      value={row[col.field]}
+                      onChange={(e) => handleInputChange(rowIndex, col.field, e.target.value as string)}
+                      fullWidth
+                      sx={{ minWidth: '120px' }} // Minimum width for dropdowns
+                    >
+                      {col.options?.map((option, optIndex) => (
+                        <MenuItem key={optIndex} value={option}>
+                          {option}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  ) : (
+                    <TextField
+                      type={typeof row[col.field] === 'number' ? 'number' : 'text'}
+                      value={row[col.field]}
+                      onChange={(e) => handleInputChange(rowIndex, col.field, e.target.value)}
+                      multiline={typeof row[col.field] === 'string' && row[col.field].length > 20} // Enable multiline for longer text
+                      fullWidth
+                      InputProps={{
+                        style: { minWidth: '120px' }, // Ensure a minimum width
+                      }}
+                      sx={{
+                        '& .MuiInputBase-root': {
+                          width: 'auto', // Width adjusts based on content
+                          flexWrap: 'wrap', // Allows wrapping for multiline text
+                        },
+                      }}
+                    />
+                  )}
+                </TableCell>
+              ))}
             </TableRow>
           ))}
         </TableBody>

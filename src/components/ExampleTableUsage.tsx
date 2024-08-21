@@ -3,18 +3,21 @@ import ParamTable from './ParamTable';
 
 const ExampleUsage: React.FC = () => {
   const [rows, setRows] = useState<any[]>([
-    { label: 'Nuclease-free Water', value: 8.45 },
-    { label: 'Buffer', value: '', isDropdown: true, options: ['Buffer A', 'Buffer B'] },
-    { label: 'dNTPs', value: 0.5 },
-    { label: 'Polymerase', value: '', isDropdown: true, options: ['Polymerase A', 'Polymerase B'] },
-    { label: 'Forward primer', value: 1.3 },
-    { label: 'Reverse primer', value: 1.25 },
+    { step: 'Initial Denaturation', temp: 98, time: '30 seconds', notes: 'Initial Denaturation' },
+    { step: '35 Cycles', temp: 98, time: '10 seconds', notes: 'DNA Denaturation' },
     // Add more rows as needed
   ]);
 
+  const columns: any[] = [
+    { header: 'Step', field: 'step' },
+    { header: 'Temp (C)', field: 'temp', isDropdown: false },
+    { header: 'Time', field: 'time' },
+    { header: 'Notes', field: 'notes' }
+  ];
+
   return (
     <div>
-      <ParamTable title="PCR Setup" rows={rows} onChange={setRows} />
+      <ParamTable title="Thermal Cycler Conditions" columns={columns} rows={rows} onChange={setRows} />
       <div>
         <pre>{JSON.stringify(rows, null, 2)}</pre>
       </div>

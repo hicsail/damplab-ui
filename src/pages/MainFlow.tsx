@@ -161,7 +161,7 @@ export default function MainFlow( client: any /*data: any*/) {
 
                         </ReactFlow>
 
-                        <div style={{ minWidth: '10%', width: 550, borderLeft: 'solid 1px' }}>
+                        <div style={{ minWidth: '10%', width: 850, borderLeft: 'solid 1px' }}>
                             <RightSidebar />
                         </div>
                         
