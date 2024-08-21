@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
+import ExampleTableUsage from "./ExampleTableUsage";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -119,11 +120,17 @@ export default function ({ activeNode }: ParamFormProps) {
             if (param.paramType !== "result") {
               if (param.type === "dropdown") {
                 return (
+                  
                   <FormControl
                     size="small"
                     sx={{ mt: 3, width: "26ch" }}
                     key={param.id}
                   >
+                    <div style={{
+                      marginTop: 50,
+                    }}>
+                    <ExampleTableUsage/>
+                    </div>
                     {param.dynamicAdd && (
                       <IconButton onClick={() => {
                         // add param to form data
