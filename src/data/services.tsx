@@ -744,6 +744,60 @@ export let services: Service[] = [
         required: false,
       },
       {
+        id: "thermal-cycler",
+        name: "Thermal Cycler Conditions",
+        type: "table",
+        paramType: "input",
+        required: false,
+        description: "Provide the thermal cycler conditions in the table",
+        tableData: {
+          columns: [
+            { header: "Step", field: "step" },
+            { header: "Temp (C)", field: "temp" },
+            { header: "Time", field: "time" },
+            { header: "Notes", field: "notes" },
+          ],
+          rows: [
+            {
+              step: "Initial Denaturation",
+              temp: 98,
+              time: "30 seconds",
+              notes: "Initial Denaturation",
+            },
+            {
+              step: "35 Cycles",
+              temp: 98,
+              time: "10 seconds",
+              notes: "DNA Denaturation",
+            },
+            {
+              step: "35 Cycles",
+              temp: 65,
+              time: "20 seconds",
+              notes: "DNA Annealing",
+            },
+            {
+              step: "35 Cycles",
+              temp: 72,
+              time: "30 seconds",
+              notes: "DNA Extension",
+            },
+            {
+              step: "Final Extension",
+              temp: 72,
+              time: "5 minutes",
+              notes: "Final Extension",
+            },
+            {
+              step: "Hold",
+              temp: 4,
+              time: "Infinite",
+              notes: "Hold",
+            },
+          ],
+        }
+      },
+      {
         id: "dilutent",
         name: "Dilutent",
         type: "dropdown",
