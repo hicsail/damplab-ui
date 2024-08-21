@@ -21,6 +21,7 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string): Nod
             value           : null,
             required        : parameter.required,
             dynamicAdd : parameter.dynamicAdd ? parameter.dynamicAdd : null,
+            tableData : parameter.tableData ? parameter.tableData : null,
         });
     }
 

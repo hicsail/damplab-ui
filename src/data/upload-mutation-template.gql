@@ -745,6 +745,88 @@ mutation {
             required: false
           }
           {
+            id: "kristen-table"
+            name: "Kristen Table"
+            type: "table"
+            paramType: "input"
+            required: false
+            tableData: {
+              columns: [
+                { header: "Reagent", field: "reagent" }
+                { header: "Per Reaction", field: "per_reaction" }
+                { header: "Volume", field: "volume" }
+              ]
+              rows: [
+                { reagent: "Master Mix", per_reaction: "1x", volume: "12.5" }
+                {
+                  reagent: "Forward Primer"
+                  per_reaction: "0.5uM"
+                  volume: "1"
+                }
+                {
+                  reagent: "Reverse Primer"
+                  per_reaction: "0.5uM"
+                  volume: "1"
+                }
+                { reagent: "Template DNA", per_reaction: "1ng/ul", volume: "1" }
+                {
+                  reagent: "Nuclease Free Water"
+                  per_reaction: "to 25uL"
+                  volume: "to 25uL"
+                }
+              ]
+            }
+          }
+          {
+            id: "thermal-cycler"
+            name: "Thermal Cycler Conditions"
+            type: "table"
+            paramType: "input"
+            required: false
+            description: "Provide the thermal cycler conditions in the table"
+            tableData: {
+              columns: [
+                { header: "Step", field: "step" }
+                { header: "Temp (C)", field: "temp" }
+                { header: "Time", field: "time" }
+                { header: "Notes", field: "notes" }
+              ]
+              rows: [
+                {
+                  step: "Initial Denaturation"
+                  temp: 98
+                  time: "30 seconds"
+                  notes: "Initial Denaturation"
+                }
+                {
+                  step: "35 Cycles"
+                  temp: 98
+                  time: "10 seconds"
+                  notes: "DNA Denaturation"
+                }
+                {
+                  step: "35 Cycles"
+                  temp: 65
+                  time: "20 seconds"
+                  notes: "DNA Annealing"
+                }
+                {
+                  step: "35 Cycles"
+                  temp: 72
+                  time: "30 seconds"
+                  notes: "DNA Extension"
+                }
+                {
+                  step: "Final Extension"
+                  temp: 72
+                  time: "5 minutes"
+                  notes: "Final Extension"
+                }
+                { step: "Hold", temp: 4, time: "Infinite", notes: "Hold" }
+              ]
+            }
+          }
+          {
             id: "dilutent"
             name: "Dilutent"
             type: "dropdown"

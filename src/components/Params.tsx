@@ -119,6 +119,18 @@ export default function ({ activeNode }: ParamFormProps) {
         <div className="input-params" style={{ marginLeft: 20 }}>
           {activeNode.data.formData.map((param: any) => {
             if (param.paramType !== "result") {
+              if (param.type === "table") {
+                console.log(param);
+                return (
+                  <div key={param.id}>
+                    <ExampleDisplayTableUsage
+                      title={param.name}
+                      columns={param.tableData.columns}
+                      rows={param.tableData.rows}
+                    />
+                  </div>
+                );
+              }
               if (param.type === "dropdown") {
                 return (
                   
@@ -130,7 +142,6 @@ export default function ({ activeNode }: ParamFormProps) {
                     <div style={{
                       marginTop: 50,
                     }}>
-                    <ExampleDisplayTableUsage />
                     </div>
                     {param.dynamicAdd && (
                       <IconButton onClick={() => {
