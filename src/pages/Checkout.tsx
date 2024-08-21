@@ -179,15 +179,7 @@ export default function Checkout() {
                 </div>
               </div>
             </ReactFlowProvider>
-            <div>
-              {val.nodes.map((node: any) => {
-                return (
-                  <Accordion key={node.id}>
-                    {node.data.label}
-                  </Accordion>
-                );
-              })}
-            </div>
+            
           </div>
         </div>
         <div
