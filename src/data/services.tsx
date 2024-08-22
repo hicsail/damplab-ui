@@ -744,8 +744,33 @@ export let services: Service[] = [
         required: false,
       },
       {
-        id: "kristen-table",
-        name: "Kristen Table",
+        id: "dilutent",
+        name: "Dilutent",
+        type: "dropdown",
+        paramType: "input",
+        required: false,
+        options: [
+          {
+            id: "nuclease-free-water",
+            name: "Nuclease Free Water",
+          },
+          {
+            id: "IDTE-BUFFER",
+            name: "IDTE BUFFER",
+          }
+        ],
+      },
+      {
+        id: 'final-volume',
+        name: 'Final Volume',
+        type: 'number',
+        paramType: 'input',
+        required: true,
+        description: 'in uL',
+      },
+      {
+        id: "master-mix-table",
+        name: "Master Mix Table",
         type: "table",
         paramType: "input",
         required: false,
@@ -753,7 +778,7 @@ export let services: Service[] = [
           columns: [
             { header: "Reagent", field: "reagent" },
             { header: "Per Reaction", field: "per_reaction" },
-            { header: "Volume", field: "volume" },
+            { header: "Volume (uL)", field: "volume" },
           ],
           rows: [
             {
@@ -793,253 +818,57 @@ export let services: Service[] = [
         description: "Provide the thermal cycler conditions in the table",
         tableData: {
           columns: [
-            { header: "Step", field: "step" },
+            { header: "Stage", field: "stage" },
+            { header: "Cycle", field: "cycle" },
             { header: "Temp (C)", field: "temp" },
             { header: "Time", field: "time" },
             { header: "Notes", field: "notes" },
           ],
           rows: [
             {
-              step: "Initial Denaturation",
+              stage: "1",
+              cycle: "1x",
               temp: 98,
               time: "30 seconds",
               notes: "Initial Denaturation",
             },
             {
-              step: "35 Cycles",
+              stage: "2",
+              cycle: "35x",
               temp: 98,
               time: "10 seconds",
               notes: "DNA Denaturation",
             },
             {
-              step: "35 Cycles",
+              stage: "",
+              cycle: "",
               temp: 65,
               time: "20 seconds",
               notes: "DNA Annealing",
             },
             {
-              step: "35 Cycles",
+              stage: "",
+              cycle: "",
               temp: 72,
               time: "30 seconds",
               notes: "DNA Extension",
             },
             {
-              step: "Final Extension",
+              stage: "3",
+              cycle: "1x",
               temp: 72,
               time: "5 minutes",
               notes: "Final Extension",
             },
             {
-              step: "Hold",
+              stage: "4",
+              cycle: "1x",
               temp: 4,
               time: "Infinite",
               notes: "Hold",
             },
           ],
         }
-      },
-      {
-        id: "dilutent",
-        name: "Dilutent",
-        type: "dropdown",
-        paramType: "input",
-        required: false,
-        options: [
-          {
-            id: "nuclease-free-water",
-            name: "Nuclease Free Water",
-          },
-          {
-            id: "IDTE-BUFFER",
-            name: "IDTE BUFFER",
-          }
-        ],
-      },
-      {
-        id: 'final-volume',
-        name: 'Final Volume',
-        type: 'number',
-        paramType: 'input',
-        required: true,
-      },
-      {
-        id: "melting-temp",
-        name: "Melting Temperature",
-        type: "number",
-        paramType: "input",
-        required: true,
-      },
-      {
-        id: "cycle-time",
-        name: "Cycle Time",
-        type: "number",
-        paramType: "input",
-        required: true,
-      },
-      {
-        id: "reaction-volume",
-        name: "Reaction Volume",
-        type: "number",
-        paramType: "input",
-        required: true,
-        defaultValue: 25,
-      },
-      {
-        id: "forward-primer",
-        name: "Forward Primer",
-        type: "boolean",
-        paramType: "result",
-        required: true,
-      },
-      {
-        id: "reverse-primer",
-        name: "Reverse Primer",
-        type: "boolean",
-        paramType: "result",
-        required: true,
-      },
-      {
-        id: "template-dna",
-        name: "Template DNA",
-        type: "result",
-        paramType: "input",
-        required: true,
-      },
-      {
-        id: "nuclease-free-water",
-        name: "Nuclease Free Water",
-        type: "number",
-        paramType: "input",
-        required: true,
-        description: "reaction volume in uL",
-      },
-      {
-        id: "master-mix",
-        name: "Master Mix",
-        type: "number",
-        paramType: "input",
-        required: true,
-        description: "reaction volume in uL",
-      },
-      {
-        id: "dntp",
-        name: "DNTP",
-        type: "dropdown",
-        paramType: "input",
-        required: true,
-        options: [
-          {
-            id: "dntp",
-            name: "dNTP",
-          },
-          {
-            id: "dntp-mix",
-            name: "dNTP Mix",
-          }
-        ]
-
-      },
-      {
-        id: "buffer",
-        name: "Buffer",
-        type: "dropdown",
-        paramType: "input",
-        required: true,
-        options: [
-          {
-            id: "taq",
-            name: "Standard Taq Buffer"
-          },
-          {
-            id: "phusion",
-            name: "Phusion® HF Buffer"
-          },
-          {
-            id: "q5",
-            name: "Q5® Reaction Buffer"
-          },
-          {
-            id: "thermo",
-            name: "ThermoPol® Buffer"
-          }
-        ]
-      },
-      {
-        id: "polymerase",
-        name: "Polymerase",
-        type: "dropdown",
-        paramType: "input",
-        required: true,
-        options: [
-          {
-            id: "q5-high-fidelity",
-            name: "Q5® High-Fidelity DNA Polymerase",
-          },
-          {
-            id: "taq",
-            name: "Taq DNA Polymerase",
-          },
-          {
-            id: "q5-hot",
-            name: "Q5® High-Fidelity DNA Polymerase Hot Start"
-          },
-          {
-            id: "phusion",
-            name: "Phusion Plus Master Mix",
-          },
-          {
-            id: "luna",
-            name: "Luna® Script RT Super Mix",
-          },
-          {
-            id: "other",
-            name: "Other",
-          },
-        ],
-      },
-      {
-        id: "other",
-        name: "Other",
-        type: "dropdown",
-        paramType: "input",
-        required: false,
-        options: [
-          {
-            id: "recombinant-albumin",
-            name: "Recombinant Albumin, Molecular Biology Grade",
-          },
-          {
-            id: "bsa",
-            name: "Q5 High GC Enhancer",
-          },
-          {
-            id: "dms",
-            name: "DMSO",
-          },
-          {
-            id: "other",
-            name: "Other",
-          }
-        ],
-
-      },
-      {
-        id: "dpn1-digest",
-        name: "Dpn1 Digest",
-        description: "",
-        options: [
-          {
-            id: "yes",
-            name: "Yes",
-          },
-          {
-            id: "no",
-            name: "No",
-          },
-        ],
-        type: "dropdown",
-        paramType: "input",
-        required: true,
       },
       {
         id: "additional-notes",
