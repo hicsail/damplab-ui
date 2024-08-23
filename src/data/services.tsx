@@ -902,7 +902,7 @@ export let services: Service[] = [
         type: "number",
         paramType: "input",
         required: true,
-        description: "30-50",
+        description: "30-50uL",
       },
       {
         id: "e-buffer",
