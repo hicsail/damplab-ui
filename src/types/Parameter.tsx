@@ -13,4 +13,5 @@ export type Parameter = {
     rangeValueMax?: number;
     dynamicAdd?: boolean;
     templateFile? : string;
+    tableData?: any;
 };

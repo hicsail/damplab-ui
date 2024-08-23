@@ -743,13 +743,15 @@ mutation {
             type: "string"
             paramType: "input"
             required: false
+            description: "Example 1:10, 1:20, etc"
           }
           {
             id: "dilutent"
             name: "Dilutent"
             type: "dropdown"
             paramType: "input"
-            required: false
+            required: false,
+            description: "in uL"
             options: [
               { id: "nuclease-free-water", name: "Nuclease Free Water" }
               { id: "IDTE-BUFFER", name: "IDTE BUFFER" }
@@ -763,133 +765,98 @@ mutation {
             required: true
           }
           {
-            id: "melting-temp"
-            name: "Melting Temperature"
-            type: "number"
-            paramType: "input"
-            required: true
-          }
-          {
-            id: "cycle-time"
-            name: "Cycle Time"
-            type: "number"
-            paramType: "input"
-            required: true
-          }
-          {
-            id: "reaction-volume"
-            name: "Reaction Volume"
-            type: "number"
-            paramType: "input"
-            required: true
-            defaultValue: 25
-          }
-          {
-            id: "forward-primer"
-            name: "Forward Primer"
-            type: "boolean"
-            paramType: "result"
-            required: true
-          }
-          {
-            id: "reverse-primer"
-            name: "Reverse Primer"
-            type: "boolean"
-            paramType: "result"
-            required: true
-          }
-          {
-            id: "template-dna"
-            name: "Template DNA"
-            type: "result"
-            paramType: "input"
-            required: true
-          }
-          {
-            id: "nuclease-free-water"
-            name: "Nuclease Free Water"
-            type: "number"
-            paramType: "input"
-            required: true
-            description: "reaction volume in uL"
-          }
-          {
-            id: "master-mix"
-            name: "Master Mix"
-            type: "number"
-            paramType: "input"
-            required: true
-            description: "reaction volume in uL"
-          }
-          {
-            id: "dntp"
-            name: "DNTP"
-            type: "dropdown"
-            paramType: "input"
-            required: true
-            options: [
-              { id: "dntp", name: "dNTP" }
-              { id: "dntp-mix", name: "dNTP Mix" }
-            ]
-          }
-          {
-            id: "buffer"
-            name: "Buffer"
-            type: "dropdown"
-            paramType: "input"
-            required: true
-            options: [
-              { id: "taq", name: "Standard Taq Buffer" }
-              { id: "phusion", name: "Phusion® HF Buffer" }
-              { id: "q5", name: "Q5® Reaction Buffer" }
-              { id: "thermo", name: "ThermoPol® Buffer" }
-            ]
-          }
-          {
-            id: "polymerase"
-            name: "Polymerase"
-            type: "dropdown"
-            paramType: "input"
-            required: true
-            options: [
-              {
-                id: "q5-high-fidelity"
-                name: "Q5® High-Fidelity DNA Polymerase"
-              }
-              { id: "taq", name: "Taq DNA Polymerase" }
-              {
-                id: "q5-hot"
-                name: "Q5® High-Fidelity DNA Polymerase Hot Start"
-              }
-              { id: "phusion", name: "Phusion Plus Master Mix" }
-              { id: "luna", name: "Luna® Script RT Super Mix" }
-              { id: "other", name: "Other" }
-            ]
-          }
-          {
-            id: "other"
-            name: "Other"
-            type: "dropdown"
+            id: "master-mix-table"
+            name: "Master Mix Table"
+            type: "table"
             paramType: "input"
             required: false
-            options: [
-              {
-                id: "recombinant-albumin"
-                name: "Recombinant Albumin, Molecular Biology Grade"
-              }
-              { id: "bsa", name: "Q5 High GC Enhancer" }
-              { id: "dms", name: "DMSO" }
-              { id: "other", name: "Other" }
-            ]
+            tableData: {
+              columns: [
+                { header: "Reagent", field: "reagent" }
+                { header: "Per Reaction", field: "per_reaction" }
+                { header: "Volume (uL)", field: "volume" }
+              ]
+              rows: [
+                { reagent: "Master Mix", per_reaction: "1x", volume: "12.5" }
+                {
+                  reagent: "Forward Primer"
+                  per_reaction: "0.5uM"
+                  volume: "1"
+                }
+                {
+                  reagent: "Reverse Primer"
+                  per_reaction: "0.5uM"
+                  volume: "1"
+                }
+                { reagent: "Template DNA", per_reaction: "1ng/ul", volume: "1" }
+                {
+                  reagent: "Nuclease Free Water"
+                  per_reaction: "to 25uL"
+                  volume: "to 25uL"
+                }
+              ]
+            }
           }
           {
-            id: "dpn1-digest"
-            name: "Dpn1 Digest"
-            description: ""
-            options: [{ id: "yes", name: "Yes" }, { id: "no", name: "No" }]
-            type: "dropdown"
+            id: "thermal-cycler"
+            name: "Thermal Cycler Conditions"
+            type: "table"
             paramType: "input"
-            required: true
+            required: false
+            description: "Provide the thermal cycler conditions in the table"
+            tableData: {
+              columns: [
+                { header: "Stage", field: "stage" }
+                { header: "Cycle", field: "cycle" }
+                { header: "Temp (C)", field: "temp" }
+                { header: "Time", field: "time" }
+                { header: "Notes", field: "notes" }
+              ]
+              rows: [
+                {
+                  stage: "1"
+                  cycle: "1x"
+                  temp: 98
+                  time: "30 seconds"
+                  notes: "Initial Denaturation"
+                }
+                {
+                  stage: "2"
+                  cycle: "35x"
+                  temp: 98
+                  time: "10 seconds"
+                  notes: "DNA Denaturation"
+                }
+                {
+                  stage: ""
+                  cycle: ""
+                  temp: 65
+                  time: "20 seconds"
+                  notes: "DNA Annealing"
+                }
+                {
+                  stage: ""
+                  cycle: ""
+                  temp: 72
+                  time: "30 seconds"
+                  notes: "DNA Extension"
+                }
+                {
+                  stage: "3"
+                  cycle: "1x"
+                  temp: 72
+                  time: "5 minutes"
+                  notes: "Final Extension"
+                }
+                {
+                  stage: "4"
+                  cycle: "1x"
+                  temp: 4
+                  time: "Infinite"
+                  notes: "Hold"
+                }
+              ]
+            }
           }
           {
             id: "additional-notes"

@@ -23,4 +23,5 @@ export type NodeParameter = {
     value: any;
     required: boolean;
     dynamicAdd: boolean;
+    tableData: any;
 }
