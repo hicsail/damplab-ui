@@ -1,5 +1,6 @@
 import React from 'react';
-import { TextField, Select, MenuItem, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import { TextField, Select, MenuItem, Table, TableBody, TableCell, TableHead, TableRow, Typography, Box, Button } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 
 type ColumnData = {
   header: string;  // The column header
@@ -27,7 +28,17 @@ const ParamTable: React.FC<ParamTableProps> = ({ title, rows, onChange, columns 
     onChange(updatedRows);
   };
 
+  const handleAddRow = () => {
+    const newRow: RowData = columns.reduce((acc, col) => {
+      acc[col.field] = ''; // Initialize new row with empty values
+      return acc;
+    }, {} as RowData);
+
+    onChange([...rows, newRow]);
+  };
+
   return (
+    <Box>
     <div>
       <Typography variant="h6">{title}</Typography>
       <Table>
@@ -81,6 +92,18 @@ const ParamTable: React.FC<ParamTableProps> = ({ title, rows, onChange, columns 
         </TableBody>
       </Table>
     </div>
+    <Box display="flex" justifyContent="flex-end" mt={2}>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={handleAddRow}
+        >
+          Add Row
+        </Button>
+      </Box>
+
+    </Box>
   );
 };
 
