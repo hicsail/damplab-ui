@@ -100,7 +100,6 @@ export default function Checkout() {
     checkoutWorkflow.forEach(async (flow: any, index: number) => {
       let workflow = flow.nodes;
       let gqlWorkflows: any = transformNodesToGQL(workflow);
-
       let edges = val.edges.filter((edge: any) => {
         return (
           workflow.find((node: any) => node.id === edge.source) &&
@@ -108,20 +107,21 @@ export default function Checkout() {
         );
       });
       let gqlEdges: any = transformEdgesToGQL(edges);
-
+      
       let gqlWorkflow = {
-        name: myRefs.current[index].value, // workflowNames[flow.id],
+        name:  "", // myRefs.current[index].value, // workflowNames[flow.id],
         nodes: gqlWorkflows,
         edges: gqlEdges,
       };
       workflows.push(gqlWorkflow);
     });
-
     return workflows;
   };
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
+    console.log('hello world');
+    console.log(getGQLWorkflows())
     if (e.target.checkValidity()) {
       const date = new Date(Date.now()).toString();
       const data = {
@@ -133,8 +133,9 @@ export default function Checkout() {
         workflows: getGQLWorkflows(),
         // submitted: date
       };
+      console.log(data);
       createJob({ variables: { createJobInput: data } });
-      console.log(getGQLWorkflows());
+      
     } else {
       alert("Form is incomplete.  Please fill out all required fields...");
     }
@@ -253,9 +254,6 @@ export default function Checkout() {
               <Button
                 variant="contained"
                 type="submit"
-                onClick={() => {
-                  console.log("Check form completion...");
-                }}
                 style={{ padding: 20, marginTop: 10, fontSize: 15 }}
               >
                 Submit
