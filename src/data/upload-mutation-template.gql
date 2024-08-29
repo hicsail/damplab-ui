@@ -634,7 +634,7 @@ mutation {
           }
           {
             id: "forward-primer"
-            name: "Forward Primer 2"
+            name: "Forward Primer"
             type: "string"
             paramType: "flow"
             flowId: "forward-primer-flow"

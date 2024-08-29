@@ -3,6 +3,11 @@ import { Service } from "../types/Service";
 // NOTE: For now, I moved away from using the icon parameters; instead, all of the icons are in the assets folder.
 // They're identified via names listed in the assets folder index.
 
+// group : {
+//   id: "g-block",
+//   name: "g-block Resuspension",
+// }
+
 export let services: Service[] = [
   {
     id: "gibson-assembly", // PRODUCES DNA; SCREENING REQUIRED
@@ -46,6 +51,7 @@ export let services: Service[] = [
         type: "string",
         paramType: "input",
         required: true,
+        dynamicAdd: true,
       },
       {
         id: "plasmid-map",
@@ -324,12 +330,20 @@ export let services: Service[] = [
         required: true,
       },
       {
-        id: "dye",
-        name: "Dye",
+        id: "gel-stain",
+        name: "Gel Stain",
         defaultValue: "SYBR safe",
         type: "string",
         paramType: "input",
         required: true,
+      },
+      {
+        id: "sample-dye",
+        name: "Sample Dye",
+        defaultValue: "NEB Gel Loading Dye, Purple (6X)",
+        type: "string", // dropdown
+        paramType: "input",
+        required: false,
       },
       {
         id: "voltage",
@@ -412,7 +426,7 @@ export let services: Service[] = [
         type: "number",
         paramType: "input",
         required: true,
-        description: "30-50",
+        description: "30-50uL",
       },
       {
         id: "e-buffer",
@@ -659,42 +673,6 @@ export let services: Service[] = [
     description: "",
     parameters: [
       {
-        id: "normalization",
-        name: "Normalization and Pooling",
-        description: "",
-        options: [
-          {
-            id: "yes",
-            name: "Yes",
-          },
-          {
-            id: "no",
-            name: "No",
-          },
-        ],
-        type: "dropdown",
-        paramType: "input",
-        required: true,
-      },
-      {
-        id: "dilutent",
-        name: "Dilutent",
-        description: "",
-        options: [
-          {
-            id: "nucleas-free-water",
-            name: "Nucleas Free Wanter",
-          },
-          {
-            id: "other",
-            name: "Other",
-          },
-        ],
-        type: "dropdown",
-        paramType: "input",
-        required: true,
-      },
-      {
         id: "additional-notes",
         name: "Additional Notes",
         type: "string",
@@ -737,6 +715,22 @@ export let services: Service[] = [
       "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.",
     parameters: [
       {
+        id: "sample-number",
+        name: "Total number of samples to be run",
+        type: "number",
+        paramType: "input",
+        required: true,
+      },
+      //tropical citrus iced energy
+      {
+        id: "supplied-volume",
+        name: "Supplied Volume",
+        type: "number",
+        paramType: "input",
+        required: true,
+        description: "in uL",
+      },
+      {
         id: "sample-dilution",
         name: "Sample Dilution",
         type: "string",
@@ -759,6 +753,7 @@ export let services: Service[] = [
             name: "IDTE BUFFER",
           }
         ],
+        
       },
       {
         id: 'final-volume',
@@ -937,6 +932,14 @@ export let services: Service[] = [
 
     parameters: [
       {
+        id: "final-volume",
+        name: "Final Volume",
+        type: "number",
+        paramType: "input",
+        required: true,
+        description: "in uL",
+      },
+      {
         id: "final-concentration",
         name: "Final Concentration",
         type: "dropdown",
@@ -953,14 +956,7 @@ export let services: Service[] = [
         paramType: "input",
         required: true,
       },
-      {
-        id: "final-volume",
-        name: "Final Volume",
-        type: "number",
-        paramType: "input",
-        required: true,
-        description: "in uL",
-      },
+      
       {
         id: "dilutent",
         name: "Dilutent",
@@ -991,33 +987,16 @@ export let services: Service[] = [
       {
         id: "mass of dna desired in pool",
         name: "Mass of DNA Desired in Pool",
-        type: "number",
+        type: "string",
         paramType: "input",
         required: true,
         description: "in ng or nM",
-      },
-      {
-        id: "unit-selection",
-        name: "Unit Selection",
-        type: "dropdown",
-        paramType: "input",
-        required: true,
-        options: [
-          {
-            id: "ng",
-            name: "ng",
-          },
-          {
-            id: "nM",
-            name: "nM",
-          },
-        ],
       },
       // exlude concentration? and if yes, enter threshold
       {
         id: "exclude-concentration-threshold",
         name: "Exclude Concentration Threshold",
-        type: "number",
+        type: "string",
         paramType: "input",
         required: false,
         description: "Option to exclude samples below a certain concentration",
@@ -1037,7 +1016,24 @@ export let services: Service[] = [
         paramType: "input",
         required: false,
         description: "in nM",
-      }
+      },
+      {
+        id: "dilutent",
+        name: "Dilutent",
+        type: "dropdown",
+        paramType: "input",
+        required: false,
+        options: [
+          {
+            id: "nuclease-free-water",
+            name: "Nuclease Free Water",
+          },
+          {
+            id: "IDTE-BUFFER",
+            name: "IDTE BUFFER",
+          }
+        ],
+      },
     ],
     allowedConnections: ['frag-analyzer'],
     categories: [],
@@ -1145,6 +1141,16 @@ export let services: Service[] = [
         required: true,
       },
       {
+        id: "plasmid-map",
+        name: "Full plasmid map",
+        description:
+          "upload full annotated file of design including vectors, inserts and primers",
+        type: "file",
+        // file type limited to .gb .fasta .svg maybe sbol in the future
+        paramType: "input",
+        required: true,
+      },
+      {
         id: "",
         name: "Sequencing type",
         type: "dropdown",
@@ -1160,8 +1166,7 @@ export let services: Service[] = [
         ],
         paramType: "input",
         required: true,
-        description:
-          "default is 37 degrees C and 250RPM, range is 30 - 42 degrees C",
+        description: "",
       },
       // result param from design and order primer comes here, if there is none it defaults to whole plasmid,
       {
@@ -1177,8 +1182,8 @@ export let services: Service[] = [
         name: "Sequencing primer",
         type: "string",
         paramType: "input",
-        required: true,
-        description: "In between 5-25 uM",
+        required: false,
+       
       },
       {
         id: "primaer-concentration",
@@ -1186,7 +1191,8 @@ export let services: Service[] = [
         type: "number",
         paramType: "input",
         required: false,
-        description: "DEfault value get from Molly",
+        defaultValue: "5uM",
+        description: "In between 5-25 uM",
       },
       {
         id: "additional-notes",
@@ -1384,7 +1390,7 @@ export let services: Service[] = [
       {
         id: "recovery-media",
         name: "Recovery Media",
-        type: "string",
+        type: "dropdown",
         paramType: "input",
         required: true,
         description: "select from dropdown, default is SOC",
@@ -1395,8 +1401,8 @@ export let services: Service[] = [
             name: "SOC",
           },
           {
-            id: "LBE",
-            name: "LBE",
+            id: "LB",
+            name: "LB",
           },
           {
             id: "TB",
@@ -1521,8 +1527,23 @@ export let services: Service[] = [
         name: "Growth Tilt",
         type: "number",
         paramType: "input",
-        required: true,
+        required: false,
         description: "0-45 degrees",
+      },
+      {
+        id: "antibiotic",
+        name: "Antibiotic",
+        type: "dropdown",
+        options: [
+          {
+            id: 'test',
+            name: 'test'
+          }
+        ],
+        paramType: "input",
+        required: true,
+        description: "anti biotic for agar plate",
+        dynamicAdd: true,
       },
       {
         id: "rpm",

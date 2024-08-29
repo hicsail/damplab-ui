@@ -142,6 +142,7 @@ export const transformNodesToGQL = (nodes: any) => {
         //delete gqlNode.serviceId;
         delete gqlNode.parameters;
         delete gqlNode.description;
+        console.log('gqlNode: ', gqlNode);
         gqlNodes.push(gqlNode);
     });
 
