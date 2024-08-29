@@ -736,22 +736,36 @@ mutation {
         name: "PCR"
         icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM"
         description: "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment."
+        paramGroups: [{ id: "g-block", name: "g-block Resuspension" }]
         parameters: [
+          {
+            id: "sample-number"
+            name: "Total number of samples to be run"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "supplied-volume"
+            name: "Supplied Volume"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "in uL"
+          }
           {
             id: "sample-dilution"
             name: "Sample Dilution"
             type: "string"
             paramType: "input"
             required: false
-            description: "Example 1:10, 1:20, etc"
           }
           {
             id: "dilutent"
             name: "Dilutent"
             type: "dropdown"
             paramType: "input"
-            required: false,
-            description: "in uL"
+            required: false
             options: [
               { id: "nuclease-free-water", name: "Nuclease Free Water" }
               { id: "IDTE-BUFFER", name: "IDTE BUFFER" }
@@ -763,6 +777,7 @@ mutation {
             type: "number"
             paramType: "input"
             required: true
+            description: "in uL"
           }
           {
             id: "master-mix-table"
@@ -1476,7 +1491,14 @@ mutation {
         id: "library-prep"
         label: "Library Prep (16S,ITS)"
         icon: ""
-        services: ["pcr", "gel-electrophoresis", "pcr-clean-up", "spectro", "normalization", "pooling"]
+        services: [
+          "pcr"
+          "gel-electrophoresis"
+          "pcr-clean-up"
+          "spectro"
+          "normalization"
+          "pooling"
+        ]
       }
       {
         id: "protein-production"

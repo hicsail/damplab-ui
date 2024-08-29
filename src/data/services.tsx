@@ -709,7 +709,6 @@ export let services: Service[] = [
   {
     id: "pcr",
     name: "PCR",
-    // icon: 'https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt',
     icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM",
     description:
       "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.",
@@ -727,7 +726,6 @@ export let services: Service[] = [
         paramType: "input",
         required: true,
       },
-      //tropical citrus iced energy
       {
         id: "supplied-volume",
         name: "Supplied Volume",
@@ -885,7 +883,7 @@ export let services: Service[] = [
       type: "PCRResult",
       result: {
         id: "pcr-result",
-        amount: "number", // this will be equal to reaction volume number
+        amount: "number", 
       },
     },
   },
