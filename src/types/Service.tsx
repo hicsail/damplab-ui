@@ -11,6 +11,7 @@ export type Service = {
     result?: any;
     categories: string[];
     description: string;
+    paramGroups?: any[];
 };  
 
 

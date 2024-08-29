@@ -14,4 +14,5 @@ export type Parameter = {
     dynamicAdd?: boolean;
     templateFile? : string;
     tableData?: any;
+    paramGroupId?: string;
 };

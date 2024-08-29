@@ -446,8 +446,8 @@ export let services: Service[] = [
           {
             id: "kit-provided",
             name: "Kit Provided",
-          }
-        ]
+          },
+        ],
       },
     ],
     // add allowed connections
@@ -713,6 +713,12 @@ export let services: Service[] = [
     icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM",
     description:
       "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.",
+    paramGroups: [
+      {
+        id: "g-block",
+        name: "g-block Resuspension",
+      },
+    ],
     parameters: [
       {
         id: "sample-number",
@@ -751,17 +757,16 @@ export let services: Service[] = [
           {
             id: "IDTE-BUFFER",
             name: "IDTE BUFFER",
-          }
+          },
         ],
-        
       },
       {
-        id: 'final-volume',
-        name: 'Final Volume',
-        type: 'number',
-        paramType: 'input',
+        id: "final-volume",
+        name: "Final Volume",
+        type: "number",
+        paramType: "input",
         required: true,
-        description: 'in uL',
+        description: "in uL",
       },
       {
         id: "master-mix-table",
@@ -800,7 +805,7 @@ export let services: Service[] = [
               reagent: "Nuclease Free Water",
               per_reaction: "to 25uL",
               volume: "to 25uL",
-            }
+            },
           ],
         },
       },
@@ -863,7 +868,7 @@ export let services: Service[] = [
               notes: "Hold",
             },
           ],
-        }
+        },
       },
       {
         id: "additional-notes",
@@ -917,8 +922,8 @@ export let services: Service[] = [
           {
             id: "kit-provided",
             name: "Kit Provided",
-          }
-        ]
+          },
+        ],
       },
     ],
     categories: [],
@@ -956,7 +961,7 @@ export let services: Service[] = [
         paramType: "input",
         required: true,
       },
-      
+
       {
         id: "dilutent",
         name: "Dilutent",
@@ -971,7 +976,7 @@ export let services: Service[] = [
           {
             id: "IDTE-BUFFER",
             name: "IDTE BUFFER",
-          }
+          },
         ],
       },
     ],
@@ -1002,12 +1007,13 @@ export let services: Service[] = [
         description: "Option to exclude samples below a certain concentration",
       },
       {
-        id: 'cap-sample-volume',
-        name: 'Cap Sample Volume',
-        type: 'number',
-        paramType: 'input',
+        id: "cap-sample-volume",
+        name: "Cap Sample Volume",
+        type: "number",
+        paramType: "input",
         required: false,
-        description: 'in uL, option to cap sample volume added to pool to a certain volume',
+        description:
+          "in uL, option to cap sample volume added to pool to a certain volume",
       },
       {
         id: "dilute-final-pool",
@@ -1031,11 +1037,11 @@ export let services: Service[] = [
           {
             id: "IDTE-BUFFER",
             name: "IDTE BUFFER",
-          }
+          },
         ],
       },
     ],
-    allowedConnections: ['frag-analyzer'],
+    allowedConnections: ["frag-analyzer"],
     categories: [],
   },
 
@@ -1183,7 +1189,6 @@ export let services: Service[] = [
         type: "string",
         paramType: "input",
         required: false,
-       
       },
       {
         id: "primaer-concentration",
@@ -1536,9 +1541,9 @@ export let services: Service[] = [
         type: "dropdown",
         options: [
           {
-            id: 'test',
-            name: 'test'
-          }
+            id: "test",
+            name: "test",
+          },
         ],
         paramType: "input",
         required: true,
