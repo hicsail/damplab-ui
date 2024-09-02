@@ -4,6 +4,7 @@ import { Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, T
 import { styled } from "@mui/system";
 
 import { MUTATE_JOB_STATE } from '../gql/mutations';
+import { createELabsStudy, createELabsExperiment } from '../mpi/eLabs';
 
 
 const CenteredModal = styled(Modal)`
@@ -29,9 +30,19 @@ const FeedbackField = styled(TextField)`
   margin-bottom: 10px;
 `;
 
+interface FetchOptions {
+  method: string;
+  headers: {
+    // accept: string;
+    // 'X-Requested-With': string;
+    'content-type': string;
+    Authorization: string;
+  };
+  body: string;
+}
 
 export default function JobFeedbackModal(props: any) {
-  const { onClose, id } = props;
+  const { onClose, id, workflows } = props;
   
   const [feedbackType,      setFeedbackType]      = useState("");
   const [feedbackMessage,   setFeedbackMessage]   = useState("");
@@ -54,7 +65,33 @@ export default function JobFeedbackModal(props: any) {
   const handleFeedbackMessageChange = (event: any) => {
     setFeedbackMessage(event.target.value);
   };
-  
+
+  const handleELabsCall = async () => {
+    try {
+      for (const workflow of workflows) {
+        console.log('eLabs Study creation: ', workflow)
+        const studyID = await createELabsStudy('822c512d20c3222a33fc79ed53aa02c2', 23469, workflow.name);
+        if (!studyID || typeof(studyID) !== 'number') {
+          throw new Error('StudyID not returned by eLabs (or invalid type)...');
+        }
+
+        for (const service of workflow.nodes) {
+          console.log('eLabs Experiment creation: ', service.label)
+          const experimentID = await createELabsExperiment('822c512d20c3222a33fc79ed53aa02c2', studyID, service.label, 'PENDING');
+          if (!experimentID || typeof(experimentID) !== 'number') {
+            throw new Error('ExperimentID not returned by eLabs (or invalid type)...');
+          }
+        }
+      }
+
+      await handleSubmit();
+
+      return(`Study created successfully in eLabs.  Study ID: {studyID}`)
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   const handleSubmit = async () => {
     // feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
     
@@ -69,7 +106,13 @@ export default function JobFeedbackModal(props: any) {
           window.location.reload();
         }
       });
-  
+
+      // const elabsResult = await handleELabsCall();
+
+      // if (elabsResult) {
+      //   console.log(elabsResult);
+      // }
+
       onClose();  // Close the modal after the mutation is completed
     } catch (error) {
       console.log(error);
@@ -100,9 +143,9 @@ export default function JobFeedbackModal(props: any) {
           </RadioGroup>
 
           {feedbackType && (
-            <Button variant="contained" color="inherit" onClick={handleSubmit}>
+            <Button variant="contained" color="inherit" onClick={handleELabsCall}>
               {feedbackType === "looks-good"
-                ? "Accept Job"
+                ? "Accept Job/Transmit to eLabs"
                 : "Send Feedback"}
             </Button>
           )}
