@@ -8,6 +8,7 @@ export type NodeData = {
     formData: NodeParameter[];
     serviceId: string;
     description: string;
+    paramGroups?: any[];
 }
 
 

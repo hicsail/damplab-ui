@@ -87,7 +87,7 @@ export default function MainFlow( client: any /*data: any*/) {
 
         const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
         const data: NodeData = { id: nodeId, label: name, description: type.description, allowedConnections: type.allowedConnections, 
-            icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId };
+            icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId, paramGroups: type.paramGroups };
         const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
         setNodes((nds: any) => nds.concat(newNode));

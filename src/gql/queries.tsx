@@ -8,6 +8,7 @@ export const GET_SERVICES = gql`
             icon 
             parameters
             description
+            paramGroups
             allowedConnections {
                 id 
                 name

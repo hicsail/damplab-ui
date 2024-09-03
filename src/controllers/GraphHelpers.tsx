@@ -46,7 +46,8 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         parameters            : service.parameters,
         additionalInstructions: "",
         formData              : formData,
-        serviceId             : service.id
+        serviceId             : service.id,
+        paramGroups           : service.paramGroups,
     }
     
     const newNode = createNodeObject(nodeId, service.name, 'selectorNode', position, nodeData);
