@@ -725,6 +725,7 @@ export let services: Service[] = [
         type: "number",
         paramType: "input",
         required: true,
+        paramGroupId: "g-block", 
       },
       {
         id: "supplied-volume",
@@ -733,6 +734,7 @@ export let services: Service[] = [
         paramType: "input",
         required: true,
         description: "in uL",
+        paramGroupId: "g-block",
       },
       {
         id: "sample-dilution",
@@ -740,6 +742,7 @@ export let services: Service[] = [
         type: "string",
         paramType: "input",
         required: false,
+        paramGroupId: "g-block",
       },
       {
         id: "dilutent",
@@ -747,6 +750,7 @@ export let services: Service[] = [
         type: "dropdown",
         paramType: "input",
         required: false,
+        paramGroupId: "g-block",
         options: [
           {
             id: "nuclease-free-water",
@@ -765,6 +769,7 @@ export let services: Service[] = [
         paramType: "input",
         required: true,
         description: "in uL",
+        paramGroupId: "g-block",
       },
       {
         id: "master-mix-table",

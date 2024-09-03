@@ -744,6 +744,7 @@ mutation {
             type: "number"
             paramType: "input"
             required: true
+            paramGroupId: "g-block"
           }
           {
             id: "supplied-volume"
@@ -752,6 +753,7 @@ mutation {
             paramType: "input"
             required: true
             description: "in uL"
+            paramGroupId: "g-block"
           }
           {
             id: "sample-dilution"
@@ -759,6 +761,7 @@ mutation {
             type: "string"
             paramType: "input"
             required: false
+            paramGroupId: "g-block"
           }
           {
             id: "dilutent"
@@ -766,6 +769,7 @@ mutation {
             type: "dropdown"
             paramType: "input"
             required: false
+            paramGroupId: "g-block"
             options: [
               { id: "nuclease-free-water", name: "Nuclease Free Water" }
               { id: "IDTE-BUFFER", name: "IDTE BUFFER" }
@@ -778,6 +782,7 @@ mutation {
             paramType: "input"
             required: true
             description: "in uL"
+            paramGroupId: "g-block"
           }
           {
             id: "master-mix-table"

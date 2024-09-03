@@ -131,7 +131,6 @@ export default function ({ activeNode }: ParamFormProps) {
               }
               if (param.type === "dropdown") {
                 return (
-                  
                   <FormControl
                     size="small"
                     sx={{ mt: 3, width: "26ch" }}
