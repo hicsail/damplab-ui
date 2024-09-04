@@ -100,7 +100,6 @@ export default function ({ activeNode }: ParamFormProps) {
         parameters: [],
       };
       activeNodeData.formData.forEach((param: any) => {
-        console.log(param, paramGroupId);
         if (param.paramGroupId === paramGroupId) {
           paramGroup.parameters.push(param);
         }
@@ -118,7 +117,6 @@ export default function ({ activeNode }: ParamFormProps) {
     // should render param group name and then the parameters
 
     let paramGroups = returnParamGroups(formData);
-    console.log(JSON.stringify(paramGroups));
 
     return (
       <div style={{
@@ -271,11 +269,7 @@ export default function ({ activeNode }: ParamFormProps) {
     }
   }, [formik.values]);
 
-  useEffect(() => {
-    console.log(activeNode.data);
-  },[activeNode.data
-  ])
-
+  
   return (
     <div>
       <h3>Parameters</h3>
