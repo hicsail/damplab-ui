@@ -67,7 +67,6 @@ export default function MainFlow( client: any /*data: any*/) {
 
         let type = event.dataTransfer.getData('application/reactflow');
             type = JSON.parse(type);
-        console.log(type)
         
         const serviceId = type.id
         const name      = type.name;

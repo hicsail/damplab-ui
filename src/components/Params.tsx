@@ -119,13 +119,14 @@ export default function ({ activeNode }: ParamFormProps) {
     let paramGroups = returnParamGroups(formData);
 
     return (
-      <div style={{
+      <div 
+      style={{
         border: "1px solid black",
         padding: 2,
       }}>
         {paramGroups.map((paramGroup: any) => {
           return (
-            <div>
+            <div key={paramGroup.id}>
               <h4>{paramGroup.name}</h4>
               <div className="input-params" style={{ marginLeft: 20 }}>
                 {paramGroup.parameters.map((param: any) => {
@@ -269,7 +270,7 @@ export default function ({ activeNode }: ParamFormProps) {
     }
   }, [formik.values]);
 
-  
+
   return (
     <div>
       <h3>Parameters</h3>
