@@ -26,4 +26,5 @@ export type NodeParameter = {
     dynamicAdd: boolean;
     tableData: any;
     paramGroups?: any[];
+    paramGroupId?: string;
 }

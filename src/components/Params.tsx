@@ -85,29 +85,31 @@ export default function ({ activeNode }: ParamFormProps) {
     },
   });
 
-  const returnParamGroups = (formData: any) => {
+  const returnParamGroups = (activeNodeData: any) => {
 
-    // return the paramGroups along with the parameters
-    let paramGroups: any = [];
-    let paramGroup: any = {};
-    let paramGroupIndex = 0;
-    let paramIndex = 0;
-    formData.forEach((param: any) => {
-      if (param.paramGroups) {
-        paramGroup = {
-          id: param.paramGroups[0].id,
-          name: param.paramGroups[0].name,
-          parameters: [],
-        };
-        paramGroups.push(paramGroup);
-        paramGroupIndex = paramGroups.length - 1;
-      }
-      if (param.paramGroups) {
-        paramGroup.parameters.push(param);
-      }
+    let paramGroups: any[] = [];
+    let paramGroupIds = activeNodeData.paramGroups.map((paramGroup: any) => {
+      return paramGroup.id;
+    });
+
+    // loop through param groups and add parameters to the group
+    paramGroupIds.forEach((paramGroupId: any) => {
+      let paramGroup = {
+        id: paramGroupId,
+        name: activeNodeData.paramGroups.find((paramGroup: any) => paramGroup.id === paramGroupId).name,
+        parameters: [],
+      };
+      activeNodeData.formData.forEach((param: any) => {
+        console.log(param, paramGroupId);
+        if (param.paramGroupId === paramGroupId) {
+          paramGroup.parameters.push(param);
+        }
+      });
+      paramGroups.push(paramGroup);
     });
 
     return paramGroups;
+    
   }
 
   const renderParamGroups = (formData: any) => {
@@ -116,9 +118,13 @@ export default function ({ activeNode }: ParamFormProps) {
     // should render param group name and then the parameters
 
     let paramGroups = returnParamGroups(formData);
+    console.log(JSON.stringify(paramGroups));
 
     return (
-      <div>
+      <div style={{
+        border: "1px solid black",
+        padding: 2,
+      }}>
         {paramGroups.map((paramGroup: any) => {
           return (
             <div>
@@ -290,12 +296,12 @@ export default function ({ activeNode }: ParamFormProps) {
       <form onSubmit={formik.handleSubmit}>
         {
           // check if there are any param groups and render them
-          activeNode.data.formData.find((obj: any) => obj.paramGroups) &&
-          renderParamGroups(activeNode.data.formData)
+          activeNode.data.paramGroups &&
+          renderParamGroups(activeNode.data)
         }
         <div className="input-params" style={{ marginLeft: 20 }}>
           {activeNode.data.formData.map((param: any) => {
-            if (param.paramType !== "result") {
+            if (param.paramType !== "result" && !param.paramGroupId) {
               if (param.type === "table") {
                 return (
                   <div key={param.id}>
