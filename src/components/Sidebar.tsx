@@ -19,6 +19,8 @@ export default () => {
   const [categories,       setCategories]       = useState<any>([]);
   const [alignment,        setAlignment]        = useState('bundles');
   const [filteredServices, setFilteredServices] = useState(services);
+  const [searchText,      setSearchText]       = useState('');
+
 
   const buttonElementStyle = {
     padding: 10,
@@ -60,13 +62,22 @@ export default () => {
 
   // filtering services by category, update filteredServices when category or services change
   useEffect(() => {
-    if (category === '') {
+    if (category === '' && searchText === '') {
       setFilteredServices(services);
-    } else {
+    } 
+    else if (category === '' && searchText !== '') {
+      // filter services by search text
+      setFilteredServices(services.filter((service: Service) => service.name.toLowerCase().includes(searchText.toLowerCase())));
+    }
+    else if (category !== '' && searchText !== '') {
+      // filter services by search text
+      setFilteredServices(categories.find((cat: any) => cat.id === category).services.filter((service: Service) => service.name.toLowerCase().includes(searchText.toLowerCase())));
+    }
+    else {
       // set filtered services as category.services
       setFilteredServices(categories.find((cat: any) => cat.id === category).services);
     }
-  }, [category, services]);
+  }, [category, services, searchText]);
 
   return (
     <aside style={{ padding: 30, height: '80vh', overflow: 'scroll' }}>
@@ -83,6 +94,9 @@ export default () => {
       {
         alignment === 'services' ? (
           <div>
+            <br/>
+            <input type="text" placeholder="Search services..." onChange={(e) => setSearchText(e.target.value)} />
+            <br/>
             <div style={{ margin: 15 }}>
               <FormControl fullWidth>
                 <InputLabel id="demo-simple-select-label">Category</InputLabel>
