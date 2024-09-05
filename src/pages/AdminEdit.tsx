@@ -1,5 +1,7 @@
-import { FormControl, MenuItem, Select, Stack, TextField, Typography } from '@mui/material';
-import { Dispatch, SetStateAction, useState } from 'react';
+import { Select, Stack, Typography } from '@mui/material';
+import { useState } from 'react';
+import { ToolBar } from '../components/edit/ToolBar';
+import { EditBundlesTable } from '../components/edit/EditBundlesTable';
 
 type EditTypes = 'Services' | 'Categories' | 'Bundles';
 
@@ -7,8 +9,16 @@ export const AdminEdit: React.FC = () => {
   const [editType, setEditType] = useState<EditTypes>('Services');
   const [searchString, setSearchString] = useState<string>('');
 
+  const tableSelector = (type: EditTypes) => {
+    switch(type) {
+      case 'Services': return <p>Services Table</p>;
+      case 'Categories': return <p>Categories Table</p>;
+      case 'Bundles': return <EditBundlesTable />;
+    }
+  }
+
   return (
-    <Stack>
+    <Stack spacing={3}>
       <Typography variant='h2'>Admin Edit Screen</Typography>
       <ToolBar
         editType={editType}
@@ -16,33 +26,7 @@ export const AdminEdit: React.FC = () => {
         searchString={searchString}
         setSearchString={setSearchString}
       />
+      {tableSelector(editType)}
     </Stack>
-  );
-};
-
-interface ToolBarProps {
-  editType: EditTypes;
-  setEditType: Dispatch<SetStateAction<EditTypes>>;
-
-  searchString: string;
-  setSearchString: Dispatch<SetStateAction<string>>;
-}
-
-const ToolBar: React.FC<ToolBarProps> = (props) => {
-  return (
-    <FormControl>
-      <Stack direction='row' spacing={3}>
-        {/* Switching between the edit views */}
-        <Select value={props.editType} onChange={(event) => props.setEditType(event.target.value as EditTypes)}>
-          <MenuItem value={'Services'}>Services</MenuItem>
-          <MenuItem value={'Categories'}>Categories</MenuItem>
-          <MenuItem value={'Bundles'}>Bundles</MenuItem>
-        </Select>
-
-        {/* Name based filtering */}
-        <TextField label="Search" value={props.searchString} onChange={(event) => props.setSearchString(event.target.value)}/>
-
-      </Stack>
-    </FormControl>
   );
 };
