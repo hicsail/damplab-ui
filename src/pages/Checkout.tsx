@@ -54,6 +54,7 @@ export default function Checkout() {
   const institutionRef = useRef<any>(null);
   const emailRef = useRef<any>(null);
   const notesRef = useRef<any>(null);
+  const [selectedNode, setSelectedNode] = useState<any>(null);
 
   const navigate = useNavigate();
 
@@ -77,6 +78,28 @@ export default function Checkout() {
   useEffect(() => {
     setCheckoutWorkflow(createWorkflowObj());
   }, [val.nodes, val.edges]);
+
+  useEffect(() => {
+
+    // scroll to selected node in parameters div
+    if (selectedNode) {
+      let node = document.getElementById(selectedNode.id);
+      if (node) {
+        node.scrollIntoView({ behavior: "smooth", block: "start" });
+        // set selected node background color to light blue
+      }
+    }
+
+
+    // set all refs to null when selected node changes
+    myRefs.current = [];
+
+    // set selected node to null after 2 seconds
+    setTimeout(() => {
+      setSelectedNode(null);
+    }, 2000);
+    
+  },[selectedNode]);
 
   const createWorkflowObj = () => {
     setWorkflows(getWorkflowsFromGraph(val.nodes, val.edges));
@@ -148,6 +171,10 @@ export default function Checkout() {
     else return [];
   };
 
+  const onNodeClick = (event: any, node: any) => {
+    setSelectedNode(node);
+  };
+
   // function that renders parameters for each service in a list
   const renderParameters = (node: any) => {
 
@@ -195,18 +222,22 @@ export default function Checkout() {
                 className="reactflow-wrapper"
                 style={{ height: "80vh", display: "flex", width: "100%" }}
               >
-                <ReactFlow nodes={val.nodes} edges={val.edges} fitView />
+                <ReactFlow nodes={val.nodes} edges={val.edges} onNodeClick={onNodeClick} fitView />
                 <div
                   style={{
                     width: "50%",
                     overflowY: "scroll",
                   }}
+                  className="parameters"
                 >
                   {
                     // render parameters for each service
                     val.nodes.map((node: any) => {
                       return (
-                        <div key={node.id} style={{
+                        <div key={node.id} 
+                        ref={(ref) => myRefs.current.push(ref)}
+                        id={node.id}
+                        style={{
                           marginBottom: 40,
                         }}>
                           {renderParameters(node)}
