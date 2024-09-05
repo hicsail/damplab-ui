@@ -151,11 +151,9 @@ export default function Checkout() {
   // function that renders parameters for each service in a list
   const renderParameters = (node: any) => {
 
-    console.log(node);
     let parameters = getParameters(node.id);
-    console.log(parameters);
-    // return node name and parameters
-    
+
+    // return node name and parameters    
     return (
       <div>
         <Typography variant="h6">{ node.name }</Typography>
@@ -177,8 +175,6 @@ export default function Checkout() {
         ))}
       </div>
     );
-
-
   }
 
   return (
@@ -203,10 +199,20 @@ export default function Checkout() {
                 <div
                   style={{
                     width: "50%",
+                    overflowY: "scroll",
                   }}
                 >
                   {
-                    renderParameters(val.nodes[0])
+                    // render parameters for each service
+                    val.nodes.map((node: any) => {
+                      return (
+                        <div key={node.id} style={{
+                          marginBottom: 40,
+                        }}>
+                          {renderParameters(node)}
+                        </div>
+                      );
+                    })
                   }
                 </div>
               </div>
