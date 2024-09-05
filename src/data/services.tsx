@@ -935,7 +935,7 @@ export let services: Service[] = [
   {
     id: "normalization",
     name: "Normalization",
-    icon: "",
+    icon: "https://drive.google.com/file/d/1HVOGRqqMUCaHoQvznXL-DOYJQzfW7Ulx/view?usp=drive_link",
     description: "",
 
     parameters: [
@@ -989,7 +989,7 @@ export let services: Service[] = [
   {
     id: "pooling",
     name: "Pooling",
-    icon: "",
+    icon: "https://drive.google.com/file/d/18276pGGL30hpkOjWVbon3dFvJkukiCu0/view?usp=drive_link",
     description: "",
     parameters: [
       {

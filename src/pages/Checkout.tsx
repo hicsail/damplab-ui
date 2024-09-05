@@ -148,17 +148,46 @@ export default function Checkout() {
     else return [];
   };
 
+  // function that renders parameters for each service in a list
+  const renderParameters = (node: any) => {
+
+    console.log(node);
+    let parameters = getParameters(node.id);
+    console.log(parameters);
+    // return node name and parameters
+    
+    return (
+      <div>
+        <Typography variant="h6">{ node.name }</Typography>
+        {parameters.map((param: any, index: number) => (
+          <Accordion key={index}>
+            <Box>
+              <Typography variant="body1">{param.label}</Typography>
+              <TextField
+                required
+                label={param.name}
+                margin="dense"
+                variant="outlined"
+                inputRef={myRefs.current[index]}
+                value={param.value}
+                size="small"
+              />
+            </Box>
+          </Accordion>
+        ))}
+      </div>
+    );
+
+
+  }
+
   return (
     <div>
       <div
-        style={{
-          display: "flex",
-          justifyContent: "left",
-        }}
       >
         <div
           style={{
-            width: "60%",
+            width: "80%",
           }}
         >
           <div>
@@ -173,10 +202,12 @@ export default function Checkout() {
                 <ReactFlow nodes={val.nodes} edges={val.edges} fitView />
                 <div
                   style={{
-                    width: "30%",
+                    width: "50%",
                   }}
                 >
-                  <Typography>Hello world</Typography>
+                  {
+                    renderParameters(val.nodes[0])
+                  }
                 </div>
               </div>
             </ReactFlowProvider>
