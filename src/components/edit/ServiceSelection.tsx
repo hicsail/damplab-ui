@@ -4,7 +4,6 @@ import { useState } from 'react';
 interface ServiceSelectionProps {
   allServices: any[];
   selectedServices: any[];
-  params: any;
 }
 
 export const ServiceSelection: React.FC<ServiceSelectionProps> = (props) => {

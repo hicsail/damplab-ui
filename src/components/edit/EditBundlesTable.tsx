@@ -2,6 +2,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useContext } from 'react';
 import { AppContext } from '../../contexts/App';
 import { ServiceSelection } from './ServiceSelection';
+import { ServiceList } from './ServiceList';
 
 export const EditBundlesTable: React.FC = () => {
   const { bundles, services } = useContext(AppContext);
@@ -16,7 +17,8 @@ export const EditBundlesTable: React.FC = () => {
       field: 'services',
       headerName: 'Services',
       width: 500,
-      renderCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} params={params} />
+      renderCell: (params) => <ServiceList services={params.row.services} />,
+      renderEditCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} />
     }
   ];
 

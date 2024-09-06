@@ -1,6 +1,6 @@
-import { useQuery } from '@apollo/client';
-import { GET_CATEGORIES } from '../../gql/queries';
-import { DataGrid, GridColDef, GridRowModesModel, GridRowModes } from '@mui/x-data-grid';
+import { useApolloClient, useQuery } from '@apollo/client';
+import { DELETE_CATEGORY, GET_CATEGORIES } from '../../gql/queries';
+import { DataGrid, GridColDef, GridRowModesModel, GridRowModes, GridRowId } from '@mui/x-data-grid';
 import { ServiceSelection } from './ServiceSelection';
 import { useContext, useState } from 'react';
 import { AppContext } from '../../contexts/App';
@@ -9,10 +9,21 @@ import { ServiceList } from './ServiceList';
 
 
 export const EditCategoriesTable: React.FC = () => {
-  const { data } = useQuery(GET_CATEGORIES);
+  const { data, refetch } = useQuery(GET_CATEGORIES);
   const categories = data ? data.categories : [];
   const { services } = useContext(AppContext);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
+  const client = useApolloClient();
+
+  const handleDeletion = async (id: GridRowId) => {
+    await client.mutate({
+      mutation: DELETE_CATEGORY,
+      variables: {
+        category: id
+      }
+    });
+    refetch();
+  };
 
   const columns: GridColDef[] = [
     {
@@ -26,10 +37,10 @@ export const EditCategoriesTable: React.FC = () => {
       width: 500,
       editable: true,
       renderCell: (params) => <ServiceList services={params.row.services} />,
-      renderEditCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} params={params} />
+      renderEditCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} />
     },
     getActionsColumn({
-      handleDelete: (_id) => {},
+      handleDelete: (id) => handleDeletion(id),
       handleEdit: (id) => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } }),
       handleCancel: (id) => setRowModesModel({
         ...rowModesModel,
