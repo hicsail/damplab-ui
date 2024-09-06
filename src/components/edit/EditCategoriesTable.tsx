@@ -1,10 +1,15 @@
+import { useQuery } from '@apollo/client';
+import { GET_CATEGORIES } from '../../gql/queries';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { ServiceSelection } from './ServiceSelection';
 import { useContext } from 'react';
 import { AppContext } from '../../contexts/App';
-import { ServiceSelection } from './ServiceSelection';
 
-export const EditBundlesTable: React.FC = () => {
-  const { bundles, services } = useContext(AppContext);
+
+export const EditCategoriesTable: React.FC = () => {
+  const { data } = useQuery(GET_CATEGORIES);
+  const categories = data ? data.categories : [];
+  const { services } = useContext(AppContext);
 
   const columns: GridColDef[] = [
     {
@@ -20,9 +25,10 @@ export const EditBundlesTable: React.FC = () => {
     }
   ];
 
+
   return (
     <DataGrid
-      rows={bundles}
+      rows={categories}
       columns={columns}
     />
   );

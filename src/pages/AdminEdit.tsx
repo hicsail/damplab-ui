@@ -2,6 +2,7 @@ import { Select, Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 import { ToolBar } from '../components/edit/ToolBar';
 import { EditBundlesTable } from '../components/edit/EditBundlesTable';
+import { EditCategoriesTable } from '../components/edit/EditCategoriesTable';
 
 type EditTypes = 'Services' | 'Categories' | 'Bundles';
 
@@ -12,7 +13,7 @@ export const AdminEdit: React.FC = () => {
   const tableSelector = (type: EditTypes) => {
     switch(type) {
       case 'Services': return <p>Services Table</p>;
-      case 'Categories': return <p>Categories Table</p>;
+      case 'Categories': return <EditCategoriesTable />;
       case 'Bundles': return <EditBundlesTable />;
     }
   }
