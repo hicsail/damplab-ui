@@ -16,7 +16,7 @@ export const EditBundlesTable: React.FC = () => {
       field: 'services',
       headerName: 'Services',
       width: 500,
-      renderCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} />
+      renderCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} params={params} />
     }
   ];
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 interface ServiceSelectionProps {
   allServices: any[];
   selectedServices: any[];
+  params: any;
 }
 
 export const ServiceSelection: React.FC<ServiceSelectionProps> = (props) => {
@@ -13,8 +14,6 @@ export const ServiceSelection: React.FC<ServiceSelectionProps> = (props) => {
     const value = event.target.value;
     setDisplayValue(typeof value === 'string' ? value.split(',') : value)
   };
-
-  console.log(props);
 
   return (
     <FormControl sx={{ width: '100%' }}>
