@@ -1,30 +1,48 @@
 import { Select, FormControl, MenuItem, Checkbox, ListItemText, SelectChangeEvent } from '@mui/material';
-import { useState } from 'react';
+import { GridRenderEditCellParams, useGridApiContext } from '@mui/x-data-grid';
+import { useState, useRef, useLayoutEffect } from 'react';
 
-interface ServiceSelectionProps {
+interface ServiceSelectionProps extends GridRenderEditCellParams {
   allServices: any[];
   selectedServices: any[];
 }
 
 export const ServiceSelection: React.FC<ServiceSelectionProps> = (props) => {
-  const [displayValue, setDisplayValue] = useState<string[]>(props.selectedServices.map((service: any) => service.name));
+  const options = props.allServices;
+  const [selected, setSelected] = useState<any[]>(
+    options
+      .filter((option) => props.selectedServices.find(selected => option.id == selected.id))
+  );
+
+  const gridRef = useGridApiContext();
+  const ref = useRef();
+
+  useLayoutEffect(() => {
+    if (props.hasFocus && ref && ref.current) {
+      (ref.current as any).focus();
+    }
+  }, [props.hasFocus]);
 
   const handleSelection = (event: SelectChangeEvent) => {
-    const value = event.target.value;
-    setDisplayValue(typeof value === 'string' ? value.split(',') : value)
+    const selectedServices = event.target.value as any;
+    // Set the visualization of the selected
+    setSelected(selectedServices);
+    // Update the internal state of the new selection
+    gridRef.current.setEditCellValue({ id: props.id, field: props.field, value: selectedServices });
   };
 
   return (
     <FormControl sx={{ width: '100%' }}>
       <Select
         multiple
-        value={displayValue}
-        renderValue={(selected) => selected.join(', ')}
+        value={selected as any}
+        renderValue={(service) => (service as any).map((service: any) => service.name).join(', ')}
         onChange={handleSelection}
+        ref={ref}
       >
-        {props.allServices.map(service => (
-          <MenuItem value={service.name} key={service.id}>
-            <Checkbox checked={props.selectedServices.some((elem: any) => elem.id == service.id)} />
+        {options.map(service => (
+          <MenuItem value={service} key={service.id}>
+            <Checkbox checked={selected.some((elem: any) => elem.id === service.id)} />
             <ListItemText primary={service.name} />
           </MenuItem>
         ))}

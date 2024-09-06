@@ -168,3 +168,11 @@ export const DELETE_CATEGORY = gql`
     deleteCategory(category: $category)
   }
 `;
+
+export const UPDATE_CATEGORY = gql`
+  mutation updateCategory($category: ID!, $changes: CategoryChange!) {
+    updateCategory(category: $category, changes: $changes) {
+      label
+    }
+  }
+`;

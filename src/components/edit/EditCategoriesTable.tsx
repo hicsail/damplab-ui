@@ -1,6 +1,15 @@
 import { useApolloClient, useQuery } from '@apollo/client';
-import { DELETE_CATEGORY, GET_CATEGORIES } from '../../gql/queries';
-import { DataGrid, GridColDef, GridRowModesModel, GridRowModes, GridRowId } from '@mui/x-data-grid';
+import { DELETE_CATEGORY, GET_CATEGORIES, UPDATE_CATEGORY } from '../../gql/queries';
+import {
+  DataGrid,
+  GridColDef,
+  GridRowModesModel,
+  GridRowModes,
+  GridRowId,
+  GridEventListener,
+  GridRowEditStopReasons,
+  GridRowModel
+} from '@mui/x-data-grid';
 import { ServiceSelection } from './ServiceSelection';
 import { useContext, useState } from 'react';
 import { AppContext } from '../../contexts/App';
@@ -25,6 +34,34 @@ export const EditCategoriesTable: React.FC = () => {
     refetch();
   };
 
+  const handleSave = async (id: GridRowId) => {
+    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
+  };
+
+  const processRowUpdate = async (newRow: GridRowModel) => {
+    // The services need to be a list of IDs
+    const changes = {
+      label: newRow.label,
+      services: newRow.services.map((service: any) => service.id)
+    };
+
+    await client.mutate({
+      mutation: UPDATE_CATEGORY,
+      variables: {
+        category: newRow.id,
+        changes
+      }
+    });
+
+    return newRow;
+  };
+
+  const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
+    if (params.reason === GridRowEditStopReasons.rowFocusOut) {
+      event.defaultMuiPrevented = true;
+    }
+  };
+
   const columns: GridColDef[] = [
     {
       field: 'label',
@@ -37,7 +74,7 @@ export const EditCategoriesTable: React.FC = () => {
       width: 500,
       editable: true,
       renderCell: (params) => <ServiceList services={params.row.services} />,
-      renderEditCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} />
+      renderEditCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} {...params} />
     },
     getActionsColumn({
       handleDelete: (id) => handleDeletion(id),
@@ -46,7 +83,7 @@ export const EditCategoriesTable: React.FC = () => {
         ...rowModesModel,
         [id]: { mode: GridRowModes.View, ignoreModifications: true }
       }),
-      handleSave: (_id) => {},
+      handleSave: (id) => handleSave(id),
       rowModesModel
     })
   ];
@@ -57,10 +94,12 @@ export const EditCategoriesTable: React.FC = () => {
       columns={columns}
       rowModesModel={rowModesModel}
       onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
+      onRowEditStop={handleRowEditStop}
       slotProps={{
         toolbar: { setRowModesModel },
       }}
       editMode="row"
+      processRowUpdate={processRowUpdate}
     />
   );
 };

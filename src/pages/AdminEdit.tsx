@@ -1,4 +1,4 @@
-import { Select, Stack, Typography } from '@mui/material';
+import { Stack, Typography } from '@mui/material';
 import { useState } from 'react';
 import { ToolBar } from '../components/edit/ToolBar';
 import { EditBundlesTable } from '../components/edit/EditBundlesTable';
