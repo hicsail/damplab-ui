@@ -4,14 +4,16 @@ import { useState, useRef, useLayoutEffect } from 'react';
 
 interface ServiceSelectionProps extends GridRenderEditCellParams {
   allServices: any[];
-  selectedServices: any[];
+  selectedServices?: any[];
 }
 
 export const ServiceSelection: React.FC<ServiceSelectionProps> = (props) => {
+  const selectedServices = props.selectedServices ? props.selectedServices : [];
+
   const options = props.allServices;
   const [selected, setSelected] = useState<any[]>(
     options
-      .filter((option) => props.selectedServices.find(selected => option.id == selected.id))
+      .filter((option) => selectedServices.find(selected => option.id == selected.id))
   );
 
   const gridRef = useGridApiContext();

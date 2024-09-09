@@ -8,21 +8,31 @@ import {
   GridRowId,
   GridEventListener,
   GridRowEditStopReasons,
-  GridRowModel
+  GridRowModel,
+  GridSlots
 } from '@mui/x-data-grid';
 import { ServiceSelection } from './ServiceSelection';
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
+import { GridToolBar } from './GridToolBar';
 
 
 export const EditCategoriesTable: React.FC = () => {
   const { data, refetch } = useQuery(GET_CATEGORIES);
-  const categories = data ? data.categories : [];
+  const [rows, setRows] = useState<any[]>([]);
   const { services } = useContext(AppContext);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const client = useApolloClient();
+
+  useEffect(() => {
+    if (data) {
+      setRows(data.categories);
+      return;
+    }
+    setRows([]);
+  }, [data]);
 
   const handleDeletion = async (id: GridRowId) => {
     await client.mutate({
@@ -90,16 +100,19 @@ export const EditCategoriesTable: React.FC = () => {
 
   return (
     <DataGrid
-      rows={categories}
+      rows={rows}
       columns={columns}
       rowModesModel={rowModesModel}
       onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
       onRowEditStop={handleRowEditStop}
-      slotProps={{
-        toolbar: { setRowModesModel },
-      }}
       editMode="row"
       processRowUpdate={processRowUpdate}
+      slots={{
+        toolbar: GridToolBar as GridSlots['toolbar']
+      }}
+      slotProps={{
+        toolbar: { setRowModesModel, setRows },
+      }}
     />
   );
 };
