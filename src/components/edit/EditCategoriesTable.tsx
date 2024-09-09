@@ -1,5 +1,5 @@
 import { useApolloClient, useQuery } from '@apollo/client';
-import { DELETE_CATEGORY, GET_CATEGORIES, UPDATE_CATEGORY } from '../../gql/queries';
+import { CREATE_CATEGORY, DELETE_CATEGORY, GET_CATEGORIES, UPDATE_CATEGORY } from '../../gql/queries';
 import {
   DataGrid,
   GridColDef,
@@ -45,10 +45,12 @@ export const EditCategoriesTable: React.FC = () => {
   };
 
   const handleSave = async (id: GridRowId) => {
+    console.log(rowModesModel);
+    console.log(id);
     setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
   };
 
-  const processRowUpdate = async (newRow: GridRowModel) => {
+  const handleUpdate = async (newRow: GridRowModel) => {
     // The services need to be a list of IDs
     const changes = {
       label: newRow.label,
@@ -64,6 +66,32 @@ export const EditCategoriesTable: React.FC = () => {
     });
 
     return newRow;
+  };
+
+  const handleCreate = async (newRow: GridRowModel) => {
+    const newCateogry = {
+      label: newRow.label || '',
+      services: newRow.services ? newRow.services.map((service: any) => service.id) : []
+    };
+
+    await client.mutate({
+      mutation: CREATE_CATEGORY,
+      variables: {
+        category: newCateogry
+      }
+    });
+
+    refetch();
+
+    return { ...newRow, isNew: false };
+  }
+
+  const processRowUpdate = async (newRow: GridRowModel) => {
+    if (!newRow.isNew) {
+      return handleUpdate(newRow);
+    } else {
+      return handleCreate(newRow);
+    }
   };
 
   const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
@@ -105,6 +133,7 @@ export const EditCategoriesTable: React.FC = () => {
       rowModesModel={rowModesModel}
       onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
       onRowEditStop={handleRowEditStop}
+      onProcessRowUpdateError={(error) => console.log(error)}
       editMode="row"
       processRowUpdate={processRowUpdate}
       slots={{

@@ -176,3 +176,11 @@ export const UPDATE_CATEGORY = gql`
     }
   }
 `;
+
+export const CREATE_CATEGORY = gql`
+  mutation createCategory($category: CreateCategory!) {
+    createCategory(category: $category) {
+      label
+    }
+  }
+`;
