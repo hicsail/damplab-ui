@@ -11,10 +11,11 @@ import {
   GridRowModel,
   GridSlots,
   GridRenderCellParams,
-  GridRenderEditCellParams
+  GridRenderEditCellParams,
+  useGridApiRef
 } from '@mui/x-data-grid';
 import { ServiceSelection } from './ServiceSelection';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
@@ -28,6 +29,7 @@ export const EditServicesTable: React.FC = () => {
   const { services } = useContext(AppContext);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const client = useApolloClient();
+  const gridRef = useGridApiRef();
 
 
   const [serviceDialogOpen, setServiceDialogOpen] = useState<boolean>(false);
@@ -57,10 +59,12 @@ export const EditServicesTable: React.FC = () => {
   };
 
   const handleUpdate = async (newRow: GridRowModel) => {
+    console.log(newRow);
     // The services need to be a list of IDs
     const changes = {
       name: newRow.name,
-      allowedConnections: newRow.allowedConnections.map((service: any) => service.id)
+      allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
+      parameters: newRow.parameters
     };
 
     await client.mutate({
@@ -173,10 +177,11 @@ export const EditServicesTable: React.FC = () => {
         slotProps={{
           toolbar: { setRowModesModel, setRows },
         }}
+        apiRef={gridRef}
       />
       <Dialog open={serviceDialogOpen} onClose={() => setServiceDialogOpen(false)} fullWidth PaperProps={{ sx: { maxWidth: '100%' }}}>
         <DialogContent>
-          <EditParametersTable viewParams={paramsViewProps} editParams={paramsEditProps} />
+          <EditParametersTable viewParams={paramsViewProps} editParams={paramsEditProps} gridRef={gridRef} />
         </DialogContent>
       </Dialog>
     </>
