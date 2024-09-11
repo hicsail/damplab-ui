@@ -30,27 +30,77 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const columns: GridColDef[] = [
     {
       field: 'id',
-      width: 500,
+      width: 200,
       editable: isEdit
     },
     {
       field: 'name',
-      width: 500,
+      width: 200,
       editable: isEdit
     },
     {
       field: 'type',
-      width: 500,
+      width: 200,
       editable: isEdit
     },
     {
       field: 'flowId',
-      width: 500,
+      width: 200,
       editable: isEdit
     },
     {
       field: 'paramType',
-      width: 500,
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'required',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'workflowId',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'options',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'defaultValue',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'rangeValueMin',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'rangeValueMax',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'dynamicAdd',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'templateFile',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'tableData',
+      width: 200,
+      editable: isEdit
+    },
+    {
+      field: 'paramGroupId',
+      width: 200,
       editable: isEdit
     }
   ];
@@ -105,7 +155,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     <DataGrid
       rows={rows}
       columns={columns}
-      sx={{ width: '100%' }}
+      sx={{ width: '200%' }}
       processRowUpdate={handleUpdate}
       editMode="row"
       rowModesModel={rowModesModel}
