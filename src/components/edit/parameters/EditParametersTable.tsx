@@ -26,6 +26,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const value = props.viewParams ? props.viewParams.value : props.editParams!.value;
   const isEdit = !!props.editParams;
+  const [rows, setRows] = useState<any[]>(value);
 
   const columns: GridColDef[] = [
     {
@@ -56,7 +57,14 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   ];
 
   const handleDeletion = async (id: GridRowId) => {
+    // Filter out the grid
+    const filtered = value.filter((parameter: any) => parameter.id != id);
 
+    // Update the edit state
+    props.gridRef.current.setEditCellValue({ id: props.editParams!.id, field: props.editParams!.field, value: filtered });
+
+    // Update the view
+    setRows(filtered);
   };
 
   const handleSave = async(id: GridRowId) => {
@@ -70,10 +78,11 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   };
 
   const handleUpdate = (newRow: GridRowModel) => {
+    // Remove the old row
     const filtered = value.filter((parameter: any) => parameter.id != newRow.id);
-    console.log(filtered);
-    props.gridRef.current.setEditCellValue({ id: props.editParams!.id, field: props.editParams!.field, value: [...filtered, newRow] });
 
+    // The new value
+    props.gridRef.current.setEditCellValue({ id: props.editParams!.id, field: props.editParams!.field, value: [...filtered, newRow] });
 
     return newRow;
   };
@@ -96,7 +105,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   return (
     <Box width={'100%'}>
     <DataGrid
-      rows={value || []}
+      rows={rows}
       columns={columns}
       sx={{ width: '100%' }}
       processRowUpdate={handleUpdate}
