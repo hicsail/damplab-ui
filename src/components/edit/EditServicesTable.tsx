@@ -1,5 +1,5 @@
-import { useApolloClient, useQuery } from '@apollo/client';
-import { CREATE_CATEGORY, DELETE_CATEGORY, UPDATE_SERVICE } from '../../gql/queries';
+import { useApolloClient } from '@apollo/client';
+import { CREATE_CATEGORY, DELETE_SERVICE, UPDATE_SERVICE } from '../../gql/queries';
 import {
   DataGrid,
   GridColDef,
@@ -47,11 +47,12 @@ export const EditServicesTable: React.FC = () => {
 
   const handleDeletion = async (id: GridRowId) => {
     await client.mutate({
-      mutation: DELETE_CATEGORY,
+      mutation: DELETE_SERVICE,
       variables: {
-        category: id
+        service: id
       }
     });
+    setRows(rows.filter((row: any) => row.id != id));
   };
 
   const handleSave = async (id: GridRowId) => {

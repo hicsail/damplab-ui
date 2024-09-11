@@ -185,6 +185,12 @@ export const CREATE_CATEGORY = gql`
   }
 `;
 
+export const DELETE_SERVICE = gql`
+  mutation deleteService($service: ID!) {
+    deleteService(service: $service)
+  }
+`;
+
 export const UPDATE_SERVICE = gql`
   mutation updateService($service: ID!, $changes: ServiceChange!) {
     updateService(service: $service, changes: $changes) {
