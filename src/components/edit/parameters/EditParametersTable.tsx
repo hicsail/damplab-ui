@@ -8,13 +8,13 @@ import {
   GridRenderEditCellParams,
   GridRowModel,
   GridEventListener,
-  GridRowEditStopReasons
+  GridRowEditStopReasons,
+  GridSlots
 } from '@mui/x-data-grid';
-import { Parameter } from '../../../types/Parameter';
-import { Box } from '@mui/material';
 import { getActionsColumn } from '../ActionColumn';
 import { MutableRefObject, useState } from 'react';
 import { GridApiCommunity } from '@mui/x-data-grid/internals';
+import { GridToolBar } from '../GridToolBar';
 
 interface EditParametersTableProps {
   viewParams: GridRenderCellParams | null;
@@ -24,9 +24,8 @@ interface EditParametersTableProps {
 
 export const EditParametersTable: React.FC<EditParametersTableProps> = (props) => {
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
-  const value = props.viewParams ? props.viewParams.value : props.editParams!.value;
   const isEdit = !!props.editParams;
-  const [rows, setRows] = useState<any[]>(value);
+  const [rows, setRows] = useState<any[]>(props.viewParams ? props.viewParams.value : props.editParams!.value);
 
   const columns: GridColDef[] = [
     {
@@ -58,7 +57,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
 
   const handleDeletion = async (id: GridRowId) => {
     // Filter out the grid
-    const filtered = value.filter((parameter: any) => parameter.id != id);
+    const filtered = rows.filter((parameter: any) => parameter.id != id);
 
     // Update the edit state
     props.gridRef.current.setEditCellValue({ id: props.editParams!.id, field: props.editParams!.field, value: filtered });
@@ -79,7 +78,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
 
   const handleUpdate = (newRow: GridRowModel) => {
     // Remove the old row
-    const filtered = value.filter((parameter: any) => parameter.id != newRow.id);
+    const filtered = rows.filter((parameter: any) => parameter.id != newRow.id);
 
     // The new value
     props.gridRef.current.setEditCellValue({ id: props.editParams!.id, field: props.editParams!.field, value: [...filtered, newRow] });
@@ -103,7 +102,6 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   }
 
   return (
-    <Box width={'100%'}>
     <DataGrid
       rows={rows}
       columns={columns}
@@ -113,7 +111,12 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       rowModesModel={rowModesModel}
       onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
       onRowEditStop={handleRowEditStop}
+      slots={{
+        toolbar: GridToolBar as GridSlots['toolbar']
+      }}
+      slotProps={{
+        toolbar: { setRowModesModel, setRows }
+      }}
     />
-    </Box>
   );
 };
