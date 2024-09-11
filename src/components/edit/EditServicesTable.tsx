@@ -9,7 +9,9 @@ import {
   GridEventListener,
   GridRowEditStopReasons,
   GridRowModel,
-  GridSlots
+  GridSlots,
+  GridRenderCellParams,
+  GridRenderEditCellParams
 } from '@mui/x-data-grid';
 import { ServiceSelection } from './ServiceSelection';
 import { useContext, useEffect, useState } from 'react';
@@ -17,6 +19,8 @@ import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
+import { Button, Dialog, DialogContent } from '@mui/material';
+import { EditParametersTable } from './parameters/EditParametersTable';
 
 
 export const EditServicesTable: React.FC = () => {
@@ -24,6 +28,16 @@ export const EditServicesTable: React.FC = () => {
   const { services } = useContext(AppContext);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const client = useApolloClient();
+
+
+  const [serviceDialogOpen, setServiceDialogOpen] = useState<boolean>(false);
+
+  // Params when in view mode for the parameters
+  const [paramsViewProps, setParamsViewProps] = useState<GridRenderCellParams | null>(null);
+
+  // Params when in edit mode for the parameters
+  const [paramsEditProps, setParamsEditProps] = useState<GridRenderEditCellParams | null>(null);
+
 
   useEffect(() => {
     setRows(services);
@@ -39,8 +53,6 @@ export const EditServicesTable: React.FC = () => {
   };
 
   const handleSave = async (id: GridRowId) => {
-    console.log(rowModesModel);
-    console.log(id);
     setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
   };
 
@@ -94,6 +106,18 @@ export const EditServicesTable: React.FC = () => {
     }
   };
 
+  const handleParamViewButton = (params: GridRenderCellParams) => {
+    setParamsViewProps(params);
+    setParamsEditProps(null);
+    setServiceDialogOpen(true);
+  }
+
+  const handleParamEditButton = (params: GridRenderCellParams) => {
+    setParamsViewProps(null);
+    setParamsEditProps(params);
+    setServiceDialogOpen(true);
+  };
+
   const columns: GridColDef[] = [
     {
       field: 'name',
@@ -113,6 +137,13 @@ export const EditServicesTable: React.FC = () => {
       renderCell: (params) => <ServiceList services={params.row.allowedConnections} />,
       renderEditCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.allowedConnections} {...params} />
     },
+    {
+      field: 'parameters',
+      width: 200,
+      editable: true,
+      renderCell: (params) => <Button variant="contained" onClick={() => handleParamViewButton(params)}>View</Button>,
+      renderEditCell: (params) => <Button variant="contained" onClick={() => handleParamEditButton(params)}>Edit</Button>
+    },
     getActionsColumn({
       handleDelete: (id) => handleDeletion(id),
       handleEdit: (id) => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } }),
@@ -126,21 +157,28 @@ export const EditServicesTable: React.FC = () => {
   ];
 
   return (
-    <DataGrid
-      rows={rows}
-      columns={columns}
-      rowModesModel={rowModesModel}
-      onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
-      onRowEditStop={handleRowEditStop}
-      onProcessRowUpdateError={(error) => console.log(error)}
-      editMode="row"
-      processRowUpdate={processRowUpdate}
-      slots={{
-        toolbar: GridToolBar as GridSlots['toolbar']
-      }}
-      slotProps={{
-        toolbar: { setRowModesModel, setRows },
-      }}
-    />
+    <>
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        rowModesModel={rowModesModel}
+        onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
+        onRowEditStop={handleRowEditStop}
+        onProcessRowUpdateError={(error) => console.log(error)}
+        editMode="row"
+        processRowUpdate={processRowUpdate}
+        slots={{
+          toolbar: GridToolBar as GridSlots['toolbar']
+        }}
+        slotProps={{
+          toolbar: { setRowModesModel, setRows },
+        }}
+      />
+      <Dialog open={serviceDialogOpen} onClose={() => setServiceDialogOpen(false)} fullWidth PaperProps={{ sx: { maxWidth: '100%' }}}>
+        <DialogContent>
+          <EditParametersTable viewParams={paramsViewProps} editParams={paramsEditProps} />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
