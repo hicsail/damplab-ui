@@ -184,3 +184,11 @@ export const CREATE_CATEGORY = gql`
     }
   }
 `;
+
+export const UPDATE_SERVICE = gql`
+  mutation updateService($service: ID!, $changes: ServiceChange!) {
+    updateService(service: $service, changes: $changes) {
+      name
+    }
+  }
+`;
