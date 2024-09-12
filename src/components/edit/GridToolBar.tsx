@@ -16,7 +16,13 @@ export const GridToolBar: React.FC<GridToolBarProps> = (props) => {
     const id = uuid();
 
     // Make an empty place for the rows
-    props.setRows((oldRows) => [...oldRows, { id, isNew: true }]);
+    props.setRows((oldRows) => {
+      if (oldRows) {
+        return [...oldRows, { id, isNew: true }];
+      } else {
+        return [{ id, isNew: true }];
+      }
+    });
 
     // Make the new row editable
     props.setRowModesModel((oldModel) => ({

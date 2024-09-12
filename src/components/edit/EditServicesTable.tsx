@@ -1,5 +1,5 @@
 import { useApolloClient } from '@apollo/client';
-import { CREATE_CATEGORY, DELETE_SERVICE, UPDATE_SERVICE } from '../../gql/queries';
+import { CREATE_CATEGORY, CREATE_SERVICE, DELETE_SERVICE, UPDATE_SERVICE } from '../../gql/queries';
 import {
   DataGrid,
   GridColDef,
@@ -80,21 +80,26 @@ export const EditServicesTable: React.FC = () => {
   };
 
   const handleCreate = async (newRow: GridRowModel) => {
-    const newCateogry = {
-      label: newRow.label || '',
-      services: newRow.services ? newRow.services.map((service: any) => service.id) : []
+    const newService = {
+      name: newRow.name || '',
+      icon: '',
+      parameters: newRow.parameters || [],
+      paramGroups: [],
+      allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
+      description: newRow.description || ''
     };
 
-    await client.mutate({
-      mutation: CREATE_CATEGORY,
+    const row = await client.mutate({
+      mutation: CREATE_SERVICE,
       variables: {
-        category: newCateogry
+        service: newService
       }
     });
 
-    // refetch();
+    // TODO: Should refetch data
 
-    return { ...newRow, isNew: false };
+
+    return { ...row.data.createService, isNew: false };
   }
 
   const processRowUpdate = async (newRow: GridRowModel) => {

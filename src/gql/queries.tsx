@@ -198,3 +198,20 @@ export const UPDATE_SERVICE = gql`
     }
   }
 `;
+
+export const CREATE_SERVICE = gql`
+  mutation createService($service: CreateService!) {
+    createService(service: $service) {
+      id
+      name
+      icon
+      parameters
+      description
+      paramGroups
+      allowedConnections {
+          id
+          name
+      }
+    }
+  }
+`;
