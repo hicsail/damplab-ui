@@ -9,12 +9,15 @@ import {
   GridRowModel,
   GridEventListener,
   GridRowEditStopReasons,
-  GridSlots
+  GridSlots,
+  useGridApiRef
 } from '@mui/x-data-grid';
 import { getActionsColumn } from '../ActionColumn';
 import { MutableRefObject, useState } from 'react';
 import { GridApiCommunity } from '@mui/x-data-grid/internals';
 import { GridToolBar } from '../GridToolBar';
+import { Button, Dialog, DialogContent } from '@mui/material';
+import { EditParameterOptions } from './EditParameterOptions';
 
 interface EditParametersTableProps {
   viewParams: GridRenderCellParams | null;
@@ -26,6 +29,22 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const isEdit = !!props.editParams;
   const [rows, setRows] = useState<any[]>(props.viewParams ? props.viewParams.value : props.editParams!.value);
+  const [optionDialogOpen, setOptionDialogOpen] = useState<boolean>(false);
+  const [optionViewProps, setOptionViewProps] = useState<GridRenderCellParams | null>(null);
+  const [optionEditProps, setOptionEditProps] = useState<GridRenderEditCellParams | null>(null);
+  const gridRef = useGridApiRef();
+
+  const handleOptionsViewButton = (options: GridRenderCellParams) => {
+    setOptionViewProps(options);
+    setOptionEditProps(null);
+    setOptionDialogOpen(true);
+  };
+
+  const handleOptionsEditButton = (options: GridRenderEditCellParams) => {
+    setOptionViewProps(null);
+    setOptionEditProps(options);
+    setOptionDialogOpen(true);
+  };
 
   const columns: GridColDef[] = [
     {
@@ -71,7 +90,9 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     {
       field: 'options',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      renderCell: (params) => <Button variant="contained" onClick={() => handleOptionsViewButton(params)}>View</Button>,
+      renderEditCell: (params) => <Button variant="contained" onClick={() => handleOptionsEditButton(params)}>Edit</Button>
     },
     {
       field: 'defaultValue',
@@ -157,21 +178,29 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   }
 
   return (
-    <DataGrid
-      rows={rows}
-      columns={columns}
-      sx={{ width: '200%' }}
-      processRowUpdate={handleUpdate}
-      editMode="row"
-      rowModesModel={rowModesModel}
-      onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
-      onRowEditStop={handleRowEditStop}
-      slots={{
-        toolbar: GridToolBar as GridSlots['toolbar']
-      }}
-      slotProps={{
-        toolbar: { setRowModesModel, setRows }
-      }}
-    />
+    <>
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        sx={{ width: '100%' }}
+        processRowUpdate={handleUpdate}
+        editMode="row"
+        rowModesModel={rowModesModel}
+        onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
+        onRowEditStop={handleRowEditStop}
+        slots={{
+          toolbar: GridToolBar as GridSlots['toolbar']
+        }}
+        slotProps={{
+          toolbar: { setRowModesModel, setRows }
+        }}
+        apiRef={gridRef}
+      />
+      <Dialog open={optionDialogOpen} onClose={() => setOptionDialogOpen(false)} fullWidth PaperProps={{ sx: { maxWidth: '100%' }}}>
+        <DialogContent>
+          <EditParameterOptions viewParams={optionViewProps} editParams={optionEditProps} gridRef={gridRef} />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
