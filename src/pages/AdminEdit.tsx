@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ToolBar } from '../components/edit/ToolBar';
 import { EditBundlesTable } from '../components/edit/EditBundlesTable';
 import { EditCategoriesTable } from '../components/edit/EditCategoriesTable';
+import { EditServicesTable } from '../components/edit/EditServicesTable';
 
 type EditTypes = 'Services' | 'Categories' | 'Bundles';
 
@@ -12,7 +13,7 @@ export const AdminEdit: React.FC = () => {
 
   const tableSelector = (type: EditTypes) => {
     switch(type) {
-      case 'Services': return <p>Services Table</p>;
+      case 'Services': return <EditServicesTable />;
       case 'Categories': return <EditCategoriesTable />;
       case 'Bundles': return <EditBundlesTable />;
     }
