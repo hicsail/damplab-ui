@@ -27,7 +27,6 @@ export const EditParameterOptions: React.FC<EditParametersOptionsProps> = (props
   const isEdit = !!props.editParams;
   const providedValue = props.viewParams ? props.viewParams.value : props.editParams!.value;
   const [rows, setRows] = useState<any[]>(providedValue ? providedValue : []);
-  console.log(rows);
 
   const columns: GridColDef[] = [
     {
