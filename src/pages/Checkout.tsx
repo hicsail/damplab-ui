@@ -80,7 +80,6 @@ export default function Checkout() {
   }, [val.nodes, val.edges]);
 
   useEffect(() => {
-
     // scroll to selected node in parameters div
     if (selectedNode) {
       let node = document.getElementById(selectedNode.id);
@@ -90,7 +89,6 @@ export default function Checkout() {
       }
     }
 
-
     // set all refs to null when selected node changes
     myRefs.current = [];
 
@@ -98,8 +96,7 @@ export default function Checkout() {
     setTimeout(() => {
       setSelectedNode(null);
     }, 2000);
-    
-  },[selectedNode]);
+  }, [selectedNode]);
 
   const createWorkflowObj = () => {
     setWorkflows(getWorkflowsFromGraph(val.nodes, val.edges));
@@ -130,9 +127,9 @@ export default function Checkout() {
         );
       });
       let gqlEdges: any = transformEdgesToGQL(edges);
-      
+
       let gqlWorkflow = {
-        name:  "", // myRefs.current[index].value, // workflowNames[flow.id],
+        name: "", // myRefs.current[index].value, // workflowNames[flow.id],
         nodes: gqlWorkflows,
         edges: gqlEdges,
       };
@@ -143,8 +140,8 @@ export default function Checkout() {
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
-    console.log('hello world');
-    console.log(getGQLWorkflows())
+    console.log("hello world");
+    console.log(getGQLWorkflows());
     if (e.target.checkValidity()) {
       const date = new Date(Date.now()).toString();
       const data = {
@@ -158,7 +155,6 @@ export default function Checkout() {
       };
       console.log(data);
       createJob({ variables: { createJobInput: data } });
-      
     } else {
       alert("Form is incomplete.  Please fill out all required fields...");
     }
@@ -177,13 +173,12 @@ export default function Checkout() {
 
   // function that renders parameters for each service in a list
   const renderParameters = (node: any) => {
-
     let parameters = getParameters(node.id);
 
-    // return node name and parameters    
+    // return node name and parameters
     return (
       <div>
-        <Typography variant="h6">{ node.name }</Typography>
+        <Typography variant="h6">{node.name}</Typography>
         {parameters.map((param: any, index: number) => (
           <Accordion key={index}>
             <Box>
@@ -202,15 +197,14 @@ export default function Checkout() {
         ))}
       </div>
     );
-  }
+  };
 
   return (
     <div>
-      <div
-      >
+      <div>
         <div
           style={{
-            width: "80%",
+            width: "100%",
           }}
         >
           <div>
@@ -220,13 +214,24 @@ export default function Checkout() {
             <ReactFlowProvider>
               <div
                 className="reactflow-wrapper"
-                style={{ height: "80vh", display: "flex", width: "100%" }}
+                style={{
+                  height: "80vh",
+                  display: "flex",
+                  width: "100%",
+                  border: "solid 1px",
+                }}
               >
-                <ReactFlow nodes={val.nodes} edges={val.edges} onNodeClick={onNodeClick} fitView />
+                <ReactFlow
+                  nodes={val.nodes}
+                  edges={val.edges}
+                  onNodeClick={onNodeClick}
+                  fitView
+                />
                 <div
                   style={{
                     width: "50%",
                     overflowY: "scroll",
+                    border: "solid 1px",
                   }}
                   className="parameters"
                 >
@@ -234,12 +239,14 @@ export default function Checkout() {
                     // render parameters for each service
                     val.nodes.map((node: any) => {
                       return (
-                        <div key={node.id} 
-                        ref={(ref) => myRefs.current.push(ref)}
-                        id={node.id}
-                        style={{
-                          marginBottom: 40,
-                        }}>
+                        <div
+                          key={node.id}
+                          ref={(ref) => myRefs.current.push(ref)}
+                          id={node.id}
+                          style={{
+                            marginBottom: 40,
+                          }}
+                        >
                           {renderParameters(node)}
                         </div>
                       );
@@ -248,7 +255,6 @@ export default function Checkout() {
                 </div>
               </div>
             </ReactFlowProvider>
-            
           </div>
         </div>
         <div
@@ -257,6 +263,9 @@ export default function Checkout() {
             textAlign: "center",
             alignItems: "center",
             width: "40%",
+            marginLeft: 100,
+            marginTop: 50,
+            marginBottom: 150,
           }}
         >
           <div
@@ -265,62 +274,73 @@ export default function Checkout() {
               marginRight: "auto",
             }}
           >
-            <Typography variant="body1">Your Information</Typography>
-            <Box
-              component="form"
-              onSubmit={handleSubmit}
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
-            >
-              <TextField
-                required
-                label="Job Name"
-                margin="dense"
-                variant="outlined"
-                inputRef={jobRef}
-              />
-              <TextField
-                required
-                label="Submitter Name"
-                margin="dense"
-                variant="outlined"
-                inputRef={userRef}
-              />
-              <TextField
-                required
-                label="Institution"
-                margin="dense"
-                variant="outlined"
-                inputRef={institutionRef}
-              />
-              <TextField
-                required
-                label="Email"
-                margin="dense"
-                variant="outlined"
-                inputRef={emailRef}
-              />
-              <TextField
-                label="Notes"
-                margin="dense"
-                variant="outlined"
-                inputRef={notesRef}
-              />
-              <Button
-                component="label"
-                role={undefined}
-                variant="contained"
-                tabIndex={-1}
-                startIcon={<CloudUploadIcon />}
+            <Typography variant="h4">Submit Job</Typography>
+            <Box height={50} />
+            <Box>
+              <Box
+                component="form"
+                onSubmit={handleSubmit}
+                sx={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
               >
-                Upload file
-                <VisuallyHiddenInput type="file" />
-              </Button>
+                <Box height={300}>
+                <Typography variant="body1">Submitter Details</Typography>
+                  <TextField
+                    required
+                    label="Submitter Name"
+                    margin="dense"
+                    variant="outlined"
+                    inputRef={userRef}
+                  />
+                  <TextField
+                    required
+                    label="Institution"
+                    margin="dense"
+                    variant="outlined"
+                    inputRef={institutionRef}
+                  />
+                  <TextField
+                    required
+                    label="Email"
+                    margin="dense"
+                    variant="outlined"
+                    inputRef={emailRef}
+                  />
+                </Box>
+                <Box height={300}>
+                  <Typography variant="body1">Job Details</Typography>
+                  <TextField
+                    required
+                    label="Job Name"
+                    margin="dense"
+                    variant="outlined"
+                    inputRef={jobRef}
+                  />
+                  <TextField
+                    label="Notes"
+                    margin="dense"
+                    variant="outlined"
+                    inputRef={notesRef}
+                  />
+                  <Box height={20} />
+                  <Button
+                    component="label"
+                    role={undefined}
+                    variant="contained"
+                    tabIndex={-1}
+                    startIcon={<CloudUploadIcon />}
+                  >
+                    Upload file
+                    <VisuallyHiddenInput type="file" />
+                  </Button>
+                </Box>
+              </Box>
               <Button
                 variant="contained"
+                fullWidth
                 type="submit"
                 style={{ padding: 20, marginTop: 10, fontSize: 15 }}
               >
