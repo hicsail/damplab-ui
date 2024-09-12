@@ -39,6 +39,11 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       editable: isEdit
     },
     {
+      field: 'description',
+      width: 200,
+      editable: isEdit
+    },
+    {
       field: 'type',
       width: 200,
       editable: isEdit
