@@ -80,23 +80,16 @@ export default function Checkout() {
   }, [val.nodes, val.edges]);
 
   useEffect(() => {
-    // scroll to selected node in parameters div
+
+    // scroll to selected node in parameters div without scrolling the whole page
     if (selectedNode) {
       let node = document.getElementById(selectedNode.id);
       if (node) {
-        node.scrollIntoView({ behavior: "smooth", block: "start" });
-        // set selected node background color to light blue
+        node.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }
-
-    // set all refs to null when selected node changes
-    myRefs.current = [];
-
-    // set selected node to null after 2 seconds
-    setTimeout(() => {
-      setSelectedNode(null);
-    }, 2000);
-  }, [selectedNode]);
+    
+  },[selectedNode]);
 
   const createWorkflowObj = () => {
     setWorkflows(getWorkflowsFromGraph(val.nodes, val.edges));
@@ -153,7 +146,6 @@ export default function Checkout() {
         workflows: getGQLWorkflows(),
         // submitted: date
       };
-      console.log(data);
       createJob({ variables: { createJobInput: data } });
     } else {
       alert("Form is incomplete.  Please fill out all required fields...");
