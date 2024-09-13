@@ -37,5 +37,11 @@ export const ImagesServicesDict: { [id: string] : string; } = {
     'Restriction Digest'                                    : require("./services/Restriction Digestion.png"),
     'Restriction Ligation'                                  : require("./services/Restriction Ligation.png"),
     'Next Generation Sequencing'                            : require("./services/RNA-Sequencing.png"),
-    'Send Sample to Sequencing'                             : require("./services/Send Sample to Sequencing.png")
+    'Send Sample to Sequencing'                             : require("./services/Send Sample to Sequencing.png"),
+    'Normalization'                                         : require("./services/Column Purification.png"),
+    'Pooling'                                               : require("./services/Column Purification.png"),
+    'Clean Up and Concentrate'                              : require("./services/Column Purification.png"),
+    'DNA/RNA Ethanol Precipitation'                         : require("./services/Column Purification.png"),
+    'Sample Indexing Information'                           : require("./services/Column Purification.png"),
+    'PCR clean up'                                          : require("./services/Column Purification.png")
 };

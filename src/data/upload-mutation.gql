@@ -354,7 +354,7 @@ mutation {
         description: ""
       }      
       { id: "eth-perc"
-        name: "DNA/RNA Ethanol Precipitation"
+        name: "DNA RNA Ethanol Precipitation"
         icon: "https://drive.google.com/thumbnail?id=1bnuf6-ZD79X7ZJ6X6dm26apEh8IU9BX7"
         categories: ["dna-rna"]
         description: ""
@@ -558,6 +558,13 @@ mutation {
         description: ""
         parameters: [
             {
+                id: "sample-cnt"
+                name: "Number of samples"
+                type: "number"
+                paramType: "input"
+                required: true
+            }
+            {
                 id: "normalization"
                 name: "Normalization and Pooling"
                 description: ""
@@ -574,6 +581,60 @@ mutation {
                 type: "dropdown"
                 paramType: "input"
                 required: true
+            }
+            {
+                id: "concentration"
+                name: "Desired Concentration"
+                description: ""
+                options: [
+                    {
+                        id: "nm2",
+                        name: "2nM"
+                    }
+                    {
+                        id: "nm4",
+                        name: "4nM"
+                    }
+                    {
+                        id: "other",
+                        name: "Other"
+                    }
+                ],
+                type: "dropdown"
+                paramType: "input"
+                required: false
+            }
+            {
+                id: "concentration-other"
+                name: "Other Concentration (if applicable)"
+                type: "string"
+                paramType: "input"
+                required: false
+            }
+            {
+                id: "diluent"
+                name: "Diluent"
+                description: ""
+                options: [
+                    {
+                        id: "nuclear-free-water",
+                        name: "Nuclear-free Water"
+                    }
+                    {
+                        id: "other",
+                        name: "Other"
+                    }
+                ],
+                type: "dropdown"
+                paramType: "input"
+                required: false
+            }
+            {
+                id: "diluent-other"
+                name: "Other Diluent (if applicable)"
+                type: "string"
+                paramType: "input"
+                required: false
             }
             {
                 id: "additional-notes"
@@ -737,6 +798,130 @@ mutation {
             name: "Library Prep Result"
             type: "string"
             paramType: "result"
+            required: true
+          }
+          {
+            id: "pool-ids"
+            name: "Library Pool IDs (comma separated)"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "final-concentration"
+            name: "Final Concentration"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "volume"
+            name: "Volume (uL)"
+            type: "number"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "flow-cell"
+            name: "Flow Cell"
+            type: "string"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "flow-cell"
+            name: "Flow Cell"
+            description: ""
+            options: [
+                {
+                    id: "p1",
+                    name: "P1"
+                }
+                {
+                    id: "p2",
+                    name: "P2"
+                }
+                {
+                    id: "p3",
+                    name: "P3"
+                }
+                {
+                    id: "p4",
+                    name: "P4"
+                }
+            ],
+            type: "dropdown"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "cycles"
+            name: "Cycles"
+            description: ""
+            options: [
+                {
+                    id: "fifty",
+                    name: "50"
+                }
+                {
+                    id: "hundred",
+                    name: "100"
+                }
+                {
+                    id: "two-hundred",
+                    name: "200"
+                }
+                {
+                    id: "three-hundred",
+                    name: "300"
+                }
+                {
+                    id: "six-hundred",
+                    name: "600"
+                }
+            ],
+            type: "dropdown"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "library-diversity"
+            name: "Library Diversity"
+            description: ""
+            options: [
+                {
+                    id: "low",
+                    name: "Low"
+                }
+                {
+                    id: "high",
+                    name: "High"
+                }
+                {
+                    id: "unknown",
+                    name: "Unknown"
+                }
+            ],
+            type: "dropdown"
+            paramType: "input"
+            required: true
+          }
+          {
+            id: "custom-primer"
+            name: "Custom Sequencing Primer"
+            description: ""
+            options: [
+                {
+                    id: "yes",
+                    name: "Yes"
+                }
+                {
+                    id: "no",
+                    name: "No"
+                }
+            ],
+            type: "dropdown"
+            paramType: "input"
             required: true
           }
           {

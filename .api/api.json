@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "apis": [
+    {
+      "identifier": "elabnextdocs",
+      "source": "@elabnextdocs/v1.0#gib5ilm052ahyt",
+      "integrity": "sha512-YMV6G2bhpSmWcnwkoIqMKd07cZ9u+TmQ1BtQHgDXVSJnZ+4064JjmA0t0bphDFMunH5/XYlQP64/jIUb5jhX2w==",
+      "installerVersion": "6.1.2"
+    }
+  ]
+}

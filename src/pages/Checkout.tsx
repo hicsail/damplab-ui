@@ -53,12 +53,12 @@ export default function Checkout() {
   const [workflowNames, setWorkflowNames] = useState<any>({});
   const [checkoutWorkflow, setCheckoutWorkflow] = useState<any>([]);
   // refs for workflows
-  const myRefs = useRef<any>([]);
-  const jobRef = useRef<any>(null);
-  const userRef = useRef<any>(null);
+  const myRefs         = useRef<any>([]);
+  const jobRef         = useRef<any>(null);
+  const userRef        = useRef<any>(null);
   const institutionRef = useRef<any>(null);
-  const emailRef = useRef<any>(null);
-  const notesRef = useRef<any>(null);
+  const emailRef       = useRef<any>(null);
+  const notesRef       = useRef<any>(null);
   const [selectedNode, setSelectedNode] = useState<any>(null);
 
   const navigate = useNavigate();

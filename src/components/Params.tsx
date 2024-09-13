@@ -1,3 +1,4 @@
+/* eslint-disable import/no-anonymous-default-export */
 import React, { useEffect, useState } from "react";
 import { useFormik } from "formik";
 import {
@@ -18,61 +19,63 @@ interface ParamFormProps {
 }
 
 export default function ({ activeNode }: ParamFormProps) {
+  console.log(activeNode);
   const [paramErrors, setParamErrors]: any = useState([]);
 
-  // init formik with values from activeNode
   const initValues = () => {
-    // init values using formDataState and setFormDataState
     let initValues: any = {};
-    activeNode.data.formData.forEach((obj: any) => {
-      if (obj.paramType === "result") {
-        obj.value = obj.value !== null ? obj.value : true;
-        initValues[obj.id] = obj.value !== null ? obj.value : true;
-        obj.resultParamValue = obj.resultParamValue ? obj.resultParamValue : "";
-        initValues[`resultParamValue${obj.id}`] = obj.resultParamValue
-          ? obj.resultParamValue
-          : "";
-      } else initValues[obj.id] = obj.value ? obj.value : "";
-    });
-    // Now a dedicated field in each service (should always accompany other params)
-    // initValues[`addinst${activeNode?.data.id}`] = activeNode?.data.additionalInstructions ? activeNode?.data.additionalInstructions : '';
-
+    if (activeNode && activeNode.data && activeNode.data.formData) {
+      activeNode.data.formData.forEach((obj: any) => {
+        if (obj.paramType === 'result') {
+          obj.value = obj.value !== null ? obj.value : true;
+          initValues[obj.id] = obj.value !== null ? obj.value : true;
+          obj.resultParamValue = obj.resultParamValue ? obj.resultParamValue : '';
+          initValues[`resultParamValue${obj.id}`] = obj.resultParamValue ? obj.resultParamValue : '';
+        } else {
+          initValues[obj.id] = obj.value ? obj.value : '';
+        }
+      });
+    }
     return initValues;
   };
 
   // validation function for formik to check for empty fields
   const validate = (values: any) => {
     let errors: any = {};
-    // loop over values and check if they are empty
-    for (let key in values) {
-      if (
-        values[key] === "" ||
-        values[key] === undefined ||
-        values[key] === null
-      ) {
-        // if key is an id of a param in formdata, then it is a required field
+    if (activeNode && activeNode.data && activeNode.data.formData) {
+      // loop over values and check if they are empty
+      for (let key in values) {
         if (
-          activeNode.data.formData.find((obj: any) => obj.id === key)
-            ?.required === true
-        )
-          errors[key] = "Required";
-        // if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
+          values[key] === "" ||
+          values[key] === undefined ||
+          values[key] === null
+        ) {
+          // if key is an id of a param in formdata, then it is a required field
+          if (
+            activeNode.data.formData.find((obj: any) => obj.id === key)
+              ?.required === true
+          )
+            errors[key] = "Required";
+          // if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
+        }
       }
+      setParamErrors(errors);
+      return errors;
     }
-    setParamErrors(errors);
-    return errors;
   };
 
   // copy formik values to activeNode.data
   const copyFormikValuesToNodeData = (values: any) => {
-    activeNode.data.formData.forEach((obj: any) => {
-      obj.value = values[obj.id];
-      if (obj.paramType === "result") {
-        obj.resultParamValue = values[`resultParamValue${obj.id}`];
-      }
+    if (activeNode && activeNode.data && activeNode.data.formData) {
+      activeNode.data.formData.forEach((obj: any) => {
+        obj.value = values[obj.id];
+        if (obj.paramType === "result") {
+          obj.resultParamValue = values[`resultParamValue${obj.id}`];
+        }
     });
     // Now a dedicated field in each service (should always accompany other params)
     // activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
+  }
   };
 
   // formik hook init
@@ -258,18 +261,22 @@ export default function ({ activeNode }: ParamFormProps) {
 
   }
 
-  // update values to active node form data and validate
   useEffect(() => {
-    copyFormikValuesToNodeData(formik.values);
-    const errors = validate(formik.values);
-    if (Object.keys(errors).length > 0) {
-      formik.setErrors(errors);
-    }
-    if (Object(errors).length !== paramErrors.length) {
-      setParamErrors(errors);
+    if (activeNode && activeNode.data && activeNode.data.formData) {
+      copyFormikValuesToNodeData(formik.values);
+      const errors = validate(formik.values);
+      if (Object.keys(errors).length > 0) {
+        formik.setErrors(errors);
+      }
+      if (Object(errors).length !== paramErrors.length) {
+        setParamErrors(errors);
+      }
     }
   }, [formik.values]);
 
+  if (!activeNode || !activeNode.data || !activeNode.data.formData) {
+    return <div>No active node data available.</div>;
+  }
 
   return (
     <div>

@@ -28,7 +28,7 @@ export default function LoginForm() {
   const [role,     setRole]     = useState('');
 
   useEffect(() => {
-    const loginInfo = JSON.parse(sessionStorage.getItem('login_info') || '{}');
+    const loginInfo = JSON.parse(localStorage.getItem('login_info') || '{}');
     if (loginInfo && loginInfo.loggedIn) {
       setLoggedIn(true);
       setRole(loginInfo.role);
@@ -52,7 +52,7 @@ export default function LoginForm() {
       loginInfo.role = 'client';
     }
 
-    sessionStorage.setItem('login_info', JSON.stringify(loginInfo));
+    localStorage.setItem('login_info', JSON.stringify(loginInfo));
     setLoggedIn(loginInfo.loggedIn);
     setRole(loginInfo.role);
     setMessage(loginInfo.loggedIn ? 'Login Succeeded' : 'Login Failed');
@@ -63,7 +63,7 @@ export default function LoginForm() {
   };
 
   const clickedLogout = () => {
-    sessionStorage.removeItem('login_info');
+    localStorage.removeItem('login_info');
     setLoggedIn(false);
     setMessage('Logged out');
     navigate('/login');

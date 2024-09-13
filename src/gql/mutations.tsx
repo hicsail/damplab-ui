@@ -64,3 +64,17 @@ export const MUTATE_JOB_STATE = gql`
         }
     }
 `;
+
+export const UPDATE_JOB = gql`
+  mutation UpdateJob($id: ID!, $updateJobInput: UpdateJobInput!) {
+    updateJob(id: $id, updateJobInput: $updateJobInput) {
+      id
+      name
+      institute
+      state
+      workflows {
+        id
+      }
+    }
+  }
+`;
