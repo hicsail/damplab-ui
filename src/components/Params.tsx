@@ -1,3 +1,4 @@
+/* eslint-disable import/no-anonymous-default-export */
 import React, { useEffect, useState } from "react";
 import { useFormik } from "formik";
 import {
@@ -18,6 +19,7 @@ interface ParamFormProps {
 }
 
 export default function ({ activeNode }: ParamFormProps) {
+  console.log(activeNode);
   const [paramErrors, setParamErrors]: any = useState([]);
 
   // init formik with values from activeNode
