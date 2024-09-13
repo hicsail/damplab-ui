@@ -333,8 +333,8 @@ export default function Checkout() {
               <Button
                 variant="contained"
                 fullWidth
-                type="submit"
                 style={{ padding: 20, marginTop: 10, fontSize: 15 }}
+                onClick={handleSubmit}
               >
                 Submit
               </Button>
