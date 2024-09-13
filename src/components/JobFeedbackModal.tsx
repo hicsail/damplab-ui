@@ -143,7 +143,7 @@ export default function JobFeedbackModal(props: any) {
     try {
       for (const workflow of workflows) {
         console.log('eLabs Study creation: ', workflow)
-        const studyID = await runCreateELabsStudy('822c512d20c3222a33fc79ed53aa02c2', 23469, workflow.name);
+        const studyID = await runCreateELabsStudy('822c512d20c3222a33fc79ed53aa02c2', 23469, 'DAMP_Workflow');  // workflow.name
         if (!studyID || typeof(studyID) !== 'number') {
           throw new Error('StudyID not returned by eLabs (or invalid type)...');
         }

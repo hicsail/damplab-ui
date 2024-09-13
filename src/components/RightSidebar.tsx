@@ -1,12 +1,16 @@
 import React, { useState, useContext, useEffect } from 'react';
 
-import { Accordion, AccordionSummary, AccordionDetails, Box, Button, IconButton, TextField, Tooltip, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Accordion, AccordionSummary, AccordionDetails, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, IconButton, TextField, Tooltip, Select, MenuItem, FormControl, InputLabel, Typography } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon  from '@mui/icons-material/Close';
+import Snackbar   from '@mui/material/Snackbar';
 import { GppMaybe } from '@mui/icons-material/';
 
+import { getServiceFromId } from '../controllers/GraphHelpers';
 import Params from './Params';
+import NodeButton from './AllowedConnectionButton';
 import { AppContext } from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas';
 import { AzentaSeqOrder,       AzentaPool,          AzentaLibrary, 
@@ -25,9 +29,11 @@ export default function RightSidebar() {
   const api_url = process.env.REACT_APP_MPI_API || '';
 
   const val = useContext(CanvasContext);
-  const { hazards } = useContext(AppContext);
+  const { services, hazards } = useContext(AppContext);
 
   const [activeNode,         setActiveNode]         = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
+  const [openToast,          setOpenToast]          = useState(false);
+  const [open,               setOpen]               = useState(false);
   const [order,              setOrder]              = useState<AzentaSeqOrder>(initialOrderDefaults);
   const [orders,             setOrders]             = useState<AzentaSeqOrder[]>([initialOrderDefaults]);
   // const [searchId,           setSearchId]           = useState('');
@@ -36,10 +42,37 @@ export default function RightSidebar() {
   // const [expandedAzentaData, setExpandedAzentaData] = useState<string | false>(false);
   const [isLoggedIn,         setIsLoggedIn]         = useState<boolean>(false);
 
+  const handleClose = () => {
+    // put logic to discard changes here
+    setOpen(false);
+  };
+
+  const handleSave = () => {
+      handleClose();
+      setOpenToast(true);
+  };
+
+  const handleCloseToast = (event: React.SyntheticEvent | Event, reason?: string) => {
+    if (reason === 'clickaway') {
+        return;
+    }
+    setOpenToast(false);
+  };
 
   useEffect(() => {
     setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
   }, [val.activeComponentId, val.nodes]);
+
+  const action = (
+    <React.Fragment>
+        <Button onClick={handleCloseToast} color="secondary" size="small">
+            UNDO
+        </Button>
+        <IconButton onClick={handleCloseToast} size="small" color="inherit" aria-label="close">
+            <CloseIcon fontSize="small" />
+        </IconButton>
+    </React.Fragment>
+  );
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -89,11 +122,77 @@ export default function RightSidebar() {
       </div>
       <div><Params activeNode={activeNode} /></div>
       <br />
-      <Box hidden={activeNode?.data.label !== 'Next Generation Sequencing'}>
-        <Box sx={{ my: 4 }}>
-          <MPILoginForm isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn}/>
-        </Box>
-        <Box sx={{ my: 4, display: 'flex', justifyContent: 'center' }}>
+      <div>
+        {
+          // return header with text Allowed Connections if allowedConnections list is not empty
+          activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 
+          ? <h3>Allowed Connections</h3>
+          : null
+        }
+        {
+          activeNode 
+          && activeNode.data.allowedConnections 
+          && activeNode.data.allowedConnections.length > 0 
+          ? (activeNode.data.allowedConnections.map((connection: any) => {
+              return (
+                  <NodeButton 
+                      key                  = {Math.random().toString(36).substring(2, 9)}
+                      node                 = {getServiceFromId(services, connection.id)}
+                      sourceId             = {val.activeComponentId}
+                      setNodes             = {val.setNodes}
+                      setEdges             = {val.setEdges}
+                      sourcePosition       = {activeNode.position}
+                      setActiveComponentId = {val.setActiveComponentId}
+                  />
+              )
+          })) 
+          : null
+        }
+    </div>
+    <div>
+      {
+        activeNode 
+        ? (
+            <>
+                <Snackbar
+                    open             = {openToast}
+                    autoHideDuration = {3000}
+                    onClose          = {handleCloseToast}
+                    message          = "Parameters Saved"
+                    action           = {action}
+                    key              = {'bottomright'}
+                    anchorOrigin     = {{ vertical: 'bottom', horizontal: 'right' }}
+                />
+                <Dialog
+                    open             = {open}
+                    onClose          = {handleClose}
+                    aria-labelledby  = "alert-dialog-title"
+                    aria-describedby = "alert-dialog-description"
+                >
+                    <DialogContent>
+                        <DialogContentText id="alert-dialog-description">
+                            There are unsaved changes. Do you want to save them?
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={handleClose}>Discard</Button>
+                        <Button onClick={handleSave} autoFocus>
+                            Save
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            </>
+        ) 
+        : <div><br />Drag a node from the left to the canvas to see its properties here.</div>
+      }
+    </div>
+    <div>
+        {/* <Button onClick={ ()=> console.log(JSON.stringify(val.nodes), JSON.stringify(val.edges))}><br/>Print</Button> */}
+    </div>
+      {/* <SequenceDropdown /> */}
+      <Box hidden={activeNode?.data.label !== 'Next Generation Sequencing' && activeNode?.data.label !== 'Send Sample to Sequencing'}>
+        <Typography textAlign='left'><h3>Evaluate Target Sequence</h3></Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           {isLoggedIn ? (
             // <Button onClick={() => {}} variant='contained' color='success'>
             //   Evaluate Sequence
@@ -105,8 +204,10 @@ export default function RightSidebar() {
             </Button>
           )}
         </Box>
+        <Box sx={{  display: 'flex', justifyContent: 'left', my: 4, ml: 2 }}>
+          <MPILoginForm isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn}/>
+        </Box>
       </Box>
-      {/* <SequenceDropdown /> */}
     </div>
   );
 }

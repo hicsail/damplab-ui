@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Checkbox, Typography, FormControlLabel } from '@mui/material';
+import { Box, Button, Checkbox, TextField, Typography, FormControlLabel } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 
@@ -12,6 +12,20 @@ const RotatingIcons = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isChecked, setIsChecked] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); // To store the uploaded file
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      setSelectedFile(event.target.files[0]);
+    }
+  };
+
+  const handleUploadClick = () => {
+    if (selectedFile) {
+      // You can handle file upload logic here
+      console.log(`Uploading: ${selectedFile.name}`);
+    }
+  };
 
   useEffect(() => {
     if (isRunning) {
@@ -62,12 +76,15 @@ const RotatingIcons = () => {
   };
 
   return (
-    <Box sx={{ textAlign: 'center', mt: 4 }}>
-      <Typography variant="h6">Evaluate Sequence</Typography>
+    <Box sx={{ textAlign: 'left' }}>
+
+      <Box sx={{ mt: '20px', ml: 2 }}>
+        <input type="file" accept=".seq,.gb,.gbk,.genbank,.ape,.fasta,.fas,.fa,.dna,.sbd" onChange={handleFileChange} />
+      </Box>
 
       { (isRunning || isCompleted) ? (
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, mt: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, mt: 3, ml: 2 }}>
           
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {progress.icon1 ? (
@@ -129,10 +146,10 @@ const RotatingIcons = () => {
       <FormControlLabel
         control={<Checkbox checked={isChecked} onChange={handleCheckboxChange} />}
         label="DAMP Lab Discount"
-        sx={{ mt: 2 }}
+        sx={{ mt: 2, ml: 2 }}
       />
       {!isRunning && !isCompleted && (
-        <Button variant="contained" color="primary" sx={{ mt: 2 }} onClick={handleStart}>
+        <Button variant="contained" color="primary" sx={{ mt: 2, ml: 2 }} onClick={handleStart}>
           Evaluate Sequence
         </Button>
       )}

@@ -42,60 +42,40 @@ export default function ({ activeNode }: ParamFormProps) {
   // validation function for formik to check for empty fields
   const validate = (values: any) => {
     let errors: any = {};
-    // loop over values and check if they are empty
-    for (let key in values) {
-      if (
-        values[key] === "" ||
-        values[key] === undefined ||
-        values[key] === null
-      ) {
-        // if key is an id of a param in formdata, then it is a required field
-        if (
-          activeNode.data.formData.find((obj: any) => obj.id === key)
-            ?.required === true
-        )
-          errors[key] = "Required";
-        // if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
-      }
-    }
-    setParamErrors(errors);
-    return errors;
-  };
-  const validate = (values: any) => {
-    let errors: any = {};
     if (activeNode && activeNode.data && activeNode.data.formData) {
+      // loop over values and check if they are empty
       for (let key in values) {
-        if (values[key] === '' || values[key] === undefined || values[key] === null) {
-          if (activeNode.data.formData.find((obj: any) => obj.id === key)?.required === true) {
-            errors[key] = 'Required';
-          }
+        if (
+          values[key] === "" ||
+          values[key] === undefined ||
+          values[key] === null
+        ) {
+          // if key is an id of a param in formdata, then it is a required field
+          if (
+            activeNode.data.formData.find((obj: any) => obj.id === key)
+              ?.required === true
+          )
+            errors[key] = "Required";
+          // if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
         }
       }
+      setParamErrors(errors);
+      return errors;
     }
-    setParamErrors(errors);
-    return errors;
   };
 
   // copy formik values to activeNode.data
   const copyFormikValuesToNodeData = (values: any) => {
-    activeNode.data.formData.forEach((obj: any) => {
-      obj.value = values[obj.id];
-      if (obj.paramType === "result") {
-        obj.resultParamValue = values[`resultParamValue${obj.id}`];
-      }
-    });
-    // Now a dedicated field in each service (should always accompany other params)
-    // activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
-  };
-  const copyFormikValuesToNodeData = (values: any) => {
     if (activeNode && activeNode.data && activeNode.data.formData) {
       activeNode.data.formData.forEach((obj: any) => {
         obj.value = values[obj.id];
-        if (obj.paramType === 'result') {
+        if (obj.paramType === "result") {
           obj.resultParamValue = values[`resultParamValue${obj.id}`];
         }
-      });
-    }
+    });
+    // Now a dedicated field in each service (should always accompany other params)
+    // activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
+  }
   };
 
   // formik hook init

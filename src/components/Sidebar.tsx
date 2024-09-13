@@ -1,3 +1,4 @@
+/* eslint-disable import/no-anonymous-default-export */
 import React, { useState, useEffect, MouseEvent, useContext } from 'react';
 import { useQuery } from '@apollo/client';
 import { Box, Button, FormControl, InputLabel, MenuItem, ToggleButton, ToggleButtonGroup } from '@mui/material';
@@ -19,7 +20,7 @@ export default () => {
   const [categories,       setCategories]       = useState<any>([]);
   const [alignment,        setAlignment]        = useState('bundles');
   const [filteredServices, setFilteredServices] = useState(services);
-  const [searchText,      setSearchText]       = useState('');
+  const [searchText,       setSearchText]       = useState('');
 
 
   const buttonElementStyle = {

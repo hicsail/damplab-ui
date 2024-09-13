@@ -138,6 +138,7 @@ export default function HeaderBar() {
                     </Hidden>
 
                     <Button onClick={() => navigate("/")} style={{ textDecoration: 'none', color: 'white', textTransform: 'none'}}>
+                        <img src="/damp-white-text.svg" style={{height: '45px'}} alt=""/>
                         <span style={{marginLeft: '15px', fontSize: 21, fontWeight: 'bold', color: '#ffffff', marginBottom: '-2px'}}>  {/*cyan: #8fb5ba, pink: #e04462*/}
                             DAMP<span style={{fontWeight: '200', color: '#8fb5ba'}}>Canvas</span>
                         </span>
