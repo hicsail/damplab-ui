@@ -130,7 +130,7 @@ export default () => {
                         {/* URL (e.g. to Google Drive) from the DB... */}
                         {/* <img src = {service.icon} alt = " " style = {{ height: 60 }} /> */}
                         {/* Local files in src/assets/icons folder... */}
-                        <img src = {ImagesServicesDict[service.name]} alt = " " style = {{ height: 60 }} /> 
+                        {ImagesServicesDict[service.name] && <img src = {ImagesServicesDict[service.name]} alt = "img not found" style = {{ height: 60 }} /> }
                       </div>
                       <div style={{padding: 5}}>
                         {service.name}
