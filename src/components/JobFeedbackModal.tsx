@@ -5,6 +5,9 @@ import { styled } from "@mui/system";
 
 import { MUTATE_JOB_STATE } from '../gql/mutations';
 import { createELabsStudy, createELabsExperiment } from '../mpi/eLabs';
+import MPILoginForm from "./MPILoginForm";
+
+type eLabsStatus = 'PENDING' | 'PROGRESS' | 'COMPLETED';
 
 
 const CenteredModal = styled(Modal)`
@@ -48,8 +51,78 @@ export default function JobFeedbackModal(props: any) {
   const [feedbackMessage,   setFeedbackMessage]   = useState("");
   // const [newState,          setNewState]          = useState("");
   const [mutationCompleted, setMutationCompleted] = useState(false);
+  const [isLoggedIn,        setIsLoggedIn]        = useState(false);
 
   const [mutateJobState] = useMutation(MUTATE_JOB_STATE);
+
+  const runCreateELabsStudy = async (bearerToken: string, projectID: number, name: string) => {
+    try {
+      const response = await fetch('http://localhost:5100/mpi/e-labs/create-study', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bearerToken}`
+        },
+        body: JSON.stringify({
+          bearerToken,
+          projectID,
+          name
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create e-Labs study');
+      }
+      
+      const data = await response.json();
+      console.log('study data: ', data);
+      return data;
+
+    } catch (err) {
+      console.error(err);
+      return undefined;
+    }
+  };
+
+  const runCreateELabsExperiment = async (
+    bearerToken: string,
+    studyID: number,
+    name: string,
+    status: eLabsStatus,
+    templateID?: number,
+    autoCollaborate?: boolean
+  ) => {
+    try {
+      const response = await fetch('http://localhost:5100/mpi/e-labs/create-experiment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bearerToken}`
+        },
+        body: JSON.stringify({
+          bearerToken,
+          studyID,
+          name,
+          status,
+          templateID,
+          autoCollaborate
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create e-Labs experiment');
+      }
+
+      const data = await response.json();
+      console.log('experiment data: ', data);
+      return data;
+
+    } catch (err) {
+      console.error(err);
+      return undefined;
+    }
+  };
+
 
   useEffect(() => {
     if (mutationCompleted) {
@@ -70,14 +143,14 @@ export default function JobFeedbackModal(props: any) {
     try {
       for (const workflow of workflows) {
         console.log('eLabs Study creation: ', workflow)
-        const studyID = await createELabsStudy('822c512d20c3222a33fc79ed53aa02c2', 23469, workflow.name);
+        const studyID = await runCreateELabsStudy('822c512d20c3222a33fc79ed53aa02c2', 23469, workflow.name);
         if (!studyID || typeof(studyID) !== 'number') {
           throw new Error('StudyID not returned by eLabs (or invalid type)...');
         }
 
         for (const service of workflow.nodes) {
           console.log('eLabs Experiment creation: ', service.label)
-          const experimentID = await createELabsExperiment('822c512d20c3222a33fc79ed53aa02c2', studyID, service.label, 'PENDING');
+          const experimentID = await runCreateELabsExperiment('822c512d20c3222a33fc79ed53aa02c2', studyID, service.label, 'PENDING');
           if (!experimentID || typeof(experimentID) !== 'number') {
             throw new Error('ExperimentID not returned by eLabs (or invalid type)...');
           }
@@ -86,7 +159,7 @@ export default function JobFeedbackModal(props: any) {
 
       await handleSubmit();
 
-      return(`Study created successfully in eLabs.  Study ID: {studyID}`)
+      return(`Study created successfully in eLabs.`)
     } catch (error) {
       console.log(error);
     }
@@ -123,7 +196,10 @@ export default function JobFeedbackModal(props: any) {
   return (
     <CenteredModal open={props.open} onClose={props.onClose}>
       <ModalBox>
-        <h2 text-align="center">Job Feedback</h2>
+        <Box display='flex' justifyContent='space-between' alignItems='center'>
+          <h2 text-align="center">Job Feedback</h2>
+          <MPILoginForm isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn}/>
+        </Box>
         <FormControl component="fieldset" sx={{width: '500px'}}>
 
           <RadioGroup onChange = {handleFeedbackTypeChange} value = {feedbackType} name = "feedback-type" aria-label = "feedback-type">

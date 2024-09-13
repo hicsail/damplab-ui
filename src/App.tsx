@@ -86,6 +86,7 @@ function App() {
                     <Route path = "/login"               element = {<LoginForm />} />
 
                     <Route path = "/canvas"              element = {<PrivateRouteClient> <MainFlow />                 </PrivateRouteClient>} />
+                    <Route path = "/canvas/:id"          element = {<PrivateRouteClient> <MainFlow />                 </PrivateRouteClient>} />
                     <Route path = "/resubmission/:id"    element = {<PrivateRouteClient> <MainFlow client={client} /> </PrivateRouteClient>} />
                     <Route path = "/checkout"            element = {<PrivateRouteClient> <Checkout />                 </PrivateRouteClient>} />
                     <Route path = "/submitted"           element = {<PrivateRouteClient> <JobSubmitted />             </PrivateRouteClient>} />

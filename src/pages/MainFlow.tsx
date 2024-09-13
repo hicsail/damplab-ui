@@ -107,23 +107,30 @@ export default function MainFlow( client: any /*data: any*/) {
 
     useEffect(() => {
         if (id !== undefined) {
-            client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
-                console.log('job loaded successfully', result);
-                if (workflows.length === 0) {
-                    workflows = result.data.jobById.workflows;
-                    workflows.map((workflow: any) => {
-                        let s   : any[] = [];
-                        let sIds: any[] = [];
-                        workflow.nodes.map((node: any) => {
-                            s.push(node);
-                            sIds.push(node.id);
-                        })
-                        addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
-                    });
-                };
-            }).catch((error: any) => {
-                console.log('error when loading job', error);
-            });
+            if (id === 'gibsonassembly') {
+                console.log('loading gibsonassembly');
+                let file = JSON.parse(localStorage.getItem('GibsonAssembly') || '{}');
+                if (file.nodes) setNodes(file.nodes);
+                if (file.edges) setEdges(file.edges);
+            } else {
+                client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
+                    console.log('job loaded successfully', result);
+                    if (workflows.length === 0) {
+                        workflows = result.data.jobById.workflows;
+                        workflows.map((workflow: any) => {
+                            let s   : any[] = [];
+                            let sIds: any[] = [];
+                            workflow.nodes.map((node: any) => {
+                                s.push(node);
+                                sIds.push(node.id);
+                            })
+                            addNodesAndEdgesFromServiceIdsAlt(s, sIds, setNodes, setEdges);
+                        });
+                    };
+                }).catch((error: any) => {
+                    console.log('error when loading job', error);
+                });
+            }
         }
     }, []);
 

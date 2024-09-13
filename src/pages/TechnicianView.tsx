@@ -179,7 +179,7 @@ export default function TechnicianView() {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/data/download/${jobNotes}`, {
+      const response = await fetch(`http://localhost:5200/data/download/${jobNotes}`, {
         method: 'GET',
         headers: {
           Accept: '*/*'
