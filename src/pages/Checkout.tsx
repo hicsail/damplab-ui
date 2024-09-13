@@ -21,6 +21,11 @@ import { CanvasContext } from "../contexts/Canvas";
 import { AppContext } from "../contexts/App";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import ReactFlow, { ReactFlowProvider } from "reactflow";
+import CustomDemoNode from "../components/CanvasNode";
+
+const nodeTypes = {
+  selectorNode: CustomDemoNode,
+};
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -203,7 +208,7 @@ export default function Checkout() {
             <Typography variant="h6">Review flow</Typography>
           </div>
           <div>
-            <ReactFlowProvider>
+            
               <div
                 className="reactflow-wrapper"
                 style={{
@@ -217,6 +222,7 @@ export default function Checkout() {
                   nodes={val.nodes}
                   edges={val.edges}
                   onNodeClick={onNodeClick}
+                  nodeTypes={nodeTypes}
                   fitView
                 />
                 <div
@@ -246,7 +252,7 @@ export default function Checkout() {
                   }
                 </div>
               </div>
-            </ReactFlowProvider>
+           
           </div>
         </div>
         <div
