@@ -5,11 +5,12 @@ export const GET_SERVICES = gql`
         services {
             id
             name
-            icon 
+            icon
             parameters
             description
+            paramGroups
             allowedConnections {
-                id 
+                id
                 name
             }
         }
@@ -21,7 +22,7 @@ export const GET_BUNDLES = gql`
         bundles {
             id
             label
-            icon 
+            icon
             services {
                 id
                 name
@@ -56,7 +57,7 @@ export const GET_JOB_BY_ID = gql`
             id
             name
             username
-            institute 
+            institute
             email
             state
             submitted
@@ -160,4 +161,57 @@ export const GET_JOB_BY_WORKFLOW_ID = gql`
             state
         }
     }
+`;
+
+export const DELETE_CATEGORY = gql`
+  mutation deleteCategory($category: ID!) {
+    deleteCategory(category: $category)
+  }
+`;
+
+export const UPDATE_CATEGORY = gql`
+  mutation updateCategory($category: ID!, $changes: CategoryChange!) {
+    updateCategory(category: $category, changes: $changes) {
+      label
+    }
+  }
+`;
+
+export const CREATE_CATEGORY = gql`
+  mutation createCategory($category: CreateCategory!) {
+    createCategory(category: $category) {
+      label
+    }
+  }
+`;
+
+export const DELETE_SERVICE = gql`
+  mutation deleteService($service: ID!) {
+    deleteService(service: $service)
+  }
+`;
+
+export const UPDATE_SERVICE = gql`
+  mutation updateService($service: ID!, $changes: ServiceChange!) {
+    updateService(service: $service, changes: $changes) {
+      name
+    }
+  }
+`;
+
+export const CREATE_SERVICE = gql`
+  mutation createService($service: CreateService!) {
+    createService(service: $service) {
+      id
+      name
+      icon
+      parameters
+      description
+      paramGroups
+      allowedConnections {
+          id
+          name
+      }
+    }
+  }
 `;

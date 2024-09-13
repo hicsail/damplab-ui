@@ -46,7 +46,8 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         parameters            : service.parameters,
         additionalInstructions: "",
         formData              : formData,
-        serviceId             : service.id
+        serviceId             : service.id,
+        paramGroups           : service.paramGroups,
     }
     
     const newNode = createNodeObject(nodeId, service.name, 'selectorNode', position, nodeData);
@@ -142,6 +143,8 @@ export const transformNodesToGQL = (nodes: any) => {
         //delete gqlNode.serviceId;
         delete gqlNode.parameters;
         delete gqlNode.description;
+        delete gqlNode.paramGroups;
+        console.log('gqlNode: ', gqlNode);
         gqlNodes.push(gqlNode);
     });
 
@@ -193,9 +196,12 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
 // TODO: Change bundle data structure to preserve service order!  Needing to check bundles.tsx just to get the correct service order...
 export const addNodesAndEdgesFromBundle = (bundle: any, services: any, setNodes: any, setEdges: any) => {
     // get serviceIds from bundle
-    const bundleServices = bundleServiceOrders.find(b => b.label === bundle.label)?.services;
+    const bundleServices = bundleServiceOrders.find(b => b.label == bundle.label)?.services;
+    
     const bundleServiceNames = bundleServices?.map(service => serviceNames.find(s => s.id === service)?.name);
+    
     const serviceIds = bundleServiceNames?.map(service => bundle.services.find((s: any) => s.name === service)?.id ?? '');
+    
     // console.log('test: ', test);
     // const serviceIds = bundle.services.map((service: any) => service.id);
     addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges);
@@ -216,7 +222,7 @@ export const paramsFilledOnNode = (node: any) : Boolean => {
 export const searchForEndService : any = (serviceId : string, endServiceId: string, visited: any[]) => {
     
     const service: any | undefined = services.find(s => s.id === serviceId);
-    console.log(service);
+   
     if (!service) {
         return null;
     }
@@ -224,7 +230,7 @@ export const searchForEndService : any = (serviceId : string, endServiceId: stri
         return null;
     }
     visited.push(service);
-    console.log(visited);
+  
     if (service.id === endServiceId) {
       return service;
     }
@@ -265,7 +271,7 @@ export const transformGQLforDominos = (workflow: any) => {
 };
 
 export const transformGQLToWorkflow = (workflow: any) => {
-    console.log(workflow);
+    
     let nodes = workflow.nodes.map((node: any) => {
         return {
             id         : node._id,

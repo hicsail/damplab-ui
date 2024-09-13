@@ -10,7 +10,7 @@ export let bundles = [
         id: 'gibson-assembly-provided',
         label: 'Gibson Assembly and Cloning with Provided DNA',
         icon: '',
-        services: ['seq', 'design-primers', 'rehydrate-primer', 'pcr', 'gel-electrophoresis', 'dna-gel', 'gibson-assembly', 'transformation', 'overnight-culture', 'miniprep-gs', 'glyc-storage', 'seq'],
+        services: ['design-primers', 'pcr', 'gel-electrophoresis', 'gibson-assembly', 'transformation', 'overnight-culture', 'miniprep-gs', 'glyc-storage', 'seq'],
     },
     {
         id: 'gibson-assembly-ordering',
@@ -22,7 +22,7 @@ export let bundles = [
         id: 'library-prep',
         label: 'Library Prep (16S,ITS)',
         icon: '',
-        services: ['pcr', 'gel-electrophoresis', 'clean-up', 'spectro'],
+        services: ['pcr', 'gel-electrophoresis', 'pcr-clean-up', 'spectro', 'normalization', 'pooling'],
     },
     {
         id: 'protein-production',

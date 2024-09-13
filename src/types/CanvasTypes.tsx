@@ -8,6 +8,7 @@ export type NodeData = {
     formData: NodeParameter[];
     serviceId: string;
     description: string;
+    paramGroups?: any[];
 }
 
 
@@ -22,4 +23,8 @@ export type NodeParameter = {
     resultParamValue: string;
     value: any;
     required: boolean;
+    dynamicAdd: boolean;
+    tableData: any;
+    paramGroups?: any[];
+    paramGroupId?: string;
 }

@@ -1,13 +1,25 @@
-import React, { useEffect, useState } from 'react';
-import { useFormik } from 'formik';
-import { FormControl, FormHelperText, IconButton, InputLabel, MenuItem, Select, TextField } from '@mui/material';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+/* eslint-disable import/no-anonymous-default-export */
+import React, { useEffect, useState } from "react";
+import { useFormik } from "formik";
+import {
+  FormControl,
+  FormHelperText,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+} from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
+import ParamTableOnForm from "./ParamTableOnForm";
 
 interface ParamFormProps {
-  activeNode: any;  // Replace 'any' with the appropriate type for activeNode
+  activeNode: any; // Replace 'any' with the appropriate type for activeNode
 }
 
-export default function Params({ activeNode }: ParamFormProps) {
+export default function ({ activeNode }: ParamFormProps) {
+  console.log(activeNode);
   const [paramErrors, setParamErrors]: any = useState([]);
 
   const initValues = () => {
@@ -27,6 +39,28 @@ export default function Params({ activeNode }: ParamFormProps) {
     return initValues;
   };
 
+  // validation function for formik to check for empty fields
+  const validate = (values: any) => {
+    let errors: any = {};
+    // loop over values and check if they are empty
+    for (let key in values) {
+      if (
+        values[key] === "" ||
+        values[key] === undefined ||
+        values[key] === null
+      ) {
+        // if key is an id of a param in formdata, then it is a required field
+        if (
+          activeNode.data.formData.find((obj: any) => obj.id === key)
+            ?.required === true
+        )
+          errors[key] = "Required";
+        // if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
+      }
+    }
+    setParamErrors(errors);
+    return errors;
+  };
   const validate = (values: any) => {
     let errors: any = {};
     if (activeNode && activeNode.data && activeNode.data.formData) {
@@ -42,6 +76,17 @@ export default function Params({ activeNode }: ParamFormProps) {
     return errors;
   };
 
+  // copy formik values to activeNode.data
+  const copyFormikValuesToNodeData = (values: any) => {
+    activeNode.data.formData.forEach((obj: any) => {
+      obj.value = values[obj.id];
+      if (obj.paramType === "result") {
+        obj.resultParamValue = values[`resultParamValue${obj.id}`];
+      }
+    });
+    // Now a dedicated field in each service (should always accompany other params)
+    // activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
+  };
   const copyFormikValuesToNodeData = (values: any) => {
     if (activeNode && activeNode.data && activeNode.data.formData) {
       activeNode.data.formData.forEach((obj: any) => {
@@ -53,6 +98,7 @@ export default function Params({ activeNode }: ParamFormProps) {
     }
   };
 
+  // formik hook init
   const formik = useFormik({
     initialValues: initValues(),
     enableReinitialize: true,
@@ -61,6 +107,179 @@ export default function Params({ activeNode }: ParamFormProps) {
       copyFormikValuesToNodeData(values);
     },
   });
+
+  const returnParamGroups = (activeNodeData: any) => {
+
+    let paramGroups: any[] = [];
+    let paramGroupIds = activeNodeData.paramGroups.map((paramGroup: any) => {
+      return paramGroup.id;
+    });
+
+    // loop through param groups and add parameters to the group
+    paramGroupIds.forEach((paramGroupId: any) => {
+      let paramGroup = {
+        id: paramGroupId,
+        name: activeNodeData.paramGroups.find((paramGroup: any) => paramGroup.id === paramGroupId).name,
+        parameters: [],
+      };
+      activeNodeData.formData.forEach((param: any) => {
+        if (param.paramGroupId === paramGroupId) {
+          paramGroup.parameters.push(param);
+        }
+      });
+      paramGroups.push(paramGroup);
+    });
+
+    return paramGroups;
+    
+  }
+
+  const renderParamGroups = (formData: any) => {
+
+    // render the paramGroups using same structure as the form
+    // should render param group name and then the parameters
+
+    let paramGroups = returnParamGroups(formData);
+
+    return (
+      <div 
+      style={{
+        border: "1px solid black",
+        padding: 2,
+      }}>
+        {paramGroups.map((paramGroup: any) => {
+          return (
+            <div key={paramGroup.id}>
+              <h4>{paramGroup.name}</h4>
+              <div className="input-params" style={{ marginLeft: 20 }}>
+                {paramGroup.parameters.map((param: any) => {
+                  if (param.paramType !== "result") {
+                    if (param.type === "table") {
+                      return (
+                        <div key={param.id}>
+                          <ParamTableOnForm
+                            title={param.name}
+                            columns={param.tableData.columns}
+                            rows={param.tableData.rows}
+                          />
+                        </div>
+                      );
+                    }
+                    if (param.type === "dropdown") {
+                      return (
+                        <FormControl
+                          size="small"
+                          sx={{ mt: 3, width: "26ch" }}
+                          key={param.id}
+                        >
+                          {param.dynamicAdd && (
+                            <IconButton onClick={() => {
+                              // add param to form data
+                              const newParam = {
+                                id: Math.random().toString(36).substring(2, 9),
+                                nodeId: activeNode.data.id,
+                                name: param.name,
+                                type: param.type,
+                                options: param.options,
+                                description: param.description,
+                                paramType: "input",
+                                resultParamValue: "",
+                                value: "",
+                                required: false,
+                                dynamicAdd: false,
+                                addedDynamically: true,
+                              };
+                              // add new param to form data right after the current param
+                              const newFormData = activeNode.data.formData;
+                              newFormData.splice(
+                                newFormData.indexOf(param) + 1,
+                                0,
+                                newParam
+                              );
+                              activeNode.data.formData = newFormData;
+                              // update formik values
+                              formik.setValues(initValues());
+
+                            }}>
+                              <PlusOne />
+                            </IconButton>
+                          )}
+                          {
+                            // if added dynamically, show delete button
+                            param.addedDynamically && (
+                              <IconButton onClick={() => {
+                                // remove param from form data
+                                const newFormData = activeNode.data.formData;
+                                newFormData.splice(newFormData.indexOf(param), 1);
+                                activeNode.data.formData = newFormData;
+                                // update formik values
+                                formik.setValues(initValues());
+                              }}>
+                                <DeleteForeverSharp />
+                              </IconButton>
+                            )
+                          }
+                          <InputLabel sx={{ backgroundColor: "white" }}>
+                            {param.name}
+                          </InputLabel>
+                          <Select
+                            name={param.id}
+                            value={
+                              formik.values[param.id] ? formik.values[param.id] : ""
+                            }
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
+                          >
+                            {param.options.map((option: any) => (
+                              <MenuItem key={option.id} value={option.id}>
+                                {option.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <FormHelperText>
+                            {param.description ? param.description : null}
+                          </FormHelperText>
+                        </FormControl>
+                      );
+                    }
+                    else {
+                      return (
+                        <div key={param.id}>
+                          {param.dynamicAdd && (
+                            <IconButton onClick={() => alert("Dynamic Add")}>
+                              <InfoOutlinedIcon />
+                            </IconButton>
+                          )}
+                          <TextField
+                            multiline={
+                              param.name === "Additional Notes" ? true : false
+                            }
+                            helperText={param.description ? param.description : null}
+                            size="small"
+                            label={param.name}
+                            type={param.type}
+                            value={
+                              formik.values[param.id] ? formik.values[param.id] : ""
+                            }
+                            name={param.id}
+                            onChange={formik.handleChange}
+                            onBlur={formik.handleBlur}
+                            sx={{ mt: 3, width: "26ch" }}
+                            InputLabelProps={{ shrink: true }}
+                          />
+                        </div>
+                      );
+                    }
+                  }
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+
+  }
 
   useEffect(() => {
     if (activeNode && activeNode.data && activeNode.data.formData) {
@@ -82,12 +301,14 @@ export default function Params({ activeNode }: ParamFormProps) {
   return (
     <div>
       <h3>Parameters</h3>
-      <div className='formik-errors' style={{ marginLeft: 20 }}>
-        <ul style={{ background: 'pink', fontSize: 10 }}>
+      <div className="formik-errors" style={{ marginLeft: 20 }}>
+        <ul style={{ background: "pink", fontSize: 10 }}>
           {Object.keys(paramErrors).map((key: any) => {
-            let name = activeNode.data.formData.find((obj: any) => obj.id === key)?.name;
+            let name = activeNode.data.formData.find(
+              (obj: any) => obj.id === key
+            )?.name;
             return (
-              <li key={key} style={{ position: 'relative', left: -25 }}>
+              <li key={key} style={{ position: "relative", left: -25 }}>
                 {name}: {paramErrors[key]}
               </li>
             );
@@ -95,16 +316,87 @@ export default function Params({ activeNode }: ParamFormProps) {
         </ul>
       </div>
       <form onSubmit={formik.handleSubmit}>
-        <div className='input-params' style={{ marginLeft: 20 }}>
+        {
+          // check if there are any param groups and render them
+          activeNode.data.paramGroups &&
+          renderParamGroups(activeNode.data)
+        }
+        <div className="input-params" style={{ marginLeft: 20 }}>
           {activeNode.data.formData.map((param: any) => {
-            if (param.paramType !== 'result') {
-              if (param.type === 'dropdown') {
+            if (param.paramType !== "result" && !param.paramGroupId) {
+              if (param.type === "table") {
                 return (
-                  <FormControl size='small' sx={{ mt: 3, width: '26ch' }} key={param.id}>
-                    <InputLabel sx={{ backgroundColor: 'white' }}>{param.name}</InputLabel>
+                  <div key={param.id}>
+                    <ParamTableOnForm
+                      title={param.name}
+                      columns={param.tableData.columns}
+                      rows={param.tableData.rows}
+                    />
+                  </div>
+                );
+              }
+              if (param.type === "dropdown") {
+                return (
+                  <FormControl
+                    size="small"
+                    sx={{ mt: 3, width: "26ch" }}
+                    key={param.id}
+                  >
+                    {param.dynamicAdd && (
+                      <IconButton onClick={() => {
+                        // add param to form data
+                        const newParam = {
+                          id: Math.random().toString(36).substring(2, 9),
+                          nodeId: activeNode.data.id,
+                          name: param.name,
+                          type: param.type,
+                          options: param.options,
+                          description: param.description,
+                          paramType: "input",
+                          resultParamValue: "",
+                          value: "",
+                          required: false,
+                          dynamicAdd: false,
+                          addedDynamically: true,
+                        };
+                        // add new param to form data right after the current param
+                        const newFormData = activeNode.data.formData;
+                        newFormData.splice(
+                          newFormData.indexOf(param) + 1,
+                          0,
+                          newParam
+                        );
+                        activeNode.data.formData = newFormData;
+                        // update formik values
+                        formik.setValues(initValues());
+
+                      }}>
+                        <PlusOne />
+                      </IconButton>
+                    )}
+                    {
+                        // if added dynamically, show delete button
+                        param.addedDynamically && (
+                            <IconButton onClick={() => {
+                                // remove param from form data
+                                const newFormData = activeNode.data.formData;
+                                newFormData.splice(newFormData.indexOf(param), 1);
+                                activeNode.data.formData = newFormData;
+                                // update formik values
+                                formik.setValues(initValues());
+                            }}>
+                                <DeleteForeverSharp />
+                            </IconButton>
+                        )
+                    }
+                    <InputLabel sx={{ backgroundColor: "white" }}>
+                      {param.name}
+                    </InputLabel>
                     <Select
                       name={param.id}
-                      value={formik.values[param.id] ?? ''}
+                      value={
+                        formik.values[param.id] ? formik.values[param.id] : ""
+                      }
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                     >
@@ -114,25 +406,37 @@ export default function Params({ activeNode }: ParamFormProps) {
                         </MenuItem>
                       ))}
                     </Select>
-                    <FormHelperText>{param.description ? param.description : null}</FormHelperText>
+                    <FormHelperText>
+                      {param.description ? param.description : null}
+                    </FormHelperText>
                   </FormControl>
                 );
               } else {
                 return (
-                  <TextField
-                    multiline={param.name === 'Additional Notes' ? true : false}
-                    helperText={param.description ? param.description : null}
-                    size='small'
-                    key={param.id}
-                    label={param.name}
-                    type={param.type}
-                    value={formik.values[param.id] ?? ''}
-                    name={param.id}
-                    onChange={formik.handleChange}
-                    onBlur={formik.handleBlur}
-                    sx={{ mt: 3, width: '26ch' }}
-                    InputLabelProps={{ shrink: true }}
-                  />
+                  <div key={param.id}>
+                    {param.dynamicAdd && (
+                      <IconButton onClick={() => alert("Dynamic Add")}>
+                        <InfoOutlinedIcon />
+                      </IconButton>
+                    )}
+                    <TextField
+                      multiline={
+                        param.name === "Additional Notes" ? true : false
+                      }
+                      helperText={param.description ? param.description : null}
+                      size="small"
+                      label={param.name}
+                      type={param.type}
+                      value={
+                        formik.values[param.id] ? formik.values[param.id] : ""
+                      }
+                      name={param.id}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
+                      sx={{ mt: 3, width: "26ch" }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </div>
                 );
               }
             } else {
@@ -140,44 +444,56 @@ export default function Params({ activeNode }: ParamFormProps) {
             }
           })}
         </div>
-        <div className='result-parms' style={{ marginLeft: 20 }}>
-          {activeNode.data.formData.find((obj: any) => obj.paramType === 'result') && (
-            <div>
-              Result Parameters
-              <IconButton
-                onClick={() => {
-                  alert(
-                    'Result parameters are results of experiments that were previously run in the workflow. By default we will use their outputs, if you would like to specify a different input, you can deselect and enter what we should use.'
-                  );
-                }}
-              >
-                <InfoOutlinedIcon />
-              </IconButton>
-            </div>
-          )}
+        <div className="result-parms" style={{ marginLeft: 20 }}>
+          {
+            // check if there are any result params and display info if there are
+            activeNode.data.formData.find(
+              (obj: any) => obj.paramType === "result"
+            ) && (
+              <div>
+                Result Parameters
+                <IconButton
+                  onClick={() => {
+                    alert(
+                      "Result parameteres are results of experiments that were previously run in the workflow. By default we will use their outputs, if you would like to specify a different input, you can deselect and enter what we should use."
+                    );
+                  }}
+                >
+                  <InfoOutlinedIcon />
+                </IconButton>
+              </div>
+            )
+          }
           {activeNode.data.formData.map((param: any) => {
-            if (param.paramType === 'result') {
+            if (param.paramType === "result") {
               return (
                 <div key={param.id}>
                   <label>{param.name}</label>
                   <input
-                    type='checkbox'
+                    type="checkbox"
                     checked={formik.values[param.id]}
                     onChange={formik.handleChange}
                     name={param.id}
                   />
-                  {!formik.values[param.id] && (
-                    <div>
-                      <label>Result Alternative</label>
-                      <input
-                        type={param.type}
-                        value={formik.values[`resultParamValue${param.id}`] ? formik.values[`resultParamValue${param.id}`] : ''}
-                        name={`resultParamValue${param.id}`}
-                        onChange={formik.handleChange}
-                        onBlur={formik.handleBlur}
-                      />
-                    </div>
-                  )}
+                  {
+                    // add input if not checked
+                    !formik.values[param.id] && (
+                      <div>
+                        <label>Result Alternative</label>
+                        <input
+                          type={param.type}
+                          value={
+                            formik.values[`resultParamValue${param.id}`]
+                              ? formik.values[`resultParamValue${param.id}`]
+                              : null
+                          }
+                          name={`resultParamValue${param.id}`}
+                          onChange={formik.handleChange}
+                          onBlur={formik.handleBlur}
+                        />
+                      </div>
+                    )
+                  }
                 </div>
               );
             } else {
@@ -187,14 +503,14 @@ export default function Params({ activeNode }: ParamFormProps) {
         </div>
         {/* Now a dedicated field in each service (should always accompany other params) */}
         {/* <div className="add-instructs" style={{marginLeft: 20, marginBottom: 10}}>
-            <TextField multiline sx={{ mt: 3, width: '26ch' }} label="Additional Instructions" rows={3}
-            value={formik.values[`addinst${activeNode?.data.id}`] 
-                 ? formik.values[`addinst${activeNode?.data.id}`] 
-                 : ""} 
-            name     = {`addinst${activeNode?.data.id}`}
-            onChange = {formik.handleChange}
-            onBlur   = {formik.handleBlur} />
-        </div> */}
+                    <TextField multiline sx={{ mt: 3, width: '26ch' }} label="Additional Instructions" rows={3}
+                    value={formik.values[`addinst${activeNode?.data.id}`] 
+                         ? formik.values[`addinst${activeNode?.data.id}`] 
+                         : ""} 
+                    name     = {`addinst${activeNode?.data.id}`}
+                    onChange = {formik.handleChange}
+                    onBlur   = {formik.handleBlur} />
+                </div> */}
       </form>
     </div>
   );

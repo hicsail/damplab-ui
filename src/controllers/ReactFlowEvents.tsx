@@ -20,6 +20,10 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string): Nod
             resultParamValue: "",
             value           : null,
             required        : parameter.required,
+            dynamicAdd : parameter.dynamicAdd ? parameter.dynamicAdd : null,
+            tableData : parameter.tableData ? parameter.tableData : null,
+            paramGroups: parameter.paramGroups ? parameter.paramGroups : null,
+            paramGroupId: parameter.paramGroupId ? parameter.paramGroupId : null,
         });
     }
 

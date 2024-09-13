@@ -67,7 +67,6 @@ export default function MainFlow( client: any /*data: any*/) {
 
         let type = event.dataTransfer.getData('application/reactflow');
             type = JSON.parse(type);
-        console.log(type)
         
         const serviceId = type.id
         const name      = type.name;
@@ -87,7 +86,7 @@ export default function MainFlow( client: any /*data: any*/) {
 
         const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
         const data: NodeData = { id: nodeId, label: name, description: type.description, allowedConnections: type.allowedConnections, 
-            icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId };
+            icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId, paramGroups: type.paramGroups };
         const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
         setNodes((nds: any) => nds.concat(newNode));
@@ -168,7 +167,7 @@ export default function MainFlow( client: any /*data: any*/) {
 
                         </ReactFlow>
 
-                        <div style={{ minWidth: '10%', width: 550, borderLeft: 'solid 1px' }}>
+                        <div style={{ minWidth: '10%', width: 850, borderLeft: 'solid 1px' }}>
                             <RightSidebar />
                         </div>
                         
