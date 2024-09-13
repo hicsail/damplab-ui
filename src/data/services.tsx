@@ -302,7 +302,7 @@ export let services: Service[] = [
       {
         id: "sample-length",
         name: "Sample Length",
-        description: "Numbers and base pairs 50bp - 10000bp",
+        description: "number of base pairs 50bp-10000bp",
         type: "number",
         paramType: "input",
         required: true,
@@ -340,15 +340,15 @@ export let services: Service[] = [
       {
         id: "sample-dye",
         name: "Sample Dye",
-        defaultValue: "NEB Gel Loading Dye, Purple (6X)",
         type: "string", // dropdown
         paramType: "input",
         required: false,
+        defaultValue: "SYBR Safe",
       },
       {
         id: "voltage",
         name: "Voltage",
-        description: "Numbers and volts 50 - 200",
+        description: "volts 50-200",
         type: "number",
         paramType: "input",
         required: false,
@@ -948,6 +948,14 @@ export let services: Service[] = [
         description: "in uL",
       },
       {
+        id: "final-concentration-value",
+        name: "Final Concentration Value",
+        type: "number",
+        paramType: "input",
+        required: true,
+        description: "in uL"
+      },
+      {
         id: "final-concentration",
         name: "Final Concentration",
         type: "dropdown",
@@ -1440,7 +1448,32 @@ export let services: Service[] = [
         id: "antibiotic",
         name: "Antibiotic",
         type: "dropdown",
-        // molly to send over email
+        options: [
+          {
+            id: "carbenicillin",
+            name: "Carbenicillin",
+          },
+          {
+            id: "kanamycin",
+            name: "Kanamycin",
+          },
+          {
+            id: "spectinomycin",
+            name: "Spectinomycin",
+          },
+          {
+            id: "gentamicin",
+            name: "Gentamicin",
+          },
+          {
+            id: "streptomycin",
+            name: "Streptomycin",
+          },
+          {
+            id: "erythromycin",
+            name: "Erythromycin",
+          },
+        ],
         paramType: "input",
         required: true,
         description: "anti biotic for agar plate",

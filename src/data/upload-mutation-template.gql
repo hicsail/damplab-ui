@@ -8,12 +8,20 @@ mutation {
         description: ""
         parameters: [
           {
-            id: "final-concentration"
-            name: "Final Concentration"
+            id: "final-concentration-unit"
+            name: "Final Concentration Unit"
             type: "dropdown"
             options: [{ id: "ng-ul", name: "ng/ul" }, { id: "nM", name: "nM" }]
             paramType: "input"
             required: true
+          }
+          {
+            id: "final-concentration-value"
+            name: "Final Concentration Value"
+            type: "number"
+            paramType: "input"
+            required: true
+            description: "in uL"
           }
           {
             id: "final-volume"
@@ -446,7 +454,7 @@ mutation {
             type: "number"
             paramType: "input"
             required: true
-            description: "30-50"
+            description: "30-50uL"
           }
           {
             id: "e-buffer"
@@ -901,12 +909,12 @@ mutation {
         description: ""
         parameters: [
           {
-            id: "e-volume"
-            name: "elution volume"
+            id: "elution-volume"
+            name: "Elution Volume"
             type: "number"
             paramType: "input"
             required: true
-            description: "30-50"
+            description: "30-50uL"
           }
         ]
         allowedConnections: []
@@ -1207,13 +1215,13 @@ mutation {
           {
             id: "recovery-media"
             name: "Recovery Media"
-            type: "string"
+            type: "dropdown"
             paramType: "input"
             required: true
             description: "select from dropdown, default is SOC"
             options: [
               { id: "SOC", name: "SOC" }
-              { id: "LBE", name: "LBE" }
+              { id: "LB", name: "LB" }
               { id: "TB", name: "TB" }
             ]
             defaultValue: "SOC"
@@ -1238,7 +1246,14 @@ mutation {
             id: "antibiotic"
             name: "Antibiotic"
             type: "dropdown"
-            options: [{ id: "test", name: "Test" }]
+            options: [
+              { id: "carbenicillin", name: "Carbenicillin" }
+              { id: "kanamycin", name: "Kanamycin" }
+              { id: "spectinomycin", name: "Spectinomycin" }
+              { id: "gentamicin", name: "Gentamicin" }
+              { id: "streptomycin", name: "Streptomycin" }
+              { id: "erythromycin", name: "Erythromycin" }
+            ]
             paramType: "input"
             required: true
             description: "anti biotic for agar plate"
