@@ -43,9 +43,10 @@ function RunAclidBiosecurity({ onClose, open }: RunAclidBiosecurityProps) {
 
   const fetchSequences = async () => {
     const responseSequences = await getAllSequences();
-    if (responseSequences) {
+    if (responseSequences && Array.isArray(responseSequences)) {
       setAllSequences(responseSequences);
     }
+    console.log('all sequences: ', responseSequences);
   }
 
   const handleSequenceSelection = (sequenceId: string) => {
@@ -62,7 +63,7 @@ function RunAclidBiosecurity({ onClose, open }: RunAclidBiosecurityProps) {
     const name = selectedSequence?.name || "";
     const sequence = selectedSequence?.seq || "";
     const sequences = { 'name': name, 'sequence': sequence };
-    const result = await screenSequence(submissionName, sequences);
+    const result = await screenSequence(submissionName, [sequences]);
     // TODO: eventully this will be an error thrown instead
     if (result && result['code'] && result['code'] === 'NO_NDA') {
       setErrorMessage("An approved NDA with Aclid is needed to screen your sequences. Head to Linked Accounts and upload an NDA. Once it's approved, you'll be able to screen sequences.");

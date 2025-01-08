@@ -27,18 +27,18 @@ export default function MPILoginForm({isLoggedIn, setIsLoggedIn}: MPILoginFormPr
   }, []);
 
   const handleLogin = () => {
-    window.location.href = `https://mpi-demo.us.auth0.com/authorize?response_type=code&scope=offline_access&client_id=vnsyrWi9gf4oA79jKyN9AlafxgVh09Y3&redirect_uri=http://127.0.0.1:5100/mpi/auth0_redirect&audience=https://mpi-demo.com`
+    window.location.href = `https://${process.env.REACT_APP_AUTH0_DOMAIN}/authorize?response_type=code&scope=offline_access&client_id=${process.env.REACT_APP_AUTH0_CLIENT_ID}&redirect_uri=${process.env.REACT_APP_REDIRECT_URI}/mpi/auth0_redirect&audience=${process.env.REACT_APP_AUTH0_AUDIENCE}`
   };
 
   const handleLogout = () => {  // TODO: Answering 'No' on confirmation page does not work?
-    window.location.href = `https://mpi-demo.us.auth0.com/oidc/logout?post_logout_redirect_uri=http://127.0.0.1:5100/mpi/auth0_logout&client_id=vnsyrWi9gf4oA79jKyN9AlafxgVh09Y3`
+    window.location.href = `https://${process.env.REACT_APP_AUTH0_DOMAIN}/oidc/logout?post_logout_redirect_uri=${process.env.REACT_APP_REDIRECT_URI}/mpi/auth0_logout&client_id=${process.env.REACT_APP_AUTH0_CLIENT_ID}`
   };
 
   if (isLoggedIn === null) {
     return <p>Loading...</p>;
   }
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', height: '50px'}}>
+    <Box sx={{ display: 'flex', justifyContent: 'center', height: '32px'}}>
       {isLoggedIn ? (
         <Button onClick={handleLogout} variant='contained' color='inherit'>MPI Logout</Button>
       ) : (

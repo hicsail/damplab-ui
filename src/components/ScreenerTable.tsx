@@ -30,7 +30,11 @@ const applyPagination = (
   page: number,
   limit: number
 ): AclidScreen[] => {
-  return screenings.slice(page * limit, page * limit + limit);
+  if (screenings) {
+    return screenings.slice(page * limit, page * limit + limit);
+  } else {
+    return [];
+  }
 };
 
 const getStatusLabel = (status: keyof typeof map): JSX.Element => {
@@ -225,7 +229,7 @@ const ScreenerTable: FC<ScreenerTableProps> = ({ screenings }) => {
       <Box p={2}>
         <TablePagination
           component="div"
-          count={screenings.length}
+          count={screenings?.length || 0}
           onPageChange={handlePageChange}
           onRowsPerPageChange={handleLimitChange}
           page={page}
