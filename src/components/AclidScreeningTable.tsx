@@ -18,7 +18,7 @@ import {
 
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { AclidScreen } from '../mpi/models/aclid';
-import AclidBiosecurityDetails from '../components/AclidBiosecurityDetails';
+import AclidBiosecurityDetails from './AclidBiosecurityDetails';
 
 interface ScreenerTableProps {
   className?: string;
