@@ -1,247 +1,205 @@
-import { FC, ChangeEvent, useState } from 'react';
 import {
-  Tooltip,
-  Divider,
-  Box,
   Card,
-  IconButton,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TablePagination,
   TableRow,
-  TableContainer,
+  Paper,
   Typography,
-  useTheme,
+  Button,
+  Modal,
+  Box,
+  Stack
 } from '@mui/material';
-
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import { AclidScreen } from '../mpi/models/aclid';
-import AclidBiosecurityDetails from './AclidBiosecurityDetails';
-
-// TODO: Copied from Aclid; reimplement for SecureDNA
+import { useEffect, useState, ChangeEvent } from 'react';
+import SeqViz from 'seqviz';
+import { updateSecureDNAScreening } from '../mpi/SecureDNAQueries';
+import { Genome } from '../mpi/models/genome';
 
 interface ScreenerTableProps {
   className?: string;
-  screenings: AclidScreen[];
+  genomes: Genome[];
 }
 
 const applyPagination = (
-  screenings: AclidScreen[],
-  page: number,
-  limit: number
-): AclidScreen[] => {
-  if (screenings) {
-    return screenings.slice(page * limit, page * limit + limit);
-  } else {
-    return [];
-  }
+    genomes: Genome[],
+    page: number,
+    limit: number
+  ): Genome[] => {
+    if (genomes) {
+      return genomes.slice(page * limit, page * limit + limit);
+    } else {
+      return [];
+    }
 };
 
-const getStatusLabel = (status: keyof typeof map): JSX.Element => {
-  const map = {
-    controlled: {
-      text: 'Controlled',
-      color: 'error'
-    },
-    'not_controlled': {
-      text: 'Not controlled',
-      color: 'success'
-    },
-    'needs_investigation': {
-      text: 'Needs investigation',
-      color: 'warning'
-    },
-  };
-
-  if (!status) {
-    return <></>;
-  }
-
-  if (map[status]) {
-    const { text, color } = map[status];
-    return <span color={color}>{text}</span>;
-  } else {
-    return <span color='success'>{status}</span>;
-  }
-
-};
-
-const convertUnderscoreToSpace = (str: string): string => {
-  return str.split('_').join(' ');
-}
-
-const ScreenerTable: FC<ScreenerTableProps> = ({ screenings }) => {
-  const theme = useTheme();
-
+function SecureDnaTable({ genomes }: ScreenerTableProps) {
+  const [genomeModal, setGenomeModal] = useState<Genome | null>(null);
   const [page, setPage] = useState<number>(0);
   const [limit, setLimit] = useState<number>(5);
-  const [open, setOpen] = useState(false);
-  const [viewingScreening, setViewingScreening] = useState<AclidScreen | null>(null);
 
-  const handleClickOpen = (screening: AclidScreen) => {
-    setViewingScreening(screening);
-    setOpen(true);
+  const getFormattedDate = (dateString: string) => {
+      const date = new Date(dateString);
+      const month = date.getUTCMonth() + 1;
+      const day = date.getUTCDate();
+      const year = date.getUTCFullYear();
+      return `${month}/${day}/${year}`;
   };
 
-  const handleClose = () => {
-    setOpen(false);
+  const getAdminStatusColor = (status: string) => {
+      switch (status) {
+          case 'approved':
+              return 'green';
+          case 'rejected':
+              return 'red';
+          case 'falsePositive':
+              return 'orange';
+      }
   };
-
 
   const handlePageChange = (event: any, newPage: number): void => {
-    setPage(newPage);
+      setPage(newPage);
   };
 
   const handleLimitChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    setLimit(parseInt(event.target.value));
+      setLimit(parseInt(event.target.value));
   };
 
-  const paginatedScreenings = applyPagination(
-    screenings,
-    page,
-    limit
-  );
+  const style = {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      width: '50%',
+      bgcolor: 'background.paper',
+      border: '0.5px solid #000',
+      boxShadow: 24,
+      p: 5,
+      overflowY: 'scroll'
+  };
+
+  const renderTable = (genomeData: Genome[]) => {
+      return genomeData.map((genome: any, index: any) => (
+          <TableRow key={index}>
+              <TableCell>{getFormattedDate(genome.timestamp)}</TableCell>
+              <TableCell>{genome.id}</TableCell>
+              <TableCell>{genome.user.email}</TableCell>
+              <TableCell>
+                  <Typography sx={{ color: genome?.sequence?.biosecurity.status === "denied" ? "red" : "green" }}>
+                      {genome?.sequence?.biosecurity.status}
+                  </Typography>
+              </TableCell>
+              <TableCell>
+                  <Typography sx={{ color: getAdminStatusColor(genome.adminStatus) }}>
+                      {genome.adminStatus !== 'falsePositive' ? genome.adminStatus : 'false positive'}
+                  </Typography>
+              </TableCell>
+              <TableCell>
+                  <Button onClick={() => setGenomeModal(genome)}>View</Button>
+              </TableCell>
+          </TableRow>
+      ));
+  };
+
+  const paginatedGenomes = applyPagination(genomes, page, limit);
+
+  const getAnnotations = () => {
+      const annotations = genomeModal?.sequence?.biosecurity?.biosecurityCheck?.map((check) => {
+          return check.hit_regions.map((region, idx) => ({
+              start: region.start_index,
+              end: region.end_index,
+              id: `${check.organism.name}-hit-region-${idx + 1}`,
+              color: 'red',
+              name: check.organism.name
+          }));
+      });
+      return annotations?.flat();
+  };
+
+  const updateGenomeAdmin = async (status: string) => {
+      const response = await updateSecureDNAScreening(genomeModal?.id, status);
+      if (response) {
+          setGenomeModal(null);
+      }
+  };
 
   return (
-    <Card>
-      <Divider />
-      <TableContainer>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Overall regulatory status</TableCell>
-              <TableCell>US CCL Export control</TableCell>
-              <TableCell>EU Dual Use export control</TableCell>
-              <TableCell>US Screening framework</TableCell>
-              <TableCell>Details</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedScreenings.map((screening) => {
-              return (
-                <TableRow
-                  hover
-                  key={screening.id}
-                >
-                  <TableCell>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      color="text.primary"
-                      sx={{ maxWidth: 150, textOverflow: "ellipsis" }}
-                      gutterBottom
-                      noWrap
-                    >
-                      {screening.name}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      color="text.primary"
-                      sx={{ textTransform: 'capitalize' }}
-                      gutterBottom
-                      noWrap
-                    >
-                      {screening.status}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      color="text.primary"
-                      gutterBottom
-                      noWrap
-                    >
-                      {getStatusLabel(screening.regulatory_status as "controlled" | "not_controlled" | "needs_investigation")}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      color="text.primary"
-                      sx={{ textTransform: 'capitalize' }}
-                      gutterBottom
-                      noWrap
-                    >
-                      {screening.findings.us_ccl_export_control ?
-                        `${convertUnderscoreToSpace(screening.findings.us_ccl_export_control.regulatory_status)} - ${convertUnderscoreToSpace(screening.findings.us_ccl_export_control.reason_code)}`
-                        : screening.status === "succeeded" ? "Not controlled" : ""
-                      }
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      color="text.primary"
-                      sx={{ textTransform: 'capitalize' }}
-                      gutterBottom
-                      noWrap
-                    >
-                      {screening.findings.eu_dual_use_export_control ?
-                        `${convertUnderscoreToSpace(screening.findings.eu_dual_use_export_control.regulatory_status)} - ${convertUnderscoreToSpace(screening.findings.eu_dual_use_export_control.reason_code)}`
-                        : screening.status === "succeeded" ? "Not controlled" : ""
-                      }
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography
-                      variant="body1"
-                      fontWeight="bold"
-                      color="text.primary"
-                      sx={{ textTransform: 'capitalize' }}
-                      gutterBottom
-                      noWrap
-                    >
-                      {screening.findings.us_screening_framework ?
-                        `${convertUnderscoreToSpace(screening.findings.us_screening_framework.regulatory_status)} - ${convertUnderscoreToSpace(screening.findings.us_screening_framework.reason_code)}`
-                        : screening.status === "succeeded" ? "Not controlled" : ""
-                      }
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Tooltip title="View details" arrow>
-                      <IconButton
-                        sx={{
-                          '&:hover': { background: theme.palette.secondary.light },
-                          color: theme.palette.secondary.main
-                        }}
-                        color="inherit"
-                        size="small"
-                        onClick={() => handleClickOpen(screening)}
-                      >
-                        <VisibilityIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      <Box p={2}>
-        <TablePagination
-          component="div"
-          count={screenings?.length || 0}
-          onPageChange={handlePageChange}
-          onRowsPerPageChange={handleLimitChange}
-          page={page}
-          rowsPerPage={limit}
-          rowsPerPageOptions={[5, 10, 25, 30]}
-        />
-      </Box>
-      {open && <AclidBiosecurityDetails onClose={handleClose} open={open} screening={viewingScreening} />}
-    </Card>
-  );
-};
+      <>
+          {genomeModal &&
+              <Modal
+                  open={genomeModal !== null}
+                  onClose={() => setGenomeModal(null)}
+              >
+                  <Box sx={style}>
+                      <Stack direction="column" spacing={2}>
+                          <Typography variant="h6" component="h2">
+                              User email: {genomeModal.user.email}
+                          </Typography>
+                          <Typography variant="body1">
+                              Sequence name: {genomeModal.sequence.name}
+                          </Typography>
+                          <Typography variant="body1">
+                              Sequence type: {genomeModal.sequence.type}
+                          </Typography>
+                          <Typography variant="body1">
+                              Sequence biosecurity status: {genomeModal?.sequence.biosecurity?.status}
+                          </Typography>
+                          {genomeModal?.sequence?.biosecurity?.status === 'denied' &&
+                              <>
+                                  <Typography variant="body1">
+                                      Organisms Detected: {genomeModal?.sequence?.biosecurity?.biosecurityCheck?.map((check) => check.organism.name).join(", ")}
+                                  </Typography>
+                                  <Typography variant="body1">
+                                      Hit Regions:
+                                  </Typography>
+                                  <SeqViz seq={genomeModal.sequence.seq} viewer="linear" style={{ height: '200px' }} annotations={getAnnotations()} />
+                              </>
+                          }
+                          <Stack direction="row" spacing={2}>
+                              <Button variant="contained" sx={{ width: '200px', backgroundColor: 'green' }} onClick={() => updateGenomeAdmin('approved')}>Approve Sequence</Button>
+                              <Button variant="contained" sx={{ width: '200px', backgroundColor: 'red' }} onClick={() => updateGenomeAdmin('rejected')}>Reject Sequence</Button>
+                              <Button variant="contained" sx={{ width: '200px', backgroundColor: 'orange' }} onClick={() => updateGenomeAdmin('falsePositive')}>Flag as False Positive</Button>
+                          </Stack>
+                      </Stack>
+                  </Box>
+              </Modal>
+          }
 
-export default ScreenerTable;
+          <TableContainer sx={{ maxWidth: '90%', textAlign: 'left' }} component={Paper}>
+              <Table sx={{ minWidth: 650 }} aria-label="simple table">
+                  <TableHead>
+                      <TableRow>
+                          <TableCell>Date</TableCell>
+                          <TableCell>ID</TableCell>
+                          <TableCell>User Email</TableCell>
+                          <TableCell>Status</TableCell>
+                          <TableCell>Admin Status</TableCell>
+                          <TableCell>Details</TableCell>
+                      </TableRow>
+                  </TableHead>
+                  <TableBody>
+                      {renderTable(paginatedGenomes)}
+                  </TableBody>
+              </Table>
+          </TableContainer>
+          <Card sx={{ maxWidth: '90%' }}>
+            <Box p={2}>
+                <TablePagination
+                    component="div"
+                    count={genomes?.length || 0}
+                    onPageChange={handlePageChange}
+                    onRowsPerPageChange={handleLimitChange}
+                    page={page}
+                    rowsPerPage={limit}
+                    rowsPerPageOptions={[5, 10, 25, 30]}
+                />
+            </Box>
+          </Card>
+      </>
+  );
+}
+
+export default SecureDnaTable;

@@ -1,71 +1,63 @@
-export const screenSequence = async (submissionName: string, sequences: any) => {
+// TODO: add types
+export const screenSequence = async (ids: string[]) => {
     try {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/aclid/run-screening`, {
-            method: "POST",
-            headers: {
-                'Content-type': 'application/json',
-            },
-            body: JSON.stringify({
-                submissionName: submissionName,
-                sequences: sequences
-            }),
-        });
-        const data = await response.json();
-        if (response.ok) {
-            return data;
-        } else {
-            const message = await data["message"];
-            console.log(message);
-        }
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/securedna/run-screening`, {
+        method: "PATCH",
+        headers: {
+          "Content-type": "application/json; charset=UTF-8",
+        },
+        body: JSON.stringify({ ids: ids }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        return data;
+      } else {
+        const message = await data["message"];
+        console.log(message);
+      }
     } catch (e) {
-        console.log(e);
+      console.log(e);
     }
-};
+  };
   
-export const getSecureDNAScreenings = async () => {
-    //TODO: Copied from Aclid; implement for SecureDNA
+  export const getSecureDNAScreenings = async () => {
     try {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/aclid/screens`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to get Aclid data');
-        }
-        
-        const data = await response.json();
-        console.log('aclid data: ', data);
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/securedna/screens`, {
+        method: "GET",
+        headers: {
+          "Content-type": "application/json; charset=UTF-8",
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
         return data;
-
-    } catch (err) {
-        console.error(err);
-        return undefined;
+      } else {
+        const message = await data["message"];
+        console.log(message);
+      }
+    } catch (e) {
+      console.log(e);
     }
-};
-
-export const getAclidScreeningDetails = async (id: string) => {
+  };
+  
+  export const updateSecureDNAScreening = async (id: string | undefined, status: string) => {
     try {
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/aclid/screen`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({id: id}),
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to get Aclid data');
-        }
-        
-        const data = await response.json();
-        console.log('aclid data: ', data);
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/securedna/screen`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id: id, adminStatus: status }),
+      });
+      const data = await response.json();
+      if (response.ok) {
         return data;
-
-    } catch (err) {
-        console.error(err);
-        return undefined;
+      } else {
+        const message = await data["message"];
+        console.log(message);
+      }
+    } catch (e) {
+      console.log(e);
     }
-};
+  };
+  

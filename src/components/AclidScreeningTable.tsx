@@ -70,7 +70,7 @@ const convertUnderscoreToSpace = (str: string): string => {
   return str.split('_').join(' ');
 }
 
-const ScreenerTable: FC<ScreenerTableProps> = ({ screenings }) => {
+const AclidTable: FC<ScreenerTableProps> = ({ screenings }) => {
   const theme = useTheme();
 
   const [page, setPage] = useState<number>(0);
@@ -242,4 +242,4 @@ const ScreenerTable: FC<ScreenerTableProps> = ({ screenings }) => {
   );
 };
 
-export default ScreenerTable;
+export default AclidTable;

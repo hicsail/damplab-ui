@@ -1,10 +1,9 @@
 import { Box, Button, FormControl, InputLabel, MenuItem, Modal, Select, Stack, TextField, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 // import { LoadingButton } from '@mui/lab';
-import { screenSequence } from '../mpi/AclidQueries';
+import { screenSequence } from '../mpi/SecureDNAQueries';
 import { Sequence } from '../mpi/models/sequence';
 import { getAllSequences } from '../mpi/SequencesQueries';
-import ErrorModal from '../components/ErrorModal';
 
 const style = {
   position: 'absolute',
@@ -21,26 +20,21 @@ const style = {
 
 // TODO: Copied from Aclid; reimplement for SecureDNA
 
-interface RunAclidBiosecurityProps {
+interface RunSecureDNABiosecurityProps {
   open: boolean
   onClose: () => void
 }
 
-function RunAclidBiosecurity({ onClose, open }: RunAclidBiosecurityProps) {
-  const [submissionName, setSubmissionName] = useState("");
+function RunSecureDNABiosecurity({ onClose, open }: RunSecureDNABiosecurityProps) {
   const [allSequences, setAllSequences] = useState<Sequence[]>([]);
   const [selectedSequence, setSelectedSequence] = useState<Sequence | undefined>();
-  const [loading, setLoading] = useState(false);
   const [alreadyRun, setAlreadyRun] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [openErrorModal, setOpenErrorModal] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     fetchSequences()
-    setSubmissionName("");
     setSelectedSequence(undefined);
     setAlreadyRun(false);
-    setOpenErrorModal(false);
   }, [open]);
 
   const fetchSequences = async () => {
@@ -61,22 +55,10 @@ function RunAclidBiosecurity({ onClose, open }: RunAclidBiosecurityProps) {
   };
 
   const runBiosecurityCheck = async () => {
-    setLoading(true);
-    const name = selectedSequence?.name || "";
-    const sequence = selectedSequence?.seq || "";
-    const sequences = { 'name': name, 'sequence': sequence };
-    const result = await screenSequence(submissionName, [sequences]);
-    // TODO: eventully this will be an error thrown instead
-    if (result && result['code'] && result['code'] === 'NO_NDA') {
-      setErrorMessage("An approved NDA with Aclid is needed to screen your sequences. Head to Linked Accounts and upload an NDA. Once it's approved, you'll be able to screen sequences.");
-      setOpenErrorModal(true);
-    } else if (result && result['code'] && result['code'] === 'NO_KEY') {
-      setErrorMessage("A key with Aclid is needed to screen your sequences. Head to My Resources and enter your key for the Aclid resource.");
-      setOpenErrorModal(true);
-    } else {
-      setAlreadyRun(true);
-    }
-    setLoading(false);
+    const id = selectedSequence?.id || "";
+    const result = await screenSequence([id]);
+    setMessage(result['message']);
+    setAlreadyRun(true);
   }
 
 
@@ -88,21 +70,12 @@ function RunAclidBiosecurity({ onClose, open }: RunAclidBiosecurityProps) {
       <Box sx={style}>
         <Stack spacing={2} direction="column" alignItems="center" sx={{ height: "100%" }}>
           <Typography variant="h4" >
-            Run Aclid's biosecurity check
+            Run SecureDNA's screening
           </Typography>
           <Typography variant="body1" sx={{ pb: 2 }}>
-            Powered by Aclid, the biosecurity check evaluates the safety of a sequence by looking
+            Powered by SecureDNA, the biosecurity check evaluates the safety of a sequence by looking
             for known pathogenic sequences and toxins. Sequences must each be at least 50 base pairs in length.
           </Typography>
-          <FormControl size="small" sx={{ width: '100%' }}>
-            <TextField
-              label="Screening name"
-              variant="outlined"
-              size="small"
-              value={submissionName}
-              onChange={(e) => setSubmissionName(e.target.value)}
-            />
-          </FormControl>
           <FormControl size="small" sx={{ width: '100%' }}>
             <InputLabel id="sequence-label">Select sequence</InputLabel>
             <Select
@@ -117,7 +90,7 @@ function RunAclidBiosecurity({ onClose, open }: RunAclidBiosecurityProps) {
             </Select>
           </FormControl>
           {!alreadyRun &&
-            <Button variant="contained" onClick={() => runBiosecurityCheck()} disabled={!setSubmissionName || !selectedSequence}>
+            <Button variant="contained" onClick={() => runBiosecurityCheck()} disabled={!selectedSequence}>
               Run
             </Button>
           }
@@ -127,9 +100,8 @@ function RunAclidBiosecurity({ onClose, open }: RunAclidBiosecurityProps) {
             </Typography>
           }
         </Stack>
-        {openErrorModal && <ErrorModal open={openErrorModal} onClose={() => setOpenErrorModal(false)} message={errorMessage} />}
       </Box>
     </Modal>
   );
 }
-export default RunAclidBiosecurity;
+export default RunSecureDNABiosecurity;

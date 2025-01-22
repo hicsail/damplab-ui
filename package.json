@@ -31,6 +31,7 @@
     "react-scripts": "5.0.1",
     "reactflow": "^11.0.0",
     "seqparse": "^0.2.1",
+    "seqviz": "^3.10.9",
     "uuidv4": "^6.2.13",
     "web-vitals": "^2.1.4"
   },

@@ -1,55 +1,53 @@
 import { useEffect, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
-import { Grid, Container } from '@mui/material';
+import { Grid } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 // import LoadingButton from '@mui/lab/LoadingButton/LoadingButton';
 import AddIcon from '@mui/icons-material/Add';
 
 import { AclidScreen } from '../mpi/models/aclid';
 import { getAclidScreenings } from '../mpi/AclidQueries';
-import { SecureDNAScreen } from '../mpi/models/securedna';
-import { getSecureDNAScreenings } from '../mpi/SecureDNAQueries';
+// import { SecureDNAScreen } from '../mpi/models/sequence';
+// import { getSecureDNAScreenings } from '../mpi/SecureDNAQueries';
 
 import MPILoginForm from '../components/MPILoginForm';
 import SecureDNAScreeningTable from '../components/SecureDNAScreeningTable';
 import RunSecureDNABiosecurity from '../components/RunSecureDNABiosecurity';
 import AclidScreeningTable from '../components/AclidScreeningTable';
 import RunAclidBiosecurity from '../components/RunAclidBiosecurity';
+import { getSecureDNAScreenings } from '../mpi/SecureDNAQueries';
 
 
-function AclidScreenings() {
+function Screener() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
 
-  const [aclidScreenings, setAclidScreenings] = useState<AclidScreen[]>([]);
-  const [aclidLoading, setAclidLoading] = useState(false);
-  const [openNewAclidSreening, setOpenNewAclidScreening] = useState(false);
-
-  const [secureDNAScreenings, setSecureDNAScreenings] = useState<SecureDNAScreen[]>([]);
-  const [secureDNALoading, setSecureDNALoading] = useState(false);
+  const [secureDNAScreenings, setSecureDNAScreenings] = useState([]);
   const [openNewSecureDNAScreening, setOpenNewSecureDNAScreening] = useState(false);
 
-  // useEffect(() => {
-  //   fetchAclidScreenings();
-  //   fetchSecureDNAScreenings();
-  // }, [])
+  const [aclidScreenings, setAclidScreenings] = useState<AclidScreen[]>([]);
+  const [openNewAclidSreening, setOpenNewAclidScreening] = useState(false);
+
+  const fetchSecureDNAScreenings = async () => {
+      const data = await getSecureDNAScreenings();
+      if (data) {
+          const sortedData = data.sort((a: any, b: any) =>
+              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+          setSecureDNAScreenings(sortedData);
+      }
+  };
 
   const fetchAclidScreenings = async () => {
-    setAclidLoading(true);
     const responseAclidScreens = await getAclidScreenings();
     if (responseAclidScreens) {
       setAclidScreenings(responseAclidScreens['items']);
-      setAclidLoading(false);
     }
   }
 
-  const fetchSecureDNAScreenings = async () => {
-    setSecureDNALoading(true);
-    const responseSecureDNAScreens = await getSecureDNAScreenings();
-    if (responseSecureDNAScreens) {
-      setSecureDNAScreenings(responseSecureDNAScreens['items']);
-      setSecureDNALoading(false);
-    }
-  }
+  useEffect(() => {
+    // fetchAclidScreenings();
+    fetchSecureDNAScreenings();
+  }, []);
 
   return (
     <>
@@ -61,59 +59,59 @@ function AclidScreenings() {
 
         <Typography variant="h5" component="h5" gutterBottom 
           sx={{ display: 'flex', alignItems: 'start', ml: 3 }}>
-          SecureDNA screening
+          SecureDNA Screenings
         </Typography>
         <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'start', ml: 3, mb: 3 }}>
           Run a biosecurity screening on your sequence(s) using SecureDNA's algorithm.
         </Typography>
-        <Container maxWidth="lg">
+        <Box maxWidth="lg" sx={{ ml: 5 }}>
           <Grid
             container
             direction="row"
-            justifyContent="center"
+            justifyContent="flex-start"
             alignItems="stretch"
             spacing={3}
           >
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Button variant='outlined' sx={{ display: 'flex', alignItems: 'start', mr: 3 }} onClick={() => fetchSecureDNAScreenings()}>
-                  <RefreshIcon fontSize='small'/>
+              <Box sx={{ display: 'flex', mb: 2 }}>
+                <Button variant='outlined' sx={{ display: 'flex', mr: 3 }} onClick={fetchSecureDNAScreenings}>
+                  <RefreshIcon fontSize='small' />
                 </Button>
                 <Button
                   sx={{ mt: { xs: 2, md: 0 } }}
                   variant="contained"
-                  onClick={() => setOpenNewAclidScreening(true)}
+                  onClick={() => setOpenNewSecureDNAScreening(true)}
                   startIcon={<AddIcon fontSize="small" />}
                 >
                   New screening
                 </Button>
               </Box>
-              <SecureDNAScreeningTable screenings={secureDNAScreenings}/>
+              <SecureDNAScreeningTable genomes={secureDNAScreenings}/>
             </Grid>
           </Grid>
           <RunSecureDNABiosecurity open={openNewSecureDNAScreening} onClose={() => setOpenNewSecureDNAScreening(false)} />
-        </Container>
+        </Box>
       </Box>
       <Box>
         <Typography variant="h5" component="h5" gutterBottom 
           sx={{ display: 'flex', alignItems: 'start', ml: 3 }}>
-          Aclid screening
+          Aclid Screenings
         </Typography>
         <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'start', ml: 3, mb: 3 }}>
           Run a biosecurity screening on your sequence(s) using Aclid's algorithm.
         </Typography>
-        <Container maxWidth="lg">
+        <Box maxWidth="lg" sx={{ ml: 5 }}>
           <Grid
             container
             direction="row"
-            justifyContent="center"
+            justifyContent="flex-start"
             alignItems="stretch"
             spacing={3}
           >
             <Grid item xs={12}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Button variant='outlined' sx={{ display: 'flex', alignItems: 'start', mr: 3 }} onClick={() => fetchAclidScreenings()}>
-                  <RefreshIcon fontSize='small'/>
+              <Box sx={{ display: 'flex', mb: 2 }}>
+                <Button variant='outlined' sx={{ display: 'flex', mr: 3 }} onClick={() => fetchAclidScreenings()}>
+                  <RefreshIcon fontSize='small' />
                 </Button>
                 <Button
                   sx={{ mt: { xs: 2, md: 0 } }}
@@ -128,10 +126,10 @@ function AclidScreenings() {
             </Grid>
           </Grid>
           <RunAclidBiosecurity open={openNewAclidSreening} onClose={() => setOpenNewAclidScreening(false)} />
-        </Container>
+        </Box>
       </Box>
     </>
   );
 }
 
-export default AclidScreenings;
+export default Screener;

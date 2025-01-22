@@ -86,7 +86,7 @@ function RunAclidBiosecurity({ onClose, open }: RunAclidBiosecurityProps) {
       <Box sx={style}>
         <Stack spacing={2} direction="column" alignItems="center" sx={{ height: "100%" }}>
           <Typography variant="h4" >
-            Run Aclid's biosecurity check
+            Run Aclid's screening
           </Typography>
           <Typography variant="body1" sx={{ pb: 2 }}>
             Powered by Aclid, the biosecurity check evaluates the safety of a sequence by looking
