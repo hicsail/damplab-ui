@@ -16,6 +16,10 @@ import RunSecureDNABiosecurity from '../components/RunSecureDNABiosecurity';
 import AclidScreeningTable from '../components/AclidScreeningTable';
 import RunAclidBiosecurity from '../components/RunAclidBiosecurity';
 import { getSecureDNAScreenings } from '../mpi/SecureDNAQueries';
+import { getAllSequences } from '../mpi/SequencesQueries';
+import SequencesTable from '../components/SequencesTable';
+import SequenceUploader from '../components/SequenceUploader';
+import { Sequence } from '../mpi/models/sequence';
 
 
 function Screener() {
@@ -26,6 +30,17 @@ function Screener() {
 
   const [aclidScreenings, setAclidScreenings] = useState<AclidScreen[]>([]);
   const [openNewAclidSreening, setOpenNewAclidScreening] = useState(false);
+
+  const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [openSequenceUploader, setOpenSequenceUploader] = useState(false);
+
+  const fetchSequences = async () => {
+    const data = await getAllSequences();
+    if (data) {
+      // Reverse the array to show newest first
+      setSequences([...data].reverse());
+    }
+  };
 
   const fetchSecureDNAScreenings = async () => {
       const data = await getSecureDNAScreenings();
@@ -45,18 +60,49 @@ function Screener() {
   }
 
   useEffect(() => {
-    // fetchAclidScreenings();
+    fetchSequences();
     fetchSecureDNAScreenings();
   }, []);
 
   return (
     <>
       <Box sx={{ position: 'relative', mb: 8, mt: 2 }}>
-        
         <Box sx={{ position: 'absolute', top: 0, right: 0, mr: 3 }}>
           <MPILoginForm isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn} />
         </Box>
 
+        <Typography variant="h5" component="h5" gutterBottom 
+          sx={{ display: 'flex', alignItems: 'start', ml: 3 }}>
+          Sequences
+        </Typography>
+        <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'start', ml: 3, mb: 3 }}>
+          Manage your sequences and run biosecurity screenings.
+        </Typography>
+        <Box maxWidth="lg" sx={{ ml: 5 }}>
+          <Grid
+            container
+            direction="row"
+            justifyContent="flex-start"
+            alignItems="stretch"
+            spacing={3}
+          >
+            <Grid item xs={12}>
+              <SequencesTable 
+                sequences={sequences} 
+                onNewSequence={() => setOpenSequenceUploader(true)}
+                onRefresh={fetchSequences}
+              />
+            </Grid>
+          </Grid>
+          <SequenceUploader 
+            open={openSequenceUploader} 
+            onClose={() => setOpenSequenceUploader(false)}
+            onUploadComplete={fetchSequences}
+          />
+        </Box>
+      </Box>
+
+      <Box sx={{ position: 'relative', mb: 8, mt: 2 }}>
         <Typography variant="h5" component="h5" gutterBottom 
           sx={{ display: 'flex', alignItems: 'start', ml: 3 }}>
           SecureDNA Screenings

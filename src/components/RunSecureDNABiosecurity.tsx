@@ -1,4 +1,4 @@
-import { Box, Button, FormControl, InputLabel, MenuItem, Modal, Select, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, FormControl, InputLabel, MenuItem, Modal, Select, Stack, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
 // import { LoadingButton } from '@mui/lab';
 import { screenSequence } from '../mpi/SecureDNAQueries';
@@ -17,8 +17,6 @@ const style = {
   p: 4,
   borderRadius: '16px'
 };
-
-// TODO: Copied from Aclid; reimplement for SecureDNA
 
 interface RunSecureDNABiosecurityProps {
   open: boolean

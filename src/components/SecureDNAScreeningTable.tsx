@@ -14,7 +14,7 @@ import {
   Box,
   Stack
 } from '@mui/material';
-import { useEffect, useState, ChangeEvent } from 'react';
+import { useState, ChangeEvent } from 'react';
 import SeqViz from 'seqviz';
 import { updateSecureDNAScreening } from '../mpi/SecureDNAQueries';
 import { Genome } from '../mpi/models/genome';

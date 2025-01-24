@@ -81,3 +81,24 @@ export const deleteSequence = async (sequenceId: string) => {
     console.log(e);
   }
 };
+
+export const createSequencesBatch = async (sequences: Sequence[]): Promise<{ message: string; status: string; timestamp: string } | undefined> => {
+  try {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/sequences/batch`, {
+      method: "POST",
+      headers: {
+        "Content-type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify(sequences),
+    });
+    const data = await response.json();
+    if (response.ok) {
+      return data;
+    } else {
+      const message = await data["message"];
+      console.log(message);
+    }
+  } catch (e) {
+    console.log(e);
+  }
+};
