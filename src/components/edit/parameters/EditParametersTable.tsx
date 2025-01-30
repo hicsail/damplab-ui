@@ -65,7 +65,16 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     {
       field: 'type',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      type: 'singleSelect',
+      valueOptions: [
+        'string',
+        'number',
+        'file',
+        'boolean',
+        'enum', //formerly called 'dropdown'...
+        'table',
+      ],
     },
     {
       field: 'flowId',
