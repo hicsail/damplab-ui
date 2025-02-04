@@ -1,45 +1,33 @@
-import React, { useState, useContext } from 'react'
+import React, { useState, useEffect, useContext } from 'react'
 import { Link, useNavigate } from "react-router-dom";
 import { AppBar, Button, Dialog, DialogTitle, IconButton, TextField, Toolbar, Hidden } from '@mui/material';
 import { SaveOutlined }         from '@mui/icons-material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import UploadFileIcon           from '@mui/icons-material/UploadFile';
-
+import Snackbar from '@mui/material/Snackbar';
 import { CanvasContext } from '../contexts/Canvas';
 import "../styles/resubmit.css";
 
+interface DialogProps {
+    open: boolean;
+    onClose: (value?: string) => void;
+    loadCanvas?: any;
+}
 
 export default function HeaderBar() {
-
     const navigate = useNavigate();
 
-    const alignRight = {
-        marginLeft: 'auto',
-        marginRight: 10,
-        //width: 'fit-content',
-    };
-
-    interface SimpleDialogProps {
-        open: boolean;
-        selectedValue: string;
-        onClose: (value: string) => void;
-        setNodes? : any;
-        setEdges? : any;
-        setLoadOpen? : any;
-    }
-
-    const [open, setOpen]         = useState(false);
+    const [saveOpen, setSaveOpen] = useState(false);
     const [loadOpen, setLoadOpen] = useState(false);
+
+    // TODO: Flesh out snackbar
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState("Test Message");
 
     const { setNodes, setEdges, nodes, edges } = useContext(CanvasContext);
 
-    const handleClickOpen = () => {
-        console.log('open');
-        setOpen(true);
-    };
-
-    const handleClose = (value: string) => {
-        setOpen(false);
+    const handleSaveOpen = () => {
+        setSaveOpen(true);
     };
 
     const handleLoadOpen = () => { 
@@ -47,76 +35,103 @@ export default function HeaderBar() {
         setLoadOpen(true);
     }
 
-    function SimpleDialog(props: SimpleDialogProps ) {
-        const { onClose, selectedValue, open } = props;
+
+    // Whenver an exit event is called from saving or loading, update current canvas
+    const handleClose = (value = "canvas:") => {
+        if (localStorage.getItem(value)) {
+            localStorage.setItem("CurrentCanvas", value);
+        }
+
+        setSaveOpen(false);
+        setLoadOpen(false);
+    };
+
+    
+    const loadCanvasData = (canvasName: string) => {
+        // Attempt to load file, load empty object if nothing found
+        let file = JSON.parse(localStorage.getItem(canvasName) || '{}');
+
+        if (file.nodes) setNodes(file.nodes);
+        if (file.edges) setEdges(file.edges);
+    }
+
+    // Checks to see the CurrentCanvas that is present in local storage
+    useEffect(() => {
+        const currentCanvas = localStorage.getItem("CurrentCanvas");
+        // If not present, set key and return
+        if (!currentCanvas) {
+            localStorage.setItem("CurrentCanvas", "");
+            return;
+        }
+        // If canvas exists, load it into storage
+        if(localStorage.getItem(currentCanvas)) {
+            loadCanvasData(currentCanvas);
+        }
+    }, [])
+
+    function SaveDialaog(props: DialogProps ) {
+        const { onClose, open } = props;
         const [fileName, setFileName] = useState('');
-        const handleClose = () => {
+
+        // Proper exit: user clicked save
+        const handleSave = () => {
             // create object with filename, nodes, edges and save to local storage
             let file = {
                 fileName: fileName,
                 nodes: nodes,
                 edges: edges,
             }
-            localStorage.setItem(fileName, JSON.stringify(file));
-            onClose(selectedValue);
+            // Apply prefix to filename for localStorage key
+            const key = "canvas:" + fileName
+            console.log(key)
+            localStorage.setItem(key, JSON.stringify(file));
+            onClose(key);
+            setSnackbarOpen(true)
         };
-      
-        // const handleListItemClick = (value: string) => {
-        //   onClose(value);
-        // };
     
         return (
-          <Dialog onClose={handleClose} open={open}>
+          <Dialog onClose={() => onClose()} open={open}>
             <div style={{width: 300, height: 200, padding: 10}}>
                 <DialogTitle>Save Canvas</DialogTitle>
                 <div>
                     <TextField id="outlined-basic" label="File name" variant="outlined" onChange={(e)=> setFileName(e.target.value)}/>
                 </div>
                 <div style={{ margin: 20 }}>
-                    <Button variant="contained" onClick={handleClose}>Save</Button>
+                    <Button variant="contained" onClick={handleSave}>Save</Button>
                 </div>
             </div>
           </Dialog>
         );
     }
 
-    function LoadDialog(props: SimpleDialogProps ) {
-        const { onClose, selectedValue, open, setNodes, setEdges, setLoadOpen } = props;
+    function LoadDialog(props: DialogProps ) {
+        const { onClose, open, loadCanvas } = props;
         
-        const handleClose = (fileName: any) => {
+        // Proper Exit: user selected a file to load
+        const handleLoad = (fileName: any) => {
             // get file from local storage and load it into the canvas
-            let file = JSON.parse(localStorage.getItem(fileName) || '{}');
             
-            onClose(selectedValue);
-            if (file.nodes) setNodes(file.nodes);
-            // console.log("Load nodes: ", file.nodes);
-            if (file.edges) setEdges(file.edges);
-            // console.log("Load edges: ", file.edges);
-            setLoadOpen(false);
+            onClose(fileName);
+            loadCanvas(fileName);
         };
       
-        // const handleListItemClick = (value: string) => {
-        //   onClose(value);
-        // };
-
-        // get list of saved files from local storage
-        let files = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            files.push(localStorage.key(i));
-        }
-
+        // Get all of they keys of canvas files the user has saved. These files begin with the string canvas: 
+        // This is done to prevent showing unwanted local storage variables in load screen
+        let files = Object.keys(localStorage).filter(key => key.startsWith("canvas:"));
+       
         return (
-          <Dialog onClose={handleClose} open={open}>
+          <Dialog onClose={() => onClose()} open={open}>
             <DialogTitle>Load Canvas</DialogTitle>
             <div style={{width: 450, height: 200, padding: 10}}>
-            {
-                files.map((file) => {
+            {files.length === 0 ? <div style={{display: 'flex', justifyContent: 'center'}}>Create and save your first canvas!</div>:
+                (files.map((file) => {
                     return (
                         <div key={Math.random().toString(36).substring(2, 9)} style={{margin: 10}}>
-                            <Button variant="contained" onClick={()=> handleClose(file)}>{file}</Button>
+                            {/* A substring of 7 is applied so the prefix "canvas:" isn't displayed */}
+                            <Button variant="contained" onClick={()=> handleLoad(file)}>{file.substring(7)}</Button>
                         </div>
                     )
-                })
+                }))
             }
             </div>
           </Dialog>
@@ -147,13 +162,13 @@ export default function HeaderBar() {
                         </span>
                     </Button>
 
-                    <div style={alignRight}>
+                    <div style={{ marginLeft: 'auto', marginRight: 10 }}>
                         
                         <IconButton onClick={handleLoadOpen} title="Load canvas" aria-controls='menu-appbar' aria-haspopup='true'>
                             <UploadFileIcon style={{color: 'white'}}/>
                         </IconButton>
 
-                        <IconButton onClick={handleClickOpen} title="Save canvas" aria-controls='menu-appbar' aria-haspopup='true'>
+                        <IconButton onClick={handleSaveOpen} title="Save canvas" aria-controls='menu-appbar' aria-haspopup='true'>
                             <SaveOutlined style={{color: 'white'}}/>
                         </IconButton>
 
@@ -167,23 +182,20 @@ export default function HeaderBar() {
 
                 </Toolbar>
 
-                <SimpleDialog
-                    selectedValue = {'test'}
-                    open          = {open}
+                <SaveDialaog
+                    open          = {saveOpen}
                     onClose       = {handleClose}
                 />
                 
                 <LoadDialog
-                    selectedValue = {'test'}
                     open          = {loadOpen}
-                    setLoadOpen   = {setLoadOpen}
                     onClose       = {handleClose}
-                    setNodes      = {setNodes}
-                    setEdges      = {setEdges}
+                    loadCanvas = {loadCanvasData}
                 />
 
             </AppBar>
             <Toolbar /> 
+            <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={() => {setSnackbarOpen(false)}} message={snackbarMessage}/>
         </div>
     )
 }
