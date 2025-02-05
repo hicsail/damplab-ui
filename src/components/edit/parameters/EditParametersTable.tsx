@@ -18,6 +18,13 @@ import { GridApiCommunity } from '@mui/x-data-grid/internals';
 import { GridToolBar } from '../GridToolBar';
 import { Button, Dialog, DialogContent } from '@mui/material';
 import { EditParameterOptions } from './EditParameterOptions';
+import {
+  ParameterDefaultValueInput,
+  ParameterNameInput,
+  ParameterOptionsButton,
+  ParameterRangeValueInput,
+  ParameterTypeSelect
+} from './ParameterFieldEditCells';
 
 interface EditParametersTableProps {
   viewParams: GridRenderCellParams | null;
@@ -55,7 +62,8 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     {
       field: 'name',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterNameInput {...params} />),
     },
     {
       field: 'description',
@@ -66,62 +74,53 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       field: 'type',
       width: 200,
       editable: isEdit,
-      type: 'singleSelect',
-      valueOptions: [
-        'string',
-        'number',
-        'file',
-        'boolean',
-        'enum', //formerly called 'dropdown'...
-        'table',
-      ],
-    },
-    {
-      field: 'flowId',
-      width: 200,
-      editable: isEdit
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterTypeSelect {...params} />),
     },
     {
       field: 'paramType',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      type: 'singleSelect',
+      valueOptions: ['input'], //['input', 'result', 'flow'], //Only input for now...
     },
     {
       field: 'required',
       width: 200,
-      editable: isEdit
-    },
-    {
-      field: 'workflowId',
-      width: 200,
-      editable: isEdit
+      editable: isEdit,
+      type: 'singleSelect',
+      valueOptions: [true, false],
     },
     {
       field: 'options',
       width: 200,
       editable: isEdit,
       renderCell: (params) => <Button variant="contained" onClick={() => handleOptionsViewButton(params)}>View</Button>,
-      renderEditCell: (params) => <Button variant="contained" onClick={() => handleOptionsEditButton(params)}>Edit</Button>
+      renderEditCell: (params : GridRenderEditCellParams) => <ParameterOptionsButton {...params} handleOptionsEditButton={handleOptionsEditButton} />,
     },
     {
       field: 'defaultValue',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterDefaultValueInput {...params} />),
     },
     {
       field: 'rangeValueMin',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterRangeValueInput {...params} />),
     },
     {
       field: 'rangeValueMax',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterRangeValueInput {...params} />),
     },
     {
       field: 'dynamicAdd',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      type: 'singleSelect',
+      valueOptions: [true, false],
     },
     {
       field: 'templateFile',
@@ -130,11 +129,6 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'tableData',
-      width: 200,
-      editable: isEdit
-    },
-    {
-      field: 'paramGroupId',
       width: 200,
       editable: isEdit
     }
