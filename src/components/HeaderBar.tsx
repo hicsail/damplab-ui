@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useContext } from 'react'
+import { useState, useEffect, useContext, useCallback } from 'react'
+import { CanvasSaveDialog, CanvasLoadDialog } from './CanvasDialogs';
 import { Link, useNavigate } from "react-router-dom";
-import { AppBar, Button, Dialog, DialogTitle, IconButton, TextField, Toolbar, Hidden } from '@mui/material';
+import { AppBar, Button, IconButton, Toolbar, Hidden, Alert } from '@mui/material';
 import { SaveOutlined }         from '@mui/icons-material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import UploadFileIcon           from '@mui/icons-material/UploadFile';
@@ -8,21 +9,17 @@ import Snackbar from '@mui/material/Snackbar';
 import { CanvasContext } from '../contexts/Canvas';
 import "../styles/resubmit.css";
 
-interface DialogProps {
-    open: boolean;
-    onClose: (value?: string) => void;
-    loadCanvas?: any;
-}
-
 export default function HeaderBar() {
     const navigate = useNavigate();
 
+    // States for dialog boxes for saving and loading canvases
     const [saveOpen, setSaveOpen] = useState(false);
     const [loadOpen, setLoadOpen] = useState(false);
 
-    // TODO: Flesh out snackbar
+    // Snackbar message controls the message of snackbar and the color of background.
+    // If snackbarMessage starts with "Success", then the snackbar will be green, otheriwse it will be red to show an error.
+    const [snackbarMessage, setSnackbarMessage] = useState("");
     const [snackbarOpen, setSnackbarOpen] = useState(false);
-    const [snackbarMessage, setSnackbarMessage] = useState("Test Message");
 
     const { setNodes, setEdges, nodes, edges } = useContext(CanvasContext);
 
@@ -31,113 +28,101 @@ export default function HeaderBar() {
     };
 
     const handleLoadOpen = () => { 
+        if (areChangesUnsaved() && !window.confirm("There are unsaved changes, continue to load another graph?")) {
+            return;
+        }
         navigate('/canvas');
         setLoadOpen(true);
     }
 
-
-    // Whenver an exit event is called from saving or loading, update current canvas
-    const handleClose = (value = "canvas:") => {
-        if (localStorage.getItem(value)) {
-            localStorage.setItem("CurrentCanvas", value);
+    // This triggers whenever the user closes a save or load dialog.
+    // This function is responsible for keeping currentCanvas up to date.
+    const handleDialogClose = (canvasName = "") => {
+        // If canvas name was provided and exists in local storage, update CurrentCanvas
+        if (canvasName !== "" && localStorage.getItem(canvasName)) {
+            localStorage.setItem("CurrentCanvas", canvasName);
         }
 
         setSaveOpen(false);
         setLoadOpen(false);
     };
 
+    // When snackbar is opened, set its message and set open useState to true
+    const handleSnackbarOpen = (message: string) => {
+        setSnackbarMessage(message);
+        setSnackbarOpen(true);
+    }
+
+    // When closing, don't erase the message or else the snackbar will change color while playing the closing animation.
+    // Because of this, we simply set the snackbarOpen state to false
+    const handleSnackbarClose = () => {
+        setSnackbarOpen(false);
+    }
     
-    const loadCanvasData = (canvasName: string) => {
+    const loadCanvasData = useCallback((canvasName: string) => {
         // Attempt to load file, load empty object if nothing found
         let file = JSON.parse(localStorage.getItem(canvasName) || '{}');
 
         if (file.nodes) setNodes(file.nodes);
         if (file.edges) setEdges(file.edges);
-    }
+    }, [setNodes, setEdges])
 
-    // Checks to see the CurrentCanvas that is present in local storage
+    // Checks to see the CurrentCanvas that is present in local storage. Only runs once on page load.
     useEffect(() => {
         const currentCanvas = localStorage.getItem("CurrentCanvas");
-        // If not present, set key and return
+
+        // If not present, set key and exit
         if (!currentCanvas) {
             localStorage.setItem("CurrentCanvas", "");
             return;
         }
-        // If canvas exists, load it into storage
+
+        // If canvas exists, load it into storage. Otherwise, reset current canvas as the canvas its refrencing no longer exists.
         if(localStorage.getItem(currentCanvas)) {
             loadCanvasData(currentCanvas);
+        } else {
+            localStorage.setItem("CurrentCanvas", "");
         }
-    }, [])
-
-    function SaveDialaog(props: DialogProps ) {
-        const { onClose, open } = props;
-        const [fileName, setFileName] = useState('');
-
-        // Proper exit: user clicked save
-        const handleSave = () => {
-            // create object with filename, nodes, edges and save to local storage
-            let file = {
-                fileName: fileName,
-                nodes: nodes,
-                edges: edges,
-            }
-            // Apply prefix to filename for localStorage key
-            const key = "canvas:" + fileName
-            console.log(key)
-            localStorage.setItem(key, JSON.stringify(file));
-            onClose(key);
-            setSnackbarOpen(true)
-        };
+    }, [loadCanvasData])
     
-        return (
-          <Dialog onClose={() => onClose()} open={open}>
-            <div style={{width: 300, height: 200, padding: 10}}>
-                <DialogTitle>Save Canvas</DialogTitle>
-                <div>
-                    <TextField id="outlined-basic" label="File name" variant="outlined" onChange={(e)=> setFileName(e.target.value)}/>
-                </div>
-                <div style={{ margin: 20 }}>
-                    <Button variant="contained" onClick={handleSave}>Save</Button>
-                </div>
-            </div>
-          </Dialog>
-        );
-    }
+    // Determines if there are changes on the graph that must be saved
+    const areChangesUnsaved = useCallback(() => {
+        // Get the name of current work from local storage, or the default value if it's empty
+        let currentCanvas = localStorage.getItem("CurrentCanvas") || "canvas:";
 
-    function LoadDialog(props: DialogProps ) {
-        const { onClose, open, loadCanvas } = props;
+        // Extract saved nodes and edges from local storage.
+        let { nodes: savedNodes, edges: savedEdges } = JSON.parse(localStorage.getItem(currentCanvas) || '{}');
         
-        // Proper Exit: user selected a file to load
-        const handleLoad = (fileName: any) => {
-            // get file from local storage and load it into the canvas
-            
-            onClose(fileName);
-            loadCanvas(fileName);
-        };
-      
-        // Get all of they keys of canvas files the user has saved. These files begin with the string canvas: 
-        // This is done to prevent showing unwanted local storage variables in load screen
-        let files = Object.keys(localStorage).filter(key => key.startsWith("canvas:"));
-       
-        return (
-          <Dialog onClose={() => onClose()} open={open}>
-            <DialogTitle>Load Canvas</DialogTitle>
-            <div style={{width: 450, height: 200, padding: 10}}>
-            {files.length === 0 ? <div style={{display: 'flex', justifyContent: 'center'}}>Create and save your first canvas!</div>:
-                (files.map((file) => {
-                    return (
-                        <div key={Math.random().toString(36).substring(2, 9)} style={{margin: 10}}>
-                            {/* A substring of 7 is applied so the prefix "canvas:" isn't displayed */}
-                            <Button variant="contained" onClick={()=> handleLoad(file)}>{file.substring(7)}</Button>
-                        </div>
-                    )
-                }))
-            }
-            </div>
-          </Dialog>
-        );
-    }
+        if (currentCanvas === "canvas:" && (nodes.length > 0 || edges.length > 0)) {
+            // Case 1: No canvas selected and there is content on the graph - Yes, changes are unsaved.
+            return true;
+        } else if (currentCanvas === "canvas:") {
+            // Case 2: No canvas is selected and there is nothing on the grapg - No changes made.
+            return false;
+        } else if (JSON.stringify(savedNodes) !== JSON.stringify(nodes) || JSON.stringify(savedEdges) !== JSON.stringify(edges)) {
+            // Case 3: Current canvas content does not match saved content - Yes, changes are unsaved.
+            return true;
+        } else {
+            // Case 4: If we are here, this means a canvas has been loaded - but no changes made.
+            return false;
+        }
+    }, [edges, nodes])
 
+    // This hook is responsible for applying the event listener for browser close on the canvas page.
+    useEffect (() => {
+        const handleUnsavedWork = (event: BeforeUnloadEvent) => {
+            if (areChangesUnsaved()) {
+                event.preventDefault();
+                event.returnValue = ''; // Required for older browsers to show dialog
+            }
+        };
+        window.addEventListener("beforeunload", handleUnsavedWork);
+        return () => {
+            window.removeEventListener("beforeunload", handleUnsavedWork);
+        };
+    }, [areChangesUnsaved])
+
+    
 
     return (
         <div>
@@ -182,20 +167,30 @@ export default function HeaderBar() {
 
                 </Toolbar>
 
-                <SaveDialaog
+                <CanvasSaveDialog
                     open          = {saveOpen}
-                    onClose       = {handleClose}
+                    onClose       = {handleDialogClose}
+                    openSnackbar = {handleSnackbarOpen}
                 />
                 
-                <LoadDialog
+                <CanvasLoadDialog
                     open          = {loadOpen}
-                    onClose       = {handleClose}
+                    onClose       = {handleDialogClose}
                     loadCanvas = {loadCanvasData}
                 />
 
             </AppBar>
             <Toolbar /> 
-            <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={() => {setSnackbarOpen(false)}} message={snackbarMessage}/>
+            <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}> 
+                <Alert 
+                    onClose={handleSnackbarClose}
+                    severity={snackbarMessage.startsWith("Success") ? 'success' : 'error'}
+                    variant='filled'
+                    sx={{ width: '100%' }}
+                >
+                    {snackbarMessage}
+                    </Alert>    
+            </Snackbar>
         </div>
     )
 }
