@@ -14,9 +14,7 @@ export default function AlertDialog (props: AlertDialogProps) {
     return (
         <Dialog open={open}>
             <DialogContent>
-                <DialogContent>
-                    {body}
-                </DialogContent>
+                {body}
             </DialogContent>
             <DialogActions>
                 <Button onClick={onDeny} variant="outlined">No</Button>
