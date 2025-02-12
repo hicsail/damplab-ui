@@ -16,7 +16,16 @@ import { getActionsColumn } from '../ActionColumn';
 import { MutableRefObject, useState } from 'react';
 import { GridApiCommunity } from '@mui/x-data-grid/internals';
 import { GridToolBar } from '../GridToolBar';
-import { Button, Dialog, DialogContent } from '@mui/material';
+import {
+  Alert,
+  AlertProps,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  Snackbar
+} from '@mui/material';
 import { EditParameterOptions } from './EditParameterOptions';
 import {
   ParameterDefaultValueInput,
@@ -25,6 +34,7 @@ import {
   ParameterRangeValueInput,
   ParameterTypeSelect
 } from './ParameterFieldEditCells';
+import {validateParameter} from './ParameterValidation';
 
 interface EditParametersTableProps {
   viewParams: GridRenderCellParams | null;
@@ -39,6 +49,15 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const [optionDialogOpen, setOptionDialogOpen] = useState<boolean>(false);
   const [optionViewProps, setOptionViewProps] = useState<GridRenderCellParams | null>(null);
   const [optionEditProps, setOptionEditProps] = useState<GridRenderEditCellParams | null>(null);
+  const [snackbar, setSnackbar] = useState<Pick<AlertProps, 'children' | 'severity'> | null>(null);
+  const [typeChangeDialog, setTypeChangeDialog] = useState({
+    open: false,
+    oldType: undefined,
+    newType: undefined,
+    fieldsToReset: undefined,
+    onConfirm: undefined,
+    onCancel: undefined
+  });
   const gridRef = useGridApiRef();
 
   const handleOptionsViewButton = (options: GridRenderCellParams) => {
@@ -52,6 +71,8 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     setOptionEditProps(options);
     setOptionDialogOpen(true);
   };
+
+  const handleCloseSnackbar = () => setSnackbar(null);
 
   const columns: GridColDef[] = [
     {
@@ -74,7 +95,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       field: 'type',
       width: 200,
       editable: isEdit,
-      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterTypeSelect {...params} />),
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterTypeSelect {...params} setTypeChangeDialog={setTypeChangeDialog} />)
     },
     {
       field: 'paramType',
@@ -156,6 +177,15 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   };
 
   const handleUpdate = (newRow: GridRowModel) => {
+    // Validate new row
+    const paramValidationErrors = validateParameter(newRow);
+    if (paramValidationErrors.length > 0) {
+      const combinedMsg = <ul>{paramValidationErrors.map((err) => <li key={err.field}>{err.field}: {err.errorMsg}</li>)}</ul>
+
+      setSnackbar({ children: combinedMsg, severity: 'error' });
+      return; //don't return newRow, don't save
+    }
+
     // Remove the old row
     const filtered = rows.filter((parameter: any) => parameter.id != newRow.id);
 
@@ -204,6 +234,29 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
           <EditParameterOptions viewParams={optionViewProps} editParams={optionEditProps} gridRef={gridRef} />
         </DialogContent>
       </Dialog>
+      <Dialog open={typeChangeDialog.open} onClose={typeChangeDialog.onCancel}>
+        <DialogContent>
+          <DialogContentText>
+            You are changing the parameter type from <strong>{typeChangeDialog.oldType}</strong> to <strong>{typeChangeDialog.newType}</strong>.
+            The following fields are not applicable for the new type and will be reset:
+            {/* FIXME: ul cannot appear as a descendant of p */}
+            <ul>{typeChangeDialog.fieldsToReset?.map((f) => <li key={f}>{f}</li>)}</ul>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={typeChangeDialog.onCancel}>Cancel</Button>
+          <Button onClick={typeChangeDialog.onConfirm}>Continue</Button>
+        </DialogActions>
+      </Dialog>
+      {!!snackbar && (
+          <Snackbar
+              open
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+              onClose={handleCloseSnackbar}
+          >
+            <Alert {...snackbar} onClose={handleCloseSnackbar} />
+          </Snackbar>
+      )}
     </>
   );
 };
