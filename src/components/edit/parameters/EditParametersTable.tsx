@@ -28,9 +28,13 @@ import {
 } from '@mui/material';
 import { EditParameterOptions } from './EditParameterOptions';
 import {
+  ParameterBooleanSelect,
   ParameterDefaultValueInput,
+  ParameterDescriptionInput,
+  ParameterIdInput,
   ParameterNameInput,
   ParameterOptionsButton,
+  ParameterParamTypeSelect,
   ParameterRangeValueInput,
   ParameterTypeSelect
 } from './ParameterFieldEditCells';
@@ -78,7 +82,8 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     {
       field: 'id',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterIdInput {...params} />),
     },
     {
       field: 'name',
@@ -89,7 +94,8 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     {
       field: 'description',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterDescriptionInput {...params} />),
     },
     {
       field: 'type',
@@ -101,15 +107,13 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       field: 'paramType',
       width: 200,
       editable: isEdit,
-      type: 'singleSelect',
-      valueOptions: ['input'], //['input', 'result', 'flow'], //Only input for now...
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterParamTypeSelect {...params} />),
     },
     {
       field: 'required',
       width: 200,
       editable: isEdit,
-      type: 'singleSelect',
-      valueOptions: [true, false],
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
     },
     {
       field: 'options',
@@ -140,8 +144,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       field: 'dynamicAdd',
       width: 200,
       editable: isEdit,
-      type: 'singleSelect',
-      valueOptions: [true, false],
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
     },
     {
       field: 'templateFile',

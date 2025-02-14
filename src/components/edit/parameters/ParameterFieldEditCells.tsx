@@ -9,6 +9,7 @@ import {
   useGridApiContext,
 } from "@mui/x-data-grid";
 import {
+  Box,
   Button,
   FormControl,
   InputAdornment,
@@ -19,9 +20,10 @@ import {
 
 // TODO: Re-render grid (or individual edit cells) on parameter type change.
 
-export function ParameterDefaultValueInput(props: GridRenderEditCellParams) {
-  // TODO: make disabled state look more evident; info msg on hover over disabled cell.
-  const { id, field, hasFocus } = props;
+export function ParameterBooleanSelect(props: GridRenderEditCellParams) {
+  // This component exists solely to make the singleSelect show the field name as the displayEmpty renderValue.
+
+  const { id, value, field, hasFocus } = props;
   const apiRef = useGridApiContext();
   const ref = React.useRef();
 
@@ -36,13 +38,75 @@ export function ParameterDefaultValueInput(props: GridRenderEditCellParams) {
   };
 
   return (
-    <GridEditInputCell
-      ref={ref}
-      disabled={!(props.row.type === "string" || props.row.type === "number")}
-      onChange={handleValueChange}
-      {...props}
-    />
+    <FormControl fullWidth>
+      <Select
+        value={value}
+        ref={ref}
+        onChange={handleValueChange}
+        displayEmpty={true}
+        renderValue={(val) => {
+          if (val === true) {
+            return "true";
+          } else if (val === false) {
+            return "false";
+          } else {
+            //return <span color={"textDisabled"}>{field}</span>;
+            return <MenuItem disabled>{field}</MenuItem>;
+          }
+        }}
+      >
+        <MenuItem disabled value={undefined}>
+          <em>{field}</em>
+        </MenuItem>
+        <MenuItem value={true}>true</MenuItem>
+        <MenuItem value={false}>false</MenuItem>
+      </Select>
+    </FormControl>
   );
+}
+
+export function ParameterDefaultValueInput(props: GridRenderEditCellParams) {
+  const { id, field, hasFocus } = props;
+  const apiRef = useGridApiContext();
+  const ref = React.useRef();
+  const [isHover, setIsHover] = React.useState(false);
+
+  const isDisabled = !(
+    props.row.type === "string" || props.row.type === "number"
+  );
+  const disabledTooltipMsg = `${field} is only applicable for parameters of type string or number.`;
+
+  React.useLayoutEffect(() => {
+    if (hasFocus) {
+      ref.current.focus();
+    }
+  }, [hasFocus]);
+
+  const handleValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    apiRef.current.setEditCellValue({ id, field, value: event.target.value });
+  };
+
+  return (
+    <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
+      <GridEditInputCell
+        ref={ref}
+        disabled={isDisabled}
+        onChange={handleValueChange}
+        onMouseOver={() => setIsHover(true)}
+        onMouseOut={() => setIsHover(false)}
+        placeholder={"Default value"}
+        {...props}
+      />
+    </Tooltip>
+  );
+}
+
+export function ParameterDescriptionInput(props: GridRenderEditCellParams) {
+  return <GridEditInputCell {...props} placeholder={"Description"} />;
+}
+
+export function ParameterIdInput(props: GridRenderEditCellParams) {
+  return <GridEditInputCell {...props} placeholder={"id"} />;
 }
 
 export function ParameterNameInput(props: GridRenderEditCellParams) {
@@ -56,42 +120,32 @@ export function ParameterNameInput(props: GridRenderEditCellParams) {
 }
 
 export function ParameterOptionsButton(props: GridRenderEditCellParams) {
-  // TODO: remove tooltip. re-render on parameter type change? info msg on hover over disabled button?
+  const [isHover, setIsHover] = React.useState(false);
 
-  let hasError, errorMsg;
-  if (
-    props.row.type === "enum" &&
-    (props.value === undefined || props.value.length == 0)
-  ) {
-    hasError = true;
-    errorMsg = "Options are required for parameters of type 'enum'.";
-  } else if (
-    props.row.type !== "enum" &&
-    props.value !== undefined &&
-    props.value.length > 0
-  ) {
-    hasError = true;
-    errorMsg = "Options will be ignored for parameters of type 'enum'.";
-  } else {
-    hasError = false;
-    errorMsg = "";
-  }
+  const isDisabled = props.row.type !== "enum";
+  const disabledTooltipMsg =
+    "Options is only applicable for parameters of type enum.";
+
   return (
-    <Tooltip open={hasError} title={errorMsg} arrow>
-      <Button
-        variant="contained"
-        disabled={props.row.type !== "enum"}
-        onClick={() => props.handleOptionsEditButton(props)}
+    <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
+      <Box
+        onMouseOver={() => setIsHover(true)}
+        onMouseOut={() => setIsHover(false)}
       >
-        Edit
-      </Button>
+        <Button
+          variant="contained"
+          disabled={isDisabled}
+          onClick={() => props.handleOptionsEditButton(props)}
+        >
+          Edit
+        </Button>
+      </Box>
     </Tooltip>
   );
 }
 
-export function ParameterRangeValueInput(props: GridRenderEditCellParams) {
-  // TODO: make disabled state look more evident; info msg on hover over disabled cell.
-  const { id, field, hasFocus } = props;
+export function ParameterParamTypeSelect(props: GridRenderEditCellParams) {
+  const { id, value, field, hasFocus } = props;
   const apiRef = useGridApiContext();
   const ref = React.useRef();
 
@@ -106,12 +160,62 @@ export function ParameterRangeValueInput(props: GridRenderEditCellParams) {
   };
 
   return (
-    <GridEditInputCell
-      ref={ref}
-      disabled={props.row.type !== "number"}
-      onChange={handleValueChange}
-      {...props}
-    />
+    <FormControl fullWidth>
+      <Select
+        value={value}
+        ref={ref}
+        onChange={handleValueChange}
+        displayEmpty={true}
+        renderValue={(val) => {
+          if (val === undefined) {
+            //return <span color={"textDisabled"}>ParamType</span>;
+            return <MenuItem disabled>ParamType</MenuItem>;
+          }
+          return val;
+        }}
+      >
+        <MenuItem disabled value={undefined}>
+          <em>ParamType</em>
+        </MenuItem>
+        <MenuItem value={"input"}>input</MenuItem>
+        {/*<MenuItem value={"result"}>result</MenuItem> only input for now... */}
+        {/*<MenuItem value={"flow"}>flow</MenuItem> only input for now... */}
+      </Select>
+    </FormControl>
+  );
+}
+
+export function ParameterRangeValueInput(props: GridRenderEditCellParams) {
+  const { id, field, hasFocus } = props;
+  const apiRef = useGridApiContext();
+  const ref = React.useRef();
+  const [isHover, setIsHover] = React.useState(false);
+
+  const isDisabled = props.row.type !== "number";
+  const disabledTooltipMsg = `${field} is only applicable for parameters of type number.`;
+
+  React.useLayoutEffect(() => {
+    if (hasFocus) {
+      ref.current.focus();
+    }
+  }, [hasFocus]);
+
+  const handleValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    apiRef.current.setEditCellValue({ id, field, value: event.target.value });
+  };
+
+  return (
+    <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
+      <GridEditInputCell
+        ref={ref}
+        disabled={isDisabled}
+        onChange={handleValueChange}
+        onMouseOver={() => setIsHover(true)}
+        onMouseOut={() => setIsHover(false)}
+        placeholder={field}
+        {...props}
+      />
+    </Tooltip>
   );
 }
 
