@@ -40,7 +40,7 @@ export function ParameterBooleanSelect(props: GridRenderEditCellParams) {
   return (
     <FormControl fullWidth>
       <Select
-        value={value}
+        value={value !== undefined ? value : ""}
         ref={ref}
         onChange={handleValueChange}
         displayEmpty={true}
@@ -55,7 +55,7 @@ export function ParameterBooleanSelect(props: GridRenderEditCellParams) {
           }
         }}
       >
-        <MenuItem disabled value={undefined}>
+        <MenuItem disabled value={""}>
           <em>{field}</em>
         </MenuItem>
         <MenuItem value={true}>true</MenuItem>
@@ -114,7 +114,7 @@ export function ParameterNameInput(props: GridRenderEditCellParams) {
     <GridEditInputCell
       {...props}
       placeholder={"Name (required)"}
-      endAdornment={<InputAdornment>*</InputAdornment>}
+      endAdornment={<InputAdornment position={"end"}>*</InputAdornment>}
     />
   );
 }
@@ -162,19 +162,19 @@ export function ParameterParamTypeSelect(props: GridRenderEditCellParams) {
   return (
     <FormControl fullWidth>
       <Select
-        value={value}
+        value={value ? value : ""}
         ref={ref}
         onChange={handleValueChange}
         displayEmpty={true}
         renderValue={(val) => {
-          if (val === undefined) {
+          if (val === "") {
             //return <span color={"textDisabled"}>ParamType</span>;
             return <MenuItem disabled>ParamType</MenuItem>;
           }
           return val;
         }}
       >
-        <MenuItem disabled value={undefined}>
+        <MenuItem disabled value={""}>
           <em>ParamType</em>
         </MenuItem>
         <MenuItem value={"input"}>input</MenuItem>
@@ -231,13 +231,6 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
   }, [hasFocus]);
 
   const handleValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    /* FIXME: Changing the value triggers a MUI error complaining about the Select component going from uncontrolled to controlled.
-       Apparently, on initial render it gets classified as uncontrolled, because the value is undefined.
-       But this component is in fact controlled - value is read from props and gets set here on change.
-       So need to either figure out why I am wrong and it's actually initially uncontrolled,
-       or figure out how to explain to MUI that there's no problem...
-    */
-
     if (value === "string" && !!props.row.defaultValue) {
       setTypeChangeDialog({
         open: true,
@@ -357,27 +350,25 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
       // No problems
       apiRef.current.setEditCellValue({ id, field, value: event.target.value });
     }
-    // TODO: Re-render the grid/the edit cells that depend on the param type
-    //apiRef.current.forceUpdate(); //<-- this is not quite it...
   };
 
   return (
     <FormControl fullWidth>
       <Select
-        value={value}
+        value={value ? value : ""}
         ref={ref}
         onChange={handleValueChange}
         displayEmpty={true}
-        endAdornment={<InputAdornment>*</InputAdornment>}
+        endAdornment={<InputAdornment position={"end"}>*</InputAdornment>}
         renderValue={(val) => {
-          if (val === undefined) {
+          if (val === "") {
             //return <span color={"textDisabled"}>Type (required)</span>;
             return <MenuItem disabled>Type (required)</MenuItem>;
           }
           return val;
         }}
       >
-        <MenuItem disabled value={undefined}>
+        <MenuItem disabled value={""}>
           <em>Type (required)</em>
         </MenuItem>
         <MenuItem value={"string"}>string</MenuItem>
