@@ -6,7 +6,9 @@ import * as React from "react";
 import {
   GridEditInputCell,
   GridRenderEditCellParams,
+  GridState,
   useGridApiContext,
+  useGridSelector,
 } from "@mui/x-data-grid";
 import {
   Box,
@@ -18,7 +20,18 @@ import {
   Tooltip,
 } from "@mui/material";
 
-// TODO: Re-render grid (or individual edit cells) on parameter type change.
+/*
+   Some fields (e.g. options, rangeValueMin/Max) render in edit mode as enabled/disabled depending on parameter type.
+   A change in the *edit* cell value of the 'type' field must therefore trigger a re-render in those dependent fields.
+   This is not achievable with props.row.type, since props.row.type is the "last saved" value, not the current edit value.
+   (It *is* probably achievable by keeping some sort of 'editModeTypeValue' state in the parent DataGrid, but since
+   multiple rows can be in edit mode simultaneously, that approach would probably become more complex than this one.)
+   To trigger the necessary re-renders, this selector is used in renderEditCell components with useGridSelector
+   like so: useGridSelector(apiRef, editingTypeSelector(id)); where apiRef is the Grid API and id is the row id from props.
+   See also: https://github.com/mui/mui-x/issues/9489#issuecomment-1610299768
+*/
+const editingTypeSelector = (rowId) => (state: GridState) =>
+  state.editRows[rowId]?.type.value;
 
 export function ParameterBooleanSelect(props: GridRenderEditCellParams) {
   // This component exists solely to make the singleSelect show the field name as the displayEmpty renderValue.
@@ -71,8 +84,11 @@ export function ParameterDefaultValueInput(props: GridRenderEditCellParams) {
   const ref = React.useRef();
   const [isHover, setIsHover] = React.useState(false);
 
+  useGridSelector(apiRef, editingTypeSelector(id));
+  const currentEditType = apiRef.current.getRowWithUpdatedValues(id).type;
+
   const isDisabled = !(
-    props.row.type === "string" || props.row.type === "number"
+    currentEditType === "string" || currentEditType === "number"
   );
   const disabledTooltipMsg = `${field} is only applicable for parameters of type string or number.`;
 
@@ -120,9 +136,14 @@ export function ParameterNameInput(props: GridRenderEditCellParams) {
 }
 
 export function ParameterOptionsButton(props: GridRenderEditCellParams) {
+  const { id } = props;
   const [isHover, setIsHover] = React.useState(false);
+  const apiRef = useGridApiContext();
 
-  const isDisabled = props.row.type !== "enum";
+  useGridSelector(apiRef, editingTypeSelector(id));
+  const currentEditType = apiRef.current.getRowWithUpdatedValues(id).type;
+
+  const isDisabled = currentEditType !== "enum";
   const disabledTooltipMsg =
     "Options is only applicable for parameters of type enum.";
 
@@ -191,7 +212,10 @@ export function ParameterRangeValueInput(props: GridRenderEditCellParams) {
   const ref = React.useRef();
   const [isHover, setIsHover] = React.useState(false);
 
-  const isDisabled = props.row.type !== "number";
+  useGridSelector(apiRef, editingTypeSelector(id));
+  const currentEditType = apiRef.current.getRowWithUpdatedValues(id).type;
+
+  const isDisabled = currentEditType !== "number";
   const disabledTooltipMsg = `${field} is only applicable for parameters of type number.`;
 
   React.useLayoutEffect(() => {
