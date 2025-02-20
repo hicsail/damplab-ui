@@ -7,6 +7,7 @@ import { CanvasContext } from '../contexts/Canvas';
 import LoadCanvasButton from './LoadCanvasButton';
 import SaveCanvasButton from './SaveCanvasButton';
 import "../styles/resubmit.css";
+import { useLocation } from 'react-router-dom';
 
 export default function HeaderBar() {
     const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function HeaderBar() {
     const [snackbarMessage, setSnackbarMessage] = useState("");
 
     const { setNodes, setEdges, nodes, edges } = useContext(CanvasContext);
+    const windowLocation = useLocation();
 
     // This function is responsible for keeping currentCanvas up to date, it is called when user saves or loads a canvas.
     const updateCurrentCanvas = (canvasName = "") => {
@@ -38,6 +40,11 @@ export default function HeaderBar() {
     }
 
     const areChangesUnsaved = useCallback(() => {
+        // This function only returns changes found on the canvas page. If the user is anywhere else return false.
+        if (windowLocation.pathname !== "/canvas") {
+            return false;
+        }
+
         // Get the name of current work from local storage, or the default value if it's empty
         let currentCanvas = localStorage.getItem("CurrentCanvas") || "canvas:";
 
@@ -57,8 +64,8 @@ export default function HeaderBar() {
             // Case 4: If we are here, this means a canvas has been loaded - but no changes made.
             return false;
         }
-    }, [edges, nodes])
-    
+    }, [edges, nodes, windowLocation])
+
     const loadCanvasData = useCallback((canvasName = "canvas:") => {
         // Update currentCanvas to new canvas
         updateCurrentCanvas(canvasName)
