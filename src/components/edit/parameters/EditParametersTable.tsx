@@ -171,6 +171,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       valueParser: (value) => {return (value === undefined || value === "") ? undefined : Number(value);},
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterRangeValueInput {...params} />),
     },
+    /*
     {
       field: 'dynamicAdd',
       width: 200,
@@ -187,6 +188,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       width: 200,
       editable: isEdit
     }
+    */
   ];
 
   const handleDeletion = async (id: GridRowId) => {
