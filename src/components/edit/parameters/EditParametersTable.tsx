@@ -23,7 +23,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   Snackbar
 } from '@mui/material';
 import { EditParameterOptions } from './EditParameterOptions';
@@ -272,12 +271,9 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       </Dialog>
       <Dialog open={typeChangeDialog.open} onClose={typeChangeDialog.onCancel}>
         <DialogContent>
-          <DialogContentText>
             You are changing the parameter type from <strong>{typeChangeDialog.oldType}</strong> to <strong>{typeChangeDialog.newType}</strong>.
             The following fields are not applicable for the new type and will be reset:
-            {/* FIXME: ul cannot appear as a descendant of p */}
             <ul>{typeChangeDialog.fieldsToReset?.map((f) => <li key={f}>{f}</li>)}</ul>
-          </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={typeChangeDialog.onCancel}>Cancel</Button>
