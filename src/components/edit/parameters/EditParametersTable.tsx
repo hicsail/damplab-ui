@@ -126,18 +126,49 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       field: 'defaultValue',
       width: 200,
       editable: isEdit,
+      valueParser: (value, row, column, apiRef) => {
+        // This valueParser makes sure that when the param type is 'number', the input values get serialized as
+        // numbers, not strings.
+
+        // In Firefox, if a user types non-numerical characters into an <input> of type 'number', those characters are
+        // displayed in the <input>, but the input value gets set to the empty string. Other browsers do not allow the
+        // entry of non-numerical characters inside a number input. (see https://bugzil.la/1398528)
+        // This makes it impossible to distinguish - either here or during validation on save - between an intentionally
+        // empty value (if a user enters a number and then backspaces, the input value ends up being "", not undefined)
+        // and a string value (whatever string the Firefox user sees on screen, the value that valueParser gets will
+        // be ""). Also, if the string goes from "a" -> "ab", the input element sees "" -> "", so the valueParser does
+        // not even run.
+        // The upshot is that a Firefox user might enter a string into a number input, hit save, and see the string
+        // "disappear" without any error message/feedback. There are ways around this, but I don't think it is worth
+        // giving up the benefits of using the native <input type='number'>, which works fine in other browsers.
+
+        const currentEditType = apiRef.current.getRowWithUpdatedValues(row.id).type;
+        if (currentEditType === "number") {
+          // Don't let undefined/empty string be cast to 0; 0 is not the same as no value.
+          // Cast "" to undefined too, so that handleValueChange in ParameterTypeSelect knows to not warn the user about
+          // resetting an empty value without needing to check against both undefined and empty string.
+          // (It cannot just check for truthiness, because the number 0 is a meaningful value.)
+          return (value === undefined || value === "") ? undefined /* not value */: Number(value);
+        } else {
+          return (value === "") ? undefined : value;
+        }
+      },
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterDefaultValueInput {...params} />),
     },
     {
       field: 'rangeValueMin',
       width: 200,
       editable: isEdit,
+      // comments on valueParser for 'defaultValue' field apply here
+      valueParser: (value) => {return (value === undefined || value === "") ? undefined : Number(value);},
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterRangeValueInput {...params} />),
     },
     {
       field: 'rangeValueMax',
       width: 200,
       editable: isEdit,
+      // comments on valueParser for 'defaultValue' field apply here
+      valueParser: (value) => {return (value === undefined || value === "") ? undefined : Number(value);},
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterRangeValueInput {...params} />),
     },
     {

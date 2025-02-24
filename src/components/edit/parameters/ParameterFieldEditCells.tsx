@@ -20,6 +20,12 @@ import {
   Tooltip,
 } from "@mui/material";
 
+/* FIXME: Error "MUI: The `children` component of the Tooltip is not forwarding its props correctly" -
+   this occurs when a GridEditInputCell is focused that has a Tooltip wrapping it.
+   See this open issue https://github.com/mui/material-ui/issues/33476
+   and this https://mui.com/material-ui/react-tooltip/#custom-child-element
+ */
+
 /*
    Some fields (e.g. options, rangeValueMin/Max) render in edit mode as enabled/disabled depending on parameter type.
    A change in the *edit* cell value of the 'type' field must therefore trigger a re-render in those dependent fields.
@@ -106,6 +112,7 @@ export function ParameterDefaultValueInput(props: GridRenderEditCellParams) {
     <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
       <GridEditInputCell
         ref={ref}
+        type={!isDisabled ? currentEditType : undefined}
         disabled={isDisabled}
         onChange={handleValueChange}
         onMouseOver={() => setIsHover(true)}
@@ -232,6 +239,8 @@ export function ParameterRangeValueInput(props: GridRenderEditCellParams) {
     <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
       <GridEditInputCell
         ref={ref}
+        // Firefox will still allow non-numerical inputs; see https://bugzilla.mozilla.org/show_bug.cgi?id=1398528
+        type={"number"}
         disabled={isDisabled}
         onChange={handleValueChange}
         onMouseOver={() => setIsHover(true)}
@@ -255,7 +264,10 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
   }, [hasFocus]);
 
   const handleValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (value === "string" && !!props.row.defaultValue) {
+    // NB: In the onConfirm callbacks, the 'type' field (this field) itself should be changed _before_ other fields are
+    // reset. This ensures that if there is a valueParser on the field being reset, it parses the reset value according
+    // to the _new_ parameter type.
+    if (value === "string" && props.row.defaultValue !== undefined) {
       setTypeChangeDialog({
         open: true,
         oldType: value,
@@ -264,13 +276,13 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
         onConfirm: () => {
           apiRef.current.setEditCellValue({
             id,
-            field: "defaultValue",
-            value: undefined,
+            field,
+            value: event.target.value,
           });
           apiRef.current.setEditCellValue({
             id,
-            field,
-            value: event.target.value,
+            field: "defaultValue",
+            value: undefined,
           });
           setTypeChangeDialog({ open: false });
         },
@@ -280,14 +292,13 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
       });
     } else if (value === "number") {
       let fieldsToReset: string[] = [];
-      if (!!props.row.defaultValue) {
-        // do we want to check the new type and if it is "string" then leave this be...?
+      if (props.row.defaultValue !== undefined) {
         fieldsToReset.push("defaultValue");
       }
-      if (!!props.row.rangeValueMin) {
+      if (props.row.rangeValueMin !== undefined) {
         fieldsToReset.push("rangeValueMin");
       }
-      if (!!props.row.rangeValueMax) {
+      if (props.row.rangeValueMax !== undefined) {
         fieldsToReset.push("rangeValueMax");
       }
 
@@ -298,6 +309,11 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
           newType: event.target.value,
           fieldsToReset: fieldsToReset,
           onConfirm: () => {
+            apiRef.current.setEditCellValue({
+              id,
+              field,
+              value: event.target.value,
+            });
             for (const field of fieldsToReset) {
               apiRef.current.setEditCellValue({
                 id,
@@ -305,11 +321,6 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
                 value: undefined,
               });
             }
-            apiRef.current.setEditCellValue({
-              id,
-              field,
-              value: event.target.value,
-            });
             setTypeChangeDialog({ open: false });
           },
           onCancel: () => {
@@ -335,12 +346,12 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
         newType: event.target.value,
         fieldsToReset: ["options"],
         onConfirm: () => {
-          apiRef.current.setEditCellValue({ id, field: "options", value: [] });
           apiRef.current.setEditCellValue({
             id,
             field,
             value: event.target.value,
           });
+          apiRef.current.setEditCellValue({ id, field: "options", value: [] });
           setTypeChangeDialog({ open: false });
         },
         onCancel: () => {
@@ -356,13 +367,13 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
         onConfirm: () => {
           apiRef.current.setEditCellValue({
             id,
-            field: "tableData",
-            value: undefined,
+            field,
+            value: event.target.value,
           });
           apiRef.current.setEditCellValue({
             id,
-            field,
-            value: event.target.value,
+            field: "tableData",
+            value: undefined,
           });
           setTypeChangeDialog({ open: false });
         },
