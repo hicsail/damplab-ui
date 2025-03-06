@@ -26,6 +26,7 @@ import {
   Snackbar
 } from '@mui/material';
 import { EditParameterOptions } from './EditParameterOptions';
+import { EditParameterTableData } from './EditParameterTableData';
 import {
   ParameterBooleanSelect,
   ParameterDefaultValueInput,
@@ -35,6 +36,7 @@ import {
   ParameterOptionsButton,
   ParameterParamTypeSelect,
   ParameterRangeValueInput,
+  ParameterTableDataButton,
   ParameterTypeSelect
 } from './ParameterFieldEditCells';
 import {validateParameter} from './ParameterValidation';
@@ -52,6 +54,8 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const [optionDialogOpen, setOptionDialogOpen] = useState<boolean>(false);
   const [optionViewProps, setOptionViewProps] = useState<GridRenderCellParams | null>(null);
   const [optionEditProps, setOptionEditProps] = useState<GridRenderEditCellParams | null>(null);
+  const [tableDataDialogOpen, setTableDataDialogOpen] = useState<boolean>(false);
+  const [tableDataParams, setTableDataParams] = useState<GridRenderCellParams | GridRenderEditCellParams | null>(null);
   const [snackbar, setSnackbar] = useState<Pick<AlertProps, 'children' | 'severity'> | null>(null);
   const [typeChangeDialog, setTypeChangeDialog] = useState({
     open: false,
@@ -74,6 +78,11 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     setOptionEditProps(options);
     setOptionDialogOpen(true);
   };
+
+  const handleTableDataButton = (params: GridRenderCellParams | GridRenderEditCellParams) => {
+    setTableDataParams(params);
+    setTableDataDialogOpen(true);
+  }
 
   const handleCloseSnackbar = () => setSnackbar(null);
 
@@ -182,12 +191,14 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       width: 200,
       editable: isEdit
     },
+    */
     {
       field: 'tableData',
       width: 200,
-      editable: isEdit
+      editable: isEdit,
+      renderCell: (params: GridRenderCellParams) => <Button variant="contained" onClick={() => handleTableDataButton(params)}>View</Button>,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterTableDataButton {...params} handleTableDataButton={handleTableDataButton} />),
     }
-    */
   ];
 
   const handleDeletion = async (id: GridRowId) => {
@@ -267,6 +278,11 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       <Dialog open={optionDialogOpen} onClose={() => setOptionDialogOpen(false)} fullWidth PaperProps={{ sx: { maxWidth: '100%' }}}>
         <DialogContent>
           <EditParameterOptions viewParams={optionViewProps} editParams={optionEditProps} gridRef={gridRef} />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={tableDataDialogOpen} onClose={() => setTableDataDialogOpen(false)}>
+        <DialogContent>
+          <EditParameterTableData tableDataParams={tableDataParams} parametersApiRef={gridRef} />
         </DialogContent>
       </Dialog>
       <Dialog open={typeChangeDialog.open} onClose={typeChangeDialog.onCancel}>

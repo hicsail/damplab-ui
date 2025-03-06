@@ -252,6 +252,36 @@ export function ParameterRangeValueInput(props: GridRenderEditCellParams) {
   );
 }
 
+export function ParameterTableDataButton(props: GridRenderEditCellParams) {
+  const { id } = props;
+  const [isHover, setIsHover] = React.useState(false);
+  const apiRef = useGridApiContext();
+
+  useGridSelector(apiRef, editingTypeSelector(id));
+  const currentEditType = apiRef.current.getRowWithUpdatedValues(id).type;
+
+  const isDisabled = currentEditType !== "table";
+  const disabledTooltipMsg =
+    "TableData is only applicable for parameters of type table.";
+
+  return (
+    <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
+      <Box
+        onMouseOver={() => setIsHover(true)}
+        onMouseOut={() => setIsHover(false)}
+      >
+        <Button
+          variant="contained"
+          disabled={isDisabled}
+          onClick={() => props.handleTableDataButton(props)}
+        >
+          Edit
+        </Button>
+      </Box>
+    </Tooltip>
+  );
+}
+
 export function ParameterTypeSelect(props: GridRenderEditCellParams) {
   const { id, value, field, hasFocus, setTypeChangeDialog } = props;
   const apiRef = useGridApiContext();
