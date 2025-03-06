@@ -21,6 +21,7 @@ import ELabs          from './pages/ELabs';
 import Kernel         from './pages/Kernel';
 import ReleaseNotes   from './pages/ReleaseNotes';
 import TestPage       from './pages/TestPage';
+import Auth0Callback  from './components/Auth0Callback';
 // import Tracking       from './pages/ClientView';
 // import Accepted       from './pages/Accepted';
 import './App.css';
@@ -101,6 +102,7 @@ function App() {
 
                     <Route path = "/test_page"           element = {<PrivateRouteAdmin> <TestPage />                  </PrivateRouteAdmin>} />
                     <Route path = "/edit"                element = {<PrivateRouteAdmin> <AdminEdit />                 </PrivateRouteAdmin>} />
+                    <Route path = "/mpi/auth0_redirect"  element = {<Auth0Callback />} />
                     <Route path = "/*"                   element = {<div>Sorry, we can't find this page at the moment (404). Please double check the URL or try again later.</div>} />
                     {/* <Route path = "/client_view/:id"     element = {<PrivateRouteAdmin> <Tracking />                  </PrivateRouteAdmin>} /> */}
                     {/* <Route path = "/callback"            element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} /> */}
