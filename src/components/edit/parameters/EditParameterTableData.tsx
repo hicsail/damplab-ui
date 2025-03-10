@@ -7,8 +7,11 @@ import {
   GridRowsProp,
   GridRenderCellParams,
   GridRenderEditCellParams,
+  GridRowModes,
+  GridRowModesModel,
   GridValidRowModel,
 } from "@mui/x-data-grid";
+import { getActionsColumn } from "../ActionColumn";
 
 export function EditParameterTableData(props) {
   const gridCellParams: GridRenderEditCellParams | GridRenderCellParams =
@@ -24,12 +27,13 @@ export function EditParameterTableData(props) {
   // setEditCellValue does not re-render this component, because this component is "outside" the parameter grid.
   // So, use state and Grid API in tandem. Similar to the pattern here
   // https://mui.com/x/react-data-grid/editing/#with-debounce, but unidirectional (no need for debounce-and-sync).
-  // TODO: Can we make it so 'editable' column field is not saved to DB and only used internally?
-  // TODO: The 'editable' field is not saved to the db, so add it internally on render.
   const [columns, setColumns] = React.useState<GridColDef[]>(
-    tableData?.columns.map((c) => ({ ...c, editable: isEditMode })) || [],
+    tableData?.columns || [],
   );
   const [rows, setRows] = React.useState<GridRowsProp>(tableData?.rows || []);
+  const [rowModesModel, setRowModesModel] = React.useState<GridRowModesModel>(
+    {},
+  );
 
   const [newColumnField, setNewColumnField] = React.useState<string>("");
   const [newColumnFieldErrorMsg, setNewColumnFieldErrorMsg] =
@@ -37,8 +41,37 @@ export function EditParameterTableData(props) {
   const [newColumnHeaderName, setNewColumnHeaderName] =
     React.useState<string>("");
 
+  // the actions column and the 'editable' field on each column are used by the grid internally,
+  // but shouldn't be saved to DB. Add them here
+  let renderColumns: GridColDef[];
+  if (isEditMode) {
+    renderColumns = columns.map((c) => ({ ...c, editable: isEditMode }));
+    renderColumns.push(
+      getActionsColumn({
+        rowModesModel: rowModesModel,
+        handleDelete: (id) => updateRows(rows.filter((row) => row.id !== id)),
+        handleEdit: (id) =>
+          setRowModesModel({
+            ...rowModesModel,
+            [id]: { mode: GridRowModes.Edit },
+          }),
+        handleCancel: (id) =>
+          setRowModesModel({
+            ...rowModesModel,
+            [id]: { mode: GridRowModes.View, ignoreModifications: true },
+          }),
+        handleSave: (id) =>
+          setRowModesModel({
+            ...rowModesModel,
+            [id]: { mode: GridRowModes.View },
+          }),
+      }),
+    );
+  } else {
+    renderColumns = columns;
+  }
+
   function updateColumns(newColumns: GridColDef[]) {
-    //columns.forEach(column => delete column.editable); //TODO
     props.parametersApiRef.current.setEditCellValue({
       id: gridCellParams.id,
       field: gridCellParams.field,
@@ -70,9 +103,6 @@ export function EditParameterTableData(props) {
         {
           field: newColumnField,
           headerName: newColumnHeaderName ? newColumnHeaderName : undefined,
-          // "headerName" in Mui Data Grid is "header" in the canvas/ParamTableDisplay code
-          header: newColumnHeaderName ? newColumnHeaderName : undefined,
-          editable: isEditMode,
         },
       ]);
       setNewColumnField("");
@@ -80,19 +110,24 @@ export function EditParameterTableData(props) {
     }
   }
   function addNewRow() {
-    updateRows([...rows, { id: uuid() }]);
+    const newId = uuid();
+    updateRows([...rows, { id: newId }]);
+    setRowModesModel((oldModel) => ({
+      ...oldModel,
+      [newId]: { mode: GridRowModes.Edit },
+    }));
   }
 
   function handleRowUpdate(updatedRow: GridValidRowModel) {
-    const indexToUpdate = rows.findIndex((row) => row.id === updatedRow.id);
     updateRows(
-      rows.map((row, index) => (index === indexToUpdate ? updatedRow : row)),
+      rows.map((row) => (row.id === updatedRow.id ? updatedRow : row)),
     );
     return updatedRow;
   }
 
+  // TODO just rename 'header' to 'headerName' in Asad's code...
   // TODO: At each stage, re-test whole flow & edit from Canvas & make sure it saves into workflowNode formdata
-  // todo: DELETE columns and rows.....
+  // TODO: Delete columns...
   // TODO: UI layout
   return (
     <>
@@ -122,7 +157,9 @@ export function EditParameterTableData(props) {
 
       <DataGrid
         rows={rows}
-        columns={columns}
+        columns={renderColumns}
+        editMode="row"
+        rowModesModel={rowModesModel}
         processRowUpdate={handleRowUpdate}
         onProcessRowUpdateError={(e) => console.log(e)}
       />
