@@ -1,9 +1,11 @@
 import * as React from "react";
 import { v4 as uuid } from "uuid";
 import { Box, Button, TextField } from "@mui/material";
+import DeleteIcon from "@mui/icons-material/Delete";
 import {
   DataGrid,
   GridColDef,
+  GridColumnHeaderParams,
   GridRowsProp,
   GridRenderCellParams,
   GridRenderEditCellParams,
@@ -44,8 +46,25 @@ export function EditParameterTableData(props) {
   // the actions column and the 'editable' field on each column are used by the grid internally,
   // but shouldn't be saved to DB. Add them here
   let renderColumns: GridColDef[];
-  if (isEditMode) {
-    renderColumns = columns.map((c) => ({ ...c, editable: isEditMode }));
+  if (!isEditMode) {
+    renderColumns = columns;
+  } else {
+    renderColumns = columns.map((c) => ({
+      ...c,
+      editable: isEditMode,
+      renderHeader: (params: GridColumnHeaderParams) => (
+        <>
+          {params.colDef.headerName || params.colDef.field}
+          <DeleteIcon
+            onClick={() => {
+              updateColumns(
+                columns.filter((col) => col.field !== params.colDef.field),
+              );
+            }}
+          />
+        </>
+      ),
+    }));
     renderColumns.push(
       getActionsColumn({
         rowModesModel: rowModesModel,
@@ -67,8 +86,6 @@ export function EditParameterTableData(props) {
           }),
       }),
     );
-  } else {
-    renderColumns = columns;
   }
 
   function updateColumns(newColumns: GridColDef[]) {
@@ -125,10 +142,6 @@ export function EditParameterTableData(props) {
     return updatedRow;
   }
 
-  // TODO just rename 'header' to 'headerName' in Asad's code...
-  // TODO: At each stage, re-test whole flow & edit from Canvas & make sure it saves into workflowNode formdata
-  // TODO: Delete columns...
-  // TODO: UI layout
   return (
     <>
       <Box component="form" hidden={!isEditMode}>
@@ -162,6 +175,8 @@ export function EditParameterTableData(props) {
         rowModesModel={rowModesModel}
         processRowUpdate={handleRowUpdate}
         onProcessRowUpdateError={(e) => console.log(e)}
+        disableColumnMenu
+        disableColumnSorting
       />
     </>
   );
