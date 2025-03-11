@@ -1,6 +1,6 @@
 import * as React from "react";
 import { v4 as uuid } from "uuid";
-import { Box, Button, TextField } from "@mui/material";
+import { Box, Button, Stack, TextField } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import {
   DataGrid,
@@ -143,29 +143,28 @@ export function EditParameterTableData(props) {
   }
 
   return (
-    <>
-      <Box component="form" hidden={!isEditMode}>
-        <TextField
-          label="Field id"
-          variant="outlined"
-          required
-          value={newColumnField}
-          onChange={(event) => setNewColumnField(event.target.value)}
-          error={!!newColumnFieldErrorMsg}
-          helperText={newColumnFieldErrorMsg}
-        />
-        <TextField
-          label="Display name"
-          variant="outlined"
-          value={newColumnHeaderName}
-          onChange={(event) => setNewColumnHeaderName(event.target.value)}
-        />
-        <Button variant="contained" onClick={addNewColumn}>
-          Add new column
-        </Button>
-        <Button variant="contained" onClick={addNewRow}>
-          Add new ROW
-        </Button>
+    <Box sx={{ width: "100%" }}>
+      <Box hidden={!isEditMode}>
+        <Stack direction="row">
+          <TextField
+            label="Field id"
+            variant="outlined"
+            required
+            value={newColumnField}
+            onChange={(event) => setNewColumnField(event.target.value)}
+            error={!!newColumnFieldErrorMsg}
+            helperText={newColumnFieldErrorMsg}
+          />
+          <TextField
+            label="Display name"
+            variant="outlined"
+            value={newColumnHeaderName}
+            onChange={(event) => setNewColumnHeaderName(event.target.value)}
+          />
+          <Button variant="contained" size="small" onClick={addNewColumn}>
+            Add new column
+          </Button>
+        </Stack>
       </Box>
 
       <DataGrid
@@ -177,7 +176,15 @@ export function EditParameterTableData(props) {
         onProcessRowUpdateError={(e) => console.log(e)}
         disableColumnMenu
         disableColumnSorting
+        hideFooter
       />
-    </>
+      <Box hidden={!isEditMode}>
+        <Stack direction="row" justifyContent="flex-start">
+          <Button variant="contained" onClick={addNewRow}>
+            Add new row
+          </Button>
+        </Stack>
+      </Box>
+    </Box>
   );
 }
