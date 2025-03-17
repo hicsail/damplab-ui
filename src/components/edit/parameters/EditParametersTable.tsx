@@ -294,7 +294,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
           <EditParameterOptions viewParams={optionViewProps} editParams={optionEditProps} gridRef={gridRef} />
         </DialogContent>
       </Dialog>
-      <Dialog open={tableDataDialogOpen} onClose={() => setTableDataDialogOpen(false)}>
+      <Dialog open={tableDataDialogOpen} onClose={() => setTableDataDialogOpen(false)} maxWidth={false}>
         <DialogContent>
           <EditParameterTableData tableDataParams={tableDataParams} parametersApiRef={gridRef} />
         </DialogContent>

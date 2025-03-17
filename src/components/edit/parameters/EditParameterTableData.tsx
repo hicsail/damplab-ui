@@ -109,10 +109,10 @@ export function EditParameterTableData(props) {
     const fieldAlreadyInUse = (col) => col.field === newColumnField;
     if (columns.some(fieldAlreadyInUse)) {
       setNewColumnFieldErrorMsg(
-        `Column field '${newColumnField}' is already in use.`,
+        `Field name '${newColumnField}' is already in use.`,
       );
     } else if (!newColumnField) {
-      setNewColumnFieldErrorMsg(`Column field is required.`);
+      setNewColumnFieldErrorMsg(`Field name is required.`);
     } else {
       setNewColumnFieldErrorMsg("");
       updateColumns([
@@ -143,25 +143,31 @@ export function EditParameterTableData(props) {
   }
 
   return (
-    <Box sx={{ width: "100%" }}>
+    <Stack spacing={2}>
       <Box hidden={!isEditMode}>
-        <Stack direction="row">
+        <Stack direction="row" spacing={1} alignItems={"baseline"}>
           <TextField
-            label="Field id"
+            label="Field name"
             variant="outlined"
             required
             value={newColumnField}
             onChange={(event) => setNewColumnField(event.target.value)}
             error={!!newColumnFieldErrorMsg}
-            helperText={newColumnFieldErrorMsg}
+            helperText={[
+              newColumnFieldErrorMsg,
+              "Field name should be a human-readable string naming the column, e.g. 'volume' or 'per_reaction'.",
+            ].join(" ")}
           />
           <TextField
             label="Display name"
             variant="outlined"
             value={newColumnHeaderName}
             onChange={(event) => setNewColumnHeaderName(event.target.value)}
+            helperText={
+              "Display name if different from field name, e.g. 'Volume (uL)' or 'Per Reaction'."
+            }
           />
-          <Button variant="contained" size="small" onClick={addNewColumn}>
+          <Button variant="contained" onClick={addNewColumn}>
             Add new column
           </Button>
         </Stack>
@@ -185,6 +191,6 @@ export function EditParameterTableData(props) {
           </Button>
         </Stack>
       </Box>
-    </Box>
+    </Stack>
   );
 }
