@@ -159,6 +159,7 @@ export function ParameterOptionsButton(props: GridRenderEditCellParams) {
       <Box
         onMouseOver={() => setIsHover(true)}
         onMouseOut={() => setIsHover(false)}
+        width={"fit-content"}
       >
         <Button
           variant="contained"
@@ -269,6 +270,7 @@ export function ParameterTableDataButton(props: GridRenderEditCellParams) {
       <Box
         onMouseOver={() => setIsHover(true)}
         onMouseOut={() => setIsHover(false)}
+        width={"fit-content"}
       >
         <Button
           variant="contained"

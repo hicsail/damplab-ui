@@ -39,6 +39,10 @@ import {
   ParameterTableDataButton,
   ParameterTypeSelect
 } from './ParameterFieldEditCells';
+import {
+  ParameterOptionsViewCell,
+  ParameterTableViewCell,
+} from './ParameterFieldViewCells';
 import {validateParameter} from './ParameterValidation';
 
 interface EditParametersTableProps {
@@ -127,7 +131,12 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       field: 'options',
       width: 200,
       editable: isEdit,
-      renderCell: (params) => <Button variant="contained" onClick={() => handleOptionsViewButton(params)}>View</Button>,
+      renderCell: (params: GridRenderCellParams) => (
+          <ParameterOptionsViewCell
+              {...params}
+              handleOptionsViewButton={handleOptionsViewButton}
+          />
+      ),
       renderEditCell: (params : GridRenderEditCellParams) => <ParameterOptionsButton {...params} handleOptionsEditButton={handleOptionsEditButton} />,
     },
     {
@@ -196,7 +205,12 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       field: 'tableData',
       width: 200,
       editable: isEdit,
-      renderCell: (params: GridRenderCellParams) => <Button variant="contained" onClick={() => handleTableDataButton(params)}>View</Button>,
+      renderCell: (params: GridRenderCellParams) => (
+          <ParameterTableViewCell
+              {...params}
+              handleTableDataButton={handleTableDataButton}
+          />
+      ),
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterTableDataButton {...params} handleTableDataButton={handleTableDataButton} />),
     }
   ];
