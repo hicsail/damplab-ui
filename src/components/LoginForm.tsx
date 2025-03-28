@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, TextField } from '@mui/material';
+import { Box, Button, TextField, Tooltip } from '@mui/material';
+import GppGood from '@mui/icons-material/GppGood';
 
 import AccountTreeIcon        from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import ViewStreamIcon         from '@mui/icons-material/ViewStream';
+import LanguageIcon from '@mui/icons-material/Language';
 
-import MPILoginForm from './MPILoginForm';
+import MPILoginButton from './MPILoginButton';
 import { UserInfo } from '../types/mpi';
 
 export default function LoginForm() {
@@ -102,26 +104,54 @@ export default function LoginForm() {
             {/* <Button variant="contained" onClick={() => navigate(role === 'admin' ? '/dashboard' : '/canvas')} style={{ marginRight: 10 }}>
               Go to {role === 'admin' ? 'Dashboard' : 'Canvas'}
             </Button> */}
-            <Button variant="contained" onClick={() => window.location.href = "https://www.damplab.org/services"} sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-              <img src='/damp-white.svg' height='30px' style={{margin: 1, marginLeft: -25, marginRight: 10}} alt="DAMP Logo"/>DAMPLab Site<br/>(See Service Prices)
+            <Button 
+              variant="contained" 
+              onClick={() => window.location.href = "https://www.damplab.org/services"} 
+              sx={{ m: 2, width: '210px', textTransform: 'none' }}
+              startIcon={<img src='/damp-white.svg' height='30px' style={{margin: 2}} alt="DAMP Logo"/>}
+            >
+              DAMPLab Site<br/>(See Service Prices)
             </Button>
-            <Button variant="contained" onClick={() => navigate('/canvas')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-              <AccountTreeIcon sx={{m:1, ml:-4, transform: "rotate(90deg) scaleY(-1)"}}/>CANVAS<br/>(Design Workflows)
+            <Button 
+              variant="contained" 
+              onClick={() => navigate('/canvas')}  
+              sx={{ m: 2, width: '210px', textTransform: 'none' }}
+              startIcon={<AccountTreeIcon sx={{ transform: "rotate(90deg) scaleY(-1)" }} />}
+            >
+              CANVAS<br/>(Design Workflows)
             </Button>
             {role === 'admin' ? 
               <>
-                <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-                  <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
-                </Button> 
-                <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-                  <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Release Notes<br/>(+ Other Admin Info)
-                </Button> 
-                <MPILoginForm 
+                <Button 
+                  variant="contained" 
+                  onClick={() => navigate('/dashboard')}  
+                  sx={{ m: 2, width: '210px', textTransform: 'none' }}
+                  startIcon={<ViewStreamIcon />}
+                >
+                  DASHBOARD<br/>(See Submitted Jobs)
+                </Button>
+                <Button 
+                  variant="contained" 
+                  onClick={() => navigate('/screener')}  
+                  sx={{ m: 2, width: '210px', textTransform: 'none' }}
+                  startIcon={<GppGood />}
+                >
+                  SCREENER<br/>(SecureDNA Screens)
+                </Button>
+                <Button 
+                  variant="contained" 
+                  onClick={() => navigate('/release_notes')}  
+                  sx={{ m: 2, mb: 6, width: '210px', textTransform: 'none' }}
+                  startIcon={<FormatListBulletedIcon />}
+                >
+                  Release Notes<br/>(+ Other Admin Info)
+                </Button>
+                {/* <MPILoginButton 
                   isLoggedIn={isLoggedIn} 
                   setIsLoggedIn={setIsLoggedIn}
                   userInfo={userInfo}
                   setUserInfo={setUserInfo}
-                />
+                /> */}
                 {/* <Button variant="contained" onClick={() => navigate('/dominos')} sx={{ m: 2 }}>Go to Dominos Page</Button> 
                 <Button variant="contained" onClick={() => navigate('/elabs')} sx={{ m: 2 }}>Go to eLabs Site</Button> 
                 <Button variant="contained" onClick={() => navigate('/kernel')} sx={{ m: 2 }}>Go to Kernel Site</Button>  */}

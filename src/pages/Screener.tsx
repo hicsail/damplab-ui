@@ -4,7 +4,7 @@ import { Grid } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
 
-import MPILoginForm from '../components/MPILoginForm';
+import MPILoginButton from '../components/MPILoginButton';
 import SecureDNAScreeningTable from '../components/SecureDNAScreeningTable';
 import UploadAndScreenSequences from '../components/UploadAndScreenSequences';
 import { getUserScreenings } from '../mpi/SecureDNAQueries';
@@ -34,24 +34,15 @@ function Screener() {
 
   return (
     <>
-      <Box sx={{ position: 'relative', mb: 8, mt: 2 }}>
-        <Box sx={{ position: 'absolute', top: 0, right: 0, mr: 3 }}>
-          <MPILoginForm 
-            isLoggedIn={isLoggedIn} 
-            setIsLoggedIn={setIsLoggedIn}
-            userInfo={userInfo}
-            setUserInfo={setUserInfo}
-          />
-        </Box>
-
+      <Box sx={{ position: 'relative', mt: 2 }}>
         <Typography variant="h5" component="h5" gutterBottom 
           sx={{ display: 'flex', alignItems: 'start', ml: 3 }}>
           SecureDNA Screenings
         </Typography>
-        <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'start', ml: 3, mb: 3 }}>
-          Run biosecurity screenings on your sequences using SecureDNA's algorithm.
+        <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'start', ml: 3, mb: 5 }}>
+          Sign into the MPI to access SecureDNA's screening tool.
         </Typography>
-        <Box maxWidth="lg" sx={{ ml: 5 }}>
+        <Box maxWidth="lg" sx={{ ml: 3 }}>
           <Grid
             container
             direction="row"
@@ -61,17 +52,26 @@ function Screener() {
           >
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', mb: 2 }}>
-                <Button variant='outlined' sx={{ display: 'flex', mr: 3 }} onClick={fetchSecureDNAScreenings}>
+                <Button variant='outlined' sx={{ mr: 3 }} onClick={fetchSecureDNAScreenings}>
                   <RefreshIcon fontSize='small' />
                 </Button>
                 <Button
-                  sx={{ mt: { xs: 2, md: 0 } }}
+                  sx={{ mr: 3 }}
                   variant="contained"
                   onClick={() => setOpenUploadAndScreen(true)}
                   startIcon={<AddIcon fontSize="small" />}
+                  disabled={!isLoggedIn}
                 >
                   Upload and Screen Sequences
                 </Button>
+                <Box sx={{ mt: 0.0 }}>
+                  <MPILoginButton 
+                    isLoggedIn={isLoggedIn} 
+                    setIsLoggedIn={setIsLoggedIn}
+                    userInfo={userInfo}
+                    setUserInfo={setUserInfo}
+                  />
+                </Box>
               </Box>
               <SecureDNAScreeningTable screenings={secureDNAScreenings}/>
             </Grid>

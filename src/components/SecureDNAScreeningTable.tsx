@@ -41,11 +41,8 @@ function SecureDnaTable({ screenings }: ScreenerTableProps) {
   const [limit, setLimit] = useState<number>(5);
 
   const getFormattedDate = (dateString: string | Date) => {
-    const date = new Date(dateString);
-    const month = date.getUTCMonth() + 1;
-    const day = date.getUTCDate();
-    const year = date.getUTCFullYear();
-    return `${month}/${day}/${year}`;
+    const datetime = new Date(dateString).toLocaleString('en-US', { timeZoneName: 'short' });
+    return datetime;
   };
 
   const handlePageChange = (event: any, newPage: number): void => {
@@ -76,12 +73,12 @@ function SecureDnaTable({ screenings }: ScreenerTableProps) {
         <TableCell>{screening.sequenceId}</TableCell>
         <TableCell>{screening.sequence.name}</TableCell>
         <TableCell>
-          <Typography sx={{ color: screening.status === "denied" ? "red" : "green" }}>
+          <Typography sx={{ textTransform: 'capitalize', color: screening.status === "denied" ? "red" : "green" }}>
             {screening.status}
           </Typography>
         </TableCell>
         <TableCell>
-          <Button onClick={() => setScreeningModal(screening)}>View</Button>
+          <Button sx={{ ml: -1 }} onClick={() => setScreeningModal(screening)}>View</Button>
         </TableCell>
       </TableRow>
     ));
@@ -142,10 +139,10 @@ function SecureDnaTable({ screenings }: ScreenerTableProps) {
         <Table sx={{ minWidth: 650 }} aria-label="simple table">
           <TableHead>
             <TableRow>
-              <TableCell>Date</TableCell>
-              <TableCell>ID</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Status</TableCell>
+              <TableCell>Time</TableCell>
+              <TableCell>Screening ID</TableCell>
+              <TableCell>Sequence Name</TableCell>
+              <TableCell>Result</TableCell>
               <TableCell>Details</TableCell>
             </TableRow>
           </TableHead>

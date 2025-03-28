@@ -1,8 +1,8 @@
-import { Box, Button, FormControl, InputLabel, MenuItem, Modal, Select, Stack, Typography, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import { Box, Button, Modal, Stack, Typography, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import { useState, useEffect } from 'react';
-import { screenSequencesBatch } from '../mpi/SecureDNAQueries';
+import { screenSequencesBatch, getUserScreenings } from '../mpi/SecureDNAQueries';
 import { Sequence } from '../mpi/models/sequence';
-import { Region } from '../mpi/types';
+import { Region, ScreeningResult } from '../mpi/types';
 import { createSequence } from '../mpi/SequencesQueries';
 import { parseFile } from "seqparse";
 import FileUploadIcon from '@mui/icons-material/FileUpload';
@@ -12,7 +12,7 @@ const style = {
   top: '50%',
   left: '55%',
   transform: 'translate(-50%, -50%)',
-  width: 800,
+  width: 900,
   bgcolor: 'background.paper',
   border: '1px solid #000',
   boxShadow: 24,
@@ -30,7 +30,6 @@ interface UploadAndScreenSequencesProps {
 
 function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: UploadAndScreenSequencesProps) {
   const [sequences, setSequences] = useState<Sequence[]>([]);
-  const [selectedRegion, setSelectedRegion] = useState<Region>(Region.ALL);
   const [message, setMessage] = useState<string>('');
   const [error, setError] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -38,20 +37,14 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
   useEffect(() => {
     if (!open) {
       setSequences([]);
-      setSelectedRegion(Region.ALL);
       setMessage('');
       setError(false);
       setIsProcessing(false);
     }
   }, [open]);
 
-  const handleRegionSelection = (event: any) => {
-    setSelectedRegion(event.target.value);
-  };
-
   const handleClose = () => {
     setSequences([]);
-    setSelectedRegion(Region.ALL);
     setMessage('');
     setError(false);
     setIsProcessing(false);
@@ -66,7 +59,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
         const fileContent = e.target?.result as string;
         try {
           const parsedSequences = parseFile(fileContent);
-          setSequences(parsedSequences);
+          setSequences(prev => [...prev, ...parsedSequences]);
           setMessage('');
         } catch (error) {
           console.error("Error parsing sequences:", error);
@@ -84,19 +77,38 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
       setMessage("");
       try {
         for (const file of Array.from(files)) {
+          // Skip directories and non-sequence files
+          if (!file.name.match(/\.(seq|gb|gbk|genbank|ape|fasta|fas|fa|dna)$/i)) {
+            console.log('Skipping non-sequence file:', file.name);
+            continue;
+          }
+          
+          console.log('Processing file:', file.name);
           const reader = new FileReader();
           const fileContent = await new Promise<string>((resolve, reject) => {
             reader.onload = (e) => resolve(e.target?.result as string);
             reader.onerror = () => reject(reader.error);
             reader.readAsText(file);
           });
-          const parsedSequences = await parseFile(fileContent);
-          allSequences.push(...parsedSequences);
+          
+          try {
+            const parsedSequences = await parseFile(fileContent);
+            console.log(`Found ${parsedSequences.length} sequences in ${file.name}`);
+            allSequences.push(...parsedSequences);
+          } catch (parseError) {
+            console.error(`Error parsing file ${file.name}:`, parseError);
+            continue; // Skip this file but continue with others
+          }
         }
-        setSequences(allSequences);
+        
+        if (allSequences.length > 0) {
+          setSequences(prev => [...prev, ...allSequences]);
+        } else {
+          setMessage("No valid sequence files found in the folder");
+        }
       } catch (error) {
-        console.error("Error parsing folder:", error);
-        setMessage("Error parsing folder or sequences");
+        console.error("Error processing folder:", error);
+        setMessage("Error processing folder or sequences");
       }
     }
   };
@@ -120,11 +132,50 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
       }
 
       // Then start the screening process with all sequence IDs
-      const screeningResult = await screenSequencesBatch(sequenceIds, selectedRegion);
+      const screeningResult = await screenSequencesBatch(sequenceIds, Region.ALL);
       
       if (screeningResult) {
         setMessage('The biosecurity check is running in the background. Results will be shown in the SecureDNA screenings table.');
-        onScreeningComplete();
+        
+        // Start polling for new results
+        const pollInterval = 10000; // Poll every 10 seconds
+        const maxAttempts = 60; // Maximum 5 minutes of polling
+        let attempts = 0;
+        
+        const pollForResults = async () => {
+          attempts++;
+          const currentScreenings = await getUserScreenings();
+          
+          if (currentScreenings) {
+            // Check if any of our sequences have results
+            const hasNewResults = currentScreenings.some((screening: ScreeningResult) => 
+              sequenceIds.includes(screening.sequenceId)
+            );
+            
+            if (hasNewResults) {
+              onScreeningComplete();
+              return true; // Stop polling
+            }
+          }
+          
+          if (attempts >= maxAttempts) {
+            setMessage('Screening started but results are taking longer than expected. The table will update automatically when results are ready.');
+            return true; // Stop polling
+          }
+          
+          return false; // Continue polling
+        };
+        
+        // Start polling
+        const poll = async () => {
+          const shouldStop = await pollForResults();
+          if (!shouldStop) {
+            setTimeout(poll, pollInterval);
+          }
+        };
+        
+        poll();
+        
         setTimeout(handleClose, 2000); // Close after 2 seconds
       } else {
         throw new Error('Failed to start screening');
@@ -138,113 +189,110 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
     }
   };
 
-  const getFormattedDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
+  const handleRemoveSequence = (index: number) => {
+    setSequences(prev => prev.filter((_, i) => i !== index));
   };
+
+  const hasInvalidSequences = sequences.some(seq => seq.seq.length < 50);
 
   return (
     <Modal open={open} onClose={handleClose}>
       <Box sx={style}>
-        <Stack spacing={6} direction="column" alignItems="center">
+        <Stack spacing={3} direction="column" alignItems="center">
           <Typography variant="h4">
             Upload and Screen Sequences
           </Typography>
           
           <Typography variant="body1" sx={{ textAlign: 'center' }}>
-            Upload your sequences and run a biosecurity screening using SecureDNA's algorithm.<br/><br/>
             Sequences must be at least 50 base pairs in length.
           </Typography>
 
-          {sequences.length === 0 ? (
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <input
-                type="file"
-                accept=".seq,.gb,.gbk,.genbank,.ape,.fasta,.fas,.fa,.dna"
-                onChange={handleFileChange}
-                id='seqFilePicker'
-                style={{ display: 'none' }}
-              />
-              <label htmlFor='seqFilePicker'>
-                <Button
-                  component="span"
-                  variant='contained'
-                  startIcon={<FileUploadIcon />}
-                >
-                  Upload File
-                </Button>
-              </label>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <input
+              type="file"
+              accept=".seq,.gb,.gbk,.genbank,.ape,.fasta,.fas,.fa,.dna"
+              onChange={handleFileChange}
+              id='seqFilePicker'
+              style={{ display: 'none' }}
+            />
+            <label htmlFor='seqFilePicker'>
+              <Button
+                component="span"
+                variant='contained'
+                startIcon={<FileUploadIcon />}
+              >
+                Upload File
+              </Button>
+            </label>
 
-              <input
-                type="file"
-                {...{ webkitdirectory: "true" }}
-                multiple
-                onChange={handleFolderUpload}
-                id='seqFolderPicker'
-                style={{ display: 'none' }}
-              />
-              <label htmlFor='seqFolderPicker'>
-                <Button
-                  component="span"
-                  variant='contained'
-                  startIcon={<FileUploadIcon />}
-                >
-                  Upload Folder
-                </Button>
-              </label>
-            </Box>
-          ) : (
+            <input
+              type="file"
+              {...{ webkitdirectory: "true" }}
+              multiple
+              onChange={handleFolderUpload}
+              id='seqFolderPicker'
+              style={{ display: 'none' }}
+            />
+            <label htmlFor='seqFolderPicker'>
+              <Button
+                component="span"
+                variant='contained'
+                startIcon={<FileUploadIcon />}
+              >
+                Upload Folder
+              </Button>
+            </label>
+            <Button
+              variant="outlined"
+              onClick={() => setSequences([])}
+              disabled={isProcessing}
+            >
+              Clear
+            </Button>
+          </Box>
+
+          {sequences.length > 0 && (
             <>
               <Box sx={{ width: '100%', maxHeight: '400px', overflowY: 'auto' }}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
+                      <TableCell>Sequence</TableCell>
                       <TableCell>Length</TableCell>
-                      <TableCell>Created</TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {sequences.map((seq, index) => (
                       <TableRow key={index}>
                         <TableCell>{seq.name}</TableCell>
-                        <TableCell>{seq.seq.length} bp</TableCell>
-                        <TableCell>{getFormattedDate(new Date().toISOString())}</TableCell>
+                        <TableCell>{seq.seq.substring(0, 50)}...</TableCell>
+                        <TableCell sx={{ color: seq.seq.length < 50 ? 'error.main' : '' }}>{seq.seq.length} bp</TableCell>
+                        <TableCell>
+                          <Button
+                            size="small"
+                            color="error"
+                            onClick={() => handleRemoveSequence(index)}
+                            disabled={isProcessing}
+                          >
+                            ×
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </Box>
 
-              <FormControl size="small" sx={{ width: '100%', mt: 2 }}>
-                <InputLabel id="region-label">Select region</InputLabel>
-                <Select
-                  label="Select region"
-                  sx={{ minWidth: 150 }}
-                  value={selectedRegion}
-                  onChange={handleRegionSelection}
-                >
-                  {Object.values(Region).map((region) => (
-                    <MenuItem key={region} value={region}>{region.toUpperCase()}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+              <Box sx={{ display: 'flex', gap: 2 }}>
                 <Button
                   variant="contained"
-                  color="primary"
+                  color="success"
                   onClick={handleScreening}
-                  disabled={isProcessing || sequences.length === 0}
+                  disabled={isProcessing || sequences.length === 0 || hasInvalidSequences}
                 >
                   {isProcessing ? 'Processing...' : 'Screen Sequences'}
-                </Button>
-                <Button
-                  variant="outlined"
-                  onClick={() => setSequences([])}
-                  disabled={isProcessing}
-                >
-                  Clear
                 </Button>
                 <Button
                   variant="outlined"
