@@ -1,128 +1,108 @@
-import React, { useState, useContext } from 'react'
+import { useState, useEffect, useContext, useCallback } from 'react'
 import { Link, useNavigate } from "react-router-dom";
-import { AppBar, Button, Dialog, DialogTitle, IconButton, TextField, Toolbar, Hidden } from '@mui/material';
-import { SaveOutlined }         from '@mui/icons-material';
+import { AppBar, Button, IconButton, Toolbar, Hidden, Alert } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
-import UploadFileIcon           from '@mui/icons-material/UploadFile';
-
+import Snackbar from '@mui/material/Snackbar';
 import { CanvasContext } from '../contexts/Canvas';
+import LoadCanvasButton from './LoadCanvasButton';
+import SaveCanvasButton from './SaveCanvasButton';
 import "../styles/resubmit.css";
 
-
 export default function HeaderBar() {
-
     const navigate = useNavigate();
 
-    const alignRight = {
-        marginLeft: 'auto',
-        marginRight: 10,
-        //width: 'fit-content',
-    };
-
-    interface SimpleDialogProps {
-        open: boolean;
-        selectedValue: string;
-        onClose: (value: string) => void;
-        setNodes? : any;
-        setEdges? : any;
-        setLoadOpen? : any;
-    }
-
-    const [open, setOpen]         = useState(false);
-    const [loadOpen, setLoadOpen] = useState(false);
+    // If snackbarMessage starts with "Success", then the snackbar will be green, otherwise it will be red to show an error.
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
+    const [snackbarMessage, setSnackbarMessage] = useState("");
 
     const { setNodes, setEdges, nodes, edges } = useContext(CanvasContext);
 
-    const handleClickOpen = () => {
-        console.log('open');
-        setOpen(true);
+    // This function is responsible for keeping currentCanvas up to date, it is called when user saves or loads a canvas.
+    const updateCurrentCanvas = (canvasName = "") => {
+        // If canvas name was provided and exists in local storage, update CurrentCanvas
+        if (canvasName !== "" && localStorage.getItem(canvasName)) {
+            localStorage.setItem("CurrentCanvas", canvasName);
+        }
     };
 
-    const handleClose = (value: string) => {
-        setOpen(false);
-    };
-
-    const handleLoadOpen = () => { 
-        navigate('/canvas');
-        setLoadOpen(true);
+    // When snackbar is opened, set its message and set open useState to true
+    const handleSnackbarOpen = (message: string) => {
+        setSnackbarMessage(message);
+        setSnackbarOpen(true);
     }
 
-    function SimpleDialog(props: SimpleDialogProps ) {
-        const { onClose, selectedValue, open } = props;
-        const [fileName, setFileName] = useState('');
-        const handleClose = () => {
-            // create object with filename, nodes, edges and save to local storage
-            let file = {
-                fileName: fileName,
-                nodes: nodes,
-                edges: edges,
-            }
-            localStorage.setItem(fileName, JSON.stringify(file));
-            onClose(selectedValue);
-        };
-      
-        // const handleListItemClick = (value: string) => {
-        //   onClose(value);
-        // };
-    
-        return (
-          <Dialog onClose={handleClose} open={open}>
-            <div style={{width: 300, height: 200, padding: 10}}>
-                <DialogTitle>Save Canvas</DialogTitle>
-                <div>
-                    <TextField id="outlined-basic" label="File name" variant="outlined" onChange={(e)=> setFileName(e.target.value)}/>
-                </div>
-                <div style={{ margin: 20 }}>
-                    <Button variant="contained" onClick={handleClose}>Save</Button>
-                </div>
-            </div>
-          </Dialog>
-        );
+    // When closing, don't erase the message or else the snackbar will change color while playing the closing animation.
+    // Because of this, we simply set the snackbarOpen state to false
+    const handleSnackbarClose = () => {
+        setSnackbarOpen(false);
     }
 
-    function LoadDialog(props: SimpleDialogProps ) {
-        const { onClose, selectedValue, open, setNodes, setEdges, setLoadOpen } = props;
+    const areChangesUnsaved = useCallback(() => {
+        // Get the name of current work from local storage, or the default value if it's empty
+        let currentCanvas = localStorage.getItem("CurrentCanvas") || "canvas:";
+
+        // Extract saved nodes and edges from local storage.
+        let { nodes: savedNodes, edges: savedEdges } = JSON.parse(localStorage.getItem(currentCanvas) || '{}');
         
-        const handleClose = (fileName: any) => {
-            // get file from local storage and load it into the canvas
-            let file = JSON.parse(localStorage.getItem(fileName) || '{}');
-            
-            onClose(selectedValue);
-            if (file.nodes) setNodes(file.nodes);
-            // console.log("Load nodes: ", file.nodes);
-            if (file.edges) setEdges(file.edges);
-            // console.log("Load edges: ", file.edges);
-            setLoadOpen(false);
-        };
-      
-        // const handleListItemClick = (value: string) => {
-        //   onClose(value);
-        // };
+        if (currentCanvas === "canvas:" && (nodes.length > 0 || edges.length > 0)) {
+            // Case 1: No canvas selected and there is content on the graph - Yes, changes are unsaved.
+            return true;
+        } else if (currentCanvas === "canvas:") {
+            // Case 2: No canvas is selected and there is nothing on the graph - No changes made.
+            return false;
+        } else if (JSON.stringify(savedNodes) !== JSON.stringify(nodes) || JSON.stringify(savedEdges) !== JSON.stringify(edges)) {
+            // Case 3: Current canvas content does not match saved content - Yes, changes are unsaved.
+            return true;
+        } else {
+            // Case 4: If we are here, this means a canvas has been loaded - but no changes made.
+            return false;
+        }
+    }, [edges, nodes])
+    
+    const loadCanvasData = useCallback((canvasName = "canvas:") => {
+        // Update currentCanvas to new canvas
+        updateCurrentCanvas(canvasName)
 
-        // get list of saved files from local storage
-        let files = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            files.push(localStorage.key(i));
+        // Attempt to load file, load empty object if nothing found
+        let file = JSON.parse(localStorage.getItem(canvasName) || '{}');
+
+        if (file.nodes) setNodes(file.nodes);
+        if (file.edges) setEdges(file.edges);
+    }, [setNodes, setEdges])
+
+    // Checks to see the CurrentCanvas that is present in local storage. Only runs once on page load.
+    useEffect(() => {
+        const currentCanvas = localStorage.getItem("CurrentCanvas");
+
+        // If not present, set key and exit
+        if (!currentCanvas) {
+            localStorage.setItem("CurrentCanvas", "");
+            return;
         }
 
-        return (
-          <Dialog onClose={handleClose} open={open}>
-            <DialogTitle>Load Canvas</DialogTitle>
-            <div style={{width: 450, height: 200, padding: 10}}>
-            {
-                files.map((file) => {
-                    return (
-                        <div key={Math.random().toString(36).substring(2, 9)} style={{margin: 10}}>
-                            <Button variant="contained" onClick={()=> handleClose(file)}>{file}</Button>
-                        </div>
-                    )
-                })
-            }
-            </div>
-          </Dialog>
-        );
-    }
+        // If canvas exists, load it into storage. Otherwise, reset current canvas as the canvas its referencing no longer exists.
+        if(localStorage.getItem(currentCanvas)) {
+            loadCanvasData(currentCanvas);
+        } else {
+            localStorage.setItem("CurrentCanvas", "");
+        }
+    }, [loadCanvasData])
 
+    // This hook is responsible for applying the event listener for browser close on the canvas page.
+    useEffect (() => {
+        const handleUnsavedWork = (event: BeforeUnloadEvent) => {
+            if (areChangesUnsaved()) {
+                event.preventDefault();
+                event.returnValue = ''; // Required for older browsers to show dialog
+            }
+        };
+        window.addEventListener("beforeunload", handleUnsavedWork);
+        return () => {
+            window.removeEventListener("beforeunload", handleUnsavedWork);
+        };
+    }, [areChangesUnsaved])
+
+    
 
     return (
         <div>
@@ -147,15 +127,17 @@ export default function HeaderBar() {
                         </span>
                     </Button>
 
-                    <div style={alignRight}>
+                    <div style={{ marginLeft: 'auto', marginRight: 10 }}>
                         
-                        <IconButton onClick={handleLoadOpen} title="Load canvas" aria-controls='menu-appbar' aria-haspopup='true'>
-                            <UploadFileIcon style={{color: 'white'}}/>
-                        </IconButton>
+                        <LoadCanvasButton 
+                            loadCanvas={loadCanvasData}
+                            areChangesUnsaved={areChangesUnsaved}
+                        />
 
-                        <IconButton onClick={handleClickOpen} title="Save canvas" aria-controls='menu-appbar' aria-haspopup='true'>
-                            <SaveOutlined style={{color: 'white'}}/>
-                        </IconButton>
+                        <SaveCanvasButton
+                            openSnackbar={handleSnackbarOpen}
+                            updateCurrentCanvas={updateCurrentCanvas}
+                        />
 
                         {window.location.href.includes('resubmission')
                         ? <Link to="/checkout" className="a a--hover a--active">Resubmit...</Link>
@@ -164,26 +146,19 @@ export default function HeaderBar() {
                           </IconButton>}
 
                     </div>
-
                 </Toolbar>
-
-                <SimpleDialog
-                    selectedValue = {'test'}
-                    open          = {open}
-                    onClose       = {handleClose}
-                />
-                
-                <LoadDialog
-                    selectedValue = {'test'}
-                    open          = {loadOpen}
-                    setLoadOpen   = {setLoadOpen}
-                    onClose       = {handleClose}
-                    setNodes      = {setNodes}
-                    setEdges      = {setEdges}
-                />
-
             </AppBar>
             <Toolbar /> 
+            <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}> 
+                <Alert 
+                    onClose={handleSnackbarClose}
+                    severity={snackbarMessage.startsWith("Success") ? 'success' : 'error'}
+                    variant='filled'
+                    sx={{ width: '100%' }}
+                >
+                    {snackbarMessage}
+                    </Alert>    
+            </Snackbar>
         </div>
     )
 }

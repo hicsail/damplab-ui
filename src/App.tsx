@@ -22,6 +22,7 @@ import ELabs          from './pages/ELabs';
 import Kernel         from './pages/Kernel';
 import ReleaseNotes   from './pages/ReleaseNotes';
 import TestPage       from './pages/TestPage';
+import FinalCheckout from './pages/FinalCheckout';
 import Auth0Callback  from './components/Auth0Callback';
 // import Tracking       from './pages/ClientView';
 // import Accepted       from './pages/Accepted';
@@ -90,6 +91,7 @@ function App() {
 
                     <Route path = "/canvas"              element = {<PrivateRouteClient> <MainFlow />                 </PrivateRouteClient>} />
                     <Route path = "/resubmission/:id"    element = {<PrivateRouteClient> <MainFlow client={client} /> </PrivateRouteClient>} />
+                    <Route path = "/final_checkout"      element = {<PrivateRouteClient> <FinalCheckout />           </PrivateRouteClient>} />
                     <Route path = "/checkout"            element = {<PrivateRouteClient> <Checkout />                 </PrivateRouteClient>} />
                     <Route path = "/submitted"           element = {<PrivateRouteClient> <JobSubmitted />             </PrivateRouteClient>} />
 
