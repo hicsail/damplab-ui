@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { handleLoginCallback, debugCheckToken } from '../mpi/SequencesQueries';
+import { handleLoginCallback, debugCheckToken } from '../mpi/MPIAuthQueries';
 import { Box, CircularProgress, Typography } from '@mui/material';
 
 const Auth0Callback = () => {
@@ -46,7 +46,7 @@ const Auth0Callback = () => {
         }
         
         // Process the code
-        const success = await handleLoginCallback(code);
+        const success = await handleLoginCallback();
         
         // Clear state regardless of success
         localStorage.removeItem('auth_state');

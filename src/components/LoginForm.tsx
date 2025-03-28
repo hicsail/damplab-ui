@@ -7,7 +7,7 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import ViewStreamIcon         from '@mui/icons-material/ViewStream';
 
 import MPILoginForm from './MPILoginForm';
-
+import { UserInfo } from '../types/mpi';
 
 export default function LoginForm() {
   const demo_admin = {
@@ -29,6 +29,7 @@ export default function LoginForm() {
   const [loggedIn,   setLoggedIn]   = useState(false);
   const [role,       setRole]       = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [userInfo,   setUserInfo]   = useState<UserInfo | null>(null);
 
   useEffect(() => {
     const loginInfo = JSON.parse(sessionStorage.getItem('login_info') || '{}');
@@ -78,29 +79,6 @@ export default function LoginForm() {
     }
   };
 
-
-  const getAclidScreenings = async () => {
-    try {
-      const response = await fetch('http://localhost:5100/mpi/aclid/screens', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get Aclid data');
-      }
-      
-      const data = await response.json();
-      console.log('aclid data: ', data);
-      return data;
-
-    } catch (err) {
-      console.error(err);
-      return undefined;
-    }
-  };
-
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
       {!loggedIn ? (
@@ -138,10 +116,12 @@ export default function LoginForm() {
                 <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
                   <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Release Notes<br/>(+ Other Admin Info)
                 </Button> 
-                <MPILoginForm isLoggedIn={isLoggedIn} setIsLoggedIn={setIsLoggedIn}/>
-                <Button variant="contained" onClick={() => getAclidScreenings()}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-                  <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Print Aclid Screenings<br/>
-                </Button> 
+                <MPILoginForm 
+                  isLoggedIn={isLoggedIn} 
+                  setIsLoggedIn={setIsLoggedIn}
+                  userInfo={userInfo}
+                  setUserInfo={setUserInfo}
+                />
                 {/* <Button variant="contained" onClick={() => navigate('/dominos')} sx={{ m: 2 }}>Go to Dominos Page</Button> 
                 <Button variant="contained" onClick={() => navigate('/elabs')} sx={{ m: 2 }}>Go to eLabs Site</Button> 
                 <Button variant="contained" onClick={() => navigate('/kernel')} sx={{ m: 2 }}>Go to Kernel Site</Button>  */}

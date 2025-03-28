@@ -16,189 +16,158 @@ import {
 } from '@mui/material';
 import { useState, ChangeEvent } from 'react';
 import SeqViz from 'seqviz';
-import { updateSecureDNAScreening } from '../mpi/SecureDNAQueries';
-import { Genome } from '../mpi/models/genome';
+import { ScreeningResult } from '../mpi/types';
 
 interface ScreenerTableProps {
   className?: string;
-  genomes: Genome[];
+  screenings: ScreeningResult[];
 }
 
 const applyPagination = (
-    genomes: Genome[],
-    page: number,
-    limit: number
-  ): Genome[] => {
-    if (genomes) {
-      return genomes.slice(page * limit, page * limit + limit);
-    } else {
-      return [];
-    }
+  screenings: ScreeningResult[],
+  page: number,
+  limit: number
+): ScreeningResult[] => {
+  if (screenings) {
+    return screenings.slice(page * limit, page * limit + limit);
+  } else {
+    return [];
+  }
 };
 
-function SecureDnaTable({ genomes }: ScreenerTableProps) {
-  const [genomeModal, setGenomeModal] = useState<Genome | null>(null);
+function SecureDnaTable({ screenings }: ScreenerTableProps) {
+  const [screeningModal, setScreeningModal] = useState<ScreeningResult | null>(null);
   const [page, setPage] = useState<number>(0);
   const [limit, setLimit] = useState<number>(5);
 
-  const getFormattedDate = (dateString: string) => {
-      const date = new Date(dateString);
-      const month = date.getUTCMonth() + 1;
-      const day = date.getUTCDate();
-      const year = date.getUTCFullYear();
-      return `${month}/${day}/${year}`;
-  };
-
-  const getAdminStatusColor = (status: string) => {
-      switch (status) {
-          case 'approved':
-              return 'green';
-          case 'rejected':
-              return 'red';
-          case 'falsePositive':
-              return 'orange';
-      }
+  const getFormattedDate = (dateString: string | Date) => {
+    const date = new Date(dateString);
+    const month = date.getUTCMonth() + 1;
+    const day = date.getUTCDate();
+    const year = date.getUTCFullYear();
+    return `${month}/${day}/${year}`;
   };
 
   const handlePageChange = (event: any, newPage: number): void => {
-      setPage(newPage);
+    setPage(newPage);
   };
 
   const handleLimitChange = (event: ChangeEvent<HTMLInputElement>): void => {
-      setLimit(parseInt(event.target.value));
+    setLimit(parseInt(event.target.value));
   };
 
   const style = {
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      width: '50%',
-      bgcolor: 'background.paper',
-      border: '0.5px solid #000',
-      boxShadow: 24,
-      p: 5,
-      overflowY: 'scroll'
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '50%',
+    bgcolor: 'background.paper',
+    border: '0.5px solid #000',
+    boxShadow: 24,
+    p: 5,
+    overflowY: 'scroll'
   };
 
-  const renderTable = (genomeData: Genome[]) => {
-      return genomeData.map((genome: any, index: any) => (
-          <TableRow key={index}>
-              <TableCell>{getFormattedDate(genome.timestamp)}</TableCell>
-              <TableCell>{genome.id}</TableCell>
-              <TableCell>{genome.user.email}</TableCell>
-              <TableCell>
-                  <Typography sx={{ color: genome?.sequence?.biosecurity.status === "denied" ? "red" : "green" }}>
-                      {genome?.sequence?.biosecurity.status}
-                  </Typography>
-              </TableCell>
-              <TableCell>
-                  <Typography sx={{ color: getAdminStatusColor(genome.adminStatus) }}>
-                      {genome.adminStatus !== 'falsePositive' ? genome.adminStatus : 'false positive'}
-                  </Typography>
-              </TableCell>
-              <TableCell>
-                  <Button onClick={() => setGenomeModal(genome)}>View</Button>
-              </TableCell>
-          </TableRow>
-      ));
+  const renderTable = (screeningData: ScreeningResult[]) => {
+    return screeningData.map((screening: ScreeningResult, index: number) => (
+      <TableRow key={index}>
+        <TableCell>{getFormattedDate(screening.createdAt)}</TableCell>
+        <TableCell>{screening.sequenceId}</TableCell>
+        <TableCell>{screening.sequence.name}</TableCell>
+        <TableCell>
+          <Typography sx={{ color: screening.status === "denied" ? "red" : "green" }}>
+            {screening.status}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Button onClick={() => setScreeningModal(screening)}>View</Button>
+        </TableCell>
+      </TableRow>
+    ));
   };
 
-  const paginatedGenomes = applyPagination(genomes, page, limit);
+  const paginatedScreenings = applyPagination(screenings, page, limit);
 
   const getAnnotations = () => {
-      const annotations = genomeModal?.sequence?.biosecurity?.biosecurityCheck?.map((check) => {
-          return check.hit_regions.map((region, idx) => ({
-              start: region.start_index,
-              end: region.end_index,
-              id: `${check.organism.name}-hit-region-${idx + 1}`,
-              color: 'red',
-              name: check.organism.name
-          }));
-      });
-      return annotations?.flat();
-  };
-
-  const updateGenomeAdmin = async (status: string) => {
-      const response = await updateSecureDNAScreening(genomeModal?.id, status);
-      if (response) {
-          setGenomeModal(null);
-      }
+    if (!screeningModal) return [];
+    return screeningModal.threats.map((threat, idx) => 
+      threat.hit_regions.map((region, regionIdx) => ({
+        start: region.seq_range_start,
+        end: region.seq_range_end,
+        id: `${threat.most_likely_organism.name}-hit-region-${idx}-${regionIdx}`,
+        color: 'red',
+        name: threat.most_likely_organism.name
+      }))
+    ).flat();
   };
 
   return (
-      <>
-          {genomeModal &&
-              <Modal
-                  open={genomeModal !== null}
-                  onClose={() => setGenomeModal(null)}
-              >
-                  <Box sx={style}>
-                      <Stack direction="column" spacing={2}>
-                          <Typography variant="h6" component="h2">
-                              User email: {genomeModal.user.email}
-                          </Typography>
-                          <Typography variant="body1">
-                              Sequence name: {genomeModal.sequence.name}
-                          </Typography>
-                          <Typography variant="body1">
-                              Sequence type: {genomeModal.sequence.type}
-                          </Typography>
-                          <Typography variant="body1">
-                              Sequence biosecurity status: {genomeModal?.sequence.biosecurity?.status}
-                          </Typography>
-                          {genomeModal?.sequence?.biosecurity?.status === 'denied' &&
-                              <>
-                                  <Typography variant="body1">
-                                      Organisms Detected: {genomeModal?.sequence?.biosecurity?.biosecurityCheck?.map((check) => check.organism.name).join(", ")}
-                                  </Typography>
-                                  <Typography variant="body1">
-                                      Hit Regions:
-                                  </Typography>
-                                  <SeqViz seq={genomeModal.sequence.seq} viewer="linear" style={{ height: '200px' }} annotations={getAnnotations()} />
-                              </>
-                          }
-                          <Stack direction="row" spacing={2}>
-                              <Button variant="contained" sx={{ width: '200px', backgroundColor: 'green' }} onClick={() => updateGenomeAdmin('approved')}>Approve Sequence</Button>
-                              <Button variant="contained" sx={{ width: '200px', backgroundColor: 'red' }} onClick={() => updateGenomeAdmin('rejected')}>Reject Sequence</Button>
-                              <Button variant="contained" sx={{ width: '200px', backgroundColor: 'orange' }} onClick={() => updateGenomeAdmin('falsePositive')}>Flag as False Positive</Button>
-                          </Stack>
-                      </Stack>
-                  </Box>
-              </Modal>
-          }
+    <>
+      {screeningModal &&
+        <Modal
+          open={screeningModal !== null}
+          onClose={() => setScreeningModal(null)}
+        >
+          <Box sx={style}>
+            <Stack direction="column" spacing={2}>
+              <Typography variant="h6" component="h2">
+                Sequence: {screeningModal.sequence.name}
+              </Typography>
+              <Typography variant="body1">
+                Status: {screeningModal.status}
+              </Typography>
+              {screeningModal.status === 'denied' &&
+                <>
+                  <Typography variant="body1">
+                    Threats Detected: {screeningModal.threats.map((threat) => threat.most_likely_organism.name).join(", ")}
+                  </Typography>
+                  <Typography variant="body1">
+                    Hit Regions:
+                  </Typography>
+                  <SeqViz 
+                    seq={screeningModal.originalSeq} 
+                    viewer="linear" 
+                    style={{ height: '200px' }} 
+                    annotations={getAnnotations()} 
+                  />
+                </>
+              }
+            </Stack>
+          </Box>
+        </Modal>
+      }
 
-          <TableContainer sx={{ maxWidth: '90%', textAlign: 'left' }} component={Paper}>
-              <Table sx={{ minWidth: 650 }} aria-label="simple table">
-                  <TableHead>
-                      <TableRow>
-                          <TableCell>Date</TableCell>
-                          <TableCell>ID</TableCell>
-                          <TableCell>User Email</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell>Admin Status</TableCell>
-                          <TableCell>Details</TableCell>
-                      </TableRow>
-                  </TableHead>
-                  <TableBody>
-                      {renderTable(paginatedGenomes)}
-                  </TableBody>
-              </Table>
-          </TableContainer>
-          <Card sx={{ maxWidth: '90%' }}>
-            <Box p={2}>
-                <TablePagination
-                    component="div"
-                    count={genomes?.length || 0}
-                    onPageChange={handlePageChange}
-                    onRowsPerPageChange={handleLimitChange}
-                    page={page}
-                    rowsPerPage={limit}
-                    rowsPerPageOptions={[5, 10, 25, 30]}
-                />
-            </Box>
-          </Card>
-      </>
+      <TableContainer sx={{ maxWidth: '90%', textAlign: 'left' }} component={Paper}>
+        <Table sx={{ minWidth: 650 }} aria-label="simple table">
+          <TableHead>
+            <TableRow>
+              <TableCell>Date</TableCell>
+              <TableCell>ID</TableCell>
+              <TableCell>Name</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Details</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {renderTable(paginatedScreenings)}
+          </TableBody>
+        </Table>
+      </TableContainer>
+      <Card sx={{ maxWidth: '90%' }}>
+        <Box p={2}>
+          <TablePagination
+            component="div"
+            count={screenings?.length || 0}
+            onPageChange={handlePageChange}
+            onRowsPerPageChange={handleLimitChange}
+            page={page}
+            rowsPerPage={limit}
+            rowsPerPageOptions={[5, 10, 25, 30]}
+          />
+        </Box>
+      </Card>
+    </>
   );
 }
 
