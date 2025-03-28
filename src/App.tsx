@@ -17,6 +17,7 @@ import Dominos        from './pages/Dominos';
 import Dashboard      from './pages/Dashboard';
 import JobSubmitted   from './pages/JobSubmitted';
 import Screener       from './pages/Screener';
+import Sequences      from './pages/Sequences';
 import ELabs          from './pages/ELabs';
 import Kernel         from './pages/Kernel';
 import ReleaseNotes   from './pages/ReleaseNotes';
@@ -96,6 +97,7 @@ function App() {
                     <Route path = "/dashboard"           element = {<PrivateRouteAdmin> <Dashboard client={client} /> </PrivateRouteAdmin>} />
                     <Route path = "/dominos"             element = {<PrivateRouteAdmin> <Dominos />                   </PrivateRouteAdmin>} />
                     <Route path = "/screener"            element = {<PrivateRouteAdmin> <Screener />                  </PrivateRouteAdmin>} />
+                    <Route path = "/sequences"           element = {<PrivateRouteAdmin> <Sequences />                  </PrivateRouteAdmin>} />
                     <Route path = "/elabs"               element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} />
                     <Route path = "/kernel"              element = {<PrivateRouteAdmin> <Kernel />                    </PrivateRouteAdmin>} />
                     <Route path = "/release_notes"       element = {<PrivateRouteAdmin> <ReleaseNotes />              </PrivateRouteAdmin>} />
