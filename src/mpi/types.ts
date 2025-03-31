@@ -46,15 +46,15 @@ export interface ScreeningResponse {
 }
 
 export interface ScreeningResult {
-  sequenceId: string;
+  id: string;
   sequence: {
     id: string;
     name: string;
   };
-  status: 'granted' | 'denied';
+  status: 'pending' | 'completed' | 'failed' | 'denied';
   threats: HazardHits[];
-  region: string;
+  region: Region;
   createdAt: Date;
-  warning?: string;
-  originalSeq: string;
+  userId: string;
+  originalSeq?: string;
 } 

@@ -14,7 +14,6 @@ import { ScreeningResult } from '../mpi/types';
 function Screener() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-
   const [secureDNAScreenings, setSecureDNAScreenings] = useState<ScreeningResult[]>([]);
   const [openUploadAndScreen, setOpenUploadAndScreen] = useState(false);
 

@@ -139,7 +139,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
         
         // Start polling for new results
         const pollInterval = 10000; // Poll every 10 seconds
-        const maxAttempts = 60; // Maximum 5 minutes of polling
+        const maxAttempts = 18; // Maximum 3 minutes of polling
         let attempts = 0;
         
         const pollForResults = async () => {
@@ -149,7 +149,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
           if (currentScreenings) {
             // Check if any of our sequences have results
             const hasNewResults = currentScreenings.some((screening: ScreeningResult) => 
-              sequenceIds.includes(screening.sequenceId)
+              sequenceIds.includes(screening.sequence.id)
             );
             
             if (hasNewResults) {
@@ -160,6 +160,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
           
           if (attempts >= maxAttempts) {
             setMessage('Screening started but results are taking longer than expected. The table will update automatically when results are ready.');
+            onScreeningComplete(); // Still update the table even if polling times out
             return true; // Stop polling
           }
           
@@ -176,7 +177,8 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
         
         poll();
         
-        setTimeout(handleClose, 2000); // Close after 2 seconds
+        // Don't close immediately, let the user see the status
+        setTimeout(handleClose, 5000); // Close after 5 seconds
       } else {
         throw new Error('Failed to start screening');
       }

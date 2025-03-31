@@ -70,15 +70,25 @@ function SecureDnaTable({ screenings }: ScreenerTableProps) {
     return screeningData.map((screening: ScreeningResult, index: number) => (
       <TableRow key={index}>
         <TableCell>{getFormattedDate(screening.createdAt)}</TableCell>
-        <TableCell>{screening.sequenceId}</TableCell>
+        <TableCell>{screening.sequence.id}</TableCell>
         <TableCell>{screening.sequence.name}</TableCell>
         <TableCell>
-          <Typography sx={{ textTransform: 'capitalize', color: screening.status === "denied" ? "red" : "green" }}>
+          <Typography sx={{ 
+            textTransform: 'capitalize', 
+            color: screening.status === "denied" || screening.status === "failed" ? "red" : 
+                   screening.status === "pending" ? "orange" : "green" 
+          }}>
             {screening.status}
           </Typography>
         </TableCell>
         <TableCell>
-          <Button sx={{ ml: -1 }} onClick={() => setScreeningModal(screening)}>View</Button>
+          <Button 
+            sx={{ ml: -1 }} 
+            onClick={() => setScreeningModal(screening)}
+            disabled={screening.status === 'pending'}
+          >
+            View
+          </Button>
         </TableCell>
       </TableRow>
     ));
@@ -114,7 +124,7 @@ function SecureDnaTable({ screenings }: ScreenerTableProps) {
               <Typography variant="body1">
                 Status: {screeningModal.status}
               </Typography>
-              {screeningModal.status === 'denied' &&
+              {(screeningModal.status === 'denied' || screeningModal.status === 'failed') &&
                 <>
                   <Typography variant="body1">
                     Threats Detected: {screeningModal.threats.map((threat) => threat.most_likely_organism.name).join(", ")}
@@ -122,12 +132,14 @@ function SecureDnaTable({ screenings }: ScreenerTableProps) {
                   <Typography variant="body1">
                     Hit Regions:
                   </Typography>
-                  <SeqViz 
-                    seq={screeningModal.originalSeq} 
-                    viewer="linear" 
-                    style={{ height: '200px' }} 
-                    annotations={getAnnotations()} 
-                  />
+                  {screeningModal.originalSeq && (
+                    <SeqViz 
+                      seq={screeningModal.originalSeq} 
+                      viewer="linear" 
+                      style={{ height: '200px' }} 
+                      annotations={getAnnotations()} 
+                    />
+                  )}
                 </>
               }
             </Stack>

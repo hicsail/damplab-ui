@@ -22,9 +22,10 @@ const style = {
 interface RunSecureDNABiosecurityProps {
   open: boolean
   onClose: () => void
+  onScreeningComplete?: () => void
 }
 
-function RunSecureDNABiosecurity({ onClose, open }: RunSecureDNABiosecurityProps) {
+function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecureDNABiosecurityProps) {
   const [allSequences, setAllSequences] = useState<Sequence[]>([]);
   const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
   const [selectedRegion, setSelectedRegion] = useState<Region>(Region.ALL);
@@ -65,6 +66,7 @@ function RunSecureDNABiosecurity({ onClose, open }: RunSecureDNABiosecurityProps
     if (result) {
       setMessage(result.message);
       setAlreadyRun(true);
+      onScreeningComplete?.();
     }
   }
 
