@@ -12,15 +12,21 @@ import {
   Button,
   Modal,
   Box,
-  Stack
+  Stack,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  IconButton
 } from '@mui/material';
-import { useState, ChangeEvent } from 'react';
+import { useState, ChangeEvent, useEffect } from 'react';
 import SeqViz from 'seqviz';
-import { ScreeningResult } from '../mpi/types';
+import { ScreeningResult, HazardHits } from '../mpi/types';
+import { useApolloClient, useQuery } from '@apollo/client';
+import { subscribeToScreeningResults } from '../mpi/Subscriptions';
+import { GET_USER_SCREENINGS } from '../mpi/Queries';
 
-interface ScreenerTableProps {
-  className?: string;
-  screenings: ScreeningResult[];
+interface SecureDNAScreeningTableProps {
+  onScreeningUpdate?: (result: ScreeningResult) => void;
 }
 
 const applyPagination = (
@@ -35,10 +41,37 @@ const applyPagination = (
   }
 };
 
-function SecureDnaTable({ screenings }: ScreenerTableProps) {
-  const [screeningModal, setScreeningModal] = useState<ScreeningResult | null>(null);
+function SecureDNAScreeningTable({ onScreeningUpdate }: SecureDNAScreeningTableProps) {
+  const [selectedScreening, setSelectedScreening] = useState<ScreeningResult | null>(null);
+  const [open, setOpen] = useState(false);
   const [page, setPage] = useState<number>(0);
   const [limit, setLimit] = useState<number>(5);
+  const client = useApolloClient();
+
+  const { data, loading, refetch } = useQuery(GET_USER_SCREENINGS);
+
+  useEffect(() => {
+    const subscription = subscribeToScreeningResults(client, (result: ScreeningResult) => {
+      refetch();
+      onScreeningUpdate?.(result);
+    });
+
+    return () => {
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        subscription.unsubscribe();
+      }
+    };
+  }, [client, refetch, onScreeningUpdate]);
+
+  const handleOpen = (screening: ScreeningResult) => {
+    setSelectedScreening(screening);
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    setSelectedScreening(null);
+  };
 
   const getFormattedDate = (dateString: string | Date) => {
     const datetime = new Date(dateString).toLocaleString('en-US', { timeZoneName: 'short' });
@@ -66,108 +99,112 @@ function SecureDnaTable({ screenings }: ScreenerTableProps) {
     overflowY: 'scroll'
   };
 
-  const renderTable = (screeningData: ScreeningResult[]) => {
-    return screeningData.map((screening: ScreeningResult, index: number) => (
-      <TableRow key={index}>
-        <TableCell>{getFormattedDate(screening.createdAt)}</TableCell>
-        <TableCell>{screening.sequence.id}</TableCell>
-        <TableCell>{screening.sequence.name}</TableCell>
-        <TableCell>
-          <Typography sx={{ 
-            textTransform: 'capitalize', 
-            color: screening.status === "denied" || screening.status === "failed" ? "red" : 
-                   screening.status === "pending" ? "orange" : "green" 
-          }}>
-            {screening.status}
-          </Typography>
-        </TableCell>
-        <TableCell>
-          <Button 
-            sx={{ ml: -1 }} 
-            onClick={() => setScreeningModal(screening)}
-            disabled={screening.status === 'pending'}
-          >
-            View
-          </Button>
-        </TableCell>
-      </TableRow>
-    ));
-  };
+  const renderTable = () => {
+    if (loading) {
+      return <Typography>Loading...</Typography>;
+    }
 
-  const paginatedScreenings = applyPagination(screenings, page, limit);
+    const screenings = data?.getUserScreenings || [];
 
-  const getAnnotations = () => {
-    if (!screeningModal) return [];
-    return screeningModal.threats.map((threat, idx) => 
-      threat.hit_regions.map((region, regionIdx) => ({
-        start: region.seq_range_start,
-        end: region.seq_range_end,
-        id: `${threat.most_likely_organism.name}-hit-region-${idx}-${regionIdx}`,
-        color: 'red',
-        name: threat.most_likely_organism.name
-      }))
-    ).flat();
-  };
-
-  return (
-    <>
-      {screeningModal &&
-        <Modal
-          open={screeningModal !== null}
-          onClose={() => setScreeningModal(null)}
-        >
-          <Box sx={style}>
-            <Stack direction="column" spacing={2}>
-              <Typography variant="h6" component="h2">
-                Sequence: {screeningModal.sequence.name}
-              </Typography>
-              <Typography variant="body1">
-                Status: {screeningModal.status}
-              </Typography>
-              {(screeningModal.status === 'denied' || screeningModal.status === 'failed') &&
-                <>
-                  <Typography variant="body1">
-                    Threats Detected: {screeningModal.threats.map((threat) => threat.most_likely_organism.name).join(", ")}
-                  </Typography>
-                  <Typography variant="body1">
-                    Hit Regions:
-                  </Typography>
-                  {screeningModal.originalSeq && (
-                    <SeqViz 
-                      seq={screeningModal.originalSeq} 
-                      viewer="linear" 
-                      style={{ height: '200px' }} 
-                      annotations={getAnnotations()} 
-                    />
-                  )}
-                </>
-              }
-            </Stack>
-          </Box>
-        </Modal>
-      }
-
-      <TableContainer sx={{ maxWidth: '90%', textAlign: 'left' }} component={Paper}>
-        <Table sx={{ minWidth: 650 }} aria-label="simple table">
+    return (
+      <TableContainer component={Paper}>
+        <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Time</TableCell>
-              <TableCell>Screening ID</TableCell>
-              <TableCell>Sequence Name</TableCell>
-              <TableCell>Result</TableCell>
-              <TableCell>Details</TableCell>
+              <TableCell>Sequence</TableCell>
+              <TableCell>Region</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell>Created At</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {renderTable(paginatedScreenings)}
+            {screenings.map((screening: ScreeningResult) => (
+              <TableRow key={screening.id}>
+                <TableCell>{screening.sequence.name}</TableCell>
+                <TableCell>{screening.region}</TableCell>
+                <TableCell>
+                  <Typography
+                    color={
+                      screening.status === 'completed'
+                        ? 'success.main'
+                        : screening.status === 'failed'
+                        ? 'error.main'
+                        : 'warning.main'
+                    }
+                  >
+                    {screening.status.toUpperCase()}
+                  </Typography>
+                </TableCell>
+                <TableCell>{new Date(screening.created_at).toLocaleString()}</TableCell>
+                <TableCell>
+                  <IconButton onClick={() => handleOpen(screening)}>
+                    <Button variant="outlined" size="small">
+                      View Details
+                    </Button>
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </TableContainer>
+    );
+  };
+
+  const paginatedScreenings = applyPagination(data?.getUserScreenings || [], page, limit);
+
+  const getAnnotations = () => {
+    if (!selectedScreening) return [];
+    return selectedScreening.threats.map((threat, idx) => ({
+      start: 0,
+      end: 0,
+      id: `${threat.name}-${idx}`,
+      color: 'red',
+      name: threat.name
+    }));
+  };
+
+  return (
+    <Box>
+      {renderTable()}
+      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+        <DialogTitle>Screening Details</DialogTitle>
+        <DialogContent>
+          {selectedScreening && (
+            <Box>
+              <Typography variant="h6">Sequence</Typography>
+              <Typography>{selectedScreening.sequence.name}</Typography>
+              <Typography variant="h6" sx={{ mt: 2 }}>Status</Typography>
+              <Typography>{selectedScreening.status.toUpperCase()}</Typography>
+              <Typography variant="h6" sx={{ mt: 2 }}>Region</Typography>
+              <Typography>{selectedScreening.region}</Typography>
+              {selectedScreening.threats && selectedScreening.threats.length > 0 && (
+                <>
+                  <Typography variant="h6" sx={{ mt: 2 }}>Threats Detected</Typography>
+                  {selectedScreening.threats.map((threat: HazardHits, index: number) => (
+                    <Box key={index} sx={{ mt: 1 }}>
+                      <Typography variant="subtitle1">{threat.name}</Typography>
+                      <Typography variant="body2">Description: {threat.description}</Typography>
+                      <Typography variant="body2">Wild Type: {threat.is_wild_type ? 'Yes' : 'No'}</Typography>
+                      {threat.references.length > 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                          References: {threat.references.join(', ')}
+                        </Typography>
+                      )}
+                    </Box>
+                  ))}
+                </>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
       <Card sx={{ maxWidth: '90%' }}>
         <Box p={2}>
           <TablePagination
             component="div"
-            count={screenings?.length || 0}
+            count={data?.getUserScreenings?.length || 0}
             onPageChange={handlePageChange}
             onRowsPerPageChange={handleLimitChange}
             page={page}
@@ -176,8 +213,8 @@ function SecureDnaTable({ screenings }: ScreenerTableProps) {
           />
         </Box>
       </Card>
-    </>
+    </Box>
   );
 }
 
-export default SecureDnaTable;
+export default SecureDNAScreeningTable;

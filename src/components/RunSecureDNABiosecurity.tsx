@@ -1,10 +1,9 @@
 import { Box, Button, FormControl, InputLabel, MenuItem, Modal, Select, Stack, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
-// import { LoadingButton } from '@mui/lab';
-import { screenSequencesBatch } from '../mpi/SecureDNAQueries';
-import { Sequence } from '../mpi/models/sequence';
-import { getAllSequences } from '../mpi/SequencesQueries';
+import { useQuery, useMutation } from '@apollo/client';
+import { Sequence } from '../mpi/types';
 import { Region } from '../mpi/types';
+import { GET_SEQUENCES, SCREEN_SEQUENCES_BATCH } from '../mpi/Queries';
 
 const style = {
   position: 'absolute',
@@ -26,26 +25,20 @@ interface RunSecureDNABiosecurityProps {
 }
 
 function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecureDNABiosecurityProps) {
-  const [allSequences, setAllSequences] = useState<Sequence[]>([]);
   const [selectedSequences, setSelectedSequences] = useState<string[]>([]);
   const [selectedRegion, setSelectedRegion] = useState<Region>(Region.ALL);
   const [alreadyRun, setAlreadyRun] = useState(false);
   const [message, setMessage] = useState("");
 
+  const { data: sequencesData, loading: sequencesLoading } = useQuery(GET_SEQUENCES);
+  const [screenSequences] = useMutation(SCREEN_SEQUENCES_BATCH);
+
   useEffect(() => {
-    fetchSequences();
     setSelectedSequences([]);
     setSelectedRegion(Region.ALL);
     setAlreadyRun(false);
     setMessage("");
   }, [open]);
-
-  const fetchSequences = async () => {
-    const responseSequences = await getAllSequences();
-    if (responseSequences && Array.isArray(responseSequences)) {
-      setAllSequences(responseSequences);
-    }
-  }
 
   const handleSequenceSelection = (event: any) => {
     setSelectedSequences(event.target.value);
@@ -62,13 +55,26 @@ function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecu
   const runBiosecurityCheck = async () => {
     if (selectedSequences.length === 0) return;
 
-    const result = await screenSequencesBatch(selectedSequences, selectedRegion);
-    if (result) {
-      setMessage(result.message);
-      setAlreadyRun(true);
-      onScreeningComplete?.();
+    try {
+      const result = await screenSequences({
+        variables: {
+          sequenceIds: selectedSequences,
+          region: selectedRegion
+        }
+      });
+
+      if (result.data) {
+        setMessage(result.data.screenSequencesBatch.message);
+        setAlreadyRun(true);
+        onScreeningComplete?.();
+      }
+    } catch (error) {
+      console.error('Error running screening:', error);
+      setMessage('Error running screening. Please try again.');
     }
   }
+
+  const allSequences = sequencesData?.getSequences || [];
 
   return (
     <Modal
@@ -93,7 +99,7 @@ function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecu
               value={selectedSequences}
               onChange={handleSequenceSelection}
             >
-              {allSequences.filter((seq) => seq.seq.length >= 50).map((seq) => {
+              {allSequences.filter((seq: Sequence) => seq.seq.length >= 50).map((seq: Sequence) => {
                 return <MenuItem key={seq.id} value={seq.id}>{seq.name}</MenuItem>
               })}
             </Select>
@@ -115,7 +121,7 @@ function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecu
             <Button 
               variant="contained" 
               onClick={runBiosecurityCheck} 
-              disabled={selectedSequences.length === 0}
+              disabled={selectedSequences.length === 0 || sequencesLoading}
             >
               Run
             </Button>
@@ -130,4 +136,5 @@ function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecu
     </Modal>
   );
 }
+
 export default RunSecureDNABiosecurity;

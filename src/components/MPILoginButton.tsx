@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Box, Button, Avatar, Typography, Menu, MenuItem, CircularProgress, Snackbar, Alert } from "@mui/material";
 import { UserInfo } from "../types/mpi";
+import { useApolloClient, useQuery } from "@apollo/client";
+import { IS_LOGGED_IN, GET_USER_INFO, LOGOUT } from "../mpi/MPIAuthQueries";
 
 interface MPILoginButtonProps {
   isLoggedIn: boolean;
@@ -14,6 +16,7 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const open = Boolean(anchorEl);
+  const client = useApolloClient();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -24,30 +27,30 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
       // Remove the token from URL without triggering a page reload
       window.history.replaceState({}, document.title, window.location.pathname);
       
-      // Verify the token and get user info
+      // Verify the token and get user info using GraphQL
       const verifyToken = async () => {
         try {
-          const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
-          const response = await fetch(`${backendUrl}/mpi/user-info`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
+          const { data: loginData } = await client.query({
+            query: IS_LOGGED_IN,
+            context: {
+              headers: {
+                authorization: `Bearer ${token}`
+              }
             }
           });
           
-          if (response.ok) {
-            const userData = await response.json();
-            setUserInfo(userData);
+          if (loginData?.isLoggedIn?.loggedIn) {
+            const { data: userData } = await client.query({
+              query: GET_USER_INFO,
+              context: {
+                headers: {
+                  authorization: `Bearer ${token}`
+                }
+              }
+            });
+            
+            setUserInfo(userData?.getUserInfo);
             setIsLoggedIn(true);
-          } else if (response.status === 401) {
-            setError('Session expired. Please log in again.');
-            localStorage.removeItem('session_token');
-            setIsLoggedIn(false);
-            setUserInfo(null);
-          } else if (response.status === 403) {
-            setError('You do not have permission to access this feature.');
-            localStorage.removeItem('session_token');
-            setIsLoggedIn(false);
-            setUserInfo(null);
           } else {
             setError('Authentication failed. Please try again.');
             localStorage.removeItem('session_token');
@@ -73,23 +76,27 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
       if (sessionToken) {
         setIsLoading(true);
         try {
-          const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
-          const response = await fetch(`${backendUrl}/mpi/is_logged_in`, {
-            headers: {
-              'Authorization': `Bearer ${sessionToken}`
+          const { data: loginData } = await client.query({
+            query: IS_LOGGED_IN,
+            context: {
+              headers: {
+                authorization: `Bearer ${sessionToken}`
+              }
             }
           });
-          const data = await response.json();
-          if (data.loggedIn) {
-            setIsLoggedIn(true);
-            // Fetch user info
-            const userResponse = await fetch(`${backendUrl}/mpi/user-info`, {
-              headers: {
-                'Authorization': `Bearer ${sessionToken}`
+
+          if (loginData?.isLoggedIn?.loggedIn) {
+            const { data: userData } = await client.query({
+              query: GET_USER_INFO,
+              context: {
+                headers: {
+                  authorization: `Bearer ${sessionToken}`
+                }
               }
             });
-            const userData = await userResponse.json();
-            setUserInfo(userData);
+            
+            setUserInfo(userData?.getUserInfo);
+            setIsLoggedIn(true);
           } else {
             localStorage.removeItem('session_token');
             setIsLoggedIn(false);
@@ -108,7 +115,7 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
     };
 
     checkExistingSession();
-  }, [setIsLoggedIn, setUserInfo]);
+  }, [client, setIsLoggedIn, setUserInfo]);
 
   const handleLogin = () => {
     setIsLoading(true);
@@ -121,17 +128,36 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
     window.location.href = loginUrl;
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsLoading(true);
-    localStorage.removeItem('session_token');
-    sessionStorage.removeItem('auth_state');
-    setIsLoggedIn(false);
-    setUserInfo(null);
-    handleMenuClose();
-    
-    const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
-    const logoutUrl = `${backendUrl}/mpi/logout`;
-    window.location.href = logoutUrl;
+    try {
+      const sessionToken = localStorage.getItem('session_token');
+      if (sessionToken) {
+        await client.mutate({
+          mutation: LOGOUT,
+          context: {
+            headers: {
+              authorization: `Bearer ${sessionToken}`
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('session_token');
+      sessionStorage.removeItem('auth_state');
+      setIsLoggedIn(false);
+      setUserInfo(null);
+      handleMenuClose();
+      
+      // Redirect to Auth0 logout
+      const auth0Domain = process.env.REACT_APP_AUTH0_DOMAIN;
+      const clientId = process.env.REACT_APP_AUTH0_CLIENT_ID;
+      const frontendUrl = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3100';
+      const logoutUrl = `https://${auth0Domain}/v2/logout?client_id=${clientId}&returnTo=${frontendUrl}&federated`;
+      window.location.href = logoutUrl;
+    }
   };
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -199,12 +225,7 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
           )}
         </Button>
       )}
-      <Snackbar 
-        open={!!error} 
-        autoHideDuration={6000} 
-        onClose={handleErrorClose}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={handleErrorClose}>
         <Alert onClose={handleErrorClose} severity="error" sx={{ width: '100%' }}>
           {error}
         </Alert>

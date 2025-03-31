@@ -5,6 +5,21 @@ export enum Region {
   PRC = 'prc'
 }
 
+export interface Sequence {
+  id: string;
+  name: string;
+  type: 'dna' | 'rna' | 'aa' | 'unknown';
+  seq: string;
+  annotations?: Array<{
+    start: number;
+    end: number;
+    type: string;
+    description?: string;
+  }>;
+  userId: string;
+  mpiId?: string;
+}
+
 export interface ScreeningInput {
   sequenceId: string;
   region: Region;
@@ -25,11 +40,10 @@ export interface Organism {
 }
 
 export interface HazardHits {
-  type: 'nuc' | 'aa';
-  is_wild_type: boolean | null;
-  hit_regions: HitRegion[];
-  most_likely_organism: Organism;
-  organisms: Organism[];
+  name: string;
+  description: string;
+  is_wild_type: boolean;
+  references: string[];
 }
 
 export interface RecordHit {
@@ -51,10 +65,10 @@ export interface ScreeningResult {
     id: string;
     name: string;
   };
-  status: 'pending' | 'completed' | 'failed' | 'denied';
+  status: 'pending' | 'completed' | 'failed';
   threats: HazardHits[];
   region: Region;
-  createdAt: Date;
+  created_at: Date;
+  updated_at: Date;
   userId: string;
-  originalSeq?: string;
 } 

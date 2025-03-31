@@ -14,8 +14,9 @@ import { ScreeningResult } from '../mpi/types';
 function Screener() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  const [secureDNAScreenings, setSecureDNAScreenings] = useState<ScreeningResult[]>([]);
   const [openUploadAndScreen, setOpenUploadAndScreen] = useState(false);
+
+  const [secureDNAScreenings, setSecureDNAScreenings] = useState<ScreeningResult[]>([]);
 
   const fetchSecureDNAScreenings = async () => {
     const data = await getUserScreenings();
@@ -25,6 +26,22 @@ function Screener() {
       );
       setSecureDNAScreenings(sortedData);
     }
+  };
+
+  const handleScreeningUpdate = (screening: ScreeningResult) => {
+    setSecureDNAScreenings(prev => {
+      const existingIndex = prev.findIndex(s => s.id === screening.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = screening;
+        return updated.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      }
+      return [screening, ...prev].sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    });
   };
 
   useEffect(() => {
@@ -72,7 +89,9 @@ function Screener() {
                   />
                 </Box>
               </Box>
-              <SecureDNAScreeningTable screenings={secureDNAScreenings}/>
+              <SecureDNAScreeningTable 
+                onScreeningUpdate={handleScreeningUpdate}
+              />
             </Grid>
           </Grid>
           <UploadAndScreenSequences 
