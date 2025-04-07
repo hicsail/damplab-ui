@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
 
 import { CanvasContext }             from './contexts/Canvas';
 import { AppContext }                from './contexts/App';
+import { UserContext }               from './contexts/UserContext';
 import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 // import { searchForEndService } from './controllers/GraphHelpers';
 import HeaderBar          from './components/HeaderBar';
@@ -36,6 +37,8 @@ function App() {
   const [services, setServices] = useState([]);
   const [bundles, setBundles] = useState([]);
   const [hazards, setHazards] = useState(Array<string>);
+
+  const user = useContext(UserContext);
 
   const client = new ApolloClient({
     uri: process.env.REACT_APP_BACKEND,
@@ -71,6 +74,7 @@ function App() {
     <div className="App">
       <ApolloProvider client={client}>
         <AppContext.Provider value={{ services: services, bundles: bundles, hazards: hazards }}>
+          <UserContext.Provider value={ user }>
           <CanvasContext.Provider value={{ nodes: nodes, setNodes: setNodes,
                                            edges: edges, setEdges: setEdges,
                                            activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId,
@@ -111,6 +115,7 @@ function App() {
                 </div>
               </BrowserRouter>
           </CanvasContext.Provider>
+          </UserContext.Provider>
         </AppContext.Provider>
       </ApolloProvider>
     </div>
