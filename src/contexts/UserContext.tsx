@@ -27,7 +27,7 @@ async function initKeycloak(): Promise<UserProps> {
   try {
     await keycloak.init({
       onLoad: "check-sso",
-      silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso`,
+      silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
     });
     return {
       isAuthenticated: keycloak.authenticated,
