@@ -1,0 +1,12 @@
+<!doctype html>
+<html>
+  <body>
+    <!--
+     This page is loaded in an iframe for use by Keycloak.
+     See https://www.keycloak.org/securing-apps/javascript-adapter#_using_the_adapter
+    -->
+    <script>
+      parent.postMessage(location.href, location.origin);
+    </script>
+  </body>
+</html>
