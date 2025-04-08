@@ -20,6 +20,7 @@ import JobSubmitted   from './pages/JobSubmitted';
 import ELabs          from './pages/ELabs';
 import Kernel         from './pages/Kernel';
 import ReleaseNotes   from './pages/ReleaseNotes';
+import SilentCheckSSO from './pages/SilentCheckSSO';
 import TestPage       from './pages/TestPage';
 // import Tracking       from './pages/ClientView';
 // import Accepted       from './pages/Accepted';
@@ -88,6 +89,7 @@ function App() {
 
                     <Route path = "/"                    element = {<LoginForm />} />
                     <Route path = "/login"               element = {<LoginForm />} />
+                    <Route path = "/silent-check-sso"    element = {<SilentCheckSSO />} />
 
                     <Route path = "/canvas"              element = {<PrivateRouteClient> <MainFlow />                 </PrivateRouteClient>} />
                     <Route path = "/resubmission/:id"    element = {<PrivateRouteClient> <MainFlow client={client} /> </PrivateRouteClient>} />

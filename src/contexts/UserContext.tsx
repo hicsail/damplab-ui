@@ -25,7 +25,10 @@ const keycloak = new Keycloak({
 
 async function initKeycloak(): Promise<UserProps> {
   try {
-    await keycloak.init();
+    await keycloak.init({
+      onLoad: "check-sso",
+      silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso`,
+    });
     return {
       isAuthenticated: keycloak.authenticated,
       isAdmin: keycloak.realmAccess?.roles.includes("damplab-admin"),
