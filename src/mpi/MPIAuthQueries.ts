@@ -1,51 +1,4 @@
-import { gql } from '@apollo/client';
 import { ApolloClient } from '@apollo/client';
-
-// GraphQL queries and mutations
-export const IS_LOGGED_IN = gql`
-  query IsLoggedIn {
-    isLoggedIn {
-      loggedIn
-      userInfo {
-        sub
-        name
-        email
-        picture
-      }
-    }
-  }
-`;
-
-export const GET_USER_INFO = gql`
-  query GetUserInfo {
-    getUserInfo {
-      sub
-      name
-      email
-      picture
-    }
-  }
-`;
-
-export const EXCHANGE_CODE_FOR_TOKEN = gql`
-  mutation ExchangeCodeForToken($code: String!, $state: String!) {
-    exchangeCodeForToken(code: $code, state: $state) {
-      token
-      userInfo {
-        sub
-        name
-        email
-        picture
-      }
-    }
-  }
-`;
-
-export const LOGOUT = gql`
-  mutation Logout {
-    logout
-  }
-`;
 
 // Helper function to get the session token
 export const getSessionToken = (): string | null => {
@@ -69,7 +22,7 @@ export const getSessionToken = (): string | null => {
 };
 
 // Update the handleLoginCallback function
-export const handleLoginCallback = async (client: ApolloClient<any>) => {
+export const handleLoginCallback = async () => {
   try {
     const url = new URL(window.location.href);
     const code = url.searchParams.get("code");
@@ -79,14 +32,24 @@ export const handleLoginCallback = async (client: ApolloClient<any>) => {
       console.error("Missing code or state in callback");
       return false;
     }
-    
-    const { data } = await client.mutate({
-      mutation: EXCHANGE_CODE_FOR_TOKEN,
-      variables: { code, state }
+
+    const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
+    const response = await fetch(`${backendUrl}/mpi/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code, state }),
     });
     
-    if (data?.exchangeCodeForToken?.token) {
-      localStorage.setItem('session_token', data.exchangeCodeForToken.token);
+    if (!response.ok) {
+      throw new Error('Failed to exchange code for token');
+    }
+
+    const data = await response.json();
+    
+    if (data?.token) {
+      localStorage.setItem('session_token', data.token);
       return true;
     }
     
@@ -98,14 +61,14 @@ export const handleLoginCallback = async (client: ApolloClient<any>) => {
 };
 
 // Add a function to check login status
-export const checkLoginStatus = async (client: any): Promise<boolean> => {
+export const checkLoginStatus = async (): Promise<{ loggedIn: boolean; userInfo?: any }> => {
   try {
     const token = getSessionToken();
     console.log("Checking login status, token exists:", !!token);
     
     if (!token) {
       console.log("No token found, not logged in");
-      return false;
+      return { loggedIn: false };
     }
     
     // Try to decode the JWT to see if it's expired locally
@@ -120,49 +83,52 @@ export const checkLoginStatus = async (client: any): Promise<boolean> => {
           localStorage.removeItem('session_token');
           localStorage.removeItem('token_expires_at');
           localStorage.removeItem('user_info');
-          return false;
+          return { loggedIn: false };
         }
       }
     } catch (e) {
       console.error("Error decoding JWT:", e);
     }
     
-    // Verify the token with the backend using GraphQL
-    const { data } = await client.query({
-      query: IS_LOGGED_IN,
-      context: {
-        headers: {
-          authorization: `Bearer ${token}`
-        }
+    // Verify the token with the backend using REST
+    const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
+    const response = await fetch(`${backendUrl}/mpi/status`, {
+      headers: {
+        authorization: `Bearer ${token}`
       }
     });
     
-    if (data?.isLoggedIn?.loggedIn) {
-      return true;
+    if (!response.ok) {
+      throw new Error('Failed to check login status');
+    }
+
+    const data = await response.json();
+    
+    if (data?.loggedIn) {
+      return { loggedIn: true, userInfo: data.userInfo };
     }
     
     // If we get here, we're not logged in
     localStorage.removeItem('session_token');
     localStorage.removeItem('token_expires_at');
     localStorage.removeItem('user_info');
-    return false;
+    return { loggedIn: false };
   } catch (e) {
     console.error("Error checking login status:", e);
-    return false;
+    return { loggedIn: false };
   }
 };
 
 // Add a function to handle logout
-export const logout = async (client: any): Promise<void> => {
+export const logout = async (): Promise<void> => {
   try {
     const token = getSessionToken();
     if (token) {
-      await client.mutate({
-        mutation: LOGOUT,
-        context: {
-          headers: {
-            authorization: `Bearer ${token}`
-          }
+      const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
+      await fetch(`${backendUrl}/mpi/logout`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`
         }
       });
     }
@@ -198,11 +164,9 @@ export const debugCheckToken = (): void => {
         console.log("DEBUG - Token subject:", payload.sub);
         console.log("DEBUG - Token issuer:", payload.iss);
         console.log("DEBUG - Token exp:", new Date(payload.exp * 1000).toISOString());
-      } else {
-        console.log("DEBUG - Not a standard JWT (doesn't have 3 parts)");
       }
     } catch (e) {
-      console.error("DEBUG - Failed to decode token:", e);
+      console.error("DEBUG - Error decoding token:", e);
     }
   }
 };

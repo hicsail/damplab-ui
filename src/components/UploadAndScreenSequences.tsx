@@ -1,9 +1,9 @@
 import { Box, Button, Modal, Stack, Typography, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import { useState, useEffect } from 'react';
-import { screenSequencesBatch, getUserScreenings } from '../mpi/SecureDNAQueries';
-import { Sequence } from '../mpi/models/sequence';
+import { useApolloClient } from '@apollo/client';
+import { Sequence } from '../mpi/types';
 import { Region, ScreeningResult } from '../mpi/types';
-import { createSequence } from '../mpi/SequencesQueries';
+import { createSequence, screenSequencesBatch, GET_USER_SCREENINGS } from '../mpi/SequencesQueries';
 import { parseFile } from "seqparse";
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 
@@ -33,6 +33,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
   const [message, setMessage] = useState<string>('');
   const [error, setError] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const client = useApolloClient();
 
   useEffect(() => {
     if (!open) {
@@ -59,7 +60,18 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
         const fileContent = e.target?.result as string;
         try {
           const parsedSequences = parseFile(fileContent);
-          setSequences(prev => [...prev, ...parsedSequences]);
+          const formattedSequences: Sequence[] = parsedSequences.map(seq => ({
+            id: '', // Will be set by the backend
+            name: seq.name,
+            type: 'unknown',
+            seq: seq.seq,
+            annotations: [],
+            userId: '', // Will be set by the backend
+            mpiId: '', // Will be set by the backend
+            created_at: new Date(),
+            updated_at: new Date()
+          }));
+          setSequences(prev => [...prev, ...formattedSequences]);
           setMessage('');
         } catch (error) {
           console.error("Error parsing sequences:", error);
@@ -94,7 +106,18 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
           try {
             const parsedSequences = await parseFile(fileContent);
             console.log(`Found ${parsedSequences.length} sequences in ${file.name}`);
-            allSequences.push(...parsedSequences);
+            const formattedSequences: Sequence[] = parsedSequences.map(seq => ({
+              id: '', // Will be set by the backend
+              name: seq.name,
+              type: 'unknown',
+              seq: seq.seq,
+              annotations: [],
+              userId: '', // Will be set by the backend
+              mpiId: '', // Will be set by the backend
+              created_at: new Date(),
+              updated_at: new Date()
+            }));
+            allSequences.push(...formattedSequences);
           } catch (parseError) {
             console.error(`Error parsing file ${file.name}:`, parseError);
             continue; // Skip this file but continue with others
@@ -124,7 +147,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
       // Create sequences one by one and collect their IDs
       const sequenceIds: string[] = [];
       for (const seq of sequences) {
-        const createdSeq = await createSequence(seq);
+        const createdSeq = await createSequence(client, seq);
         if (!createdSeq?.id) {
           throw new Error(`Failed to create sequence: ${seq.name}`);
         }
@@ -132,7 +155,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
       }
 
       // Then start the screening process with all sequence IDs
-      const screeningResult = await screenSequencesBatch(sequenceIds, Region.ALL);
+      const screeningResult = await screenSequencesBatch(client, sequenceIds, Region.ALL);
       
       if (screeningResult) {
         setMessage('The biosecurity check is running in the background. Results will be shown in the SecureDNA screenings table.');
@@ -144,7 +167,8 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
         
         const pollForResults = async () => {
           attempts++;
-          const currentScreenings = await getUserScreenings();
+          const { data } = await client.query({ query: GET_USER_SCREENINGS });
+          const currentScreenings = data.getUserScreenings;
           
           if (currentScreenings) {
             // Check if any of our sequences have results

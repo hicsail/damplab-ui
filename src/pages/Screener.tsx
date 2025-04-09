@@ -3,50 +3,27 @@ import { Box, Button, Typography } from '@mui/material';
 import { Grid } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
+import { useQuery, useApolloClient } from '@apollo/client';
 
 import MPILoginButton from '../components/MPILoginButton';
 import SecureDNAScreeningTable from '../components/SecureDNAScreeningTable';
 import UploadAndScreenSequences from '../components/UploadAndScreenSequences';
-import { getUserScreenings } from '../mpi/SecureDNAQueries';
 import { UserInfo } from '../types/mpi';
-import { ScreeningResult } from '../mpi/types';
+import { GET_USER_SCREENINGS } from '../mpi/SequencesQueries';
 
 function Screener() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [openUploadAndScreen, setOpenUploadAndScreen] = useState(false);
+  const client = useApolloClient();
 
-  const [secureDNAScreenings, setSecureDNAScreenings] = useState<ScreeningResult[]>([]);
+  const { data, loading, error, refetch } = useQuery(GET_USER_SCREENINGS, {
+    pollInterval: 30000, // Poll every 30 seconds
+  });
 
-  const fetchSecureDNAScreenings = async () => {
-    const data = await getUserScreenings();
-    if (data) {
-      const sortedData = data.sort((a: any, b: any) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setSecureDNAScreenings(sortedData);
-    }
+  const handleRefresh = () => {
+    refetch();
   };
-
-  const handleScreeningUpdate = (screening: ScreeningResult) => {
-    setSecureDNAScreenings(prev => {
-      const existingIndex = prev.findIndex(s => s.id === screening.id);
-      if (existingIndex >= 0) {
-        const updated = [...prev];
-        updated[existingIndex] = screening;
-        return updated.sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-      }
-      return [screening, ...prev].sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    });
-  };
-
-  useEffect(() => {
-    fetchSecureDNAScreenings();
-  }, []);
 
   return (
     <>
@@ -68,7 +45,7 @@ function Screener() {
           >
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', mb: 2 }}>
-                <Button variant='outlined' sx={{ mr: 3 }} onClick={fetchSecureDNAScreenings}>
+                <Button variant='outlined' sx={{ mr: 3 }} onClick={handleRefresh}>
                   <RefreshIcon fontSize='small' />
                 </Button>
                 <Button
@@ -89,15 +66,13 @@ function Screener() {
                   />
                 </Box>
               </Box>
-              <SecureDNAScreeningTable 
-                onScreeningUpdate={handleScreeningUpdate}
-              />
+              <SecureDNAScreeningTable />
             </Grid>
           </Grid>
           <UploadAndScreenSequences 
             open={openUploadAndScreen} 
             onClose={() => setOpenUploadAndScreen(false)}
-            onScreeningComplete={fetchSecureDNAScreenings}
+            onScreeningComplete={handleRefresh}
           />
         </Box>
       </Box>

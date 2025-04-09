@@ -1,9 +1,9 @@
 import { Box, Button, FormControl, InputLabel, MenuItem, Modal, Select, Stack, Typography } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { Sequence } from '../mpi/types';
 import { Region } from '../mpi/types';
-import { GET_SEQUENCES, SCREEN_SEQUENCES_BATCH } from '../mpi/Queries';
+import { GET_SEQUENCES, SCREEN_SEQUENCES_BATCH } from '../mpi/SequencesQueries';
 
 const style = {
   position: 'absolute',
@@ -29,6 +29,7 @@ function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecu
   const [selectedRegion, setSelectedRegion] = useState<Region>(Region.ALL);
   const [alreadyRun, setAlreadyRun] = useState(false);
   const [message, setMessage] = useState("");
+  const client = useApolloClient();
 
   const { data: sequencesData, loading: sequencesLoading } = useQuery(GET_SEQUENCES);
   const [screenSequences] = useMutation(SCREEN_SEQUENCES_BATCH);
@@ -58,13 +59,15 @@ function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecu
     try {
       const result = await screenSequences({
         variables: {
-          sequenceIds: selectedSequences,
-          region: selectedRegion
+          input: {
+            sequenceIds: selectedSequences,
+            region: selectedRegion
+          }
         }
       });
 
       if (result.data) {
-        setMessage(result.data.screenSequencesBatch.message);
+        setMessage("Screening started successfully");
         setAlreadyRun(true);
         onScreeningComplete?.();
       }
@@ -74,7 +77,7 @@ function RunSecureDNABiosecurity({ onClose, open, onScreeningComplete }: RunSecu
     }
   }
 
-  const allSequences = sequencesData?.getSequences || [];
+  const allSequences = sequencesData?.sequences || [];
 
   return (
     <Modal

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Box, Button, Avatar, Typography, Menu, MenuItem, CircularProgress, Snackbar, Alert } from "@mui/material";
 import { UserInfo } from "../types/mpi";
-import { useApolloClient, useQuery } from "@apollo/client";
-import { IS_LOGGED_IN, GET_USER_INFO, LOGOUT } from "../mpi/MPIAuthQueries";
+import { checkLoginStatus, logout } from "../mpi/MPIAuthQueries";
 
 interface MPILoginButtonProps {
   isLoggedIn: boolean;
@@ -16,7 +15,6 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const open = Boolean(anchorEl);
-  const client = useApolloClient();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -27,29 +25,13 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
       // Remove the token from URL without triggering a page reload
       window.history.replaceState({}, document.title, window.location.pathname);
       
-      // Verify the token and get user info using GraphQL
+      // Verify the token and get user info
       const verifyToken = async () => {
         try {
-          const { data: loginData } = await client.query({
-            query: IS_LOGGED_IN,
-            context: {
-              headers: {
-                authorization: `Bearer ${token}`
-              }
-            }
-          });
+          const { loggedIn, userInfo: userData } = await checkLoginStatus();
           
-          if (loginData?.isLoggedIn?.loggedIn) {
-            const { data: userData } = await client.query({
-              query: GET_USER_INFO,
-              context: {
-                headers: {
-                  authorization: `Bearer ${token}`
-                }
-              }
-            });
-            
-            setUserInfo(userData?.getUserInfo);
+          if (loggedIn && userData) {
+            setUserInfo(userData);
             setIsLoggedIn(true);
           } else {
             setError('Authentication failed. Please try again.');
@@ -76,26 +58,10 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
       if (sessionToken) {
         setIsLoading(true);
         try {
-          const { data: loginData } = await client.query({
-            query: IS_LOGGED_IN,
-            context: {
-              headers: {
-                authorization: `Bearer ${sessionToken}`
-              }
-            }
-          });
-
-          if (loginData?.isLoggedIn?.loggedIn) {
-            const { data: userData } = await client.query({
-              query: GET_USER_INFO,
-              context: {
-                headers: {
-                  authorization: `Bearer ${sessionToken}`
-                }
-              }
-            });
-            
-            setUserInfo(userData?.getUserInfo);
+          const { loggedIn, userInfo: userData } = await checkLoginStatus();
+          
+          if (loggedIn && userData) {
+            setUserInfo(userData);
             setIsLoggedIn(true);
           } else {
             localStorage.removeItem('session_token');
@@ -115,7 +81,7 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
     };
 
     checkExistingSession();
-  }, [client, setIsLoggedIn, setUserInfo]);
+  }, [setIsLoggedIn, setUserInfo]);
 
   const handleLogin = () => {
     setIsLoading(true);
@@ -131,17 +97,7 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
   const handleLogout = async () => {
     setIsLoading(true);
     try {
-      const sessionToken = localStorage.getItem('session_token');
-      if (sessionToken) {
-        await client.mutate({
-          mutation: LOGOUT,
-          context: {
-            headers: {
-              authorization: `Bearer ${sessionToken}`
-            }
-          }
-        });
-      }
+      await logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -204,19 +160,35 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
             anchorEl={anchorEl}
             open={open}
             onClose={handleMenuClose}
-            MenuListProps={{
-              'aria-labelledby': 'user-menu-button',
+            onClick={handleMenuClose}
+            PaperProps={{
+              elevation: 0,
+              sx: {
+                overflow: 'visible',
+                filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                mt: 1.5,
+                '& .MuiAvatar-root': {
+                  width: 32,
+                  height: 32,
+                  ml: -0.5,
+                  mr: 1,
+                },
+              },
             }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
           >
-            <MenuItem onClick={handleLogout}>Logout</MenuItem>
+            <MenuItem onClick={handleLogout}>
+              <Typography variant="body2">Logout</Typography>
+            </MenuItem>
           </Menu>
         </>
       ) : (
         <Button 
-          onClick={handleLogin} 
-          variant='contained' 
-          color='primary'
+          variant="contained" 
+          onClick={handleLogin}
           disabled={isLoading}
+          sx={{ textTransform: 'none' }}
         >
           {isLoading ? (
             <CircularProgress size={24} color="inherit" />
@@ -225,7 +197,12 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
           )}
         </Button>
       )}
-      <Snackbar open={!!error} autoHideDuration={6000} onClose={handleErrorClose}>
+      <Snackbar 
+        open={!!error} 
+        autoHideDuration={6000} 
+        onClose={handleErrorClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
         <Alert onClose={handleErrorClose} severity="error" sx={{ width: '100%' }}>
           {error}
         </Alert>

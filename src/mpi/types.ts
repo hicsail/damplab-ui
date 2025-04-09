@@ -41,7 +41,7 @@ export interface Organism {
 
 export interface HazardHits {
   name: string;
-  description: string;
+  hit_regions: HitRegion[];
   is_wild_type: boolean;
   references: string[];
 }
@@ -64,8 +64,10 @@ export interface ScreeningResult {
   sequence: {
     id: string;
     name: string;
+    seq: string;
+    type: 'dna' | 'rna' | 'aa' | 'unknown';
   };
-  status: 'pending' | 'completed' | 'failed';
+  status: 'granted' | 'denied';
   threats: HazardHits[];
   region: Region;
   created_at: Date;

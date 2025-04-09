@@ -1,220 +1,240 @@
-import {
-  Card,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TablePagination,
-  TableRow,
-  Paper,
-  Typography,
-  Button,
-  Modal,
-  Box,
-  Stack,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  IconButton
-} from '@mui/material';
-import { useState, ChangeEvent, useEffect } from 'react';
-import SeqViz from 'seqviz';
-import { ScreeningResult, HazardHits } from '../mpi/types';
-import { useApolloClient, useQuery } from '@apollo/client';
-import { subscribeToScreeningResults } from '../mpi/Subscriptions';
-import { GET_USER_SCREENINGS } from '../mpi/Queries';
+import { useState } from 'react';
+import { useQuery } from '@apollo/client';
+import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
+import { Button, Typography, Box, Modal, Stack, Chip } from '@mui/material';
+import { GET_USER_SCREENINGS } from '../mpi/SequencesQueries';
+import { ScreeningResult, HitRegion } from '../mpi/types';
 
-interface SecureDNAScreeningTableProps {
-  onScreeningUpdate?: (result: ScreeningResult) => void;
+interface ScreeningRow extends ScreeningResult {
+  id: string;
+  onViewDetails: (screening: ScreeningResult) => void;
 }
 
-const applyPagination = (
-  screenings: ScreeningResult[],
-  page: number,
-  limit: number
-): ScreeningResult[] => {
-  if (screenings) {
-    return screenings.slice(page * limit, page * limit + limit);
-  } else {
-    return [];
-  }
-};
-
-function SecureDNAScreeningTable({ onScreeningUpdate }: SecureDNAScreeningTableProps) {
-  const [selectedScreening, setSelectedScreening] = useState<ScreeningResult | null>(null);
-  const [open, setOpen] = useState(false);
-  const [page, setPage] = useState<number>(0);
-  const [limit, setLimit] = useState<number>(5);
-  const client = useApolloClient();
-
-  const { data, loading, refetch } = useQuery(GET_USER_SCREENINGS);
-
-  useEffect(() => {
-    const subscription = subscribeToScreeningResults(client, (result: ScreeningResult) => {
-      refetch();
-      onScreeningUpdate?.(result);
-    });
-
-    return () => {
-      if (subscription && typeof subscription.unsubscribe === 'function') {
-        subscription.unsubscribe();
-      }
-    };
-  }, [client, refetch, onScreeningUpdate]);
-
-  const handleOpen = (screening: ScreeningResult) => {
-    setSelectedScreening(screening);
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-    setSelectedScreening(null);
-  };
-
-  const getFormattedDate = (dateString: string | Date) => {
-    const datetime = new Date(dateString).toLocaleString('en-US', { timeZoneName: 'short' });
-    return datetime;
-  };
-
-  const handlePageChange = (event: any, newPage: number): void => {
-    setPage(newPage);
-  };
-
-  const handleLimitChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    setLimit(parseInt(event.target.value));
-  };
-
-  const style = {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    width: '50%',
-    bgcolor: 'background.paper',
-    border: '0.5px solid #000',
-    boxShadow: 24,
-    p: 5,
-    overflowY: 'scroll'
-  };
-
-  const renderTable = () => {
-    if (loading) {
-      return <Typography>Loading...</Typography>;
+const columns: GridColDef<ScreeningRow>[] = [
+  { 
+    field: 'sequence', 
+    headerName: 'Sequence', 
+    flex: 1,
+    renderCell: (params: GridRenderCellParams<ScreeningRow>) => {
+      return params.row.sequence?.name || '';
     }
+  },
+  { 
+    field: 'status', 
+    headerName: 'Status', 
+    flex: 1,
+    renderCell: (params: GridRenderCellParams<ScreeningRow>) => {
+      const status = params.row.status.toUpperCase();
+      const color = status === 'GRANTED' ? 'success.main' : 'error.main';
+      return (
+        <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+          <Typography color={color}>{status}</Typography>
+        </Box>
+      );
+    }
+  },
+  { 
+    field: 'created_at', 
+    headerName: 'Created', 
+    flex: 1,
+    renderCell: (params: GridRenderCellParams<ScreeningRow>) => {
+      if (!params.row.created_at) return '';
+      return new Date(params.row.created_at).toLocaleString();
+    }
+  },
+  {
+    field: 'actions',
+    headerName: 'Actions',
+    flex: 1,
+    renderCell: (params: GridRenderCellParams<ScreeningRow>) => (
+      <Button 
+        variant="contained" 
+        size="small"
+        onClick={() => params.row?.onViewDetails(params.row)}
+        sx={{ 
+          backgroundColor: '#1976d2',
+          '&:hover': {
+            backgroundColor: '#1565c0',
+          }
+        }}
+      >
+        View Details
+      </Button>
+    )
+  }
+];
 
-    const screenings = data?.getUserScreenings || [];
+export default function SecureDNAScreeningTable() {
+  const [selectedScreening, setSelectedScreening] = useState<ScreeningResult | null>(null);
+  const { loading, error, data } = useQuery<{ getUserScreenings: ScreeningResult[] }>(GET_USER_SCREENINGS);
 
-    return (
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Sequence</TableCell>
-              <TableCell>Region</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Created At</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {screenings.map((screening: ScreeningResult) => (
-              <TableRow key={screening.id}>
-                <TableCell>{screening.sequence.name}</TableCell>
-                <TableCell>{screening.region}</TableCell>
-                <TableCell>
-                  <Typography
-                    color={
-                      screening.status === 'completed'
-                        ? 'success.main'
-                        : screening.status === 'failed'
-                        ? 'error.main'
-                        : 'warning.main'
-                    }
-                  >
-                    {screening.status.toUpperCase()}
-                  </Typography>
-                </TableCell>
-                <TableCell>{new Date(screening.created_at).toLocaleString()}</TableCell>
-                <TableCell>
-                  <IconButton onClick={() => handleOpen(screening)}>
-                    <Button variant="outlined" size="small">
-                      View Details
-                    </Button>
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  };
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
 
-  const paginatedScreenings = applyPagination(data?.getUserScreenings || [], page, limit);
-
-  const getAnnotations = () => {
-    if (!selectedScreening) return [];
-    return selectedScreening.threats.map((threat, idx) => ({
-      start: 0,
-      end: 0,
-      id: `${threat.name}-${idx}`,
-      color: 'red',
-      name: threat.name
-    }));
-  };
+  const rows: ScreeningRow[] = (data?.getUserScreenings || []).map((screening) => ({
+    ...screening,
+    id: screening.id,
+    onViewDetails: (screening: ScreeningResult) => setSelectedScreening(screening)
+  }));
 
   return (
-    <Box>
-      {renderTable()}
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>Screening Details</DialogTitle>
-        <DialogContent>
-          {selectedScreening && (
-            <Box>
-              <Typography variant="h6">Sequence</Typography>
-              <Typography>{selectedScreening.sequence.name}</Typography>
-              <Typography variant="h6" sx={{ mt: 2 }}>Status</Typography>
-              <Typography>{selectedScreening.status.toUpperCase()}</Typography>
-              <Typography variant="h6" sx={{ mt: 2 }}>Region</Typography>
-              <Typography>{selectedScreening.region}</Typography>
-              {selectedScreening.threats && selectedScreening.threats.length > 0 && (
-                <>
-                  <Typography variant="h6" sx={{ mt: 2 }}>Threats Detected</Typography>
-                  {selectedScreening.threats.map((threat: HazardHits, index: number) => (
-                    <Box key={index} sx={{ mt: 1 }}>
-                      <Typography variant="subtitle1">{threat.name}</Typography>
-                      <Typography variant="body2">Description: {threat.description}</Typography>
-                      <Typography variant="body2">Wild Type: {threat.is_wild_type ? 'Yes' : 'No'}</Typography>
-                      {threat.references.length > 0 && (
-                        <Typography variant="body2" color="text.secondary">
-                          References: {threat.references.join(', ')}
-                        </Typography>
+    <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        initialState={{
+          pagination: {
+            paginationModel: { pageSize: 5 }
+          }
+        }}
+        pageSizeOptions={[5, 10, 25]}
+        disableRowSelectionOnClick
+        autoHeight
+        sx={{
+          '& .MuiDataGrid-cell': {
+            borderBottom: 'none',
+            display: 'flex',
+            alignItems: 'center',
+          },
+          '& .MuiDataGrid-columnHeaders': {
+            backgroundColor: '#f5f5f5',
+          },
+          '& .MuiDataGrid-footerContainer': {
+            borderTop: '1px solid rgba(224, 224, 224, 1)',
+            marginTop: 0,
+          },
+          '& .MuiDataGrid-virtualScroller': {
+            overflow: 'hidden',
+          }
+        }}
+      />
+      {selectedScreening && (
+        <Modal open={!!selectedScreening} onClose={() => setSelectedScreening(null)}>
+          <Box sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '55%',
+            transform: 'translate(-50%, -50%)',
+            width: 800,
+            bgcolor: 'background.paper',
+            border: '1px solid #000',
+            boxShadow: 24,
+            p: 4,
+            borderRadius: '16px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+          }}>
+            <Typography variant="h4" sx={{ mb: 2 }}>
+              Screening Details
+            </Typography>
+            <Stack spacing={3}>
+              <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 2, mb: 2 }}>
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Sequence:
+                    </Typography>
+                    <Typography sx={{ pl: 2, wordBreak: 'break-word' }}>{selectedScreening.sequence.name}</Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Status:
+                    </Typography>
+                    <Typography 
+                      sx={{ 
+                        pl: 2, 
+                        color: selectedScreening.status === 'granted' ? 'success.main' : 'error.main',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      {selectedScreening.status.toUpperCase()}
+                    </Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Region:
+                    </Typography>
+                    <Typography sx={{ pl: 2 }}>{selectedScreening.region.toUpperCase()}</Typography>
+                  </Box>
+
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Created:
+                    </Typography>
+                    <Typography sx={{ pl: 2 }}>
+                      {new Date(selectedScreening.created_at).toLocaleString()}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+
+              {selectedScreening.threats.map((threat, threatIndex) => (
+                <Box key={threatIndex} sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 2, mb: 2 }}>
+                  <Stack spacing={2}>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                      <Chip label="THREAT" color="error" size="small" />
+                      {threat.is_wild_type !== null && (
+                        <Chip
+                          label={threat.is_wild_type ? 'Wild Type' : 'Non-Wild Type'}
+                          color={threat.is_wild_type ? 'warning' : 'secondary'}
+                          size="small"
+                        />
                       )}
+                    </Stack>
+
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        Name:
+                      </Typography>
+                      <Typography sx={{ pl: 2, wordBreak: 'break-word' }}>{threat.name}</Typography>
                     </Box>
-                  ))}
-                </>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Card sx={{ maxWidth: '90%' }}>
-        <Box p={2}>
-          <TablePagination
-            component="div"
-            count={data?.getUserScreenings?.length || 0}
-            onPageChange={handlePageChange}
-            onRowsPerPageChange={handleLimitChange}
-            page={page}
-            rowsPerPage={limit}
-            rowsPerPageOptions={[5, 10, 25, 30]}
-          />
-        </Box>
-      </Card>
+
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        Hit Regions:
+                      </Typography>
+                      <Stack spacing={1} sx={{ pl: 2 }}>
+                        {threat.hit_regions?.map((region: HitRegion, idx: number) => (
+                          <Box key={idx}>
+                            <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+                              Range: {region.seq_range_start}-{region.seq_range_end}
+                            </Typography>
+                            <Typography variant="body2" sx={{ wordBreak: 'break-word', fontFamily: 'monospace' }}>
+                              Sequence: {region.seq}
+                            </Typography>
+                          </Box>
+                        ))}
+                        {(!threat.hit_regions || threat.hit_regions.length === 0) && (
+                          <Typography variant="body2" color="text.secondary">
+                            No hit regions available
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Box>
+
+                    {threat.references.length > 0 && (
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          Related Organisms:
+                        </Typography>
+                        <Stack spacing={1} sx={{ pl: 2 }}>
+                          {threat.references.map((org, idx) => (
+                            <Typography key={idx} variant="body2" sx={{ wordBreak: 'break-word' }}>
+                              {org}
+                            </Typography>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+        </Modal>
+      )}
     </Box>
   );
 }
-
-export default SecureDNAScreeningTable;

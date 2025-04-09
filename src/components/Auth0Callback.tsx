@@ -2,13 +2,11 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { handleLoginCallback, debugCheckToken } from '../mpi/MPIAuthQueries';
 import { Box, CircularProgress, Typography } from '@mui/material';
-import { useApolloClient } from '@apollo/client';
 
 const Auth0Callback = () => {
   const [isProcessing, setIsProcessing] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const client = useApolloClient();
 
   useEffect(() => {
     const processAuthCallback = async () => {
@@ -48,7 +46,7 @@ const Auth0Callback = () => {
         }
         
         // Process the code
-        const success = await handleLoginCallback(client);
+        const success = await handleLoginCallback();
         
         // Clear state regardless of success
         localStorage.removeItem('auth_state');
@@ -71,7 +69,7 @@ const Auth0Callback = () => {
     };
     
     processAuthCallback();
-  }, [client]);
+  }, []);
   
   if (isProcessing) {
     return (
