@@ -70,6 +70,22 @@ Ultimately, the tool will have a wide variety of other features, such as a biose
  - Branching path workflows/stages (re-implementation)
 
 
+### Some instructions on setting up auth with Keycloak
+
+First, deploy a Keycloak instance. The exact method will depend on the platform.
+[Here](https://www.keycloak.org/getting-started/getting-started-docker) are the Keycloak quickstart docs for Docker.
+You will need to set up a realm, register a (public) client, and create user(s).
+Be sure to carefully configure appropriate Redirect URIs and Web Origins on the client; since the app must use a public client, this is especially important for security.
+
+The damplab-ui app expects to see certain roles attached to its users.
+These are: `damplab-staff`, `internal-customer`, and `external-customer`.
+It often makes sense to assign roles to groups and then add users to groups, rather than configuring roles directly on the users.
+
+The damplab-ui app will then need the following environment variables to be set in order to talk to Keycloak:
+- `REACT_APP_KEYCLOAK_URL`
+- `REACT_APP_KEYCLOAK_REALM`
+- `REACT_APP_KEYCLOAK_CLIENT_ID`
+
 ## Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
