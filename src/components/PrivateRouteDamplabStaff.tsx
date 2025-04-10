@@ -7,11 +7,11 @@ import {
 } from "../contexts/UserContext";
 
 // Admins can access all pages
-const PrivateRouteAdmin = ({ children }: any) => {
+const PrivateRouteDamplabStaff = ({ children }: any) => {
   const userContext: UserContextProps = useContext(UserContext);
   const userProps: UserProps = use(userContext.userProps);
 
-  return userProps?.isAdmin ? children : <Navigate to="/login" />;
+  return userProps?.isDamplabStaff ? children : <Navigate to="/login" />;
 };
 
-export default PrivateRouteAdmin;
+export default PrivateRouteDamplabStaff;
