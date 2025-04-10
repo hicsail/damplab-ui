@@ -1,15 +1,17 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-
+import React, { use, useContext } from "react";
+import { Navigate } from "react-router-dom";
+import {
+  UserContext,
+  UserContextProps,
+  UserProps,
+} from "../contexts/UserContext";
 
 // Admins can access all pages
 const PrivateRouteAdmin = ({ children }: any) => {
+  const userContext: UserContextProps = useContext(UserContext);
+  const userProps: UserProps = use(userContext.userProps);
 
-  const loginInfo = JSON.parse(sessionStorage.getItem('login_info') || '{}');
-  const isAuthenticated = loginInfo && loginInfo.loggedIn && loginInfo.role === 'admin';
-
-  return isAuthenticated ? children : <Navigate to="/login" />;
-
+  return userProps?.isAdmin ? children : <Navigate to="/login" />;
 };
 
 export default PrivateRouteAdmin;
