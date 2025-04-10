@@ -32,7 +32,9 @@ export default function LoginForm() {
         <>
           <Box sx={{ width: '300px' }}>
             <p>Hello, {appellation}.</p>
-            {userProps.isAdmin ? <p>This account has Admin privileges.</p>:<></>}
+            {userProps.isDamplabStaff && <p>This account has Admin privileges.</p>}
+            {userProps.isInternalCustomer && <p>This is an internal customer account.</p>}
+            {userProps.isExternalCustomer && <p>This is an external customer account.</p>}
             {/* <Button variant="contained" onClick={() => navigate(role === 'admin' ? '/dashboard' : '/canvas')} style={{ marginRight: 10 }}>
               Go to {role === 'admin' ? 'Dashboard' : 'Canvas'}
             </Button> */}
@@ -42,7 +44,7 @@ export default function LoginForm() {
             <Button variant="contained" onClick={() => navigate('/canvas')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
               <AccountTreeIcon sx={{m:1, ml:-4, transform: "rotate(90deg) scaleY(-1)"}}/>CANVAS<br/>(Design Workflows)
             </Button>
-            {userProps.isAdmin ?
+            {userProps.isDamplabStaff ?
               <>
                 <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
                   <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)

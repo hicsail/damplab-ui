@@ -10,8 +10,9 @@ export interface UserContextProps {
 }
 export interface UserProps {
   isAuthenticated: boolean;
-  isAdmin?: boolean;
-  isClient?: boolean;
+  isDamplabStaff?: boolean;
+  isInternalCustomer?: boolean;
+  isExternalCustomer?: boolean;
   subject?: string;
   roles?: string[];
   idTokenParsed?: object;
@@ -31,8 +32,9 @@ async function initKeycloak(): Promise<UserProps> {
     });
     return {
       isAuthenticated: keycloak.authenticated,
-      isAdmin: keycloak.realmAccess?.roles.includes("damplab-admin"),
-      isClient: keycloak.realmAccess?.roles.includes("damplab-client"),
+      isDamplabStaff: keycloak.realmAccess?.roles.includes("damplab-staff"),
+      isInternalCustomer: keycloak.realmAccess?.roles.includes("internal-customer"),
+      isExternalCustomer: keycloak.realmAccess?.roles.includes("external-customer"),
       subject: keycloak.subject,
       roles: keycloak.realmAccess,
       idTokenParsed: keycloak.idTokenParsed,
