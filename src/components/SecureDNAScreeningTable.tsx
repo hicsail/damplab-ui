@@ -69,12 +69,28 @@ export default function SecureDNAScreeningTable() {
   const { loading, error, data } = useQuery<{ getUserScreenings: ScreeningResult[] }>(GET_USER_SCREENINGS);
 
   if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+  if (error) {
+    if (error.message.includes('unauthorized') || error.message.includes('No authorization header')) {
+      return (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary">
+            Please login to the MPI to view screening results
+          </Typography>
+        </Box>
+      );
+    }
+    return <div>Error: {error.message}</div>;
+  }
 
-  const rows: ScreeningRow[] = (data?.getUserScreenings || []).map((screening) => ({
+  const screenings = data?.getUserScreenings || [];
+  const sortedScreenings = [...screenings].sort((a, b) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  const rows = sortedScreenings.map((screening) => ({
     ...screening,
     id: screening.id,
-    onViewDetails: (screening: ScreeningResult) => setSelectedScreening(screening)
+    onViewDetails: () => setSelectedScreening(screening)
   }));
 
   return (
