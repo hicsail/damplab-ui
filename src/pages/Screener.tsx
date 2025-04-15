@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { Grid } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import AddIcon from '@mui/icons-material/Add';
-import { useQuery, useApolloClient } from '@apollo/client';
+import { useQuery } from '@apollo/client';
 
 import MPILoginButton from '../components/MPILoginButton';
 import SecureDNAScreeningTable from '../components/SecureDNAScreeningTable';
@@ -15,9 +15,8 @@ function Screener() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [openUploadAndScreen, setOpenUploadAndScreen] = useState(false);
-  const client = useApolloClient();
 
-  const { data, loading, error, refetch } = useQuery(GET_USER_SCREENINGS, {
+  const { refetch } = useQuery(GET_USER_SCREENINGS, {
     pollInterval: 30000, // Poll every 30 seconds
   });
 

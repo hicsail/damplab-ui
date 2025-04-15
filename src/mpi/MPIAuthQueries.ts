@@ -1,5 +1,3 @@
-import { ApolloClient } from '@apollo/client';
-
 // Helper function to get the session token
 export const getSessionToken = (): string | null => {
   const token = localStorage.getItem('session_token');
