@@ -88,7 +88,7 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
     const state = Math.random().toString(36).substring(7);
     sessionStorage.setItem('auth_state', state);
     
-    const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
+    const backendUrl = process.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
     const currentPath = window.location.pathname;
     const loginUrl = `${backendUrl}/mpi/login?state=${encodeURIComponent(state)}&redirectTo=${encodeURIComponent(currentPath)}`;
     window.location.href = loginUrl;

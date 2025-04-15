@@ -33,7 +33,7 @@ export const handleLoginCallback = async () => {
       return false;
     }
 
-    const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
+    const backendUrl = process.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
     const response = await fetch(`${backendUrl}/mpi/token`, {
       method: 'POST',
       headers: {
@@ -91,7 +91,7 @@ export const checkLoginStatus = async (): Promise<{ loggedIn: boolean; userInfo?
     }
     
     // Verify the token with the backend using REST
-    const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
+    const backendUrl = process.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
     const response = await fetch(`${backendUrl}/mpi/status`, {
       headers: {
         authorization: `Bearer ${token}`
@@ -124,7 +124,7 @@ export const logout = async (): Promise<void> => {
   try {
     const token = getSessionToken();
     if (token) {
-      const backendUrl = process.env.REACT_APP_BACKEND_MPI || 'http://127.0.0.1:5100';
+      const backendUrl = process.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
       await fetch(`${backendUrl}/mpi/logout`, {
         method: 'POST',
         headers: {

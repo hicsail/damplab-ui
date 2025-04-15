@@ -210,7 +210,7 @@ export const deleteSequence = async (client: any, sequenceId: string): Promise<b
 export const createSequencesBatch = async (sequences: Sequence[]): Promise<{ message: string; status: string; timestamp: string } | undefined> => {
   try {
     const token = getSessionToken();
-    const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/mpi/sequences/batch`, {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_BASEURL}/mpi/sequences/batch`, {
       method: "POST",
       headers: {
         "Content-type": "application/json; charset=UTF-8",

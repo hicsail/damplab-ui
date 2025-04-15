@@ -4,7 +4,7 @@ import { ScreeningInput, ScreeningResult, Region } from "./types";
 export const screenSequence = async (sequenceId: string, region: string): Promise<ScreeningResult | undefined> => {
   try {
     const token = getSessionToken();
-    const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/secure-dna/screen`, {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_BASEURL}/secure-dna/screen`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -30,7 +30,7 @@ export const screenSequence = async (sequenceId: string, region: string): Promis
 export const getScreeningResults = async (sequenceId: string): Promise<ScreeningResult[] | undefined> => {
   try {
     const token = getSessionToken();
-    const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/secure-dna/screen/${sequenceId}`, {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_BASEURL}/secure-dna/screen/${sequenceId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -52,7 +52,7 @@ export const getScreeningResults = async (sequenceId: string): Promise<Screening
 export const getUserScreenings = async (): Promise<ScreeningResult[] | undefined> => {
   try {
     const token = getSessionToken();
-    const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/secure-dna/screenings`, {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_BASEURL}/secure-dna/screenings`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -74,7 +74,7 @@ export const getUserScreenings = async (): Promise<ScreeningResult[] | undefined
 export const screenSequencesBatch = async (sequenceIds: string[], region: Region): Promise<{ message: string; status: string; timestamp: string } | undefined> => {
   try {
     const token = getSessionToken();
-    const response = await fetch(`${process.env.REACT_APP_BACKEND_MPI}/secure-dna/screen/batch`, {
+    const response = await fetch(`${process.env.REACT_APP_BACKEND_BASEURL}/secure-dna/screen/batch`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
