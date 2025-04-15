@@ -3,7 +3,7 @@ import { TextField, Select, MenuItem, Table, TableBody, TableCell, TableHead, Ta
 import AddIcon from '@mui/icons-material/Add';
 
 type ColumnData = {
-  header: string;  // The column header
+  headerName: string;  // The column headerName (display name)
   field: string;   // The field name to match in row data
   isDropdown?: boolean;  // If true, this column will have a dropdown
   options?: string[];    // Options for the dropdown, only if `isDropdown` is true
@@ -45,7 +45,7 @@ const ParamTable: React.FC<ParamTableProps> = ({ title, rows, onChange, columns 
         <TableHead>
           <TableRow>
             {columns.map((col, colIndex) => (
-              <TableCell key={colIndex}>{col.header}</TableCell>
+              <TableCell key={colIndex}>{col.headerName || col.field}</TableCell>
             ))}
           </TableRow>
         </TableHead>
