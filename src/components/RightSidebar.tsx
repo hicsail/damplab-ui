@@ -3,7 +3,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText } 
 import Snackbar   from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon  from '@mui/icons-material/Close';
-import { GppMaybe } from '@mui/icons-material/';
+import { GppMaybe } from '@mui/icons-material';
 
 import { getServiceFromId } from '../controllers/GraphHelpers';
 import Params from './Params';
