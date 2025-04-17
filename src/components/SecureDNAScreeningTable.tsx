@@ -4,10 +4,17 @@ import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { Button, Typography, Box, Modal, Stack, Chip } from '@mui/material';
 import { GET_USER_SCREENINGS } from '../mpi/SequencesQueries';
 import { ScreeningResult, HitRegion } from '../mpi/types';
+import { ApolloError } from '@apollo/client';
 
 interface ScreeningRow extends ScreeningResult {
   id: string;
   onViewDetails: (screening: ScreeningResult) => void;
+}
+
+interface SecureDNAScreeningTableProps {
+  screenings?: ScreeningResult[];
+  loading?: boolean;
+  error?: ApolloError;
 }
 
 const columns: GridColDef<ScreeningRow>[] = [
@@ -16,7 +23,7 @@ const columns: GridColDef<ScreeningRow>[] = [
     headerName: 'Sequence', 
     flex: 1,
     renderCell: (params: GridRenderCellParams<ScreeningRow>) => {
-      return params.row.sequence?.name || '';
+      return params.row.sequence && params.row.sequence.name ? params.row.sequence.name : '';
     }
   },
   { 
@@ -64,9 +71,12 @@ const columns: GridColDef<ScreeningRow>[] = [
   }
 ];
 
-export default function SecureDNAScreeningTable() {
+export default function SecureDNAScreeningTable({ 
+  screenings = [], 
+  loading = false, 
+  error 
+}: SecureDNAScreeningTableProps) {
   const [selectedScreening, setSelectedScreening] = useState<ScreeningResult | null>(null);
-  const { loading, error, data } = useQuery<{ getUserScreenings: ScreeningResult[] }>(GET_USER_SCREENINGS);
 
   if (loading) return <div>Loading...</div>;
   if (error) {
@@ -82,7 +92,6 @@ export default function SecureDNAScreeningTable() {
     return <div>Error: {error.message}</div>;
   }
 
-  const screenings = data?.getUserScreenings || [];
   const sortedScreenings = [...screenings].sort((a, b) => 
     new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );

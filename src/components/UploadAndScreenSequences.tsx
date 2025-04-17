@@ -53,7 +53,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const file = event.target.files && event.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = async (e) => {
@@ -158,7 +158,7 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
       const screeningResult = await screenSequencesBatch(client, sequenceIds, Region.ALL);
       
       if (screeningResult) {
-        setMessage('The biosecurity check is running in the background. Results will be shown in the SecureDNA screenings table.');
+        setMessage('Biosecurity check is running in the background. Results usually appear in the screenings table after a minute or so.');
         
         // Start polling for new results
         const pollInterval = 10000; // Poll every 10 seconds

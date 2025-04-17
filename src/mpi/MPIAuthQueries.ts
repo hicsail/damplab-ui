@@ -46,7 +46,7 @@ export const handleLoginCallback = async () => {
 
     const data = await response.json();
     
-    if (data?.token) {
+    if (data && data.token) {
       localStorage.setItem('session_token', data.token);
       return true;
     }

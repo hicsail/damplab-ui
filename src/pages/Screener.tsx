@@ -16,7 +16,7 @@ function Screener() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [openUploadAndScreen, setOpenUploadAndScreen] = useState(false);
 
-  const { refetch } = useQuery(GET_USER_SCREENINGS, {
+  const { data, loading, error, refetch } = useQuery(GET_USER_SCREENINGS, {
     pollInterval: 30000, // Poll every 30 seconds
   });
 
@@ -65,7 +65,11 @@ function Screener() {
                   />
                 </Box>
               </Box>
-              <SecureDNAScreeningTable />
+              <SecureDNAScreeningTable 
+                screenings={data && data.getUserScreenings ? data.getUserScreenings : []}
+                loading={loading}
+                error={error}
+              />
             </Grid>
           </Grid>
           <UploadAndScreenSequences 

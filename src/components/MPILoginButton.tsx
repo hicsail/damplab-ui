@@ -141,7 +141,7 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
             }}
             onClick={handleMenuClick}
           >
-            {userInfo?.picture ? (
+            {userInfo && userInfo.picture ? (
               <Avatar 
                 src={userInfo.picture} 
                 alt={userInfo.name || 'User'} 
@@ -149,7 +149,7 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
               />
             ) : (
               <Avatar sx={{ width: 32, height: 32, marginRight: 1 }}>
-                {userInfo?.name?.charAt(0) || 'U'}
+                {userInfo && userInfo.name ? userInfo.name.charAt(0) : 'U'}
               </Avatar>
             )}
             <Typography variant="body2" sx={{ marginRight: 1 }}>
