@@ -82,9 +82,9 @@ These are: `damplab-staff`, `internal-customer`, and `external-customer`.
 It often makes sense to assign roles to groups and then add users to groups, rather than configuring roles directly on the users.
 
 The damplab-ui app will then need the following environment variables to be set in order to talk to Keycloak:
-- `REACT_APP_KEYCLOAK_URL`
-- `REACT_APP_KEYCLOAK_REALM`
-- `REACT_APP_KEYCLOAK_CLIENT_ID`
+- `VITE_KEYCLOAK_URL`
+- `VITE_KEYCLOAK_REALM`
+- `VITE_KEYCLOAK_CLIENT_ID`
 
 ## Getting Started with Create React App
 

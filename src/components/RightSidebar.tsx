@@ -22,7 +22,7 @@ interface SidebarProps {
 export default function ContextTestComponent(props: SidebarProps) {
     const {noMouseEvents} = props;
 
-    const api_url = process.env.REACT_APP_MPI_API || '';
+    const api_url = import.meta.env.VITE_MPI_API || '';
     
     const { trunc } = useUtility();
 

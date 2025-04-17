@@ -41,7 +41,7 @@ function App() {
   const user = useContext(UserContext);
 
   const client = new ApolloClient({
-    uri: process.env.REACT_APP_BACKEND,
+    uri: import.meta.env.VITE_BACKEND,
     cache: new InMemoryCache(),
   });
 
