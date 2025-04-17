@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
+import { ApolloClient, InMemoryCache, ApolloProvider, createHttpLink } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
 
 import { CanvasContext }             from './contexts/Canvas';
 import { AppContext }                from './contexts/App';
@@ -16,11 +17,13 @@ import TechnicianView from './pages/TechnicianView';
 import Dominos        from './pages/Dominos';
 import Dashboard      from './pages/Dashboard';
 import JobSubmitted   from './pages/JobSubmitted';
+import Screener       from './pages/Screener';
 import ELabs          from './pages/ELabs';
 import Kernel         from './pages/Kernel';
 import ReleaseNotes   from './pages/ReleaseNotes';
 import TestPage       from './pages/TestPage';
 import FinalCheckout from './pages/FinalCheckout';
+import Auth0Callback  from './components/Auth0Callback';
 // import Tracking       from './pages/ClientView';
 // import Accepted       from './pages/Accepted';
 import './App.css';
@@ -35,10 +38,24 @@ function App() {
   const [nodeParams, setNodeParams] = useState([]);
   const [services, setServices] = useState([]);
   const [bundles, setBundles] = useState([]);
-  const [hazards, setHazards] = useState(Array<string>);
+  const [hazards, setHazards] = useState<string[]>([]);
+
+  const httpLink = createHttpLink({
+    uri: process.env.REACT_APP_BACKEND,
+  });
+
+  const authLink = setContext((_, { headers }) => {
+    const token = localStorage.getItem('session_token');
+    return {
+      headers: {
+        ...headers,
+        authorization: token ? `Bearer ${token}` : "",
+      }
+    }
+  });
 
   const client = new ApolloClient({
-    uri: process.env.REACT_APP_BACKEND,
+    link: authLink.concat(httpLink),
     cache: new InMemoryCache(),
   });
 
@@ -95,12 +112,14 @@ function App() {
                     <Route path = "/technician_view/:id" element = {<PrivateRouteAdmin> <TechnicianView />            </PrivateRouteAdmin>} />
                     <Route path = "/dashboard"           element = {<PrivateRouteAdmin> <Dashboard client={client} /> </PrivateRouteAdmin>} />
                     <Route path = "/dominos"             element = {<PrivateRouteAdmin> <Dominos />                   </PrivateRouteAdmin>} />
+                    <Route path = "/screener"            element = {<PrivateRouteAdmin> <Screener />                  </PrivateRouteAdmin>} />
                     <Route path = "/elabs"               element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} />
                     <Route path = "/kernel"              element = {<PrivateRouteAdmin> <Kernel />                    </PrivateRouteAdmin>} />
                     <Route path = "/release_notes"       element = {<PrivateRouteAdmin> <ReleaseNotes />              </PrivateRouteAdmin>} />
 
                     <Route path = "/test_page"           element = {<PrivateRouteAdmin> <TestPage />                  </PrivateRouteAdmin>} />
                     <Route path = "/edit"                element = {<PrivateRouteAdmin> <AdminEdit />                 </PrivateRouteAdmin>} />
+                    <Route path = "/mpi/auth0_redirect"  element = {<Auth0Callback />} />
                     <Route path = "/*"                   element = {<div>Sorry, we can't find this page at the moment (404). Please double check the URL or try again later.</div>} />
                     {/* <Route path = "/client_view/:id"     element = {<PrivateRouteAdmin> <Tracking />                  </PrivateRouteAdmin>} /> */}
                     {/* <Route path = "/callback"            element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} /> */}
