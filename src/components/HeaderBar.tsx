@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext, useCallback } from 'react'
 import { Link, useNavigate } from "react-router-dom";
-import { AppBar, Button, IconButton, Toolbar, Hidden, Alert } from '@mui/material';
+import { AppBar, Button, IconButton, Toolbar, Alert } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import Snackbar from '@mui/material/Snackbar';
 import { CanvasContext } from '../contexts/Canvas';
@@ -117,12 +117,10 @@ export default function HeaderBar() {
 
                 <Toolbar style={{background: 'black'}}>
 
-                    <Hidden mdDown>
-                        <Button onClick={() => window.location.href = "https://damplab.org/services"} style={{ textDecoration: 'none', color: 'white', marginRight: 'auto' }}>
-                            <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png" 
-                                style={{width: 250}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
-                        </Button>
-                    </Hidden>
+                    <Button onClick={() => window.location.href = "https://damplab.org/services"} style={{ textDecoration: 'none', color: 'white', marginRight: 'auto' }} sx={{ display: { xs: 'none', md: 'block' } }}>
+                        <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"
+                            style={{width: 250}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
+                    </Button>
 
                     <Button onClick={() => navigate("/")} style={{ textDecoration: 'none', color: 'white', textTransform: 'none'}}>
                         <img src="damp-white-text.svg" style={{height: '45px'}} alt="DAMP Logo"/>
