@@ -27,7 +27,7 @@ git clone git@github.com:hicsail/damplab-ui.git
 cd damplab-ui
 ```
 
-If necessary, install Node.js and npm (Node Package Manager) (tested on v18.16.0): 
+If necessary, install Node.js and npm (Node Package Manager) (tested on v22.14.0):
 
  - [Node.js and npm install instructions](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm#using-a-node-version-manager-to-install-nodejs-and-npm)
 
@@ -35,7 +35,7 @@ If necessary, install Node.js and npm (Node Package Manager) (tested on v18.16.0
 You can then install the dependencies and launch the program in development mode by running the following from the root folder: 
 
 ```console
-run npm install --legacy-peer-deps
+npm install
 npm start
 ```
 
@@ -86,16 +86,10 @@ The damplab-ui app will then need the following environment variables to be set 
 - `VITE_KEYCLOAK_REALM`
 - `VITE_KEYCLOAK_CLIENT_ID`
 
-## Getting Started with Create React App
-
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ### Learn More
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
+This [React](https://reactjs.org/) app is built on [Vite](https://vite.dev/) and [React Router](https://reactrouter.com/).
 
 ## Credit
 
