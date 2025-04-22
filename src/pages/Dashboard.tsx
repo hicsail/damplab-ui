@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router";
 import { useQuery } from '@apollo/client'
 import { Box, Button, Typography} from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';

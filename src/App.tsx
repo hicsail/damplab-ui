@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router";
 import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
 
 import { CanvasContext }             from './contexts/Canvas';

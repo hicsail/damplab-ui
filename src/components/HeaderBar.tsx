@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useCallback } from 'react'
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router";
 import { AppBar, Button, IconButton, Toolbar, Alert } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import Snackbar from '@mui/material/Snackbar';
@@ -7,7 +7,6 @@ import { CanvasContext } from '../contexts/Canvas';
 import LoadCanvasButton from './LoadCanvasButton';
 import SaveCanvasButton from './SaveCanvasButton';
 import "../styles/resubmit.css";
-import { useLocation } from 'react-router-dom';
 
 export default function HeaderBar() {
     const navigate = useNavigate();
