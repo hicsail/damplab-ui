@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from "react-router";
+import { Routes, Route } from "react-router";
 import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
 
 import { CanvasContext }             from './contexts/Canvas';
@@ -79,7 +79,6 @@ function App() {
                                            edges: edges, setEdges: setEdges,
                                            activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId,
                                            nodeParams: nodeParams, setNodeParams: setNodeParams }}>
-              <BrowserRouter>
 
                 <HeaderBar />
 
@@ -113,7 +112,6 @@ function App() {
                   </Routes>
 
                 </div>
-              </BrowserRouter>
           </CanvasContext.Provider>
           </UserContext.Provider>
         </AppContext.Provider>
