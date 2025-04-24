@@ -10,7 +10,7 @@ import Params from './Params';
 import NodeButton from './AllowedConnectionButton';
 import { AppContext }    from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas'
-import { useUtility } from '../contexts/UtilityContext';
+import { trunc } from '../utils';
 
 import { RecState } from '../types/Types';
 import '../App.css';
@@ -24,8 +24,6 @@ export default function ContextTestComponent(props: SidebarProps) {
 
     const api_url = import.meta.env.VITE_MPI_API || '';
     
-    const { trunc } = useUtility();
-
     const val                   = useContext(CanvasContext);
     const { services, hazards } = useContext(AppContext);
 

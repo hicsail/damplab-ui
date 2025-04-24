@@ -3,14 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
-import { UtilityProvider } from './contexts/UtilityContext';
 
 ReactDOM.hydrateRoot(
     document,
     <React.StrictMode>
-      <UtilityProvider>
-        <HydratedRouter />
-      </UtilityProvider>
+      <HydratedRouter />
     </React.StrictMode>
 );
 
