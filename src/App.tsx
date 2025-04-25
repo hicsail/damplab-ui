@@ -1,6 +1,5 @@
 import { Routes, Route } from "react-router";
 // import { searchForEndService } from './controllers/GraphHelpers';
-import HeaderBar          from './components/HeaderBar';
 import LoginForm          from './components/LoginForm';
 import PrivateRouteDamplabStaff  from './components/PrivateRouteDamplabStaff';
 import PrivateRouteAuthed from './components/PrivateRouteAuthed';
@@ -25,9 +24,6 @@ function App() {
 
   return (
     <div className="App">
-                <HeaderBar />
-
-                <div style={{ padding: 20 }}>
 
                   <Routes>
 
@@ -56,7 +52,6 @@ function App() {
 
                   </Routes>
 
-                </div>
     </div>
   );
 }

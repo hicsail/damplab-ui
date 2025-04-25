@@ -11,6 +11,7 @@ import {
 import { CanvasContext } from "./contexts/Canvas";
 import { AppContext } from "./contexts/App";
 import { GET_BUNDLES, GET_SERVICES } from "./gql/queries";
+import HeaderBar from "./components/HeaderBar";
 
 const client = new ApolloClient({
   uri: import.meta.env.VITE_BACKEND,
@@ -36,7 +37,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
 
       <body>
-        {children}
+        <HeaderBar />
+        <div style={{ padding: 20 }}>
+          {children}
+        </div>
         <ScrollRestoration />
         <Scripts />
       </body>

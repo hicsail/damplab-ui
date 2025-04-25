@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext, useCallback } from 'react'
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useMatch, useNavigate } from "react-router";
 import { AppBar, Button, IconButton, Toolbar, Alert } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import Snackbar from '@mui/material/Snackbar';
@@ -10,6 +10,7 @@ import "../styles/resubmit.css";
 
 export default function HeaderBar() {
     const navigate = useNavigate();
+    const isResubmitting = useMatch("resubmission/:id");
 
     // If snackbarMessage starts with "Success", then the snackbar will be green, otherwise it will be red to show an error.
     const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -143,7 +144,7 @@ export default function HeaderBar() {
                             updateCurrentCanvas={updateCurrentCanvas}
                         />
 
-                        {window.location.href.includes('resubmission')
+                        { isResubmitting
                         ? <Link to="/checkout" className="a a--hover a--active">Resubmit...</Link>
                         : <IconButton onClick={() => navigate("/checkout")} title="Checkout page" aria-controls='menu-appbar' aria-haspopup='true'>
                             <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
