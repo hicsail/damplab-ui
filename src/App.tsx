@@ -1,11 +1,4 @@
-import { useContext, useState, useEffect } from 'react';
 import { Routes, Route } from "react-router";
-import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
-
-import { CanvasContext }             from './contexts/Canvas';
-import { AppContext }                from './contexts/App';
-import { UserContext }               from './contexts/UserContext';
-import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 // import { searchForEndService } from './controllers/GraphHelpers';
 import HeaderBar          from './components/HeaderBar';
 import LoginForm          from './components/LoginForm';
@@ -30,56 +23,8 @@ import { AdminEdit } from './pages/AdminEdit';
 
 function App() {
 
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]);
-  const [activeComponentId, setActiveComponentId] = useState('');
-  const [nodeParams, setNodeParams] = useState([]);
-  const [services, setServices] = useState([]);
-  const [bundles, setBundles] = useState([]);
-  const [hazards, setHazards] = useState(Array<string>);
-
-  const user = useContext(UserContext);
-
-  const client = new ApolloClient({
-    uri: import.meta.env.VITE_BACKEND,
-    cache: new InMemoryCache(),
-  });
-
-  // initial load of services and bundles
-  useEffect(() => {
-
-    client.query({ query: GET_SERVICES }).then((result) => {
-      console.log('services loaded successfully on app', result);
-      setServices(result.data.services);
-
-    }).catch((error) => {
-      console.log('error when loading services on app', error);
-    });
-
-    client.query({ query: GET_BUNDLES }).then((result) => {
-      console.log('bundles loaded successfully on app', result);
-      setBundles(result.data.bundles);
-    }).catch((error) => {
-      console.log('error when loading bundles on app', error);
-    });
-
-    // TODO: Change hazards to a service attribute...
-    // Matches to 'activeNode?.data.label in RightSideBar
-    setHazards(['Gibson Assembly', 'Modular Cloning']);
-
-  }, []);
-
-
   return (
     <div className="App">
-      <ApolloProvider client={client}>
-        <AppContext.Provider value={{ services: services, bundles: bundles, hazards: hazards }}>
-          <UserContext.Provider value={ user }>
-          <CanvasContext.Provider value={{ nodes: nodes, setNodes: setNodes,
-                                           edges: edges, setEdges: setEdges,
-                                           activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId,
-                                           nodeParams: nodeParams, setNodeParams: setNodeParams }}>
-
                 <HeaderBar />
 
                 <div style={{ padding: 20 }}>
@@ -90,13 +35,13 @@ function App() {
                     <Route path = "/login"               element = {<LoginForm />} />
 
                     <Route path = "/canvas"              element = {<MainFlow />} />
-                    <Route path = "/resubmission/:id"    element = {<PrivateRouteAuthed> <MainFlow client={client} /> </PrivateRouteAuthed>} />
+                    <Route path = "/resubmission/:id"    element = {<PrivateRouteAuthed> <MainFlow />                 </PrivateRouteAuthed>} />
                     <Route path = "/final_checkout"      element = {<PrivateRouteAuthed> <FinalCheckout />            </PrivateRouteAuthed>} />
                     <Route path = "/checkout"            element = {<PrivateRouteAuthed> <Checkout />                 </PrivateRouteAuthed>} />
                     <Route path = "/submitted"           element = {<PrivateRouteAuthed> <JobSubmitted />             </PrivateRouteAuthed>} />
 
                     <Route path = "/technician_view/:id" element = {<PrivateRouteDamplabStaff> <TechnicianView />            </PrivateRouteDamplabStaff>} />
-                    <Route path = "/dashboard"           element = {<PrivateRouteDamplabStaff> <Dashboard client={client} /> </PrivateRouteDamplabStaff>} />
+                    <Route path = "/dashboard"           element = {<PrivateRouteDamplabStaff> <Dashboard />                 </PrivateRouteDamplabStaff>} />
                     <Route path = "/dominos"             element = {<PrivateRouteDamplabStaff> <Dominos />                   </PrivateRouteDamplabStaff>} />
                     <Route path = "/elabs"               element = {<PrivateRouteDamplabStaff> <ELabs />                     </PrivateRouteDamplabStaff>} />
                     <Route path = "/kernel"              element = {<PrivateRouteDamplabStaff> <Kernel />                    </PrivateRouteDamplabStaff>} />
@@ -112,10 +57,6 @@ function App() {
                   </Routes>
 
                 </div>
-          </CanvasContext.Provider>
-          </UserContext.Provider>
-        </AppContext.Provider>
-      </ApolloProvider>
     </div>
   );
 }

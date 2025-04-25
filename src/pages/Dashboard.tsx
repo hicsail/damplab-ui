@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from "react-router";
-import { useQuery } from '@apollo/client'
+import { useApolloClient, useQuery } from "@apollo/client";
 import { Box, Button, Typography} from '@mui/material';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { PDFDownloadLink } from '@react-pdf/renderer';
@@ -11,7 +11,7 @@ import JobPDFDocument from '../components/JobPDFDocument';
 
 
 export default function Dashboard( {...props} ) {
-
+    const apolloClient = useApolloClient();
     const [queuedWorkflows,     setQueuedWorkflows]     = useState([]);
     const [inProgressWorkflows, setInProgressWorkflows] = useState([]);
     const [completedWorkflows,  setCompletedWorkflows]  = useState([]);
@@ -40,7 +40,7 @@ export default function Dashboard( {...props} ) {
             const allWorkflows = [...queuedWorkflows, ...inProgressWorkflows, ...completedWorkflows];
             const jobIDPromises = allWorkflows.map(async (workflow: any) => {
                 try {
-                    const result = await props.client.query({
+                    const result = await apolloClient.query({
                         query: GET_JOB_BY_WORKFLOW_ID,
                         variables: { id: workflow.id },
                     });
@@ -55,7 +55,7 @@ export default function Dashboard( {...props} ) {
         };
 
         fetchJobIDs();
-    }, [queuedWorkflows, inProgressWorkflows, completedWorkflows, props.client]);
+    }, [queuedWorkflows, inProgressWorkflows, completedWorkflows, apolloClient]);
 
     return (
         <div>
