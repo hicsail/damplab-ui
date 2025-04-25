@@ -7,7 +7,7 @@ import { EditServicesTable } from '../components/edit/EditServicesTable';
 
 type EditTypes = 'Services' | 'Categories' | 'Bundles';
 
-export const AdminEdit: React.FC = () => {
+export default function AdminEdit () {
   const [editType, setEditType] = useState<EditTypes>('Services');
   const [searchString, setSearchString] = useState<string>('');
 
