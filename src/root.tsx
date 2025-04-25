@@ -82,10 +82,10 @@ export default function Root() {
 
   return (
     <ApolloProvider client={client}>
-      <AppContext.Provider
+      <AppContext
         value={{ services: services, bundles: bundles, hazards: hazards }}
       >
-        <CanvasContext.Provider
+        <CanvasContext
           value={{
             nodes: nodes,
             setNodes: setNodes,
@@ -98,8 +98,8 @@ export default function Root() {
           }}
         >
           <Outlet />
-        </CanvasContext.Provider>
-      </AppContext.Provider>
+        </CanvasContext>
+      </AppContext>
     </ApolloProvider>
   );
 }
