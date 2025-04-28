@@ -13,7 +13,6 @@ import { CanvasContext } from '../contexts/Canvas'
 import { trunc } from '../utils';
 
 import { RecState } from '../types/Types';
-import '../App.css';
 
 interface SidebarProps {
     noMouseEvents?: boolean;
