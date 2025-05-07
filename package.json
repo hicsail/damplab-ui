@@ -27,9 +27,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "vite",
-    "build": "vite build",
-    "serve": "vite preview"
+    "build": "react-router build",
+    "dev": "react-router dev"
   },
   "eslintConfig": {
     "extends": [
