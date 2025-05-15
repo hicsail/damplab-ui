@@ -1,4 +1,6 @@
-import { gql } from '@apollo/client';
+// someday: import from @apollo/client once Apollo Client 4 is out (which will address ESM issues) - see discussion at
+// https://github.com/apollographql/apollo-client/issues/9976#issuecomment-1768446694
+import { gql } from '@apollo/client/index.js';
 
 export const GET_SERVICES = gql`
     query GetServices {

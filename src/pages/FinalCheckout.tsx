@@ -5,7 +5,7 @@ import React, { SyntheticEvent, useState, useEffect, useContext } from 'react';
 import { useMutation } from "@apollo/client";
 import { CREATE_JOB } from "../gql/mutations";
 import { CanvasContext } from "../contexts/Canvas";
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import {
   Snackbar,
   Typography,

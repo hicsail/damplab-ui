@@ -1,26 +1,25 @@
-FROM node:18-alpine as builder
+FROM node:22 AS build
 
-ARG REACT_APP_BACKEND
-ARG REACT_APP_KEYCLOAK_URL
-ARG REACT_APP_KEYCLOAK_REALM
-ARG REACT_APP_KEYCLOAK_CLIENT_ID
+ARG VITE_BACKEND
+ARG VITE_KEYCLOAK_URL
+ARG VITE_KEYCLOAK_REALM
+ARG VITE_KEYCLOAK_CLIENT_ID
 
-ENV REACT_APP_BACKEND ${REACT_APP_BACKEND}
-ENV REACT_APP_KEYCLOAK_URL ${REACT_APP_KEYCLOAK_URL}
-ENV REACT_APP_KEYCLOAK_REALM ${REACT_APP_KEYCLOAK_REALM}
-ENV REACT_APP_KEYCLOAK_CLIENT_ID ${REACT_APP_KEYCLOAK_CLIENT_ID}
+ENV VITE_BACKEND=${VITE_BACKEND}
+ENV VITE_KEYCLOAK_URL=${VITE_KEYCLOAK_URL}
+ENV VITE_KEYCLOAK_REALM=${VITE_KEYCLOAK_REALM}
+ENV VITE_KEYCLOAK_CLIENT_ID=${VITE_KEYCLOAK_CLIENT_ID}
 
-WORKDIR /usr/src/app
-
+WORKDIR /app
 COPY . .
-
-RUN npm install --legacy-peer-deps
+RUN npm install
 RUN npm run build
 
-FROM registry.access.redhat.com/ubi7/nginx-120
 
-COPY --from=builder /usr/src/app/build .
+FROM nginx:1.28
 
-ADD ./nginx.conf "${NGINX_CONF_PATH}"
+COPY nginx-http-server.conf /etc/nginx/conf.d/default.conf
 
-CMD nginx -g "daemon off;"
+COPY --from=build /app/build/client /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

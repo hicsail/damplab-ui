@@ -1,6 +1,6 @@
 // JobSubmitted.tsx
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router';
 import { useQuery } from '@apollo/client';
 import { GET_JOB_BY_ID } from '../gql/queries';
 import { Workflow } from '../gql/graphql';

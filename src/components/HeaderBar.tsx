@@ -1,16 +1,16 @@
 import { useState, useEffect, useContext, useCallback } from 'react'
-import { Link, useNavigate } from "react-router-dom";
-import { AppBar, Button, IconButton, Toolbar, Hidden, Alert } from '@mui/material';
+import { Link, useLocation, useMatch, useNavigate } from "react-router";
+import { AppBar, Button, IconButton, Toolbar, Alert } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import Snackbar from '@mui/material/Snackbar';
 import { CanvasContext } from '../contexts/Canvas';
 import LoadCanvasButton from './LoadCanvasButton';
 import SaveCanvasButton from './SaveCanvasButton';
 import "../styles/resubmit.css";
-import { useLocation } from 'react-router-dom';
 
 export default function HeaderBar() {
     const navigate = useNavigate();
+    const isResubmitting = useMatch("resubmission/:id");
 
     // If snackbarMessage starts with "Success", then the snackbar will be green, otherwise it will be red to show an error.
     const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -117,12 +117,10 @@ export default function HeaderBar() {
 
                 <Toolbar style={{background: 'black'}}>
 
-                    <Hidden mdDown>
-                        <Button onClick={() => window.location.href = "https://damplab.org/services"} style={{ textDecoration: 'none', color: 'white', marginRight: 'auto' }}>
-                            <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png" 
-                                style={{width: 250}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
-                        </Button>
-                    </Hidden>
+                    <Button onClick={() => window.location.href = "https://damplab.org/services"} style={{ textDecoration: 'none', color: 'white', marginRight: 'auto' }} sx={{ display: { xs: 'none', md: 'block' } }}>
+                        <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"
+                            style={{width: 250}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
+                    </Button>
 
                     <Button onClick={() => navigate("/")} style={{ textDecoration: 'none', color: 'white', textTransform: 'none'}}>
                         <img src="damp-white-text.svg" style={{height: '45px'}} alt="DAMP Logo"/>
@@ -146,7 +144,7 @@ export default function HeaderBar() {
                             updateCurrentCanvas={updateCurrentCanvas}
                         />
 
-                        {window.location.href.includes('resubmission')
+                        { isResubmitting
                         ? <Link to="/checkout" className="a a--hover a--active">Resubmit...</Link>
                         : <IconButton onClick={() => navigate("/checkout")} title="Checkout page" aria-controls='menu-appbar' aria-haspopup='true'>
                             <ShoppingCartOutlinedIcon style={{color: 'white'}}/>

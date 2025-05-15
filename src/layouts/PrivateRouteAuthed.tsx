@@ -1,5 +1,5 @@
-import React, { use, useContext } from "react";
-import { Navigate } from "react-router-dom";
+import { use, useContext } from "react";
+import { Navigate, Outlet } from "react-router";
 import {
   UserContext,
   UserContextProps,
@@ -7,11 +7,11 @@ import {
 } from "../contexts/UserContext";
 
 // Clients can only access certain pages, such as the Canvas, Checkout, and Submission Confirmation
-const PrivateRouteAuthed = ({ children }: any) => {
+const PrivateRouteAuthed = () => {
   const userContext: UserContextProps = useContext(UserContext);
   const userProps: UserProps = use(userContext.userProps);
 
-  return userProps?.isAuthenticated ? children : <Navigate to="/login" />;
+  return userProps?.isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
 };
 
 export default PrivateRouteAuthed;

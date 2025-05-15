@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { useQuery, useMutation } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
