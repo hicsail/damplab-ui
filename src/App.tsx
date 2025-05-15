@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ApolloClient, InMemoryCache, ApolloProvider } from '@apollo/client';
 
 import { CanvasContext }             from './contexts/Canvas';
 import { AppContext }                from './contexts/App';
+import { UserContext }               from './contexts/UserContext';
 import { GET_BUNDLES, GET_SERVICES } from './gql/queries';
 // import { searchForEndService } from './controllers/GraphHelpers';
 import HeaderBar          from './components/HeaderBar';
 import LoginForm          from './components/LoginForm';
-import PrivateRouteAdmin  from './components/PrivateRouteAdmin';
-import PrivateRouteClient from './components/PrivateRouteClient';
+import PrivateRouteDamplabStaff  from './components/PrivateRouteDamplabStaff';
+import PrivateRouteAuthed from './components/PrivateRouteAuthed';
 import MainFlow       from './pages/MainFlow';
 import Checkout       from './pages/Checkout';
 import TechnicianView from './pages/TechnicianView';
@@ -36,6 +37,8 @@ function App() {
   const [services, setServices] = useState([]);
   const [bundles, setBundles] = useState([]);
   const [hazards, setHazards] = useState(Array<string>);
+
+  const user = useContext(UserContext);
 
   const client = new ApolloClient({
     uri: process.env.REACT_APP_BACKEND,
@@ -71,6 +74,7 @@ function App() {
     <div className="App">
       <ApolloProvider client={client}>
         <AppContext.Provider value={{ services: services, bundles: bundles, hazards: hazards }}>
+          <UserContext.Provider value={ user }>
           <CanvasContext.Provider value={{ nodes: nodes, setNodes: setNodes,
                                            edges: edges, setEdges: setEdges,
                                            activeComponentId: activeComponentId, setActiveComponentId: setActiveComponentId,
@@ -86,21 +90,21 @@ function App() {
                     <Route path = "/"                    element = {<LoginForm />} />
                     <Route path = "/login"               element = {<LoginForm />} />
 
-                    <Route path = "/canvas"              element = {<PrivateRouteClient> <MainFlow />                 </PrivateRouteClient>} />
-                    <Route path = "/resubmission/:id"    element = {<PrivateRouteClient> <MainFlow client={client} /> </PrivateRouteClient>} />
-                    <Route path = "/final_checkout"      element = {<PrivateRouteClient> <FinalCheckout />           </PrivateRouteClient>} />
-                    <Route path = "/checkout"            element = {<PrivateRouteClient> <Checkout />                 </PrivateRouteClient>} />
-                    <Route path = "/submitted"           element = {<PrivateRouteClient> <JobSubmitted />             </PrivateRouteClient>} />
+                    <Route path = "/canvas"              element = {<MainFlow />} />
+                    <Route path = "/resubmission/:id"    element = {<PrivateRouteAuthed> <MainFlow client={client} /> </PrivateRouteAuthed>} />
+                    <Route path = "/final_checkout"      element = {<PrivateRouteAuthed> <FinalCheckout />            </PrivateRouteAuthed>} />
+                    <Route path = "/checkout"            element = {<PrivateRouteAuthed> <Checkout />                 </PrivateRouteAuthed>} />
+                    <Route path = "/submitted"           element = {<PrivateRouteAuthed> <JobSubmitted />             </PrivateRouteAuthed>} />
 
-                    <Route path = "/technician_view/:id" element = {<PrivateRouteAdmin> <TechnicianView />            </PrivateRouteAdmin>} />
-                    <Route path = "/dashboard"           element = {<PrivateRouteAdmin> <Dashboard client={client} /> </PrivateRouteAdmin>} />
-                    <Route path = "/dominos"             element = {<PrivateRouteAdmin> <Dominos />                   </PrivateRouteAdmin>} />
-                    <Route path = "/elabs"               element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} />
-                    <Route path = "/kernel"              element = {<PrivateRouteAdmin> <Kernel />                    </PrivateRouteAdmin>} />
-                    <Route path = "/release_notes"       element = {<PrivateRouteAdmin> <ReleaseNotes />              </PrivateRouteAdmin>} />
+                    <Route path = "/technician_view/:id" element = {<PrivateRouteDamplabStaff> <TechnicianView />            </PrivateRouteDamplabStaff>} />
+                    <Route path = "/dashboard"           element = {<PrivateRouteDamplabStaff> <Dashboard client={client} /> </PrivateRouteDamplabStaff>} />
+                    <Route path = "/dominos"             element = {<PrivateRouteDamplabStaff> <Dominos />                   </PrivateRouteDamplabStaff>} />
+                    <Route path = "/elabs"               element = {<PrivateRouteDamplabStaff> <ELabs />                     </PrivateRouteDamplabStaff>} />
+                    <Route path = "/kernel"              element = {<PrivateRouteDamplabStaff> <Kernel />                    </PrivateRouteDamplabStaff>} />
 
-                    <Route path = "/test_page"           element = {<PrivateRouteAdmin> <TestPage />                  </PrivateRouteAdmin>} />
-                    <Route path = "/edit"                element = {<PrivateRouteAdmin> <AdminEdit />                 </PrivateRouteAdmin>} />
+                    <Route path = "/release_notes"       element = {<ReleaseNotes />} />
+                    <Route path = "/test_page"           element = {<TestPage />} />
+                    <Route path = "/edit"                element = {<PrivateRouteDamplabStaff> <AdminEdit />                 </PrivateRouteDamplabStaff>} />
                     <Route path = "/*"                   element = {<div>Sorry, we can't find this page at the moment (404). Please double check the URL or try again later.</div>} />
                     {/* <Route path = "/client_view/:id"     element = {<PrivateRouteAdmin> <Tracking />                  </PrivateRouteAdmin>} /> */}
                     {/* <Route path = "/callback"            element = {<PrivateRouteAdmin> <ELabs />                     </PrivateRouteAdmin>} /> */}
@@ -111,6 +115,7 @@ function App() {
                 </div>
               </BrowserRouter>
           </CanvasContext.Provider>
+          </UserContext.Provider>
         </AppContext.Provider>
       </ApolloProvider>
     </div>
