@@ -1,19 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { HydratedRouter } from 'react-router/dom';
 import './index.css';
-import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { UtilityProvider } from './contexts/UtilityContext';
 
-const root = ReactDOM.createRoot(
-  document.getElementById('root') as HTMLElement
-);
-root.render(
-  <React.StrictMode>
-    <UtilityProvider>
-      <App />
-    </UtilityProvider>
-  </React.StrictMode>
+ReactDOM.hydrateRoot(
+    document,
+    <React.StrictMode>
+      <HydratedRouter />
+    </React.StrictMode>
 );
 
 // If you want to start measuring performance in your app, pass a function

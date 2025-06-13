@@ -3,17 +3,16 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText } 
 import Snackbar   from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon  from '@mui/icons-material/Close';
-import { GppMaybe } from '@mui/icons-material/';
+import { GppMaybe } from '@mui/icons-material';
 
 import { getServiceFromId } from '../controllers/GraphHelpers';
 import Params from './Params';
 import NodeButton from './AllowedConnectionButton';
 import { AppContext }    from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas'
-import { useUtility } from '../contexts/UtilityContext';
+import { trunc } from '../utils';
 
 import { RecState } from '../types/Types';
-import '../App.css';
 
 interface SidebarProps {
     noMouseEvents?: boolean;
@@ -22,10 +21,8 @@ interface SidebarProps {
 export default function ContextTestComponent(props: SidebarProps) {
     const {noMouseEvents} = props;
 
-    const api_url = process.env.REACT_APP_MPI_API || '';
+    const api_url = import.meta.env.VITE_MPI_API || '';
     
-    const { trunc } = useUtility();
-
     const val                   = useContext(CanvasContext);
     const { services, hazards } = useContext(AppContext);
 

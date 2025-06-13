@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useContext } from 'react';
-import { useParams } from 'react-router-dom';
-import { useMutation } from '@apollo/client';
+import { useParams } from 'react-router';
+import { useApolloClient, useMutation } from '@apollo/client';
 import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOptions, 
                     applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -28,7 +28,8 @@ const fitViewOptions: FitViewOptions = {
 };
 
 
-export default function MainFlow( client: any /*data: any*/) {
+export default function MainFlow() {
+    const apolloClient = useApolloClient();
     const { id }                                                   = useParams();
     const reactFlowWrapper                                         = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance]                = useState<any>(null);
@@ -106,7 +107,7 @@ export default function MainFlow( client: any /*data: any*/) {
 
     useEffect(() => {
         if (id !== undefined) {
-            client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
+            apolloClient.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
                 console.log('job loaded successfully', result);
                 if (workflows.length === 0) {
                     workflows = result.data.jobById.workflows;
