@@ -50,7 +50,7 @@ export default function LoginForm() {
 
   <Box sx={{ mb: 3, textAlign: 'center' }}>
     <p>Hello, {appellation}.</p>
-    <Stack direction="row" spacing={1} sx={{marginBottom: 5}}>
+    <Stack direction="row" spacing={1} sx={{ marginBottom: 5, justifyContent: 'center' }}>
       {userProps.isDamplabStaff && <Chip label="DAMPLab Staff" />}
       {userProps.isInternalCustomer && <Chip label="Internal Customer" />}
       {userProps.isExternalCustomer && <Chip label="External Customer" />}
