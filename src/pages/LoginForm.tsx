@@ -1,11 +1,12 @@
 import { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Box, Button } from '@mui/material';
+import { Box, Button, Chip, Stack } from '@mui/material';
 
 import AccountTreeIcon        from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import ViewStreamIcon         from '@mui/icons-material/ViewStream';
 import CampaignIcon           from '@mui/icons-material/Campaign';
+import EditIcon from '@mui/icons-material/Edit';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import  AnnouncementBox  from '../components/AnnouncementBox';
@@ -37,9 +38,11 @@ export default function LoginForm() {
 
   <Box sx={{ mb: 3, textAlign: 'center' }}>
     <p>Hello, {appellation}.</p>
-    {userProps.isDamplabStaff && <p>This account has Admin privileges.</p>}
-    {userProps.isInternalCustomer && <p>This is an internal customer account.</p>}
-    {userProps.isExternalCustomer && <p>This is an external customer account.</p>}
+    <Stack direction="row" spacing={1}>
+      {userProps.isDamplabStaff && <Chip label="DAMPLab Staff" />}
+      {userProps.isInternalCustomer && <Chip label="Internal Customer" />}
+      {userProps.isExternalCustomer && <Chip label="External Customer" />}
+    </Stack>
     {/* <Button variant="contained" onClick={() => navigate(role === 'admin' ? '/dashboard' : '/canvas')} style={{ marginRight: 10 }}> 
       Go to {role === 'admin' ? 'Dashboard' : 'Canvas'} </Button> */}
   </Box>
@@ -81,6 +84,9 @@ export default function LoginForm() {
           <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
             <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
           </Button> 
+          <Button variant="contained" onClick={() => navigate('/edit')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+            <EditIcon sx={{m:1, ml:-8}} />Admin Edit<br/>(Edit Services)
+          </Button>
           <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
             <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Release Notes<br/>(+ Other Admin Info)
           </Button> 
