@@ -3,10 +3,7 @@ import Keycloak from "keycloak-js";
 
 export interface UserContextProps {
   keycloak: any;
-  // The application must wait for keycloak.init() to resolve before consuming any of the keycloak object properties.
-  // Extracting/interpreting the user properties in this module and guarding _all_ the user properties behind the
-  // keycloak.init() Promise helps consumers of this context to not use the keycloak object incorrectly.
-  userProps: Promise<UserProps>;
+  userProps: UserProps;
 }
 export interface UserProps {
   isAuthenticated: boolean;
@@ -52,5 +49,5 @@ async function initKeycloak(): Promise<UserProps> {
 
 export const UserContext = createContext({
   keycloak: keycloak,
-  userProps: initKeycloak(),
+  userProps: await initKeycloak(),
 } as UserContextProps);

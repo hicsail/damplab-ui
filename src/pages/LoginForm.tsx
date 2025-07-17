@@ -26,15 +26,7 @@ function MenuButton({onClick, navigateTo, children}) {
 export default function LoginForm() {
   const navigate = useNavigate();
   const userContext: UserContextProps = useContext(UserContext);
-  const [userProps, setUserProps] = useState<UserProps | undefined>(undefined);
-
-  useEffect(() => {
-    async function awaitUserProps() {
-      const userProps = await userContext.userProps;
-      setUserProps(userProps);
-    }
-    awaitUserProps();
-  }, [userContext]);
+  const userProps : UserProps = userContext.userProps;
 
   const appellation = userProps?.idTokenParsed?.name || userProps?.idTokenParsed?.email || "DAMPLab User";
 
