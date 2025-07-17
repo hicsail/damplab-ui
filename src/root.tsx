@@ -14,6 +14,10 @@ import { GET_BUNDLES, GET_SERVICES } from "./gql/queries";
 import HeaderBar from "./components/HeaderBar";
 import './root.css';
 
+// The user's access token is added to Apollo queries by getting it from the UserContext and passing it like this:
+// useQuery(YOUR_QUERY, { context: { headers: {authorization: `Bearer ${userProps?.accessToken}`}}}); or like this:
+// apolloClient.query({ query: YOUR_QUERY, context: { headers: { authorization: token ? `Bearer ${token}` : "", } } });
+// We do not insert the auth header using an Apollo Link since the token lives in the UserContext.
 const client = new ApolloClient({
   uri: import.meta.env.VITE_BACKEND,
   cache: new InMemoryCache(),

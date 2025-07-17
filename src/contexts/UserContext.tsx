@@ -15,6 +15,8 @@ export interface UserProps {
   isExternalCustomer?: boolean;
   subject?: string;
   roles?: string[];
+  // accessToken is passed to the backend in graphql queries.
+  accessToken?: object;
   idTokenParsed?: object;
 }
 
@@ -37,6 +39,7 @@ async function initKeycloak(): Promise<UserProps> {
       isExternalCustomer: keycloak.realmAccess?.roles.includes("external-customer"),
       subject: keycloak.subject,
       roles: keycloak.realmAccess,
+      accessToken: keycloak.token,
       idTokenParsed: keycloak.idTokenParsed,
     } as UserProps;
   } catch (error) {
