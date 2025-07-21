@@ -1,5 +1,6 @@
 import { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
+import { useApolloClient } from '@apollo/client';
 import { Box, Button, Chip, Stack } from '@mui/material';
 
 import AccountTreeIcon        from '@mui/icons-material/AccountTree';
@@ -24,9 +25,18 @@ function MenuButton({onClick, navigateTo, children}) {
 }
 
 export default function LoginForm() {
+  const apolloClient = useApolloClient();
   const navigate = useNavigate();
   const userContext: UserContextProps = useContext(UserContext);
   const userProps : UserProps = userContext.userProps;
+
+  function logout() {
+      // Technically we should clear the Apollo client cache on logout, but right now, even without the resetStore()
+      // call, all queries get refetched anyway because the keycloak logout redirects essentially trigger a reload.
+      // So this is redundant by happenstance. Do it anyway to be proper...
+      apolloClient.resetStore();
+      userContext.keycloak.logout();
+  }
 
   const appellation = userProps?.idTokenParsed?.name || userProps?.idTokenParsed?.email || "DAMPLab User";
 
@@ -77,7 +87,7 @@ export default function LoginForm() {
           <MenuButton navigateTo='/edit_announcements'><CampaignIcon />Add Announcement<br />(+ Edit)</MenuButton>
         </>
       )}
-      <Button variant="contained" color="secondary" onClick={() => userContext.keycloak.logout()}  sx={{ m: 5 }}>Logout</Button>
+      <Button variant="contained" color="secondary" onClick={logout}  sx={{ m: 5 }}>Logout</Button>
     </Box>
 
         {/* Right Column: AnnouncementBox (conditionally shown) */}
