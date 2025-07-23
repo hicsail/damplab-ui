@@ -32,6 +32,7 @@ export default [
     ]),
 
     route("/release_notes", "./pages/ReleaseNotes.tsx"),
+    route("/edit_announcements", "./pages/Announcements.tsx"),
     route("/test_page", "./pages/TestPage.tsx"),
 
     route("*", "./pages/NotFound.tsx"),

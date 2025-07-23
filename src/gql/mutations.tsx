@@ -64,3 +64,13 @@ export const MUTATE_JOB_STATE = gql`
         }
     }
 `;
+
+export const CREATE_ANNOUNCEMENT = gql`
+  mutation createAnnouncement($input: CreateAnnouncementInput!) {
+    createAnnouncement(input: $input) {
+      text
+      timestamp
+      is_displayed
+    }
+  }
+`;
