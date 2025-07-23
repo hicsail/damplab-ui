@@ -2,33 +2,8 @@ import { useMutation, useQuery } from '@apollo/client';
 import { CREATE_ANNOUNCEMENT } from '../gql/mutations';
 import { GET_ANNOUNCEMENTS } from '../gql/queries';
 import { useState } from 'react';
-import { Box, Button, TextField, Typography, Paper } from '@mui/material';
-
-function Boldify({ text }: { text: string }) {
-  // Split on '**'
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-
-  return (
-    <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
-      {parts.map((part, i) => {
-        if (part.startsWith('**') && part.endsWith('**')) {
-          const boldText = part.slice(2, -2); // remove '**'
-          return (
-            <Typography
-              key={i}
-              component="span"
-              fontWeight="bold"
-              sx={{ whiteSpace: 'normal' }}
-            >
-              {boldText}
-            </Typography>
-          );
-        }
-        return part;
-      })}
-    </Typography>
-  );
-}
+import { Box, Button, TextField, Typography, Paper, Alert } from '@mui/material';
+import { FormatAnnouncement } from '../components/AnnouncementBox'
 
 export default function Announcements() {
   const [announcement, setAnnouncement] = useState('');
@@ -74,7 +49,7 @@ export default function Announcements() {
             <Typography>Loading...</Typography>
         ) : currentAnnouncement && currentAnnouncement.is_displayed ? (
             <>
-            <Boldify text={currentAnnouncement.text} />
+            <FormatAnnouncement text={currentAnnouncement.text} />
             <Button
                 variant="outlined"
                 color="tertiary"
@@ -94,7 +69,7 @@ export default function Announcements() {
       </Typography>
 
       <TextField
-        label="New Announcement (To bold text do **TEXT**)"
+        label="New Announcement"
         variant="outlined"
         fullWidth
         multiline
@@ -104,6 +79,11 @@ export default function Announcements() {
         sx={{ mb: 2 }}
       />
 
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Use <b>#</b> for headings, <b>##</b> for subheadings, <b>**bold**</b> for bold, 
+        and <i>*italic*</i> for italic text.
+      </Alert>
+
       <Button
         variant="contained"
         color="primary"
@@ -111,6 +91,7 @@ export default function Announcements() {
       >
         Submit Announcement
       </Button>
+
     </Box>
   );
 };
