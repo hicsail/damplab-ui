@@ -1,9 +1,9 @@
 import { useQuery } from '@apollo/client';
-import { GET_ANNOUNCEMENT } from '../gql/queries';
+import { GET_ANNOUNCEMENTS } from '../gql/queries';
 import { Box } from '@mui/material';
 
 export default function AnnouncementBox() {
-  const { data, loading, error } = useQuery(GET_ANNOUNCEMENT);
+  const { data, loading, error } = useQuery(GET_ANNOUNCEMENTS);
 
   if (loading) return <p>Loading announcements...</p>;
   if (error) return <p>Error loading announcements: {error.message}</p>;
@@ -47,3 +47,4 @@ export default function AnnouncementBox() {
     </Box>
   );
 }
+

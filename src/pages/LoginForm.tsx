@@ -8,6 +8,7 @@ import ViewStreamIcon         from '@mui/icons-material/ViewStream';
 import CampaignIcon           from '@mui/icons-material/Campaign';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
+import  AnnouncementBox  from '../components/AnnouncementBox';
 
 export default function LoginForm() {
   const navigate = useNavigate();
@@ -56,6 +57,8 @@ export default function LoginForm() {
               CANVAS<br />(Design Workflows)
             </Button>
 
+            {userProps?.isAuthenticated && <AnnouncementBox />}
+
             {userProps.isDamplabStaff && (
               <>
                 <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
@@ -71,8 +74,7 @@ export default function LoginForm() {
                 <Button variant="contained" onClick={() => navigate('/elabs')} sx={{ m: 2 }}>Go to eLabs Site</Button> 
                 <Button variant="contained" onClick={() => navigate('/kernel')} sx={{ m: 2 }}>Go to Kernel Site</Button>  */}
               </>
-              : ''
-            }
+            )}
             <Button variant="contained" color="secondary" onClick={() => userContext.keycloak.logout()}  sx={{ m: 5 }}>Logout</Button>
           </Box>
         </>
