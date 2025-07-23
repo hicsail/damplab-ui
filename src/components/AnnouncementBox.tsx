@@ -82,20 +82,23 @@ export default function AnnouncementBox() {
     <Box
       sx={{
         mt: 4,
-        width: '100%',
-        maxWidth: 600,
+        ml: 4,                    // spacing between announcement and buttons
+        maxWidth:  { xs: '100%', sm: 400 },          // changed to be a slimmer maximum width, og 400
+        width: 'fit-content',     // adapts or shrink  to fit content 
+        minWidth: 250,           
         backgroundColor: '#fbfbfe',
         border: '1px solid #8fb5ba',
         borderRadius: 2,
         padding: 3,
         boxShadow: 3,
+        alignSelf: 'flex-start',  // keep alignment to buttons
       }}
-    >
-      <h3 style={{ color: '#456b6e', marginBottom: '1rem' }}>📢 Announcements</h3>
+>
+    
+      <h3 style={{ color: '#e04462', marginBottom: '1rem' }}>📢 Announcements</h3>
 
       <Box sx={{ mb: 2 }}>
-        <strong style={{ color: '#e04462' }}>{announcement.label}</strong>
-        <p style={{ margin: '4px 0', color: '#050315' }}>{announcement.text}</p>
+        <FormatAnnouncement text={announcement.text} />
         <small style={{ color: '#8fb5ba' }}>
           {new Date(announcement.timestamp).toLocaleString()}
         </small>
