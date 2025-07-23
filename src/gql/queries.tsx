@@ -218,12 +218,13 @@ export const CREATE_SERVICE = gql`
   }
 `;
 
+
 export const GET_ANNOUNCEMENTS = gql`
-    query {
-        announcements {
-            text
-            timestamp
-            is_displayed
-        }
+  query{
+	announcements{
+    text
+    timestamp
+    is_displayed
     }
+  }
 `;

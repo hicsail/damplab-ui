@@ -2,7 +2,7 @@ import { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Box, Button } from '@mui/material';
 
-import AccountTreeIcon        from '@mui/icons-material/AccountTree';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import ViewStreamIcon         from '@mui/icons-material/ViewStream';
 import CampaignIcon           from '@mui/icons-material/Campaign';
@@ -11,7 +11,7 @@ import { UserContext, UserContextProps, UserProps } from "../contexts/UserContex
 
 export default function LoginForm() {
   const navigate = useNavigate();
-  const userContext : UserContextProps = useContext(UserContext);
+  const userContext: UserContextProps = useContext(UserContext);
   const [userProps, setUserProps] = useState<UserProps | undefined>(undefined);
 
   useEffect(() => {
@@ -20,14 +20,16 @@ export default function LoginForm() {
       setUserProps(userProps);
     }
     awaitUserProps();
-
   }, [userContext]);
+
   const appellation = userProps?.idTokenParsed?.name || userProps?.idTokenParsed?.email || "DAMPLab User";
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-      {!(userProps?.isAuthenticated) ? (
-        <Button variant="contained" onClick={() => userContext.keycloak.login()}>Log in</Button>
+      {!userProps?.isAuthenticated ? (
+        <Button variant="contained" onClick={() => userContext.keycloak.login()}>
+          Log in
+        </Button>
       ) : (
         <>
           <Box sx={{ width: '300px' }}>
@@ -35,16 +37,26 @@ export default function LoginForm() {
             {userProps.isDamplabStaff && <p>This account has Admin privileges.</p>}
             {userProps.isInternalCustomer && <p>This is an internal customer account.</p>}
             {userProps.isExternalCustomer && <p>This is an external customer account.</p>}
-            {/* <Button variant="contained" onClick={() => navigate(role === 'admin' ? '/dashboard' : '/canvas')} style={{ marginRight: 10 }}>
-              Go to {role === 'admin' ? 'Dashboard' : 'Canvas'}
-            </Button> */}
-            <Button variant="contained" onClick={() => window.location.href = "https://www.damplab.org/services"} sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-              <img src='/damp-white.svg' height='30px' style={{margin: 1, marginLeft: -25, marginRight: 10}} alt="DAMP Logo"/>DAMPLab Site<br/>(See Service Prices)
+
+            <Button
+              variant="contained"
+              onClick={() => window.location.href = "https://www.damplab.org/services"}
+              sx={{ m: 2, width: '210px', textTransform: 'none' }}
+            >
+              <img src='/damp-white.svg' height='30px' style={{ margin: 1, marginLeft: -25, marginRight: 10 }} alt="DAMP Logo" />
+              DAMPLab Site<br />(See Service Prices)
             </Button>
-            <Button variant="contained" onClick={() => navigate('/canvas')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-              <AccountTreeIcon sx={{m:1, ml:-4, transform: "rotate(90deg) scaleY(-1)"}}/>CANVAS<br/>(Design Workflows)
+
+            <Button
+              variant="contained"
+              onClick={() => navigate('/canvas')}
+              sx={{ m: 2, width: '210px', textTransform: 'none' }}
+            >
+              <AccountTreeIcon sx={{ m: 1, ml: -4, transform: "rotate(90deg) scaleY(-1)" }} />
+              CANVAS<br />(Design Workflows)
             </Button>
-            {userProps.isDamplabStaff ?
+
+            {userProps.isDamplabStaff && (
               <>
                 <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
                   <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
