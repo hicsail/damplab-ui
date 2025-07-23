@@ -38,21 +38,21 @@ export default function LoginForm() {
             {/* <Button variant="contained" onClick={() => navigate(role === 'admin' ? '/dashboard' : '/canvas')} style={{ marginRight: 10 }}>
               Go to {role === 'admin' ? 'Dashboard' : 'Canvas'}
             </Button> */}
-            <Button variant="contained" onClick={() => window.location.href = "https://www.damplab.org/services"} sx={{ m: 2, width: '210px', textTransform: 'none', backgroundColor: '#8fb5ba' }}>
+            <Button variant="contained" onClick={() => window.location.href = "https://www.damplab.org/services"} sx={{ m: 2, width: '210px', textTransform: 'none' }}>
               <img src='/damp-white.svg' height='30px' style={{margin: 1, marginLeft: -25, marginRight: 10}} alt="DAMP Logo"/>DAMPLab Site<br/>(See Service Prices)
             </Button>
-            <Button variant="contained" onClick={() => navigate('/canvas')}  sx={{ m: 2, width: '210px', textTransform: 'none', backgroundColor: '#8fb5ba' }}>
+            <Button variant="contained" onClick={() => navigate('/canvas')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
               <AccountTreeIcon sx={{m:1, ml:-4, transform: "rotate(90deg) scaleY(-1)"}}/>CANVAS<br/>(Design Workflows)
             </Button>
             {userProps.isDamplabStaff ?
               <>
-                <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none', backgroundColor: '#8fb5ba' }}>
+                <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
                   <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
                 </Button> 
-                <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none', backgroundColor: '#8fb5ba' }}>
+                <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
                   <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Release Notes<br/>(+ Other Admin Info)
                 </Button> 
-                 <Button variant="contained" onClick={() => navigate('/edit_announcements')}  sx={{ m: 2, width: '210px', textTransform: 'none', backgroundColor: '#8fb5ba' }}>
+                 <Button variant="contained" onClick={() => navigate('/edit_announcements')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
                   <CampaignIcon sx={{m:1, ml:-3}}/>Add Announcement<br/>(+ Edit)
                 </Button>
                 {/* <Button variant="contained" onClick={() => navigate('/dominos')} sx={{ m: 2 }}>Go to Dominos Page</Button> 
@@ -61,7 +61,7 @@ export default function LoginForm() {
               </>
               : ''
             }
-            <Button variant="contained" onClick={() => userContext.keycloak.logout()}  sx={{ m: 5, backgroundColor: '#e04462' }}>Logout</Button>
+            <Button variant="contained" color="secondary" onClick={() => userContext.keycloak.logout()}  sx={{ m: 5 }}>Logout</Button>
           </Box>
         </>
       )}

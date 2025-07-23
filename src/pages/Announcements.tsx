@@ -5,6 +5,32 @@ import { useState } from 'react';
 import { Box, Button, TextField, Typography, Paper } from '@mui/material';
 import { useNavigate } from 'react-router';
 
+function Boldify({ text }: { text: string }) {
+  // Split on '**'
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+
+  return (
+    <Typography variant="body1" sx={{ whiteSpace: 'pre-line' }}>
+      {parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          const boldText = part.slice(2, -2); // remove '**'
+          return (
+            <Typography
+              key={i}
+              component="span"
+              fontWeight="bold"
+              sx={{ whiteSpace: 'normal' }}
+            >
+              {boldText}
+            </Typography>
+          );
+        }
+        return part;
+      })}
+    </Typography>
+  );
+}
+
 export default function Announcements() {
   const [announcement, setAnnouncement] = useState('');
   const [createAnnouncement] = useMutation(CREATE_ANNOUNCEMENT, {
@@ -40,7 +66,7 @@ export default function Announcements() {
 
   return (
     <Box sx={{ p: 4, maxWidth: 600, mx: 'auto' }}>
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="h5" gutterBottom color="secondary" sx={{ fontWeight: 'bold' }}>
         Current Announcement
       </Typography>
 
@@ -49,13 +75,12 @@ export default function Announcements() {
             <Typography>Loading...</Typography>
         ) : currentAnnouncement && currentAnnouncement.is_displayed ? (
             <>
-            <Typography variant="body1" sx={{ mb: 1 }}>
-                {currentAnnouncement.text}
-            </Typography>
+            <Boldify text={currentAnnouncement.text} />
             <Button
                 variant="outlined"
-                color="secondary"
+                color="tertiary"
                 onClick={handleHide}
+                sx={{ mt: 2 }}
             >
                 Hide Current Announcement
             </Button>
@@ -65,12 +90,12 @@ export default function Announcements() {
         )}
       </Paper>
 
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="h5" gutterBottom color="secondary" sx={{ fontWeight: 'bold' }}>
         Add Announcement
       </Typography>
 
       <TextField
-        label="New Announcement"
+        label="New Announcement (To bold text do **TEXT**)"
         variant="outlined"
         fullWidth
         multiline

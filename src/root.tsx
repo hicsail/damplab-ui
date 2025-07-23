@@ -13,6 +13,8 @@ import { AppContext } from "./contexts/App";
 import { GET_BUNDLES, GET_SERVICES } from "./gql/queries";
 import HeaderBar from "./components/HeaderBar";
 import './root.css';
+import { ThemeProvider } from '@mui/material/styles';
+import theme from './styles/themes';
 
 const client = new ApolloClient({
   uri: import.meta.env.VITE_BACKEND,
@@ -89,24 +91,26 @@ export default function Root() {
 
   return (
     <ApolloProvider client={client}>
-      <AppContext
-        value={{ services: services, bundles: bundles, hazards: hazards }}
-      >
-        <CanvasContext
-          value={{
-            nodes: nodes,
-            setNodes: setNodes,
-            edges: edges,
-            setEdges: setEdges,
-            activeComponentId: activeComponentId,
-            setActiveComponentId: setActiveComponentId,
-            nodeParams: nodeParams,
-            setNodeParams: setNodeParams,
-          }}
+      <ThemeProvider theme={theme}>
+        <AppContext
+          value={{ services: services, bundles: bundles, hazards: hazards }}
         >
-          <Outlet />
-        </CanvasContext>
-      </AppContext>
+          <CanvasContext
+            value={{
+              nodes: nodes,
+              setNodes: setNodes,
+              edges: edges,
+              setEdges: setEdges,
+              activeComponentId: activeComponentId,
+              setActiveComponentId: setActiveComponentId,
+              nodeParams: nodeParams,
+              setNodeParams: setNodeParams,
+            }}
+          >
+            <Outlet />
+          </CanvasContext>
+        </AppContext>
+      </ThemeProvider>
     </ApolloProvider>
   );
 }
