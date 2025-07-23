@@ -1,6 +1,6 @@
 import { useQuery } from '@apollo/client';
 import { GET_ANNOUNCEMENTS } from '../gql/queries';
-import { Box, Typography, Paper } from '@mui/material';
+import { Box, Typography, Stack } from '@mui/material';
 
 export function FormatAnnouncement({ text }: { text: string }) {
   // Split by lines
@@ -69,28 +69,45 @@ export default function AnnouncementBox() {
   if (!currentAnnouncement || !currentAnnouncement.is_displayed) return null;
 
   return (
-    <Box
-      sx={{
-        mt: 4,
-        ml: 4,                    // spacing between announcement and buttons
-        maxWidth:  { xs: '100%', sm: 400 },          // changed to be a slimmer maximum width, og 400
-        width: 'fit-content',     // adapts or shrink  to fit content 
-        minWidth: 250,           
-        backgroundColor: '#fbfbfe',
-        border: '1px solid #8fb5ba',
-        borderRadius: 2,
-        padding: 3,
-        boxShadow: 3,
-        alignSelf: 'flex-start',  // keep alignment to buttons
-      }}
+    <Stack
+      direction="column"
+      spacing={1} // small gap between header and content
+      sx={{ mt: 4, ml: 4, maxWidth: { xs: '100%', sm: 400 }, alignSelf: 'flex-start' }}
     >
-      <Typography variant="h6" fontWeight="bold" sx={{ color: "#e04462", mb: 2 }}>
-        📢 Announcements:
-      </Typography>
-      <FormatAnnouncement text={currentAnnouncement.text} />
-      <Typography variant="caption" sx={{ color: "#8fb5ba", display: "block", mt: 2 }}>
-        {new Date(currentAnnouncement.timestamp).toLocaleString()}
-      </Typography>
-    </Box>
+      {/* Header Box */}
+      <Box
+        sx={{
+          backgroundColor: '#e04462',
+          border: '1px solid #8fb5ba',
+          borderRadius: 2,
+          boxShadow: 3,
+          px: 2,
+          py: 1,
+        }}
+      >
+        <Typography variant="h6" fontWeight="bold" sx={{ color: "#ffffff" }}>
+          Announcements:
+        </Typography>
+      </Box>
+
+      {/* Content Box */}
+      <Box
+        sx={{
+          backgroundColor: '#fbfbfe',
+          border: '1px solid #8fb5ba',
+          borderRadius: 2,
+          boxShadow: 3,
+          p: 3,
+        }}
+      >
+        <FormatAnnouncement text={currentAnnouncement.text} />
+        <Typography
+          variant="caption"
+          sx={{ color: "#8fb5ba", display: "block", mt: 2 }}
+        >
+          {new Date(currentAnnouncement.timestamp).toLocaleString()}
+        </Typography>
+      </Box>
+    </Stack>
   );
 }
