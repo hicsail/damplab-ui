@@ -72,16 +72,19 @@ export default function AnnouncementBox() {
     <Box
       sx={{
         mt: 4,
-        width: "100%",
-        maxWidth: 600,
-        backgroundColor: "#fbfbfe",
-        border: "1px solid #8fb5ba",
+        ml: 4,                    // spacing between announcement and buttons
+        maxWidth:  { xs: '100%', sm: 400 },          // changed to be a slimmer maximum width, og 400
+        width: 'fit-content',     // adapts or shrink  to fit content 
+        minWidth: 250,           
+        backgroundColor: '#fbfbfe',
+        border: '1px solid #8fb5ba',
         borderRadius: 2,
         padding: 3,
         boxShadow: 3,
+        alignSelf: 'flex-start',  // keep alignment to buttons
       }}
     >
-      <Typography variant="h6" fontWeight="bold" sx={{ color: "#456b6e", mb: 2 }}>
+      <Typography variant="h6" fontWeight="bold" sx={{ color: "#e04462", mb: 2 }}>
         📢 Announcements:
       </Typography>
       <FormatAnnouncement text={currentAnnouncement.text} />
