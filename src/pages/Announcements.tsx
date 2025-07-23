@@ -3,7 +3,6 @@ import { CREATE_ANNOUNCEMENT } from '../gql/mutations';
 import { GET_ANNOUNCEMENTS } from '../gql/queries';
 import { useState } from 'react';
 import { Box, Button, TextField, Typography, Paper } from '@mui/material';
-import { useNavigate } from 'react-router';
 
 function Boldify({ text }: { text: string }) {
   // Split on '**'
