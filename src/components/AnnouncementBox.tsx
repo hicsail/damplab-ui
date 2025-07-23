@@ -47,12 +47,13 @@ export function FormatAnnouncement({ text }: { text: string }) {
           <Typography
             key={idx}
             variant={variant}
-            sx={{ whiteSpace: "pre-line", mb: 1 }}
             fontWeight={variant === "h4" || variant === "h5" ? "bold" : undefined}
+            color={variant === "h4" ? "primary" : variant === "h5" ? "secondary" : "text.primary"}
+            sx={{ whiteSpace: "pre-line", mb: 1 }}
           >
             {formatInline(content, `line-${idx}`)}
           </Typography>
-        );
+          );
       })}
     </>
   );
