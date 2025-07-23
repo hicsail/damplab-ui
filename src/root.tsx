@@ -17,7 +17,6 @@ import { ThemeProvider } from '@mui/material/styles';
 import theme from './styles/themes';
 
 
-console.log('ApolloClient URI:', import.meta.env.VITE_BACKEND);
 const client = new ApolloClient({
   uri: import.meta.env.VITE_BACKEND,
   cache: new InMemoryCache(),
