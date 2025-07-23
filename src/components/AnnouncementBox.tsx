@@ -71,7 +71,6 @@ export default function AnnouncementBox() {
   return (
     <Box
       sx={{
-        mt: 4,
         ml: 4,                    // spacing between announcement and buttons
         maxWidth:  { xs: '100%', sm: 400 },          // changed to be a slimmer maximum width, og 400
         width: 'fit-content',     // adapts or shrink  to fit content 
@@ -81,7 +80,6 @@ export default function AnnouncementBox() {
         borderRadius: 2,
         padding: 3,
         boxShadow: 3,
-        alignSelf: 'flex-start',  // keep alignment to buttons
       }}
     >
       <Typography variant="h6" fontWeight="bold" sx={{ color: "#e04462", mb: 2 }}>

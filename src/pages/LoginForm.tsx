@@ -33,54 +33,72 @@ export default function LoginForm() {
         </Button>
       ) : (
         <>
-<Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' }}>
-  {/* Left Column: user buttons */}
-        <Box sx={{ width: '300px' }}>
-          <p>Hello, {appellation}.</p>
-          {userProps.isDamplabStaff && <p>This account has Admin privileges.</p>}
-          {userProps.isInternalCustomer && <p>This is an internal customer account.</p>}
-          {userProps.isExternalCustomer && <p>This is an external customer account.</p>}
+<Box sx={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' }}>
 
-          <Button
-            variant="contained"
-            onClick={() => window.location.href = "https://www.damplab.org/services"}
-            sx={{ m: 2, width: '210px', textTransform: 'none' }}
-          >
-            <img src='/damp-white.svg' height='30px' style={{ margin: 1, marginLeft: -25, marginRight: 10 }} alt="DAMP Logo" />
-            DAMPLab Site<br />(See Service Prices)
+  <Box sx={{ mb: 3, textAlign: 'center' }}>
+    <p>Hello, {appellation}.</p>
+    {userProps.isDamplabStaff && <p>This account has Admin privileges.</p>}
+    {userProps.isInternalCustomer && <p>This is an internal customer account.</p>}
+    {userProps.isExternalCustomer && <p>This is an external customer account.</p>}
+  </Box>
+
+
+  {/* Left Column: user buttons  - annoucement box side to side */}
+
+  <Box
+    sx={{
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+      width: '100%',
+    }}
+  >
+    {/* User options buttons */}
+    <Box sx={{ width: '300px' }}>
+      <Button
+        variant="contained"
+        onClick={() => window.location.href = "https://www.damplab.org/services"}
+        sx={{ mb: 2, width: '210px', textTransform: 'none' }}
+      >
+        <img src='/damp-white.svg' height='30px' style={{ margin: 1, marginLeft: -25, marginRight: 10 }} alt="DAMP Logo" />
+        DAMPLab Site<br />(See Service Prices)
+      </Button>
+
+      <Button
+        variant="contained"
+        onClick={() => navigate('/canvas')}
+        sx={{ m: 2, width: '210px', textTransform: 'none' }}
+      >
+        <AccountTreeIcon sx={{ m: 1, ml: -4, transform: "rotate(90deg) scaleY(-1)" }} />
+        CANVAS<br />(Design Workflows)
+      </Button>
+
+      {userProps.isDamplabStaff && (
+        <>
+          <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+            <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
+          </Button> 
+          <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+            <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Release Notes<br/>(+ Other Admin Info)
+          </Button> 
+          <Button variant="contained" onClick={() => navigate('/edit_announcements')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+            <CampaignIcon sx={{m:1, ml:-3}}/>Add Announcement<br/>(+ Edit)
           </Button>
-
-          <Button
-            variant="contained"
-            onClick={() => navigate('/canvas')}
-            sx={{ m: 2, width: '210px', textTransform: 'none' }}
-          >
-            <AccountTreeIcon sx={{ m: 1, ml: -4, transform: "rotate(90deg) scaleY(-1)" }} />
-            CANVAS<br />(Design Workflows)
-          </Button>
-
-          {userProps.isDamplabStaff && (
-            <>
-              <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-                <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
-              </Button> 
-              <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-                <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Release Notes<br/>(+ Other Admin Info)
-              </Button> 
-              <Button variant="contained" onClick={() => navigate('/edit_announcements')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-                <CampaignIcon sx={{m:1, ml:-3}}/>Add Announcement<br/>(+ Edit)
-              </Button>
-            </>
-          )}
-          <Button variant="contained" color="secondary" onClick={() => userContext.keycloak.logout()}  sx={{ m: 5 }}>Logout</Button>
-        </Box>
-
-        {/* Right Column: AnnouncementBox (conditionally shown) */}
-        <AnnouncementBox />
-      </Box>
-
         </>
       )}
+      <Button variant="contained" color="secondary" onClick={() => userContext.keycloak.logout()}  sx={{ m: 5 }}>Logout</Button>
     </Box>
+
+        {/* Right Column: AnnouncementBox (conditionally shown) */}
+          <AnnouncementBox />
+  
+    </Box>
+
+  </Box>
+
+  </>
+    )}
+</Box>
   );
 }
