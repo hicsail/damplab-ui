@@ -24,14 +24,15 @@ export default [
         route("/elabs", "./pages/ELabs.tsx"),
         route("/kernel", "./pages/Kernel.tsx"),
         route("/edit", "./pages/AdminEdit.tsx"),
+        route("/release_notes", "./pages/ReleaseNotes.tsx"),
+        route("/edit_announcements", "./pages/Announcements.tsx"),
 
         /* Old comments from pre-React-Router-migration App.tsx: */
         /* <Route path = "/client_view/:id" element = {<PrivateRouteAdmin> <Tracking /> </PrivateRouteAdmin>} /> */
         /* <Route path = "/callback" element = {<PrivateRouteAdmin> <ELabs /> </PrivateRouteAdmin>} /> */
         /* <Route path="/accepted" element={wrapPrivateRoute(<Accepted />, isLoggedIn, 'accepted')} /> */
     ]),
-
-    route("/release_notes", "./pages/ReleaseNotes.tsx"),
+    
     route("/test_page", "./pages/TestPage.tsx"),
 
     route("*", "./pages/NotFound.tsx"),
