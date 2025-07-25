@@ -76,14 +76,14 @@ export default function AnnouncementBox() {
     >
       {/* Header Box */}
       <Box
-        sx={{
-          backgroundColor: '#e04462',
-          border: '1px solid #8fb5ba',
-          borderRadius: 2,
+        sx={(theme) => ({
+          backgroundColor: theme.palette.secondary.main,
+          border: `1px solid ${theme.palette.primary.light}`,
+          borderRadius: 1,
           boxShadow: 3,
           px: 2,
           py: 1,
-        }}
+        })}
       >
         <Typography variant="h6" fontWeight="bold" sx={{ color: "#ffffff" }}>
           Announcements:
@@ -92,18 +92,19 @@ export default function AnnouncementBox() {
 
       {/* Content Box */}
       <Box
-        sx={{
+        sx={(theme) => ({
           backgroundColor: '#fbfbfe',
-          border: '1px solid #8fb5ba',
-          borderRadius: 2,
+          border: `1px solid ${theme.palette.primary.light}`,
+          borderRadius: 1,
           boxShadow: 3,
           p: 3,
-        }}
+        })}
       >
         <FormatAnnouncement text={currentAnnouncement.text} />
         <Typography
           variant="caption"
-          sx={{ color: "#8fb5ba", display: "block", mt: 2 }}
+          color='primary'
+          sx={{ display: "block", mt: 2 }}
         >
           {new Date(currentAnnouncement.timestamp).toLocaleString()}
         </Typography>
