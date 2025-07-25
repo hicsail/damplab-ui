@@ -40,6 +40,8 @@ export default function LoginForm() {
     {userProps.isDamplabStaff && <p>This account has Admin privileges.</p>}
     {userProps.isInternalCustomer && <p>This is an internal customer account.</p>}
     {userProps.isExternalCustomer && <p>This is an external customer account.</p>}
+    {/* <Button variant="contained" onClick={() => navigate(role === 'admin' ? '/dashboard' : '/canvas')} style={{ marginRight: 10 }}> 
+      Go to {role === 'admin' ? 'Dashboard' : 'Canvas'} </Button> */}
   </Box>
 
 
