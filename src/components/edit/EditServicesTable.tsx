@@ -64,6 +64,7 @@ export const EditServicesTable: React.FC = () => {
     // The services need to be a list of IDs
     const changes = {
       name: newRow.name,
+      price: Number(newRow.price) || 0,
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters
@@ -83,6 +84,7 @@ export const EditServicesTable: React.FC = () => {
   const handleCreate = async (newRow: GridRowModel) => {
     const newService = {
       name: newRow.name || '',
+      price: newRow.price || 0,
       icon: '',
       parameters: newRow.parameters || [],
       paramGroups: [],
@@ -133,6 +135,11 @@ export const EditServicesTable: React.FC = () => {
     {
       field: 'name',
       width: 500,
+      editable: true
+    },
+    {
+      field: 'price',
+      width: 200,
       editable: true
     },
     {

@@ -50,6 +50,7 @@ interface WorkflowNode {
   data: {
       id: string;
       label: string;
+      price: number;
       description: string;
       serviceId: string;
       icon?: string;
@@ -96,7 +97,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const val = useContext(CanvasContext);
   const rawWorkflows = getWorkflowsFromGraph(val.nodes, val.edges) || [];
-
+  console.log('Raw workflows:', rawWorkflows);
 
   const [workflows, setWorkflows] = useState<WorkflowNode[][]>(rawWorkflows);
   const [open, setOpen] = useState(false);
@@ -111,6 +112,7 @@ export default function Checkout() {
                     console.log('Each workflow node:', {
                         id: workflow.id,
                         name: workflow.name,
+                        price: workflow.data.price,
                         label: workflow.data.label,
                         type: workflow.type
                     });
@@ -139,7 +141,7 @@ export default function Checkout() {
       workflows: workflows,
       workflowCosts: workflows.map(workflow => ({
         workflowId: workflow[0]?.id,
-        cost: calculateDUMMYSERVICECost(workflow)
+        cost: calculateServiceCost(workflow)
       })),
       totalCost: calculateTotalJobCost(workflows),
       serviceDetails: workflows.map(workflow => groupServicesByLabel(workflow))
@@ -160,11 +162,12 @@ export default function Checkout() {
     }
   };
 
-  const calculateDUMMYSERVICECost = (workflow: WorkflowNode[]) => {
-    const PLACEHOLDER_COST_PER_SERVICE = 100;
-    const total = workflow.length * PLACEHOLDER_COST_PER_SERVICE;
-    return total;
-  }
+  const calculateServiceCost = (workflow: WorkflowNode[]) => {
+  return workflow.reduce((total, node) => {
+    const price = node.data.price ?? 0; // default to 0 if price is missing
+    return total + price;
+    }, 0);
+  };
 
   const groupServicesByLabel = (workflow: WorkflowNode[]) => {
     return workflow.reduce((acc, node) => {
@@ -172,7 +175,7 @@ export default function Checkout() {
       if (!acc[label]) {
         acc[label] = {
           count: 1,
-          cost: 100,
+          cost: node.data.price,
           nodes: [node]  // Store array of nodes instead of single node
         };
       } else {
@@ -185,7 +188,7 @@ export default function Checkout() {
 
   const calculateTotalJobCost = (workflows: WorkflowNode[][]) => {
     return workflows.reduce((total, workflow) => {
-      return total + calculateDUMMYSERVICECost(workflow);
+      return total + calculateServiceCost(workflow);
     }, 0);
   };
 
@@ -263,7 +266,7 @@ export default function Checkout() {
               <Typography variant="h6">
                 Workflow {index + 1}
                 </Typography>
-              <Typography variant="subtitle1">Cost : ${calculateDUMMYSERVICECost(workflow).toFixed(2)}</Typography>
+              <Typography variant="subtitle1">Cost : ${calculateServiceCost(workflow).toFixed(2)}</Typography>
               </Box> 
               <Divider sx={{ my: 2}} />
               <Box
@@ -453,7 +456,7 @@ export default function Checkout() {
     <Typography variant="subtitle1" 
     fontWeight="bold"
     sx={{ pr: 4}}>
-      ${calculateDUMMYSERVICECost(workflow).toFixed(2)}
+      ${calculateServiceCost(workflow).toFixed(2)}
     </Typography>
   </Box>
 </AccordionDetails>
@@ -498,7 +501,7 @@ export default function Checkout() {
           Workflow {index + 1}
         </Typography>
         <Typography variant="subtitle1" sx={{ fontSize: '0.875rem' }}>
-          ${calculateDUMMYSERVICECost(workflow).toFixed(2)}
+          ${calculateServiceCost(workflow).toFixed(2)}
         </Typography>
       </Box>
     ))}
