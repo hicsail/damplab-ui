@@ -32,7 +32,6 @@ export default [
         /* <Route path = "/callback" element = {<PrivateRouteAdmin> <ELabs /> </PrivateRouteAdmin>} /> */
         /* <Route path="/accepted" element={wrapPrivateRoute(<Accepted />, isLoggedIn, 'accepted')} /> */
     ]),
-    
     route("/test_page", "./pages/TestPage.tsx"),
 
     route("*", "./pages/NotFound.tsx"),
