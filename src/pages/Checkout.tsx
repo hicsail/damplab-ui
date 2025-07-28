@@ -105,7 +105,6 @@ export default function Checkout() {
 
   useEffect(() => {
     if (workflows && workflows.length > 0) {
-        console.log('Sample workflow from state:', workflows);
         workflows.forEach((workflowArray) => {
             if (Array.isArray(workflowArray)) {
                 workflowArray.forEach((workflow) => {
