@@ -8,10 +8,10 @@ import ReactMarkdown from "react-markdown";
 
 export default function Announcements() {
   const [announcement, setAnnouncement] = useState('');
-  const [createAnnouncement] = useMutation(CREATE_ANNOUNCEMENT, {
+  const [createAnnouncement, { loading: creating }] = useMutation(CREATE_ANNOUNCEMENT, {
     refetchQueries: [{ query: GET_ANNOUNCEMENTS }],
   });
-  const [updateAnnouncement] = useMutation(UPDATE_ANNOUNCEMENT, {
+  const [updateAnnouncement, { loading: updating }] = useMutation(UPDATE_ANNOUNCEMENT, {
   refetchQueries: [{ query: GET_ANNOUNCEMENTS }],
   });
 
@@ -19,19 +19,30 @@ export default function Announcements() {
   const currentAnnouncement = data?.announcements?.[0] || null;
 
   const handleSubmit = async () => {
-    await createAnnouncement({
-      variables: {
-        input: {
-          text: announcement,
-          is_displayed: true,
+    if (!announcement.trim()) {return;}
+    try {
+      await createAnnouncement({
+        variables: {
+          input: {
+            text: announcement,
+            is_displayed: true,
+          },
         },
-      },
-    });
-    setAnnouncement('');
+      });
+    } catch (error) {
+      console.error(error);
+    }
   };
 
 const handleHide = async () => {
-  console.log('Button clicked, running mutation...');
+  if (!currentAnnouncement || !currentAnnouncement.timestamp) {
+    console.warn("No announcement to hide.");
+    return;
+  }
+  if (!currentAnnouncement.timestamp) {
+    console.error("Announcement missing timestamp!");
+    return;
+  }
   await updateAnnouncement({
     variables: {
       timestamp: currentAnnouncement.timestamp,
@@ -83,12 +94,13 @@ const handleHide = async () => {
                       br: () => <br />,
                     }}
                   >
-                    {currentAnnouncement.text}
+                  {currentAnnouncement.text}
                   </ReactMarkdown>
             <Button
                 variant="outlined"
                 color="tertiary"
                 onClick={handleHide}
+                disabled={updating || !currentAnnouncement}
                 sx={{ mt: 2 }}
             >
                 Hide Current Announcement
@@ -123,6 +135,7 @@ const handleHide = async () => {
         variant="contained"
         color="primary"
         onClick={handleSubmit}
+        disabled={!announcement.trim()}
       >
         Submit Announcement
       </Button>
