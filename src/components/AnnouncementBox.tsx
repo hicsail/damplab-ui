@@ -1,63 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { GET_ANNOUNCEMENTS } from '../gql/queries';
 import { Box, Typography, Stack } from '@mui/material';
-
-export function FormatAnnouncement({ text }: { text: string }) {
-  // Split by lines
-  const lines = text.split("\n");
-
-  const formatInline = (content: string, keyPrefix: string) => {
-    // Split into segments for bold and italic
-    const segments = content.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-
-    return segments.map((seg, i) => {
-      if (seg.startsWith("**") && seg.endsWith("**")) {
-        return (
-          <Typography key={`${keyPrefix}-b${i}`} component="span" fontWeight="bold">
-            {seg.slice(2, -2)}
-          </Typography>
-        );
-      }
-      if (seg.startsWith("*") && seg.endsWith("*")) {
-        return (
-          <Typography key={`${keyPrefix}-i${i}`} component="span" fontStyle="italic">
-            {seg.slice(1, -1)}
-          </Typography>
-        );
-      }
-      return seg;
-    });
-  };
-
-  return (
-    <>
-      {lines.map((line, idx) => {
-        let variant: "h4" | "h5" | "body1" = "body1";
-        let content = line;
-
-        if (line.startsWith("##")) {
-          variant = "h5";
-          content = line.replace(/^##\s*/, "");
-        } else if (line.startsWith("#")) {
-          variant = "h4";
-          content = line.replace(/^#\s*/, "");
-        }
-
-        return (
-          <Typography
-            key={idx}
-            variant={variant}
-            fontWeight={variant === "h4" || variant === "h5" ? "bold" : undefined}
-            color={variant === "h4" ? "primary" : variant === "h5" ? "secondary" : "text.primary"}
-            sx={{ whiteSpace: "pre-line", mb: 1 }}
-          >
-            {formatInline(content, `line-${idx}`)}
-          </Typography>
-          );
-      })}
-    </>
-  );
-}
+import ReactMarkdown from "react-markdown";
 
 export default function AnnouncementBox() {
   const { data, loading, error } = useQuery(GET_ANNOUNCEMENTS);
@@ -100,7 +44,40 @@ export default function AnnouncementBox() {
           p: 3,
         })}
       >
-        <FormatAnnouncement text={currentAnnouncement.text} />
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => (
+            <Typography variant="body1" component="p" sx={{ mb: 2 }}>
+              {children}
+            </Typography>
+          ),
+          strong: ({ children }) => (
+            <Typography component="span" fontWeight="bold">
+              {children}
+            </Typography>
+          ),
+          em: ({ children }) => (
+            <Typography component="span" fontStyle="italic">
+              {children}
+            </Typography>
+          ),
+          h1: ({ children }) => (
+            <Typography variant="h5" component="h1" color="primary" sx={{ mb: 2, fontWeight: "bold" }}>
+              {children}
+            </Typography>
+          ),
+          h2: ({ children }) => (
+            <Typography variant="h6" component="h2" color="secondary" sx={{ mb: 1.5, fontWeight: "bold" }}>
+              {children}
+            </Typography>
+          ),
+          br: () => <br />,
+        }}
+      >
+        {currentAnnouncement.text}
+      </ReactMarkdown>
+
+
         <Typography
           variant="caption"
           color='primary'
