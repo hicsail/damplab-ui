@@ -394,7 +394,7 @@ export default function Checkout() {
             )}
           </Box>
           <Typography variant="body2" color="text.secondary">
-            ${(service.cost * service.count).toFixed(2)}
+            {formatPriceLabel(service.cost)}
           </Typography>
         </Box>
       }
