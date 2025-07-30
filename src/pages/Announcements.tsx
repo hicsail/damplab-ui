@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@apollo/client';
 import { CREATE_ANNOUNCEMENT } from '../gql/mutations';
+import { UPDATE_ANNOUNCEMENT } from '../gql/mutations';
 import { GET_ANNOUNCEMENTS } from '../gql/queries';
 import { useState } from 'react';
 import { Box, Button, TextField, Typography, Paper, Alert } from '@mui/material';
@@ -9,6 +10,9 @@ export default function Announcements() {
   const [announcement, setAnnouncement] = useState('');
   const [createAnnouncement] = useMutation(CREATE_ANNOUNCEMENT, {
     refetchQueries: [{ query: GET_ANNOUNCEMENTS }],
+  });
+  const [updateAnnouncement] = useMutation(UPDATE_ANNOUNCEMENT, {
+  refetchQueries: [{ query: GET_ANNOUNCEMENTS }],
   });
 
   const { data, loading } = useQuery(GET_ANNOUNCEMENTS);
@@ -26,16 +30,17 @@ export default function Announcements() {
     setAnnouncement('');
   };
 
-  const handleHide = async () => {
-    await createAnnouncement({
-      variables: {
-        input: {
-          text: '',
-          is_displayed: false,
-        },
+const handleHide = async () => {
+  console.log('Button clicked, running mutation...');
+  await updateAnnouncement({
+    variables: {
+      timestamp: currentAnnouncement.timestamp,
+      input: {
+        is_displayed: false,
       },
-    });
-  };
+    },
+  });
+};
 
   return (
     <Box sx={{ p: 4, maxWidth: 600, mx: 'auto' }}>
