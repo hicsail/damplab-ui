@@ -7,6 +7,7 @@ export const GET_SERVICES = gql`
         services {
             id
             name
+            price
             icon
             parameters
             description
@@ -75,6 +76,7 @@ export const GET_JOB_BY_ID = gql`
                     service {
                         id
                         name
+                        price
                         icon
                         parameters
                         allowedConnections {
@@ -206,6 +208,7 @@ export const CREATE_SERVICE = gql`
     createService(service: $service) {
       id
       name
+      price
       icon
       parameters
       description
