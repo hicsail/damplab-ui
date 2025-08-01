@@ -43,14 +43,14 @@ const handleHide = async () => {
     console.error("Announcement missing timestamp!");
     return;
   }
-  await updateAnnouncement({
+  await updateAnnouncement({    
     variables: {
-      timestamp: currentAnnouncement.timestamp,
       input: {
+        timestamp: currentAnnouncement.timestamp,
         is_displayed: false,
       },
-    },
-  });
+    }}
+  );
 };
 
   return (

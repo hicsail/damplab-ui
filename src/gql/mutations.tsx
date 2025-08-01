@@ -76,8 +76,8 @@ export const CREATE_ANNOUNCEMENT = gql`
 `;
 
 export const UPDATE_ANNOUNCEMENT = gql`
-  mutation UpdateAnnouncement($timestamp: String!, $input: UpdateAnnouncementInput!) {
-    updateAnnouncement(timestamp: $timestamp, input: $input) {
+  mutation UpdateAnnouncement($input: UpdateAnnouncementInput!) {
+    updateAnnouncement(input: $input) {
       timestamp
       is_displayed
     }
