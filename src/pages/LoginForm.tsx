@@ -1,14 +1,27 @@
 import { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Box, Button } from '@mui/material';
+import { Box, Button, Chip, Stack } from '@mui/material';
 
 import AccountTreeIcon        from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import ViewStreamIcon         from '@mui/icons-material/ViewStream';
 import CampaignIcon           from '@mui/icons-material/Campaign';
+import EditIcon from '@mui/icons-material/Edit';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import  AnnouncementBox  from '../components/AnnouncementBox';
+
+function MenuButton({onClick, navigateTo, children}) {
+    const navigate = useNavigate();
+    return (
+        <Button variant="contained" onClick={onClick ? onClick : () => navigate(navigateTo)}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
+            <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                {children[0]}
+                <Box sx={{width: '100%'}}>{children.slice(1)}</Box>
+            </Box>
+        </Button>
+    );
+}
 
 export default function LoginForm() {
   const navigate = useNavigate();
@@ -37,9 +50,11 @@ export default function LoginForm() {
 
   <Box sx={{ mb: 3, textAlign: 'center' }}>
     <p>Hello, {appellation}.</p>
-    {userProps.isDamplabStaff && <p>This account has Admin privileges.</p>}
-    {userProps.isInternalCustomer && <p>This is an internal customer account.</p>}
-    {userProps.isExternalCustomer && <p>This is an external customer account.</p>}
+    <Stack direction="row" spacing={1} sx={{ marginBottom: 5, justifyContent: 'center' }}>
+      {userProps.isDamplabStaff && <Chip label="DAMPLab Staff" />}
+      {userProps.isInternalCustomer && <Chip label="Internal Customer" />}
+      {userProps.isExternalCustomer && <Chip label="External Customer" />}
+    </Stack>
     {/* <Button variant="contained" onClick={() => navigate(role === 'admin' ? '/dashboard' : '/canvas')} style={{ marginRight: 10 }}> 
       Go to {role === 'admin' ? 'Dashboard' : 'Canvas'} </Button> */}
   </Box>
@@ -58,35 +73,16 @@ export default function LoginForm() {
   >
     {/* User options buttons */}
     <Box sx={{ width: '300px' }}>
-      <Button
-        variant="contained"
-        onClick={() => window.location.href = "https://www.damplab.org/services"}
-        sx={{ mb: 2, width: '210px', textTransform: 'none' }}
-      >
-        <img src='/damp-white.svg' height='30px' style={{ margin: 1, marginLeft: -25, marginRight: 10 }} alt="DAMP Logo" />
-        DAMPLab Site<br />(See Service Prices)
-      </Button>
+      <MenuButton onClick={() => window.location.href = "https://www.damplab.org/services"}><img src='/damp-white.svg' height='30px' alt="DAMP Logo"/>DAMPLab Site<br/>(See Service Prices)</MenuButton>
 
-      <Button
-        variant="contained"
-        onClick={() => navigate('/canvas')}
-        sx={{ m: 2, width: '210px', textTransform: 'none' }}
-      >
-        <AccountTreeIcon sx={{ m: 1, ml: -4, transform: "rotate(90deg) scaleY(-1)" }} />
-        CANVAS<br />(Design Workflows)
-      </Button>
+      <MenuButton navigateTo='/canvas'><AccountTreeIcon sx={{transform: "rotate(90deg) scaleY(-1)"}}/>Canvas<br />(Design Workflows)</MenuButton>
 
       {userProps.isDamplabStaff && (
         <>
-          <Button variant="contained" onClick={() => navigate('/dashboard')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-            <ViewStreamIcon sx={{m:1, ml:-3}}/>DASHBOARD<br/>(See Submitted Jobs)
-          </Button> 
-          <Button variant="contained" onClick={() => navigate('/release_notes')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-            <FormatListBulletedIcon sx={{m:1, ml:-3}}/>Release Notes<br/>(+ Other Admin Info)
-          </Button> 
-          <Button variant="contained" onClick={() => navigate('/edit_announcements')}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
-            <CampaignIcon sx={{m:1, ml:-3}}/>Add Announcement<br/>(+ Edit)
-          </Button>
+          <MenuButton navigateTo='/dashboard'><ViewStreamIcon />Dashboard<br />(See Submitted Jobs)</MenuButton>
+          <MenuButton navigateTo='/edit'><EditIcon />Admin Edit<br />(Edit Services)</MenuButton>
+          <MenuButton navigateTo='/release_notes'><FormatListBulletedIcon />Release Notes<br />(+ Other Admin Info)</MenuButton>
+          <MenuButton navigateTo='/edit_announcements'><CampaignIcon />Add Announcement<br />(+ Edit)</MenuButton>
         </>
       )}
       <Button variant="contained" color="secondary" onClick={() => userContext.keycloak.logout()}  sx={{ m: 5 }}>Logout</Button>
