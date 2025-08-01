@@ -4,7 +4,7 @@ import { UPDATE_ANNOUNCEMENT } from '../gql/mutations';
 import { GET_ANNOUNCEMENTS } from '../gql/queries';
 import { useState } from 'react';
 import { Box, Button, TextField, Typography, Paper, Alert } from '@mui/material';
-import ReactMarkdown from "react-markdown";
+import Markdown from '../components/ReactMarkdown';
 
 export default function Announcements() {
   const [announcement, setAnnouncement] = useState('');
@@ -64,38 +64,9 @@ const handleHide = async () => {
             <Typography>Loading...</Typography>
         ) : currentAnnouncement && currentAnnouncement.is_displayed ? (
             <>
-            <ReactMarkdown
-                    components={{
-                      p: ({ children }) => (
-                        <Typography variant="body1" component="p" sx={{ mb: 2 }}>
-                          {children}
-                        </Typography>
-                      ),
-                      strong: ({ children }) => (
-                        <Typography component="span" fontWeight="bold">
-                          {children}
-                        </Typography>
-                      ),
-                      em: ({ children }) => (
-                        <Typography component="span" fontStyle="italic">
-                          {children}
-                        </Typography>
-                      ),
-                      h1: ({ children }) => (
-                        <Typography variant="h5" component="h1" color="primary" sx={{ mb: 2, fontWeight: "bold" }}>
-                          {children}
-                        </Typography>
-                      ),
-                      h2: ({ children }) => (
-                        <Typography variant="h6" component="h2" color="secondary" sx={{ mb: 1.5, fontWeight: "bold" }}>
-                          {children}
-                        </Typography>
-                      ),
-                      br: () => <br />,
-                    }}
-                  >
-                  {currentAnnouncement.text}
-                  </ReactMarkdown>
+            <Markdown
+                  >{currentAnnouncement.text}
+            </Markdown>
             <Button
                 variant="outlined"
                 color="tertiary"
@@ -128,7 +99,7 @@ const handleHide = async () => {
 
       <Alert severity="info" sx={{ mb: 2 }}>
         Use <b>#</b> for headings, <b>##</b> for subheadings, <b>**bold**</b> for bold, 
-        <i>*italic*</i> for italic text, and 2 spaces + return for new line.
+        <i>*italic*</i> for italic text, and two line breaks for new line.
       </Alert>
 
       <Button

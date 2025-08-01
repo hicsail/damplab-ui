@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { GET_ANNOUNCEMENTS } from '../gql/queries';
 import { Box, Typography, Stack } from '@mui/material';
-import ReactMarkdown from "react-markdown";
+import Markdown from './ReactMarkdown';
 
 export default function AnnouncementBox() {
   const { data, loading, error } = useQuery(GET_ANNOUNCEMENTS);
@@ -44,38 +44,9 @@ export default function AnnouncementBox() {
           p: 3,
         })}
       >
-      <ReactMarkdown
-        components={{
-          p: ({ children }) => (
-            <Typography variant="body1" component="p" sx={{ mb: 2 }}>
-              {children}
-            </Typography>
-          ),
-          strong: ({ children }) => (
-            <Typography component="span" fontWeight="bold">
-              {children}
-            </Typography>
-          ),
-          em: ({ children }) => (
-            <Typography component="span" fontStyle="italic">
-              {children}
-            </Typography>
-          ),
-          h1: ({ children }) => (
-            <Typography variant="h5" component="h1" color="primary" sx={{ mb: 2, fontWeight: "bold" }}>
-              {children}
-            </Typography>
-          ),
-          h2: ({ children }) => (
-            <Typography variant="h6" component="h2" color="secondary" sx={{ mb: 1.5, fontWeight: "bold" }}>
-              {children}
-            </Typography>
-          ),
-          br: () => <br />,
-        }}
-      >
-        {currentAnnouncement.text}
-      </ReactMarkdown>
+      <Markdown
+      >{currentAnnouncement.text}
+      </Markdown>
 
 
         <Typography
