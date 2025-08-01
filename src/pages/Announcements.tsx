@@ -37,7 +37,7 @@ export default function Announcements() {
   };
 
 const handleHide = async () => {
-  if (!currentAnnouncement?.timestamp) return; // Just in case
+  if (!currentAnnouncement.timestamp) return; // Just in case
   await updateAnnouncement({    
     variables: {
       input: {
