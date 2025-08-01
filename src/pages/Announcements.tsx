@@ -29,20 +29,15 @@ export default function Announcements() {
           },
         },
       });
+      setAnnouncement(""); // Clear field after successful submission
+
     } catch (error) {
       console.error(error);
     }
   };
 
 const handleHide = async () => {
-  if (!currentAnnouncement || !currentAnnouncement.timestamp) {
-    console.warn("No announcement to hide.");
-    return;
-  }
-  if (!currentAnnouncement.timestamp) {
-    console.error("Announcement missing timestamp!");
-    return;
-  }
+  if (!currentAnnouncement?.timestamp) return; // Just in case
   await updateAnnouncement({    
     variables: {
       input: {
@@ -71,7 +66,7 @@ const handleHide = async () => {
                 variant="outlined"
                 color="tertiary"
                 onClick={handleHide}
-                disabled={updating || !currentAnnouncement}
+                disabled={updating}
                 sx={{ mt: 2 }}
             >
                 Hide Current Announcement
