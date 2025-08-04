@@ -40,6 +40,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
     const nodeData = {
         id                    : nodeId,
         label                 : service.name,
+        price                 : service.price,
         description           : service.description,
         allowedConnections    : service.allowedConnections,
         icon                  : service.icon,
@@ -144,6 +145,7 @@ export const transformNodesToGQL = (nodes: any) => {
         delete gqlNode.parameters;
         delete gqlNode.description;
         delete gqlNode.paramGroups;
+        delete gqlNode.price;
         console.log('gqlNode: ', gqlNode);
         gqlNodes.push(gqlNode);
     });
@@ -278,6 +280,7 @@ export const transformGQLToWorkflow = (workflow: any) => {
             name       : node.service.name,
             state      : node.state,
             description: node.description,
+            price      : node.price,
             data: {
                 icon    : node.service.icon,
                 formData: node.formData

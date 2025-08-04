@@ -64,6 +64,7 @@ export const EditServicesTable: React.FC = () => {
     // The services need to be a list of IDs
     const changes = {
       name: newRow.name,
+      price: Number(newRow.price) || null,
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters
@@ -84,6 +85,7 @@ export const EditServicesTable: React.FC = () => {
     const newService = {
       name: newRow.name || '',
       icon: '',
+      price: Number(newRow.price) || null,
       parameters: newRow.parameters || [],
       paramGroups: [],
       allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
@@ -133,6 +135,11 @@ export const EditServicesTable: React.FC = () => {
     {
       field: 'name',
       width: 500,
+      editable: true
+    },
+    {
+      field: 'price',
+      width: 200,
       editable: true
     },
     {
