@@ -1,4 +1,4 @@
-import { use, useContext } from "react";
+import { useContext } from "react";
 import { Navigate, Outlet } from "react-router";
 import {
   UserContext,
@@ -9,7 +9,7 @@ import {
 // Admins can access all pages
 const PrivateRouteDamplabStaff = () => {
   const userContext: UserContextProps = useContext(UserContext);
-  const userProps: UserProps = use(userContext.userProps);
+  const userProps: UserProps = userContext.userProps;
 
   return userProps?.isDamplabStaff ? <Outlet /> : <Navigate to="/login" />;
 };
