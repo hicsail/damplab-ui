@@ -140,7 +140,12 @@ export const EditServicesTable: React.FC = () => {
     {
       field: 'price',
       width: 200,
-      editable: true
+      editable: true,
+      type: 'number',
+      preProcessEditCellProps: (params) => {
+        const value = Number(params.props.value);
+        return { ...params.props, error: value < 0 };
+      },
     },
     {
       field: 'description',
