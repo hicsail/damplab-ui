@@ -64,7 +64,7 @@ export const EditServicesTable: React.FC = () => {
     // The services need to be a list of IDs
     const changes = {
       name: newRow.name,
-      price: Number(newRow.price) || 0,
+      price: Number(newRow.price) || null,
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters
