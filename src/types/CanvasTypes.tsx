@@ -17,7 +17,6 @@ export type NodeParameter = {
     id: string;
     nodeId: string;
     name: string;
-    price: number;
     type: string;
     options?: any[];
     description: string;
