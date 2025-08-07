@@ -97,7 +97,7 @@ const Item = styled(Paper)(({ theme }) => ({
 export default function Checkout() {
   const navigate = useNavigate();
   const val = useContext(CanvasContext);
-  const rawWorkflows = getWorkflowsFromGraph(val.nodes, val.edges) || [];;
+  const rawWorkflows = getWorkflowsFromGraph(val.nodes, val.edges) || [];
 
   const [workflows, setWorkflows] = useState<WorkflowNode[][]>(rawWorkflows);
   const [open, setOpen] = useState(false);
@@ -165,11 +165,11 @@ export default function Checkout() {
     return workflow.reduce((total, node) => total + (node.data.price), 0);
   };
 
-const formatPriceLabel = (price: number | null | undefined): string => {
-  if (price == null) return "[Price Pending Review]";
-  
-  return `$${price.toFixed(2)}`;
-};
+  const formatPriceLabel = (price: number | null | undefined): string => {
+    if (price == null) return "[Price Pending Review]";
+    
+    return `$${price.toFixed(2)}`;
+  };
 
   const groupServicesByLabel = (workflow: WorkflowNode[]) => {
     return workflow.reduce((acc, node) => {
