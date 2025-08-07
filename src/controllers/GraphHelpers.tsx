@@ -138,14 +138,14 @@ export const transformNodesToGQL = (nodes: any) => {
         gqlNode           = { ...node.data };
         gqlNode.reactNode = node;
         gqlNode.serviceId = node.data.serviceId  // random value for now 
-        // remove allowedConnections
+        // remove unnecessary fields
         delete gqlNode.allowedConnections;
         delete gqlNode.icon;
-        //delete gqlNode.serviceId;
+        // delete gqlNode.serviceId;
         delete gqlNode.parameters;
         delete gqlNode.description;
         delete gqlNode.paramGroups;
-        delete gqlNode.price;
+
         console.log('gqlNode: ', gqlNode);
         gqlNodes.push(gqlNode);
     });
