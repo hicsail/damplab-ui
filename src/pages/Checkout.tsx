@@ -165,15 +165,11 @@ export default function Checkout() {
     return workflow.reduce((total, node) => total + (node.data.price), 0);
   };
 
-  const formatPriceLabel = (price: number): string => {
-    if (!price) return "[Price Pending Review]";
-
-    if (price > 0) {
-      return `$${price.toFixed(2)}`
-    } else {
-      return "[Price Pending Review]"
-    }
-  };
+const formatPriceLabel = (price: number | null | undefined): string => {
+  if (price == null) return "[Price Pending Review]";
+  
+  return `$${price.toFixed(2)}`;
+};
 
   const groupServicesByLabel = (workflow: WorkflowNode[]) => {
     return workflow.reduce((acc, node) => {

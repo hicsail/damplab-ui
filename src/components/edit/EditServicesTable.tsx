@@ -20,8 +20,12 @@ import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
-import { Button, Dialog, DialogContent } from '@mui/material';
+import { Button, Dialog, DialogContent, Tooltip } from '@mui/material';
 import { EditParametersTable } from './parameters/EditParametersTable';
+
+type ServiceRow = GridRowModel & {
+  error?: string;
+};
 
 
 export const EditServicesTable: React.FC = () => {
@@ -70,6 +74,11 @@ export const EditServicesTable: React.FC = () => {
       parameters: newRow.parameters
     };
 
+    if (changes.price !== null && changes.price < 0) {
+      throw new Error("Price must be non-negative");
+    }
+
+
     await client.mutate({
       mutation: UPDATE_SERVICE,
       variables: {
@@ -92,6 +101,11 @@ export const EditServicesTable: React.FC = () => {
       description: newRow.description || ''
     };
 
+    if (newService.price !== null && newService.price < 0) {
+      throw new Error("Warning! Price is negative");
+}
+
+
     const row = await client.mutate({
       mutation: CREATE_SERVICE,
       variables: {
@@ -105,7 +119,12 @@ export const EditServicesTable: React.FC = () => {
     return { ...row.data.createService, isNew: false };
   }
 
-  const processRowUpdate = async (newRow: GridRowModel) => {
+  const processRowUpdate = async (newRow: ServiceRow) => {
+    const price = Number(newRow.price);
+    if (!isNaN(price) && price < 0) {
+      return { ...newRow, error: "Warning! Price is negative."};
+    }
+      
     if (!newRow.isNew) {
       return handleUpdate(newRow);
     } else {
@@ -137,14 +156,29 @@ export const EditServicesTable: React.FC = () => {
       width: 500,
       editable: true
     },
+
     {
       field: 'price',
-      width: 200,
+      headerName: 'Price',
       editable: true,
-      type: 'number',
-      preProcessEditCellProps: (params) => {
-        const value = Number(params.props.value);
-        return { ...params.props, error: value < 0 };
+      renderCell: (params) => {
+        const hasError = !!params.row.error;
+        return (
+          <Tooltip title={hasError ? params.row.error :''} arrow>
+            <span
+              style={{
+                border: hasError ? '1px solid red' :undefined,
+                padding: '4px 8px',
+                borderRadius: 4,
+                backgroundColor: hasError ? '#ffe6e6' :undefined,
+                display: 'inline-block',
+                width: '100%',
+              }}
+            >
+              ${params.value}
+            </span>
+          </Tooltip>
+        );
       },
     },
     {
