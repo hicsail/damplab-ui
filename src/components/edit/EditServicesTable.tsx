@@ -22,14 +22,21 @@ import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
 import { Button, Dialog, DialogContent } from '@mui/material';
 import { EditParametersTable } from './parameters/EditParametersTable';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
+
+type ServiceRow = GridRowModel & {
+  error?: string;
+};
 
 
 export const EditServicesTable: React.FC = () => {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<ServiceRow[]>([]);
   const { services } = useContext(AppContext);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const client = useApolloClient();
   const gridRef = useGridApiRef();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
 
   const [serviceDialogOpen, setServiceDialogOpen] = useState<boolean>(false);
@@ -52,11 +59,14 @@ export const EditServicesTable: React.FC = () => {
         service: id
       }
     });
-    setRows(rows.filter((row: any) => row.id != id));
+    setRows(rows.filter((row: ServiceRow) => row.id != id));
   };
 
   const handleSave = async (id: GridRowId) => {
-    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
+    console.log('Save button clicked for row:', id);
+    if (gridRef.current) {
+      gridRef.current.stopRowEditMode({ id });
+    }
   };
 
   const handleUpdate = async (newRow: GridRowModel) => {
@@ -64,10 +74,16 @@ export const EditServicesTable: React.FC = () => {
     // The services need to be a list of IDs
     const changes = {
       name: newRow.name,
+      price: Number(newRow.price) || null,
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters
     };
+
+    if (changes.price !== null && changes.price < 0) {
+      throw new Error("Price must be non-negative");
+    }
+
 
     await client.mutate({
       mutation: UPDATE_SERVICE,
@@ -84,6 +100,7 @@ export const EditServicesTable: React.FC = () => {
     const newService = {
       name: newRow.name || '',
       icon: '',
+      price: Number(newRow.price) || null,
       parameters: newRow.parameters || [],
       paramGroups: [],
       allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
@@ -103,13 +120,18 @@ export const EditServicesTable: React.FC = () => {
     return { ...row.data.createService, isNew: false };
   }
 
-  const processRowUpdate = async (newRow: GridRowModel) => {
-    if (!newRow.isNew) {
-      return handleUpdate(newRow);
-    } else {
-      return handleCreate(newRow);
+  const processRowUpdate = async (newRow: ServiceRow) => {
+    try {
+      if (!newRow.isNew) {
+        return await handleUpdate(newRow);
+      }
+      return await handleCreate(newRow);
+    } catch (error) {
+      console.error("Error processing row update:", error);
+      return rows.find(row => row.id === newRow.id) || newRow;
     }
   };
+
 
   const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
     if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -134,6 +156,23 @@ export const EditServicesTable: React.FC = () => {
       field: 'name',
       width: 500,
       editable: true
+    },
+    {
+      field: 'price',
+      width: 200,
+      editable: true,
+      type: 'number',
+      preProcessEditCellProps: (params) => {
+        const value = Number(params.props.value);
+        const hasError = isNaN(value) || value < 0;
+
+        if (hasError && value < 0) {
+          setErrorMessage("Price must be non-negative");
+        } else if (!hasError) {
+          setErrorMessage(null);
+        }
+        return { ...params.props, error: hasError };
+      }
     },
     {
       field: 'description',
@@ -175,7 +214,14 @@ export const EditServicesTable: React.FC = () => {
         rowModesModel={rowModesModel}
         onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
         onRowEditStop={handleRowEditStop}
-        onProcessRowUpdateError={(error) => console.log(error)}
+        onProcessRowUpdateError={(error) => {
+          console.error("Row update error:", error);
+          if (error instanceof Error) {
+            setErrorMessage(error.message);
+          } else {
+            setErrorMessage("An unexpected error occurred.");
+          }
+        }}
         editMode="row"
         processRowUpdate={processRowUpdate}
         slots={{
@@ -186,6 +232,16 @@ export const EditServicesTable: React.FC = () => {
         }}
         apiRef={gridRef}
       />
+      <Snackbar
+        open={!!errorMessage}
+        autoHideDuration={4000}
+        onClose={() => setErrorMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setErrorMessage(null)} severity="error" sx={{ width: '100%' }}>
+          {errorMessage}
+        </Alert>
+      </Snackbar>
       <Dialog open={serviceDialogOpen} onClose={() => setServiceDialogOpen(false)} fullWidth PaperProps={{ sx: { maxWidth: '100%' }}}>
         <DialogContent>
           <EditParametersTable viewParams={paramsViewProps} editParams={paramsEditProps} gridRef={gridRef} />
