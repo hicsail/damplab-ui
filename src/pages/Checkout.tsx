@@ -27,7 +27,8 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Alert
+  Alert,
+  Stack
 } from "@mui/material";
 
 import CircleIcon from '@mui/icons-material/Circle';
@@ -166,10 +167,13 @@ export default function Checkout() {
   };
 
   const formatPriceLabel = (price: number | null | undefined): string => {
-    if (price == null) return "[Price Pending Review]";
-    
-    return `$${price.toFixed(2)}`;
-  };
+    if (!price) return "[Price Pending Review]";
+    if (price >= 0) {
+      return `$${price.toFixed(2)}`;
+    } else {
+      return "[Price Pending Review]";} // handles all 3 cases of price
+  }
+
 
   const groupServicesByLabel = (workflow: WorkflowNode[]) => {
     return workflow.reduce((acc, node) => {
@@ -406,32 +410,26 @@ export default function Checkout() {
                       secondary={
                         <Box sx={{ mt: 1 }}>
                           {service.nodes.map((node, index) => (
-                            <Box
-                              key={node.id}
-                              sx={{ mb: index !== service.nodes.length - 1 ? 2 : 0 }}
-                            >
-                              {service.count > 1 && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{ ml: 2 }}
-                                >
-                                  Service {index + 1}:
-                                </Typography>
-                              )}
-                              {node.data?.formData?.map((param) => (
-                                <Typography
-                                  key={param.id}
-                                  variant="body2"
-                                  color="text.secondary"
-                                  sx={{
-                                    ml: service.count > 1 ? 3 : 2,
-                                    fontSize: '0.875rem'
-                                  }}
-                                >
-                                  {param.name}: {param.value}
-                                </Typography>
-                              ))}
+                            <Box key={node.id}>
+                              <Stack spacing={0.5} sx={{ ml: service.count > 1 ? 0 : 2 }}>
+                                {service.count > 1 && (
+                                  <Typography variant="body2" color="text.secondary">
+                                    Service {index + 1}:
+                                  </Typography>
+                                )}
+                                <Box sx={{ ml: service.count > 1 ? 2 : 0 }}>
+                                  {node.data?.formData?.map((param) => (
+                                    <Typography
+                                      key={param.id}
+                                      variant="body2"
+                                      color="text.secondary"
+                                      sx={{ fontSize: '0.875rem' }}
+                                    >
+                                      {param.name}: {param.value}
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              </Stack>
                             </Box>
                           ))}
                         </Box>
