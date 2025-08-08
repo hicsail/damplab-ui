@@ -138,10 +138,9 @@ export const transformNodesToGQL = (nodes: any) => {
         gqlNode           = { ...node.data };
         gqlNode.reactNode = node;
         gqlNode.serviceId = node.data.serviceId  // random value for now 
-        // remove unnecessary fields
+        // remove fields that are not part of backend's workflownode schema
         delete gqlNode.allowedConnections;
         delete gqlNode.icon;
-        // delete gqlNode.serviceId;
         delete gqlNode.parameters;
         delete gqlNode.description;
         delete gqlNode.paramGroups;
