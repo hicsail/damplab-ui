@@ -20,10 +20,8 @@ import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
-import { Button, Dialog, DialogContent } from '@mui/material';
+import { Button, Dialog, DialogContent, Alert, Snackbar } from '@mui/material';
 import { EditParametersTable } from './parameters/EditParametersTable';
-import Snackbar from '@mui/material/Snackbar';
-import Alert from '@mui/material/Alert';
 
 type ServiceRow = GridRowModel & {
   error?: string;
@@ -63,7 +61,6 @@ export const EditServicesTable: React.FC = () => {
   };
 
   const handleSave = async (id: GridRowId) => {
-    console.log('Save button clicked for row:', id);
     if (gridRef.current) {
       gridRef.current.stopRowEditMode({ id });
     }
@@ -79,11 +76,6 @@ export const EditServicesTable: React.FC = () => {
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters
     };
-
-    if (changes.price !== null && changes.price < 0) {
-      throw new Error("Price must be non-negative");
-    }
-
 
     await client.mutate({
       mutation: UPDATE_SERVICE,
@@ -115,9 +107,8 @@ export const EditServicesTable: React.FC = () => {
     });
 
     // TODO: Should refetch data
-
-
-    return { ...row.data.createService, isNew: false };
+    setRows(prev => [...prev, { ...row.data.createdService, isNew: false }]);
+    return { ...row.data.createdService, isNew: false };
   }
 
   const processRowUpdate = async (newRow: ServiceRow) => {
@@ -128,6 +119,7 @@ export const EditServicesTable: React.FC = () => {
       return await handleCreate(newRow);
     } catch (error) {
       console.error("Error processing row update:", error);
+      setErrorMessage(error instanceof Error ? error.message : "An unexpected error occurred."); // Updates snackbar instead of swallowing
       return rows.find(row => row.id === newRow.id) || newRow;
     }
   };
@@ -167,7 +159,7 @@ export const EditServicesTable: React.FC = () => {
         const hasError = isNaN(value) || value < 0;
 
         if (hasError && value < 0) {
-          setErrorMessage("Price must be non-negative");
+          setErrorMessage("Warning! Price is negative.");
         } else if (!hasError) {
           setErrorMessage(null);
         }
