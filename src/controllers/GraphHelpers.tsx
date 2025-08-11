@@ -277,6 +277,7 @@ export const transformGQLToWorkflow = (workflow: any) => {
         return {
             id         : node._id,
             name       : node.service.name,
+            price      : node.price,
             state      : node.state,
             description: node.description,
             data: {

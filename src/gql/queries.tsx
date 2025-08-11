@@ -73,6 +73,7 @@ export const GET_JOB_BY_ID = gql`
                     _id
                     id
                     label
+                    price
                     service {
                         id
                         name

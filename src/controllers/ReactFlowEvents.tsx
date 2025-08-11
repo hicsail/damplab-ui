@@ -13,7 +13,6 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string): Nod
             id              : formId,
             nodeId          : nodeId,
             name            : parameter.name,
-            price           : parameter.price,
             type            : parameter.type,
             options         : parameter.options ? parameter.options    : null,
             description     : parameter.description,
