@@ -112,15 +112,10 @@ export const EditServicesTable: React.FC = () => {
   }
 
   const processRowUpdate = async (newRow: ServiceRow) => {
-    try {
-      if (!newRow.isNew) {
-        return await handleUpdate(newRow);
-      }
-      return await handleCreate(newRow);
-    } catch (error) {
-      console.error("Error processing row update:", error);
-      setErrorMessage(error instanceof Error ? error.message : "An unexpected error occurred."); // Updates snackbar instead of swallowing
-      return rows.find(row => row.id === newRow.id) || newRow;
+    if (!newRow.isNew) {
+      return handleUpdate(newRow);
+    } else {
+      return handleCreate(newRow);
     }
   };
 
