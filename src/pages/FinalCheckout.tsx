@@ -451,6 +451,7 @@ export default function FinalCheckout() {
         </Typography>
 
         <Box>
+<<<<<<< Updated upstream
         {workflowCosts?.map((workflow: WorkflowCost, index: number) => (
         <Box
           key={index}
@@ -467,6 +468,94 @@ export default function FinalCheckout() {
         <Typography variant="body1">
           ${workflow.cost.toFixed(2)}
         </Typography>
+=======
+          {workflowCosts?.map((workflow: WorkflowCost, index: number) => (
+            <Box
+              key={index}
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                mb: 2,
+              }}
+            >
+              <Typography variant="body1">Workflow {index + 1}</Typography>
+              <Typography variant="body1">${workflow.cost.toFixed(2)}</Typography>
+            </Box>
+          ))}
+
+          <Divider sx={{ my: 2 }} />
+
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 3,
+            }}
+          >
+            <Typography variant="h6" fontWeight="bold">
+              Estimated Cost*
+            </Typography>
+            <Typography variant="h6" fontWeight="bold">
+              ${totalCost?.toFixed(2)}
+            </Typography>
+          </Box>
+
+        <Alert
+          severity="info" sx={{ mb: 3, borderRadius: 2}}
+        >
+          *Please note: The final price and payment details, along with other relevant information, will be sent to your email.
+        </Alert>
+
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          onClick={handleSubmitJob}
+          disabled={!isFormValid() || submitting}
+        >
+          SUBMIT JOB
+        </Button>
+
+
+          <Snackbar
+            open={snackbarState.open}
+            autoHideDuration={6000}
+            onClose={handleSnackbarClose}
+            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            sx={{ mt: 6 }}
+          >
+            <Alert
+              onClose={handleSnackbarClose}
+              variant="filled"
+              severity={snackbarState.severity}
+              color={
+                snackbarState.severity === 'success'
+                  ? 'primary'
+                  : snackbarState.severity === 'error'
+                  ? 'secondary'
+                  : snackbarState.severity === 'info'
+                  ? 'secondary'
+                  : undefined
+              }
+              sx={{
+                width: '100%',
+                minWidth: '300px',
+                boxShadow: 2,
+                fontSize: '0.95rem',
+              }}
+              icon={
+                snackbarState.showSpinner ? (
+                  <CircularProgress color="inherit" size={20} />
+                ) : undefined
+              }
+            >
+              {snackbarState.message}
+            </Alert>
+          </Snackbar>
+        </Box>
+>>>>>>> Stashed changes
       </Box>
     ))}
 
