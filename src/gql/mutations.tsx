@@ -12,10 +12,11 @@ export const CREATE_WORKFLOW = gql`
 `;
 
 export const CREATE_JOB = gql`
-    mutation createJob($createJobInput: CreateJob!) {
+    mutation createJob($createJobInput: CreateJobInput!) {
         createJob(createJobInput: $createJobInput) {
             id
             name
+            institute
         }
     }
 `;
