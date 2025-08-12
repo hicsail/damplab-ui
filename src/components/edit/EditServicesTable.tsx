@@ -61,9 +61,7 @@ export const EditServicesTable: React.FC = () => {
   };
 
   const handleSave = async (id: GridRowId) => {
-    if (gridRef.current) {
-      gridRef.current.stopRowEditMode({ id });
-    }
+    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
   };
 
   const handleUpdate = async (newRow: GridRowModel) => {
