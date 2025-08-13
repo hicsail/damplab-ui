@@ -23,10 +23,10 @@ export default function(results) {
       const relativePath = path.relative(projectRoot, file.filePath);
       output += `\nFile: ${chalk.cyan(relativePath)}\n`;
       if (fileFormattingErrors) {
-        output += `  Formatting Issues: ${chalk.yellow(fileFormattingErrors)}\n`;
+        output += ` ‣ Formatting Issues: ${chalk.yellow(fileFormattingErrors)}\n`;
       }
       if (fileLogicalErrors) {
-        output += `  Logical Errors: ${chalk.red(fileLogicalErrors)}\n`;
+        output += ` ‣ Logical Errors: ${chalk.red(fileLogicalErrors)}\n`;
       }
     }
 
@@ -34,9 +34,14 @@ export default function(results) {
     totalLogicalErrors += fileLogicalErrors;
   });
 
-  output += `\n====== TOTAL ======\n`;
-  output += `${chalk.yellow(`Formatting Issues: ${totalFormattingErrors}`)}\n`;
-  output += `${chalk.red(`Logical Errors: ${totalLogicalErrors}`)}\n`;
+  output += `\n· · ────── Total ────── · ·\n` +
+          (totalFormattingErrors > 0 
+            ? chalk.yellow(`Formatting Issues: ${totalFormattingErrors}\n`) 
+            : chalk.green("No Formatting Issues\n")) +
+          (totalLogicalErrors > 0 
+            ? chalk.red(`Logical Errors: ${totalLogicalErrors}\n`) 
+            : chalk.green("No Logical Errors\n"));
+  output += `${chalk.gray("\n(To get more details run `lint:full`)\n")}`;
 
   return output;
 }
