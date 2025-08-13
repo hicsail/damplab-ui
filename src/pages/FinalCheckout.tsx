@@ -116,7 +116,7 @@ export default function FinalCheckout() {
 }
 
   // GraphQL mutation for job creation
-  const [createJob, {loading: jobLoading}] = useMutation(CREATE_JOB, {
+  const [createJob] = useMutation(CREATE_JOB, {
     onCompleted: (data) => {
       // Store job details in localStorage for persistence
       let fileName = `${data.createJob.id}_${new Date().toLocaleString()}`;
@@ -137,7 +137,6 @@ export default function FinalCheckout() {
       
       // Navigate after showing the success message
       const jobId = data.createJob.id;
-      const username = data.createJob.username; 
 
       setTimeout(() => {
         navigate(`/jobs/${jobId}`);
@@ -169,8 +168,6 @@ export default function FinalCheckout() {
   // Form data state management
   const [formData, setFormData] = useState({
     workflowName: '',
-    username: '',
-    email: '',
     institute: ''
   });
 
@@ -219,7 +216,7 @@ const handleSubmitJob = () => {
     setSnackbarState({
       open: true,
       message: 'Submitting job...',
-      severity: 'info',
+      severity: 'secondary',
       showSpinner: true
     });
 
@@ -231,34 +228,19 @@ const handleSubmitJob = () => {
         },
       },
     });
-    //alert('Job created successfully!');
   } catch (error) {
     console.error('Job submission failed:', error);
     
-    //alert('Error creating job.');
     setSubmitting(false); // Re-enable button if error occurs
   }}
 
-  const formatPriceLabel = (price: string): string => {
+  const formatPriceLabel = (price: number | null | undefined): string => {
     if (!price) return "[Price Pending Review]";
-
-    // Match a range like "100 - 200"
-    const matchRange = price.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/);
-    if (matchRange) {
-      const low = parseFloat(matchRange[1]).toFixed(2);
-      const high = parseFloat(matchRange[2]).toFixed(2);
-      return `$${low} - $${high}`;
-    }
-
-    // Match a single price like "150"
-    const matchSingle = price.match(/^\d+(?:\.\d+)?$/);
-    if (matchSingle) {
-      const value = parseFloat(price).toFixed(2);
-      return `$${value}`;
-    }
-
-    return "[Price Pending Review]";
-  };
+    if (price >= 0) {
+      return `$${price.toFixed(2)}`;
+    } else {
+      return "[Price Pending Review]";} // handles all 3 cases of price
+  }
 
   return (
   <div>
@@ -310,7 +292,7 @@ const handleSubmitJob = () => {
           variant="outlined"
           value={formData.workflowName}
           onChange={handleInputChange('workflowName')}
-          error={tabValue === 1 && formData.workflowName === ''}
+          error={formData.workflowName === ''}
           helperText={tabValue === 1 && formData.workflowName === '' ? 'This field is required' : ''}
         />
       </Grid>
@@ -327,21 +309,19 @@ const handleSubmitJob = () => {
       <Grid container spacing={0.5} direction="column">
         <Grid item xs={12} sx={{ mb: 1 }}>
           <TextField
-            label="Username" // Will need to refactor to display Family name + Given name from user data
+            label="Your Name" // Will need to refactor to display Family name + Given name from user data
             value={username ?? ''}
             fullWidth
             disabled
           />
-          <input type="hidden" name="username" value={username ?? ''} />
         </Grid>
-                <Grid item xs={12} sx={{ mb: 1 }}>
+        <Grid item xs={12} sx={{ mb: 1 }}>
           <TextField
             label="Email"
             value={email ?? ''}
             fullWidth
             disabled
           />
-          <input type="hidden" name="email" value={email ?? ''} />
         </Grid>
 
         <Grid item xs={12} sx={{ mb: 1 }}>
@@ -387,7 +367,7 @@ const handleSubmitJob = () => {
               }}
             >
               <Typography variant="body1">Workflow {index + 1}</Typography>
-              <Typography variant="body1">${workflow.cost.toFixed(2)}</Typography>
+              <Typography variant="body1">{formatPriceLabel(workflow.cost)}</Typography>
             </Box>
           ))}
 
