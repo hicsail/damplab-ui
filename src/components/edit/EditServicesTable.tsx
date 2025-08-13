@@ -69,7 +69,7 @@ export const EditServicesTable: React.FC = () => {
     // The services need to be a list of IDs
     const changes = {
       name: newRow.name,
-      price: newRow.price == null ? null : Number(newRow.price),
+      price: newRow.price == null ? null : Number(newRow.price), // prevents errors where the code passes null directly to Number()
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters
@@ -90,7 +90,7 @@ export const EditServicesTable: React.FC = () => {
     const newService = {
       name: newRow.name || '',
       icon: '',
-      price: Number(newRow.price) || null,
+      price: newRow.price == null ? null : Number(newRow.price),
       parameters: newRow.parameters || [],
       paramGroups: [],
       allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
@@ -104,13 +104,14 @@ export const EditServicesTable: React.FC = () => {
       }
     });
 
-    // Replace the temp row so there is no gap from the id mismatch
-    setRows(prevRows => prevRows.map(row =>
-      row.id === newRow.id ? { ...result.data.createService, isNew: false } : row
+    // GridToolBar.tsx creates a temporary row id, but since the backend issues a different id, 
+    // This code, setRows, replaces the temp id with the real id.
+    setRows(prevRows => 
+      prevRows.map(row =>
+        row.id === newRow.id ? { ...result.data.createService, isNew: false } : row
     ));
 
-  return { ...result.data.createService, isNew: false };
-    // TODO: Should refetch data
+    return { ...result.data.createService, isNew: false };
   }
 
   const processRowUpdate = async (newRow: ServiceRow) => {
