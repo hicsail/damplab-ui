@@ -112,7 +112,7 @@ return (
 
               <Button
                 variant="contained"
-                color="error"
+                color="secondary"
                 onClick={logout}
                 sx={{ m: 5 }}
               >
