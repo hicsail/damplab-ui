@@ -29,7 +29,11 @@
   },
   "scripts": {
     "build": "react-router build",
-    "dev": "react-router dev"
+    "dev": "react-router dev",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --check 'src/**/*.{ts,tsx}'",
+    "format:fix": "prettier --write 'src/**/*.{ts,tsx}'"
   },
   "eslintConfig": {
     "extends": [
@@ -57,7 +61,12 @@
     "@types/node": "^22.14.1",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.6.2",
     "typescript": "^5.8.3",
     "vite": "^6.2.6"
   }
