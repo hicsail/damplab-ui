@@ -19,7 +19,11 @@ function MenuButton({ onClick, navigateTo, children }) {
     <Button
       variant="contained"
       onClick={onClick ? onClick : () => navigate(navigateTo)}
-      sx={{ m: 2, width: '210px', textTransform: 'none' }}
+      sx={{ mt: 0, mb: 2, ml: 2, mr: 2, width: '210px', textTransform: 'none',
+        '&:not(:first-of-type)': {
+          mt: 2, // top margin for all buttons after the first
+        },
+      }}
     >
       <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
         {children[0]}
@@ -56,15 +60,17 @@ export default function HomePage() {
             {userProps.isExternalCustomer && <Chip label="External Customer" />}
           </Stack>
         </Box>
+      </Box>
 
         {/* Main Content Row */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
           {/* Left column with buttons */}
-          <Box sx={{ width: '300px', alignSelf: 'flex-start' }}>
+          <Box sx={{ width: '300px', alignSelf: 'flex-start',mt: 0, pt: 0, minHeight: 0}}>
             <MenuButton onClick={() => window.location.href = "https://www.damplab.org/services"}>
               <img src='/damp-white.svg' height='30px' alt="DAMP Logo" />
               DAMPLab Site<br/>(See Service Prices)
             </MenuButton>
+
 
             <MenuButton navigateTo='/canvas'>
               <AccountTreeIcon sx={{ transform: "rotate(90deg) scaleY(-1)" }} />
@@ -94,11 +100,8 @@ export default function HomePage() {
           </Box>
 
           {/* Right Column: AnnouncementBox */}
-          <Box sx={{ alignSelf: 'flex-start' }}>
             <AnnouncementBox />
-          </Box>
         </Box>
-      </Box>
     </Box>
   );
 }
