@@ -6,12 +6,11 @@ import {
 } from "@react-router/dev/routes";
 
 export default [
-    index("./pages/LoginForm.tsx", { id: "index" }), // specify 'id' to avoid duplicating /login route's id
+    route("/canvas", "./pages/MainFlow.tsx"),
     route("/login", "./pages/LoginForm.tsx"),
 
-    route("/canvas", "./pages/MainFlow.tsx"),
-
     layout("./layouts/PrivateRouteAuthed.tsx", [
+        index("./pages/Home.tsx", { id: "index" }),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),
