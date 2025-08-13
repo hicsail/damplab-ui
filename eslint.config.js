@@ -1,6 +1,7 @@
 import { defineConfig } from "eslint/config";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import prettierPlugin from "eslint-plugin-prettier";
+import tsParser from "@typescript-eslint/parser";
 
 export default defineConfig({
   files: ["src/**/*.{ts,tsx}"],
@@ -15,7 +16,7 @@ export default defineConfig({
     "plugin:prettier/recommended",
   ],*/
   rules: {
-    "prettier/prettier": "error",
+    "prettier/prettier": ["warn", {}, { "usePrettierrc": true }],
     "@typescript-eslint/interface-name-prefix": "off",
     "@typescript-eslint/explicit-function-return-type": "error",
     "@typescript-eslint/explicit-module-boundary-types": "off",
@@ -23,6 +24,10 @@ export default defineConfig({
     "@typescript-eslint/no-non-null-assertion": "off",
   },
   languageOptions: {
+    parser: tsParser,
+    parserOptions: {
+      sourceType: "module",
+    },
     globals: {
       // Node globals
       process: "readonly",
