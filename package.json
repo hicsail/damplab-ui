@@ -31,7 +31,8 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "lint": "eslint src --ext .ts,.tsx",
-    "lint:fix": "eslint src --ext .ts,.tsx --fix"
+    "lint:summary": "eslint src --ext .ts,.tsx -f ./eslintFormatter.js",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix -f ./eslintFormatter.js"
   },
   "eslintConfig": {
     "extends": [
