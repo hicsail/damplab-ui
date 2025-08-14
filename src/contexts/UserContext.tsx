@@ -14,7 +14,15 @@ export interface UserProps {
   roles?: string[];
   // accessToken is passed to the backend in graphql queries.
   accessToken?: object;
-  idTokenParsed?: object;
+  idTokenParsed?: TokenClaims;
+}
+export interface TokenClaims {
+  preferred_username?: string;
+  email?: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  email_verified?: boolean;
 }
 
 const keycloak = new Keycloak({

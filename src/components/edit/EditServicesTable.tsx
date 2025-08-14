@@ -69,7 +69,7 @@ export const EditServicesTable: React.FC = () => {
     // The services need to be a list of IDs
     const changes = {
       name: newRow.name,
-      price: Number(newRow.price) || null,
+      price: newRow.price == null ? null : Number(newRow.price),
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters
@@ -90,23 +90,28 @@ export const EditServicesTable: React.FC = () => {
     const newService = {
       name: newRow.name || '',
       icon: '',
-      price: Number(newRow.price) || null,
+      price: newRow.price == null ? null : Number(newRow.price),
       parameters: newRow.parameters || [],
       paramGroups: [],
       allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
       description: newRow.description || ''
     };
 
-    const row = await client.mutate({
+    const result = await client.mutate({
       mutation: CREATE_SERVICE,
       variables: {
         service: newService
       }
     });
 
-    // TODO: Should refetch data
-    setRows(prev => [...prev, { ...row.data.createdService, isNew: false }]);
-    return { ...row.data.createdService, isNew: false };
+    // GridToolBar.tsx creates a temporary row id, but since the backend issues a different id, 
+    // This code, setRows, replaces the temp id with the real id.
+    setRows(prevRows => 
+      prevRows.map(row =>
+        row.id === newRow.id ? { ...result.data.createService, isNew: false } : row
+    ));
+
+    return { ...result.data.createService, isNew: false };
   }
 
   const processRowUpdate = async (newRow: ServiceRow) => {
@@ -148,6 +153,13 @@ export const EditServicesTable: React.FC = () => {
       editable: true,
       type: 'number',
       preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        // Allow empty / untouched values
+        if (raw === undefined || raw === null || raw === '') {
+          setErrorMessage(null); // clear the previous warnings
+          return { ...params.props, error: false };
+        }
+
         const value = Number(params.props.value);
         const hasError = isNaN(value) || value < 0;
 
