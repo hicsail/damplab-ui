@@ -24,7 +24,6 @@ export default function JobSubmitted() {
 
   const { loading, error, data } = useQuery(GET_JOB_BY_ID, { //should later check logged in user token to access
     variables: { id: jobId },
-    skip: !jobId,
     onCompleted: (data) => {
       setWorkflowName(data.jobById.workflows[0].name);
       setWorkflowState(data.jobById.workflows[0].state);

@@ -88,6 +88,7 @@ export default function FinalCheckout() {
   });
   const [touched, setTouched] = useState({
     jobName: false,
+    institute: false,
   });
   const [redirecting, setRedirecting] = useState(false);
   
@@ -197,8 +198,6 @@ const handleSubmitJob = async () => {
   try {
     const data = {
       name: formData.jobName,
-      //username: formData.username,
-      //email: formData.email,
       institute: formData.institute,
       notes: formData.notes, // Optional
       workflows: workflows.map((workflow: any) => ({
@@ -330,6 +329,9 @@ const handleSubmitJob = async () => {
             value={formData.institute ?? ''}
             fullWidth
             onChange={handleInputChange('institute')} 
+            onBlur={() => handleBlur('institute')}
+            error={touched.institute && formData.institute === ''}
+            helperText={touched.institute && formData.institute === '' ? 'This field is required' : ''}
           />
         </Grid>
       </Grid>
