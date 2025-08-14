@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext, useMemo } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 // someday: import from @apollo/client once Apollo Client 4 is out (which will address ESM issues) - see discussion at
 // https://github.com/apollographql/apollo-client/issues/9976#issuecomment-1768446694
@@ -6,25 +6,18 @@ import {
   ApolloClient,
   InMemoryCache,
   ApolloProvider,
+  createHttpLink,
 } from "@apollo/client/index.js";
+import { setContext } from "@apollo/client/link/context";
 
 import { CanvasContext } from "./contexts/Canvas";
 import { AppContext } from "./contexts/App";
 import { GET_BUNDLES, GET_SERVICES } from "./gql/queries";
+import { UserContext } from "./contexts/UserContext";
 import HeaderBar from "./components/HeaderBar";
 import './root.css';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './styles/themes';
-
-
-// The user's access token is added to Apollo queries by getting it from the UserContext and passing it like this:
-// useQuery(YOUR_QUERY, { context: { headers: {authorization: `Bearer ${userProps?.accessToken}`}}}); or like this:
-// apolloClient.query({ query: YOUR_QUERY, context: { headers: { authorization: token ? `Bearer ${token}` : "", } } });
-// We do not insert the auth header using an Apollo Link since the token lives in the UserContext.
-const client = new ApolloClient({
-  uri: import.meta.env.VITE_BACKEND,
-  cache: new InMemoryCache(),
-});
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -66,6 +59,30 @@ export default function Root() {
   const [services, setServices] = useState([]);
   const [bundles, setBundles] = useState([]);
   const [hazards, setHazards] = useState(Array<string>);
+
+  const userContext = useContext(UserContext);
+  const token = userContext.userProps?.accessToken;
+
+  // Create Apollo Client with auth link that uses token from context
+  const client = useMemo(() => {
+    const httpLink = createHttpLink({
+      uri: import.meta.env.VITE_BACKEND,
+    });
+
+    const authLink = setContext((_, { headers }) => {
+      return {
+        headers: {
+          ...headers,
+          authorization: token ? `Bearer ${token}` : "",
+        },
+      };
+    });
+
+    return new ApolloClient({
+      link: authLink.concat(httpLink),
+      cache: new InMemoryCache(),
+    });
+  }, [token]);  
 
   // initial load of services and bundles
   useEffect(() => {
