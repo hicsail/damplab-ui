@@ -10,12 +10,14 @@ export default function(results) {
   results.forEach(file => {
     let fileFormattingErrors = 0;
     let fileErrors = 0;
+    let errorMessages = "";
 
     file.messages.forEach(msg => {
       if (msg.ruleId === "prettier/prettier") {
         fileFormattingErrors++;
       } else {
         fileErrors++;
+        errorMessages += `  - ${chalk.gray(`${msg.line}:${msg.column}`)} ${chalk.red(msg.message)} (${msg.ruleId || "no rule"})\n`;
       }
     });
 
@@ -26,7 +28,8 @@ export default function(results) {
         output += ` ‣ Formatting Issues: ${chalk.yellow(fileFormattingErrors)}\n`;
       }
       if (fileErrors) {
-        output += ` ‣ Errors: ${chalk.red(fileErrors)}\n`;
+        output += ` ‣ ${chalk.red(fileErrors)} Error(s):\n`;
+        output += errorMessages;
       }
     }
 
@@ -44,4 +47,3 @@ export default function(results) {
   }
 
   return output;
-}
