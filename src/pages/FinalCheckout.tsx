@@ -29,7 +29,6 @@ interface SnackbarState {
   open: boolean;
   message: string;
   severity: AlertColor;
-  showSpinner?: boolean;
 }
 
 interface WorkflowCost {
@@ -75,7 +74,6 @@ export default function FinalCheckout() {
   const val = useContext(CanvasContext);
   const location = useLocation();
   const navigate = useNavigate();
-  const [submitting, setSubmitting] = useState(false);
   const userContext: UserContextProps = useContext(UserContext);
   const userProps = userContext.userProps;
   const token = userContext.userProps?.accessToken;
@@ -100,8 +98,8 @@ export default function FinalCheckout() {
     notes: ''
   });
 
-    // GraphQL mutation for job creation
-  const [createJob] = useMutation(CREATE_JOB, {
+  // GraphQL mutation for job creation
+  const [createJob, { loading: jobLoading }] = useMutation(CREATE_JOB, {
     onCompleted: (data) => {
       // Store job details in localStorage for persistence
       let fileName = `${data.createJob.id}_${new Date().toLocaleString()}`;
@@ -116,10 +114,8 @@ export default function FinalCheckout() {
         open: true,
         message: 'Job submitted successfully!',
         severity: 'success',
-        showSpinner: true
-        
+        showSpinner: true     
       });
-      setSubmitting(false);
       
       // Navigate after showing the success message
       const jobId = data.createJob.id;
@@ -177,8 +173,7 @@ export default function FinalCheckout() {
 
   const isFormValid = () => {
     return (
-      formData.workflowName.trim() !== '',
-      formData.institute.trim() !== ''
+      formData.workflowName.trim() !== '' && formData.institute.trim() !== ''
     );
   };
 
@@ -197,7 +192,6 @@ export default function FinalCheckout() {
 */
 const handleSubmitJob = async () => {
   if (!isFormValid()) return;
-  setSubmitting(true);
 
   const workflows = location.state?.orderSummary?.workflows || [];
 
@@ -237,8 +231,6 @@ const handleSubmitJob = async () => {
     });
   } catch (error) {
     console.error('Job submission failed:', error);
-    
-    setSubmitting(false); // Re-enable button if error occurs
   }}
 
   const formatPriceLabel = (price: number | null | undefined): string => {
@@ -423,7 +415,8 @@ const handleSubmitJob = async () => {
           color="primary"
           fullWidth
           onClick={handleSubmitJob}
-          disabled={!isFormValid() || submitting}
+          disabled={!isFormValid() || jobLoading}
+          startIcon={jobLoading ? <CircularProgress size={20} color="inherit" /> : null}
         >
           SUBMIT JOB
         </Button>
@@ -456,7 +449,7 @@ const handleSubmitJob = async () => {
                 fontSize: '0.95rem',
               }}
               icon={
-                snackbarState.showSpinner ? (
+                jobLoading ? (
                   <CircularProgress color="inherit" size={20} />
                 ) : undefined
               }
