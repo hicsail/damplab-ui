@@ -87,13 +87,13 @@ export default function FinalCheckout() {
     severity: 'success'
   });
   const [touched, setTouched] = useState({
-    workflowName: false,
+    jobName: false,
   });
   const [redirecting, setRedirecting] = useState(false);
   
   // Form data state management
   const [formData, setFormData] = useState({
-    workflowName: '',
+    jobName: '',
     institute: '',
     notes: ''
   });
@@ -173,7 +173,7 @@ export default function FinalCheckout() {
 
   const isFormValid = () => {
     return (
-      formData.workflowName.trim() !== '' && formData.institute.trim() !== ''
+      formData.jobName.trim() !== '' && formData.institute.trim() !== ''
     );
   };
 
@@ -196,7 +196,7 @@ const handleSubmitJob = async () => {
 
   try {
     const data = {
-      name: formData.workflowName,
+      name: formData.jobName,
       //username: formData.username,
       //email: formData.email,
       institute: formData.institute,
@@ -285,14 +285,14 @@ const handleSubmitJob = async () => {
       <Grid item xs={12} sx={{ mb: 3 }}>
         <TextField
           fullWidth
-          label="Workflow Name"
+          label="Job Name"
           required
           variant="outlined"
-          value={formData.workflowName}
-          onChange={handleInputChange('workflowName')}
-          onBlur={() => handleBlur('workflowName')}
-          error={touched.workflowName && formData.workflowName === ''}
-          helperText={touched.workflowName && formData.workflowName === '' ? 'This field is required' : ''}
+          value={formData.jobName}
+          onChange={handleInputChange('jobName')}
+          onBlur={() => handleBlur('jobName')}
+          error={touched.jobName && formData.jobName === ''}
+          helperText={touched.jobName && formData.jobName === '' ? 'This field is required' : ''}
         />
       </Grid>
 
