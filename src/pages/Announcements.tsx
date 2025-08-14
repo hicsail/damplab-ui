@@ -2,9 +2,10 @@ import { useMutation, useQuery } from '@apollo/client';
 import { CREATE_ANNOUNCEMENT } from '../gql/mutations';
 import { UPDATE_ANNOUNCEMENT } from '../gql/mutations';
 import { GET_ANNOUNCEMENTS } from '../gql/queries';
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Box, Button, TextField, Typography, Paper, Alert } from '@mui/material';
 import Markdown from '../components/ReactMarkdown';
+import { UserContext, UserContextProps } from '../contexts/UserContext';
 
 export default function Announcements() {
   const [announcement, setAnnouncement] = useState('');
@@ -17,6 +18,8 @@ export default function Announcements() {
 
   const { data, loading } = useQuery(GET_ANNOUNCEMENTS);
   const currentAnnouncement = data?.announcements?.[0] || null;
+  const userContext: UserContextProps = useContext(UserContext);
+  const token = userContext.userProps?.accessToken;
 
   const handleSubmit = async () => {
     if (!announcement.trim()) {return;}
@@ -26,6 +29,11 @@ export default function Announcements() {
           input: {
             text: announcement,
             is_displayed: true,
+          },
+        },
+        context: {
+          headers: {
+            authorization: `Bearer ${token}`,
           },
         },
       });
@@ -44,8 +52,13 @@ const handleHide = async () => {
         timestamp: currentAnnouncement.timestamp,
         is_displayed: false,
       },
-    }}
-  );
+    },
+    context: {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+  });
 };
 
   return (
