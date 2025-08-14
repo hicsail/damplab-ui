@@ -191,7 +191,6 @@ export default function FinalCheckout() {
   * Transforms workflow data and submits to backend
 */
 const handleSubmitJob = async () => {
-  if (!isFormValid()) return;
 
   const workflows = location.state?.orderSummary?.workflows || [];
 
@@ -327,9 +326,10 @@ const handleSubmitJob = async () => {
         <Grid item xs={4} sx={{ mb: 1 }}>
           <TextField
             label="Institute"
+            required
             value={formData.institute ?? ''}
             fullWidth
-            onChange={handleInputChange('institute')} // needs to be required for mutation, but currently set as optional on the UI
+            onChange={handleInputChange('institute')} 
           />
         </Grid>
       </Grid>
@@ -407,7 +407,7 @@ const handleSubmitJob = async () => {
         <Alert
           severity="info" sx={{ mb: 3, borderRadius: 2}}
         >
-          *Please note: Damplab will send the final price and payment details, along with other relevant information, to your email.
+          *Please note: The final price and payment details, along with other relevant information, will someday be sent to your email.
         </Alert>
 
         <Button

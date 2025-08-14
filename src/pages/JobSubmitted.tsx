@@ -1,6 +1,6 @@
 // /submitted path in router
 import React, { useState, useEffect } from 'react';
-import { useLocation, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { useQuery } from '@apollo/client';
 import { GET_JOB_BY_ID } from '../gql/queries';
 import { Workflow } from '../gql/graphql';
@@ -9,13 +9,7 @@ import { Box, Alert } from '@mui/material';
 import JobPDFDocument from '../components/JobPDFDocument';
 
 export default function JobSubmitted() {
-  // get job id from navigation state
-  //const location = useLocation(); //changed to useParams directly from url since useLocation is local + temp
   const { jobId } = useParams<{ jobId: string }>();
-
-  if (!jobId) { //guard in case user navigates to /submit - no ID
-    return <Alert severity="error">Invalid Job ID</Alert>;}
-
   const [value, setValue] = useState(`https://damplab.sail.codes/client_view/${jobId}`);
 
   const [workflowName, setWorkflowName] = useState('');
@@ -56,7 +50,7 @@ export default function JobSubmitted() {
   if (loading) return <p>Loading...</p>;
   if (error) {
     console.log("GraphQL error:", error);
-    return <Alert severity="error">Sorry, job not found or you don’t have access.</Alert>;
+    return <Alert severity="error">Invalid Job ID.</Alert>;
   }
   if (!data || !data.jobById) return <p>No job found.</p>;
 
