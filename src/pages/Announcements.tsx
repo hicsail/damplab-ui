@@ -31,11 +31,6 @@ export default function Announcements() {
             is_displayed: true,
           },
         },
-        context: {
-          headers: {
-            authorization: `Bearer ${token}`,
-          },
-        },
       });
       setAnnouncement(""); // Clear field after successful submission
 
@@ -53,11 +48,6 @@ const handleHide = async () => {
         is_displayed: false,
       },
     },
-    context: {
-        headers: {
-          authorization: `Bearer ${token}`,
-        },
-      },
   });
 };
 
