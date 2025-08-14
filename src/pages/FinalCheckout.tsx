@@ -1,6 +1,6 @@
 //V4
 
-import React, { SyntheticEvent, useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useMutation } from "@apollo/client";
 import { CREATE_JOB } from "../gql/mutations";
 import { CanvasContext } from "../contexts/Canvas";
@@ -80,7 +80,6 @@ export default function FinalCheckout() {
   const userProps = userContext.userProps;
   const token = userContext.userProps?.accessToken;
   //formData retrieved from auth
-  const username = userProps.idTokenParsed?.preferred_username ?? '';
   const email = userProps.idTokenParsed?.email ?? '';
   const name = userProps.idTokenParsed?.name ?? '';
 
@@ -120,6 +119,7 @@ export default function FinalCheckout() {
         showSpinner: true
         
       });
+      setSubmitting(false);
       
       // Navigate after showing the success message
       const jobId = data.createJob.id;
@@ -177,7 +177,8 @@ export default function FinalCheckout() {
 
   const isFormValid = () => {
     return (
-      formData.workflowName.trim() !== '' 
+      formData.workflowName.trim() !== '',
+      formData.institute.trim() !== ''
     );
   };
 
@@ -194,7 +195,7 @@ export default function FinalCheckout() {
   * Handles the job submission process
   * Transforms workflow data and submits to backend
 */
-const handleSubmitJob = () => {
+const handleSubmitJob = async () => {
   if (!isFormValid()) return;
   setSubmitting(true);
 
@@ -226,7 +227,7 @@ const handleSubmitJob = () => {
       showSpinner: true
     });
 
-    createJob({ 
+    await createJob({ 
       variables: { createJobInput: data },
       context: {
         headers: {
@@ -352,7 +353,7 @@ const handleSubmitJob = () => {
             fullWidth
             multiline
             minRows={4}
-            onChange={handleInputChange('notes')} // needs to be required for mutation, but currently set as optional on the UI
+            onChange={handleInputChange('notes')}
           />
         </Grid>
       </Grid>
