@@ -97,7 +97,8 @@ export default function FinalCheckout() {
   // Form data state management
   const [formData, setFormData] = useState({
     workflowName: '',
-    institute: ''
+    institute: '',
+    notes: ''
   });
 
     // GraphQL mutation for job creation
@@ -205,7 +206,7 @@ const handleSubmitJob = () => {
       //username: formData.username,
       //email: formData.email,
       institute: formData.institute,
-      notes: '', // Optional
+      notes: formData.notes, // Optional
       workflows: workflows.map((workflow: any) => ({
         name: `Workflow-${workflow.id || workflow[0]?.id}`,
         nodes: transformNodesToGQL(Array.isArray(workflow) ? workflow : [workflow]),
@@ -312,16 +313,16 @@ const handleSubmitJob = () => {
       </Typography>
 
       {/* Non-editable contact info */}
-      <Grid container spacing={0.5} direction="column">
-        <Grid item xs={12} sx={{ mb: 1 }}>
+      <Grid item xs={12} container spacing={0.5} direction="row">
+        <Grid item xs={4} sx={{ mb: 1 }}>
           <TextField
-            label="Your Name" // Will need to refactor to display Family name + Given name from user data
+            label="Your Name" 
             value={name ?? ''}
             fullWidth
             disabled
           />
         </Grid>
-        <Grid item xs={12} sx={{ mb: 1 }}>
+        <Grid item xs={4} sx={{ mb: 1 }}>
           <TextField
             label="Email"
             value={email ?? ''}
@@ -330,12 +331,12 @@ const handleSubmitJob = () => {
           />
         </Grid>
 
-        <Grid item xs={12} sx={{ mb: 1 }}>
+        <Grid item xs={4} sx={{ mb: 1 }}>
           <TextField
             label="Institute"
             value={formData.institute ?? ''}
             fullWidth
-            onChange={handleInputChange('institute')} // needs to be required for mutation, but currently set as optional
+            onChange={handleInputChange('institute')} // needs to be required for mutation, but currently set as optional on the UI
           />
         </Grid>
       </Grid>
@@ -343,8 +344,20 @@ const handleSubmitJob = () => {
       <Typography variant="h6" sx={{ mt: 2, mb: 1, textAlign: 'left', fontWeight: 500 }}>
         Additional Notes
       </Typography>
-
+      <Grid container spacing={0.5} direction="column">
+        <Grid item xs={12} sx={{ mb: 1 }}>
+          <TextField
+            label="Notes"
+            value={formData.notes ?? ''}
+            fullWidth
+            multiline
+            minRows={4}
+            onChange={handleInputChange('notes')} // needs to be required for mutation, but currently set as optional on the UI
+          />
+        </Grid>
+      </Grid>
     </Box>
+
 
       {/* Right Column - Order Summary */}
       <Box
