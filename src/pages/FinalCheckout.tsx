@@ -1,4 +1,3 @@
-
 //V4
 
 import React, { SyntheticEvent, useState, useEffect, useContext } from 'react';
@@ -86,36 +85,23 @@ export default function FinalCheckout() {
   const email = userProps.idTokenParsed?.email ?? '';
   const name = userProps.idTokenParsed?.name ?? '';
 
-
-
   const [snackbarState, setSnackbarState] = useState<SnackbarState>({
     open: false,
     message: '',
     severity: 'success'
   });
+  const [touched, setTouched] = useState({
+    workflowName: false,
+  });
+  const [redirecting, setRedirecting] = useState(false);
+  
+  // Form data state management
+  const [formData, setFormData] = useState({
+    workflowName: '',
+    institute: ''
+  });
 
-  useEffect(() => {
-    // Guard: redirect if didn't come from previous page/state parsed
-    console.log('Location state:', location.state);
-    if (!location.state?.orderSummary) {
-      navigate("/checkout", { replace: true });
-    }
-  }, [location, navigate]);
-
-  if (!location.state?.orderSummary) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        height="100vh"
-      >
-        <CircularProgress />
-      </Box>
-    );
-}
-
-  // GraphQL mutation for job creation
+    // GraphQL mutation for job creation
   const [createJob] = useMutation(CREATE_JOB, {
     onCompleted: (data) => {
       // Store job details in localStorage for persistence
@@ -140,7 +126,7 @@ export default function FinalCheckout() {
 
       setTimeout(() => {
         navigate(`/jobs/${jobId}`);
-      }, 2000);
+      }, 1000);
     },
     onError: (error: any) => {
       console.error("Error creating job:", error);
@@ -152,6 +138,29 @@ export default function FinalCheckout() {
       });
     },
   });
+
+  useEffect(() => {
+    // Guard: redirect if didn't come from previous page/state parsed
+    if (!location.state?.orderSummary) {
+      setRedirecting(true);
+      setTimeout(() => {
+        navigate("/checkout", { replace: true }); 
+      }, 500);
+    }
+  }, [location, navigate]);
+
+  if (redirecting) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        height="100vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   const handleSnackbarClose = (_event?: React.SyntheticEvent | Event, reason?: string) => {
     if (reason === 'clickaway') {
@@ -165,20 +174,17 @@ export default function FinalCheckout() {
   // Extract workflow information from location state
   const { workflows, workflowCosts, totalCost, serviceDetails } = location.state?.orderSummary || {};
 
-  // Form data state management
-  const [formData, setFormData] = useState({
-    workflowName: '',
-    institute: ''
-  });
-
 
   const isFormValid = () => {
     return (
       formData.workflowName.trim() !== '' 
     );
   };
-  
 
+  // Handler to mark a field as touched https://formik.org/docs/tutorial
+  const handleBlur = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
 
   const handleInputChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
@@ -292,8 +298,9 @@ const handleSubmitJob = () => {
           variant="outlined"
           value={formData.workflowName}
           onChange={handleInputChange('workflowName')}
-          error={formData.workflowName === ''}
-          helperText={tabValue === 1 && formData.workflowName === '' ? 'This field is required' : ''}
+          onBlur={() => handleBlur('workflowName')}
+          error={touched.workflowName && formData.workflowName === ''}
+          helperText={touched.workflowName && formData.workflowName === '' ? 'This field is required' : ''}
         />
       </Grid>
 
@@ -302,7 +309,7 @@ const handleSubmitJob = () => {
       </Typography>
       
       <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary', textAlign: 'left' }}>
-        Please verify your contact details below. These are read-only.
+        Please verify your contact details below.
       </Typography>
 
       {/* Non-editable contact info */}
@@ -310,7 +317,7 @@ const handleSubmitJob = () => {
         <Grid item xs={12} sx={{ mb: 1 }}>
           <TextField
             label="Your Name" // Will need to refactor to display Family name + Given name from user data
-            value={username ?? ''}
+            value={name ?? ''}
             fullWidth
             disabled
           />
@@ -329,9 +336,8 @@ const handleSubmitJob = () => {
             label="Institute"
             value={formData.institute ?? ''}
             fullWidth
-            disabled //can change
+            onChange={handleInputChange('institute')} // needs to be required for mutation, but currently set as optional
           />
-          <input type="hidden" name="institute" value={formData.institute ?? ''} />
         </Grid>
 
       </Grid>
@@ -392,7 +398,7 @@ const handleSubmitJob = () => {
         <Alert
           severity="info" sx={{ mb: 3, borderRadius: 2}}
         >
-          *Please note: The final price and payment details, along with other relevant information, will be sent to your email.
+          *Please note: Damplab will send the final price and payment details, along with other relevant information, to your email.
         </Alert>
 
         <Button

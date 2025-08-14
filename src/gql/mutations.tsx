@@ -16,7 +16,6 @@ export const CREATE_JOB = gql`
         createJob(createJobInput: $createJobInput) {
             id
             name
-            institute
         }
     }
 `;
