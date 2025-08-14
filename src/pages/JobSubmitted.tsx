@@ -39,7 +39,7 @@ export default function JobSubmitted() {
       setJobState(data.jobById.state);
       setJobTime(data.jobById.submitted);
       setJobUsername(data.jobById.username);
-      setJobInstitution(data.jobById.institute);
+      setJobInstitution(data.jobById.institute); 
       setJobEmail(data.jobById.email);
       setJobNotes(data.jobById.notes);
       setWorkflows(data.jobById.workflows);

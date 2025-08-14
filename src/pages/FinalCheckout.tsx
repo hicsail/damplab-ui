@@ -75,7 +75,6 @@ export default function FinalCheckout() {
   const val = useContext(CanvasContext);
   const location = useLocation();
   const navigate = useNavigate();
-  const [tabValue, setTabValue] = React.useState(0);
   const [submitting, setSubmitting] = useState(false);
   const userContext: UserContextProps = useContext(UserContext);
   const userProps = userContext.userProps;
@@ -145,7 +144,7 @@ export default function FinalCheckout() {
       setRedirecting(true);
       setTimeout(() => {
         navigate("/checkout", { replace: true }); 
-      }, 500);
+      }, 1500);
     }
   }, [location, navigate]);
 
@@ -339,8 +338,12 @@ const handleSubmitJob = () => {
             onChange={handleInputChange('institute')} // needs to be required for mutation, but currently set as optional
           />
         </Grid>
-
       </Grid>
+
+      <Typography variant="h6" sx={{ mt: 2, mb: 1, textAlign: 'left', fontWeight: 500 }}>
+        Additional Notes
+      </Typography>
+
     </Box>
 
       {/* Right Column - Order Summary */}
