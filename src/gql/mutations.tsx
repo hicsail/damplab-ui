@@ -84,9 +84,22 @@ export const UPDATE_ANNOUNCEMENT = gql`
   }
 `;
 
+export const UPDATE_BUNDLE = gql `
+  mutation UpdateBundle($bundle: ID!, $changes: BundleChange!) {
+    updateBundle(bundle: $bundle, changes: $changes){
+        id
+        label
+        icon
+        services{
+            id
+            name}
+    } 
+  }
+`
+
 export const CREATE_BUNDLE = gql `
   mutation CreateBundle($input: CreateBundleInput!) {
-    createbundle(input: $input) {
+    createBundle(input: $input) {
         id
         label
         icon
