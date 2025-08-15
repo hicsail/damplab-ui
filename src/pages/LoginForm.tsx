@@ -12,7 +12,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import  AnnouncementBox  from '../components/AnnouncementBox';
 
-function MenuButton({onClick, navigateTo, children}) {
+function MenuButton({onClick, navigateTo, children} : any) {
     const navigate = useNavigate();
     return (
         <Button variant="contained" onClick={onClick ? onClick : () => navigate(navigateTo)}  sx={{ m: 2, width: '210px', textTransform: 'none' }}>
@@ -84,6 +84,7 @@ export default function LoginForm() {
           <MenuButton navigateTo='/dashboard'><ViewStreamIcon />Dashboard<br />(See Submitted Jobs)</MenuButton>
           <MenuButton navigateTo='/edit'><EditIcon />Admin Edit<br />(Edit Services)</MenuButton>
           <MenuButton navigateTo='/release_notes'><FormatListBulletedIcon />Release Notes<br />(+ Other Admin Info)</MenuButton>
+          <MenuButton navigateTo='/data_translation'><EditIcon />Data Translation<br />(Abbott to eLabs formatting)</MenuButton>
           <MenuButton navigateTo='/edit_announcements'><CampaignIcon />Add Announcement<br />(+ Edit)</MenuButton>
         </>
       )}

@@ -26,6 +26,7 @@ export default [
         route("/edit", "./pages/AdminEdit.tsx"),
         route("/release_notes", "./pages/ReleaseNotes.tsx"),
         route("/edit_announcements", "./pages/Announcements.tsx"),
+        route("/data_translation", "./pages/DataTranslation.tsx"),
 
         /* Old comments from pre-React-Router-migration App.tsx: */
         /* <Route path = "/client_view/:id" element = {<PrivateRouteAdmin> <Tracking /> </PrivateRouteAdmin>} /> */
