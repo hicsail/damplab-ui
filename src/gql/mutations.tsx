@@ -83,3 +83,36 @@ export const UPDATE_ANNOUNCEMENT = gql`
     }
   }
 `;
+
+export const UPDATE_BUNDLE = gql `
+  mutation UpdateBundle($bundle: ID!, $changes: BundleChange!) {
+    updateBundle(bundle: $bundle, changes: $changes){
+        id
+        label
+        icon
+        services{
+            id
+            name}
+    } 
+  }
+`
+
+export const CREATE_BUNDLE = gql `
+  mutation CreateBundle($input: CreateBundleInput!) {
+    createBundle(input: $input) {
+        id
+        label
+        icon
+        services {
+            id
+            name
+        }
+    }
+  }
+`;
+
+export const DELETE_BUNDLE = gql `
+  mutation DeleteBundle($id: ID!) {
+    deleteBundle(id: $id)
+  }
+`;
