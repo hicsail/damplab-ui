@@ -12,7 +12,7 @@ import {
 } from '@mui/x-data-grid';
 
 // Import custom hooks
-import { useFileUpload, useTemplateManager, useDataManager } from './hooks';
+import { useFileUpload, useTemplateManagerWithBackend, useDataManager } from './hooks';
 
 // Import components
 import FileUploadSection from './FileUploadSection';
@@ -48,7 +48,14 @@ export default function DataTranslation() {
 
   // Custom hooks
   const { isProcessing, fileInputRef, handleFileUpload, triggerFileInput } = useFileUpload();
-  const { savedTemplates, saveTemplate, applyTemplate, deleteTemplate } = useTemplateManager();
+  const { 
+    savedTemplates, 
+    saveTemplate, 
+    applyTemplate, 
+    deleteTemplate, 
+    loading: templatesLoading,
+    useLocalStorage 
+  } = useTemplateManagerWithBackend();
   const {
     fileData,
     setFileData,
@@ -184,6 +191,8 @@ export default function DataTranslation() {
         fileInputRef={fileInputRef}
         isProcessing={isProcessing}
         savedTemplates={savedTemplates}
+        templatesLoading={templatesLoading}
+        useLocalStorage={useLocalStorage}
         onFileUpload={handleFileUploadEvent}
         onTriggerFileInput={triggerFileInput}
         onOpenTemplateDialog={() => setTemplateDialog(true)}

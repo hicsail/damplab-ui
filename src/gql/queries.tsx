@@ -228,3 +228,58 @@ export const GET_ANNOUNCEMENTS = gql`
     }
   }
 `;
+
+// Template queries
+export const GET_TEMPLATES = gql`
+  query GetTemplates {
+    templates {
+      id
+      name
+      description
+      createdAt
+      columnMapping {
+        field
+        headerName
+        type
+        width
+        order
+      }
+    }
+  }
+`;
+
+export const GET_TEMPLATE_BY_ID = gql`
+  query GetTemplateById($id: ID!) {
+    template(id: $id) {
+      id
+      name
+      description
+      createdAt
+      columnMapping {
+        field
+        headerName
+        type
+        width
+        order
+      }
+    }
+  }
+`;
+
+export const GET_TEMPLATE_BY_NAME = gql`
+  query GetTemplateByName($name: String!) {
+    templateByName(name: $name) {
+      id
+      name
+      description
+      createdAt
+      columnMapping {
+        field
+        headerName
+        type
+        width
+        order
+      }
+    }
+  }
+`;

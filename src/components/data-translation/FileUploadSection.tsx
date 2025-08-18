@@ -16,6 +16,8 @@ interface FileUploadSectionProps {
   fileInputRef: React.RefObject<HTMLInputElement>;
   isProcessing: boolean;
   savedTemplates: Template[];
+  templatesLoading?: boolean;
+  useLocalStorage?: boolean;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onTriggerFileInput: () => void;
   onOpenTemplateDialog: () => void;
@@ -25,6 +27,8 @@ export default function FileUploadSection({
   fileInputRef,
   isProcessing,
   savedTemplates,
+  templatesLoading = false,
+  useLocalStorage = false,
   onFileUpload,
   onTriggerFileInput,
   onOpenTemplateDialog
@@ -57,20 +61,33 @@ export default function FileUploadSection({
           Supported formats: .xlsx, .xls, .csv
         </Typography>
         
-        {savedTemplates.length > 0 && (
+        {(savedTemplates.length > 0 || templatesLoading) && (
           <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
-              📋 You have {savedTemplates.length} saved template{savedTemplates.length > 1 ? 's' : ''}
-            </Typography>
-            <Button
-              size="small"
-              variant="text"
-              startIcon={<BookmarkIcon />}
-              onClick={onOpenTemplateDialog}
-              sx={{ textTransform: 'none' }}
-            >
-              Apply template after upload
-            </Button>
+            {templatesLoading ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                🔄 Loading templates...
+              </Typography>
+            ) : (
+              <>
+                <Typography variant="body2" color="primary" sx={{ mb: 1 }}>
+                  📋 You have {savedTemplates.length} saved template{savedTemplates.length > 1 ? 's' : ''}
+                  {useLocalStorage && (
+                    <Typography component="span" variant="body2" color="warning.main" sx={{ ml: 1 }}>
+                      (📱 stored locally)
+                    </Typography>
+                  )}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="text"
+                  startIcon={<BookmarkIcon />}
+                  onClick={onOpenTemplateDialog}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Apply template after upload
+                </Button>
+              </>
+            )}
           </Box>
         )}
       </Box>

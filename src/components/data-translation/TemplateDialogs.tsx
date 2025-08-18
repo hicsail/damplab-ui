@@ -152,15 +152,12 @@ export default function TemplateDialogs({
                     <ListItemText
                       primary={template.name}
                       secondary={
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">
-                            {template.description || 'No description'}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Created: {new Date(template.createdAt).toLocaleDateString()} • 
-                            {template.columnMapping.length} columns
-                          </Typography>
-                        </Box>
+                        <>
+                          {template.description || 'No description'}
+                          <br />
+                          Created: {new Date(template.createdAt).toLocaleDateString()} • 
+                          {template.columnMapping.length} columns
+                        </>
                       }
                     />
                     <ListItemSecondaryAction>

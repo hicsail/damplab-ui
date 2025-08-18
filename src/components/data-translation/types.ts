@@ -12,18 +12,34 @@ export interface FileData {
   rows: GridRowsProp;
 }
 
+export interface ColumnMapping {
+  field: string;
+  headerName: string;
+  type: string;
+  width: number;
+  order: number;
+}
+
 export interface Template {
   id: string;
   name: string;
   description?: string;
-  createdAt: string;
-  columnMapping: {
-    field: string;
-    headerName: string;
-    type: string;
-    width: number;
-    order: number;
-  }[];
+  createdAt: string | Date;
+  columnMapping: ColumnMapping[];
+}
+
+// Backend input types
+export interface CreateTemplateInput {
+  name: string;
+  description?: string;
+  columnMapping: ColumnMapping[];
+}
+
+export interface UpdateTemplateInput {
+  id: string;
+  name?: string;
+  description?: string;
+  columnMapping?: ColumnMapping[];
 }
 
 export type DataType = 'number' | 'date' | 'string';

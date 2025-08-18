@@ -136,7 +136,7 @@ export const generateCopyData = (fileData: FileData, includeHeaders: boolean): s
  */
 export const applyTemplateToData = (fileData: FileData, template: Template): FileData => {
   // Create a mapping of original data to template columns, preserving order
-  const templateColumns = template.columnMapping
+  const templateColumns = [...template.columnMapping]
     .sort((a, b) => a.order - b.order)
     .map(mapping => ({
       field: mapping.field,
