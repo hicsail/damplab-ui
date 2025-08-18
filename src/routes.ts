@@ -10,7 +10,7 @@ export default [
     route("/login", "./pages/LoginForm.tsx"),
 
     layout("./layouts/PrivateRouteAuthed.tsx", [
-        index("./pages/Home.tsx", { id: "index" }),
+        index("./pages/Home.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),

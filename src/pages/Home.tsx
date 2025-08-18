@@ -19,9 +19,8 @@ function MenuButton({ onClick, navigateTo, children }) {
     <Button
       variant="contained"
       onClick={onClick ? onClick : () => navigate(navigateTo)}
-      sx={{ mt: 0, mb: 2, ml: 2, mr: 2, width: '210px', textTransform: 'none',
-        '&:not(:first-of-type)': {
-          mt: 2, // top margin for all buttons after the first
+      sx={{ m:2, width: '210px', textTransform: 'none', '&:first-of-type': {
+          mt: 0, // custom top margin of none just for the first
         },
       }}
     >
