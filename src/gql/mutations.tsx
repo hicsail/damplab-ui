@@ -84,29 +84,40 @@ export const UPDATE_ANNOUNCEMENT = gql`
   }
 `;
 
-export const UPDATE_BUNDLE = gql `
+export const UPDATE_BUNDLE = gql`
   mutation UpdateBundle($bundle: ID!, $changes: BundleChange!) {
-    updateBundle(bundle: $bundle, changes: $changes){
+    updateBundle(bundle: $bundle, changes: $changes) {
+      id
+      label
+      icon
+      nodes {
         id
         label
-        icon
-        services{
-            id
-            name}
-    } 
+      }
+      edges {
+        id
+        source
+        target
+      }
+    }
   }
-`
+`;
 
-export const CREATE_BUNDLE = gql `
+export const CREATE_BUNDLE = gql`
   mutation CreateBundle($input: CreateBundleInput!) {
     createBundle(input: $input) {
+      id
+      label
+      icon
+      nodes {
         id
         label
-        icon
-        services {
-            id
-            name
-        }
+      }
+      edges {
+        id
+        source
+        target
+      }
     }
   }
 `;
