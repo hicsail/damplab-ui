@@ -164,7 +164,7 @@ export const EditBundlesTable: React.FC = () => {
     {
       field: 'label',
       headerName: 'Bundle Name',
-      width: 300,
+      width: 500,
       editable: true
     },
     {
@@ -173,7 +173,6 @@ export const EditBundlesTable: React.FC = () => {
       width: 400,
       renderCell: (params: GridRenderCellParams) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <ServiceList services={params.row.services} />
           <IconButton
             size="small"
             onClick={() => handleEditBundleServices(params.row)}
@@ -182,6 +181,7 @@ export const EditBundlesTable: React.FC = () => {
           >
             <AccountTreeIcon fontSize="small" />
           </IconButton>
+          <ServiceList services={params.row.services} />
         </div>
       ),
       renderEditCell: (params: GridRenderEditCellParams) => (
@@ -196,6 +196,7 @@ export const EditBundlesTable: React.FC = () => {
       field: 'serviceCount',
       headerName: 'Service Count',
       width: 120,
+      align: 'center',
       renderCell: (params: GridRenderCellParams) => (
         <span>{params.row.services?.length || 0}</span>
       )
