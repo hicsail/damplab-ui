@@ -61,28 +61,26 @@ export default function Root() {
   const [hazards, setHazards] = useState(Array<string>);
 
   const userContext = useContext(UserContext);
-  const token = userContext.userProps?.accessToken;
 
   // Create Apollo Client with auth link that uses token from context
-  const client = useMemo(() => {
-    const httpLink = createHttpLink({
-      uri: import.meta.env.VITE_BACKEND,
-    });
+  const httpLink = createHttpLink({
+    uri: import.meta.env.VITE_BACKEND,
+  });
 
-    const authLink = setContext((_, { headers }) => {
-      return {
-        headers: {
-          ...headers,
-          authorization: token ? `Bearer ${token}` : "",
-        },
-      };
-    });
+  const authLink = setContext(async (_, { headers }) => {
+    const token = await userContext.userProps?.getAccessToken();
+    return {
+      headers: {
+        ...headers,
+        authorization: token ? `Bearer ${token}` : "",
+      },
+    };
+  });
 
-    return new ApolloClient({
-      link: authLink.concat(httpLink),
-      cache: new InMemoryCache(),
-    });
-  }, [token]);  
+  const client = new ApolloClient({
+    link: authLink.concat(httpLink),
+    cache: new InMemoryCache(),
+  });
 
   // initial load of services and bundles
   useEffect(() => {
