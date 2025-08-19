@@ -33,7 +33,7 @@
     "lint:full": "eslint src --ext .ts,.tsx",
     "lint": "eslint src --ext .ts,.tsx -f ./scripts/eslintFormatter.js",
     "lint:fix": "eslint src --ext .ts,.tsx --fix -f ./scripts/eslintFormatter.js",
-    "format": "node --loader ts-node/esm scripts/prettier-formatter.ts 'src/**/*.{ts,tsx}'",
+    "format": "prettier --check 'src/**/*.{ts,tsx}'",
     "format:fix": "prettier --write 'src/**/*.{ts,tsx}'"
   },
   "eslintConfig": {
@@ -69,7 +69,6 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "prettier": "^3.6.2",
-    "ts-node": "^10.9.2",
     "typescript": "^5.9.2",
     "vite": "^6.2.6"
   }
