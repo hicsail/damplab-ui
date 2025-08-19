@@ -15,8 +15,8 @@ export default function AnnouncementBox() {
   return (
     <Stack
       direction="column"
-      spacing={1} // small gap between header and content
-      sx={{ml: 4, maxWidth: { xs: '100%', sm: 400 }, alignSelf: 'flex-start' }}
+      spacing={0.5} // small gap between header and content
+      sx={{maxWidth: { xs: '100%', sm: 400 }, alignSelf: 'flex-start' }}
     >
       {/* Header Box */}
       <Box
