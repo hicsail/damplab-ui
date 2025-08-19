@@ -18,8 +18,8 @@ import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
 import { ServiceSelection } from './ServiceSelection';
-import { Button, Snackbar, Alert, IconButton } from '@mui/material';
-import { AccountTree as AccountTreeIcon } from '@mui/icons-material';
+import { Snackbar, Alert, IconButton } from '@mui/material';
+import DashboardCustomizeIcon from '@mui/icons-material/DashboardCustomize';
 import { GridToolBar } from './GridToolBar';
 import { BundleCanvasPopup } from './BundleCanvasPopup';
 
@@ -172,16 +172,17 @@ export const EditBundlesTable: React.FC = () => {
       headerName: 'Services',
       width: 400,
       renderCell: (params: GridRenderCellParams) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+          <div style={{ flexGrow: 1, minWidth: 0 }}>
+            <ServiceList services={params.row.services} />
+          </div>
           <IconButton
-            size="small"
             onClick={() => handleEditBundleServices(params.row)}
             title="Edit services in canvas"
-            sx={{ ml: 1 }}
+            sx={{ color: "black" }}
           >
-            <AccountTreeIcon fontSize="small" />
+            <DashboardCustomizeIcon/>
           </IconButton>
-          <ServiceList services={params.row.services} />
         </div>
       ),
       renderEditCell: (params: GridRenderEditCellParams) => (
