@@ -52,26 +52,38 @@ export const EditBundlesTable: React.FC = () => {
       const changes = {
         label: updatedBundle.label,
         icon: updatedBundle.icon || null,
-        services: updatedBundle.services?.map((s: any) => s.id) || []
+        nodes: updatedBundle.nodes?.map((n: any) => ({
+          id: n.id,
+          serviceId: n.serviceId,
+          label: n.label || 'Unnamed Node',
+        })),
+        edges: updatedBundle.edges?.map((e: any) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          reactEdge: JSON.stringify(e.reactEdge),
+        })),
       };
+
+      console.log(updatedBundle.id, changes)
 
       await client.mutate({
         mutation: UPDATE_BUNDLE,
         variables: {
           bundle: updatedBundle.id,
-          changes
-        }
+          changes,
+        },
       });
 
+      // Update the local state for immediate UI update
       setRows((prev) =>
         prev.map((row) =>
           row.id === updatedBundle.id ? { ...row, ...updatedBundle } : row
         )
       );
-
     } catch (err) {
       console.error('Error updating bundle:', err);
-      setErrorMessage('Failed to update bundle services');
+      setErrorMessage('Failed to update bundle');
     }
   };
 
@@ -94,7 +106,6 @@ export const EditBundlesTable: React.FC = () => {
     const changes = {
       label: newRow.label,
       icon: newRow.icon || null,
-      services: newRow.services?.map((s: any) => s.id) || []
     };
 
     try {
@@ -119,13 +130,14 @@ export const EditBundlesTable: React.FC = () => {
     const input = {
       label: newRow.label || '',
       icon: newRow.icon || null,
-      services: newRow.services?.map((s: any) => s.id) || []
     };
+
+    console.log("CreateBundle input:", JSON.stringify({ input }, null, 2));
 
     try {
       const result = await client.mutate({
         mutation: CREATE_BUNDLE,
-        variables: { input }
+        variables: { input },
       });
 
       setRows((prev) =>
@@ -258,9 +270,14 @@ export const EditBundlesTable: React.FC = () => {
         onClose={() => setPopupOpen(false)}
         bundle={selectedBundle}
         allServices={services}
-        onSave={(updatedServices) => {
+        onSave={(result) => { // result has { nodes, edges }
+          console.log(result)
           if (selectedBundle) {
-            const updatedBundle = { ...selectedBundle, services: updatedServices };
+            const updatedBundle = { 
+              ...selectedBundle, 
+              nodes: result.nodes,   // save updated nodes
+              edges: result.edges,   // save updated edges
+            };
             handleUpdateBundle(updatedBundle);
           }
           setPopupOpen(false);

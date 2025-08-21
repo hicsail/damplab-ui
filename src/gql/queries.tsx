@@ -22,18 +22,29 @@ export const GET_SERVICES = gql`
 
 export const GET_BUNDLES = gql`
   query GetBundles {
-    bundles {
+    bundles{
       id
       label
-      icon
       nodes {
+        _id
         id
         label
+        service {
+          name
+        }
       }
       edges {
         id
-        source
-        target
+        source {
+          _id
+          id
+          label
+        }
+        target {
+          _id
+          id
+          label
+        }
       }
     }
   }

@@ -32,10 +32,14 @@ type BundleCanvasPopupProps = {
   bundle: {
     id: string;
     label: string;
-    services: any[];
+    nodes: { id: string; label: string }[];
+    edges?: { id: string; source: string; target: string }[];
   } | null;
   allServices: any[];
-  onSave: (updatedServices: any[]) => void;
+  onSave: (result: { 
+    nodes: { id: string; label: string }[];
+    edges: { id: string; source: string; target: string }[];
+  }) => void;
 };
 
 const BundleCanvasContent: React.FC<{
@@ -141,25 +145,31 @@ const BundleCanvasContent: React.FC<{
   };
 
   const handleSave = () => {
-    const updatedServices = nodes.map((node) => {
-      // look up original service to keep fields not editable on Canvas
-      // Edge case: if allServices has no services, originalService = {}, only keep fields set
-      const originalService = allServices.find(s => s.id === node.data.serviceId) || {};
-      
-      return {
-        ...originalService,
-        id: node.data.serviceId,
-        name: node.data.label,
-        icon: node.data.icon,
-        price: node.data.price,
-        description: node.data.description,
-        parameters: node.data.parameters,
-        allowedConnections: node.data.allowedConnections,
-        paramGroups: node.data.paramGroups,
-      };
+    const updatedNodes = nodes.map((node) => ({
+      id: node.id,
+      serviceId: node.data.serviceId,
+      label: node.data.label,
+    }));
+
+    const updatedEdges = edges.map((edge) => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      reactEdge: {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        animated: edge.animated || false,
+        style: edge.style || {},
+        label: edge.label || '',
+      }
+    }));
+
+    onSave({
+      nodes: updatedNodes,
+      edges: updatedEdges,
     });
-    
-    onSave(updatedServices);
   };
 
   const handleClose = () => {
