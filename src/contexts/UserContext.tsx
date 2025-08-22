@@ -44,7 +44,11 @@ async function getAccessToken() : Promise<string | undefined> {
 }
 
 
-async function initKeycloak(): Promise<UserProps> {
+async function initKeycloak(): Promise<UserProps | null> {
+  // Do not attempt to initialize during SSR
+  if (typeof window === 'undefined') {
+    return null;
+  }
   try {
     await keycloak.init({
       onLoad: "check-sso",
