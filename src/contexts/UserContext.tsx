@@ -12,8 +12,8 @@ export interface UserProps {
   isExternalCustomer?: boolean;
   subject?: string;
   roles?: string[];
-  // accessToken is passed to the backend in graphql queries.
-  accessToken?: object;
+  // access token is refreshed as necessary and passed to the backend in graphql queries.
+  getAccessToken: () => Promise<string | undefined>;
   idTokenParsed?: TokenClaims;
 }
 export interface TokenClaims {
@@ -31,7 +31,24 @@ const keycloak = new Keycloak({
   clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID,
 });
 
-async function initKeycloak(): Promise<UserProps> {
+async function getAccessToken() : Promise<string | undefined> {
+  if (!keycloak.authenticated) {
+    return undefined;
+  }
+  try {
+    await keycloak.updateToken(30);
+  } catch (error) {
+    console.error(`Failed to refresh token: ${error.name}: ${error.message}`);
+  }
+  return keycloak.token;
+}
+
+
+async function initKeycloak(): Promise<UserProps | null> {
+  // Do not attempt to initialize during SSR
+  if (typeof window === 'undefined') {
+    return null;
+  }
   try {
     await keycloak.init({
       onLoad: "check-sso",
@@ -44,7 +61,7 @@ async function initKeycloak(): Promise<UserProps> {
       isExternalCustomer: keycloak.realmAccess?.roles.includes("external-customer"),
       subject: keycloak.subject,
       roles: keycloak.realmAccess,
-      accessToken: keycloak.token,
+      getAccessToken: getAccessToken,
       idTokenParsed: keycloak.idTokenParsed,
     } as UserProps;
   } catch (error) {
