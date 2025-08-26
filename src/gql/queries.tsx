@@ -30,6 +30,7 @@ export const GET_BUNDLES = gql`
         id
         label
         service {
+          id
           name
         }
       }

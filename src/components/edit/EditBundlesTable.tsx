@@ -38,9 +38,13 @@ export const EditBundlesTable: React.FC = () => {
   const [popupOpen, setPopupOpen] = useState(false);
   const [selectedBundle, setSelectedBundle] = useState<any>(null);
 
-  useEffect(() => {
-    setRows(bundles);
-  }, [bundles]);
+useEffect(() => {
+  const rowsWithServices = bundles.map((bundle) => ({
+    ...bundle,
+    services: bundle.nodes?.map((node: any) => node.service).filter(Boolean)
+  }));
+  setRows(rowsWithServices);
+}, [bundles]);
 
   const handleEditBundleServices = (bundle: any) => {
     setSelectedBundle(bundle);
@@ -49,36 +53,62 @@ export const EditBundlesTable: React.FC = () => {
 
   const handleUpdateBundle = async (updatedBundle: any) => {
     try {
+      // Map nodes from canvas to backend format
+      const nodeChanges = updatedBundle.nodes.map((n: any) => ({
+        id: n.id,
+        label: n.label,
+        serviceId: n.serviceId,
+      }));
+
+      // Map canvas IDs to backend node IDs for edges
+      const byServiceId: Record<string, string> = {};
+        updatedBundle.nodes.forEach((n: any) => {
+          if (n.id) byServiceId[n.serviceId] = n.id;
+        });
+      
+      const edgeChanges = updatedBundle.edges
+        ?.map((e: any) => {
+          const sourceDb = byServiceId[e.sourceCanvasId];
+          const targetDb = byServiceId[e.targetCanvasId];
+          if (!sourceDb || !targetDb) return null; // skip edges with missing nodes
+          return {
+            id: e.id || null,
+            source: sourceDb,
+            target: targetDb,
+            reactEdge: JSON.stringify({ ...e.reactEdge, source: sourceDb, target: targetDb }),
+          };
+        })
+        .filter(Boolean);
+
       const changes = {
         label: updatedBundle.label,
         icon: updatedBundle.icon || null,
-        nodes: updatedBundle.nodes?.map((n: any) => ({
-          id: n.id,
-          serviceId: n.serviceId,
-          label: n.label || 'Unnamed Node',
-        })),
-        edges: updatedBundle.edges?.map((e: any) => ({
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          reactEdge: JSON.stringify(e.reactEdge),
-        })),
+        nodes: nodeChanges,
+        edges: edgeChanges || [],
       };
 
-      console.log(updatedBundle.id, changes)
-
-      await client.mutate({
+      const { data } = await client.mutate({
         mutation: UPDATE_BUNDLE,
         variables: {
           bundle: updatedBundle.id,
           changes,
         },
       });
+      const savedBundle = data.updateBundle;
 
-      // Update the local state for immediate UI update
+
       setRows((prev) =>
         prev.map((row) =>
-          row.id === updatedBundle.id ? { ...row, ...updatedBundle } : row
+          row.id === updatedBundle.id
+            ? {
+                ...row,
+                label: savedBundle.label,
+                icon: savedBundle.icon,
+                nodes: savedBundle.nodes,
+                edges: savedBundle.edges,
+                services: savedBundle.nodes?.map((n: any) => n.service).filter(Boolean),
+              }
+            : row
         )
       );
     } catch (err) {

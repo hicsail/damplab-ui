@@ -25,70 +25,71 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { NodeData } from '../../types/CanvasTypes';
 import { createNodeObject } from '../../controllers/ReactFlowEvents';
+import { Bundle, BundleNode, BundleEdge } from '../../gql/graphql';
+import { transformEdgesToGQL } from '../../controllers/GraphHelpers';
 
 type BundleCanvasPopupProps = {
   open: boolean;
-  onClose: () => void;
-  bundle: {
-    id: string;
-    label: string;
-    nodes: { id: string; label: string }[];
-    edges?: { id: string; source: string; target: string }[];
-  } | null;
+  onClose: () => void;  
+  bundle: Bundle;
   allServices: any[];
-  onSave: (result: { 
-    nodes: { id: string; label: string }[];
-    edges: { id: string; source: string; target: string }[];
-  }) => void;
+  onSave: (result: { nodes: BundleNode[]; edges: BundleEdge[] }) => void;
 };
 
 const BundleCanvasContent: React.FC<{
   bundle: NonNullable<BundleCanvasPopupProps['bundle']>;
   allServices: any[];
-  onSave: (services: any[]) => void;
+  onSave:  (bundle: { nodes: BundleNode[]; edges: BundleEdge[] }) => void;
   onClose: () => void;
 }> = ({ bundle, allServices, onSave, onClose }) => {
   const [nodes, setNodes] = useState<Node<NodeData>[]>([]);
   const [edges, setEdges] = useState<any[]>([]);
-  const [hasChanges, setHasChanges] = useState(false); // Implement this feat in case admin closes before saving
+  const [hasChanges, setHasChanges] = useState(false); // ImplemeserviceIdnt this feat in case admin closes before saving
   const { fitView } = useReactFlow();
 
 
   useEffect(() => {
-    if (bundle && bundle.services) {
-      const initialNodes = bundle.services.map((service, index) => {
-        // Grid layout like the MainFLow Canvas
-        const cols = 4;
-        const nodeSpacing = { x: 200, y: 150 };
-        const position = { 
-          x: (index % cols) * nodeSpacing.x + 50, 
-          y: Math.floor(index / cols) * nodeSpacing.y + 50 
-        };
-        
-        const nodeId = service.id || `service-${index}`;
-        const data: NodeData = {
-          id: nodeId,
-          label: service.name || service.label || 'Unnamed Service',
-          serviceId: service.id,
-          icon: service.icon,
-          price: service.price,
-          description: service.description,
-          parameters: service.parameters || [],
-          allowedConnections: service.allowedConnections || [],
-          formData: [],
-          paramGroups: service.paramGroups || [],
-          additionalInstructions: '',
-        };
-        
-        return createNodeObject(nodeId, data.label, 'selectorNode', position, data);
-      });
-      setNodes(initialNodes);
-      setEdges([]);
-      setHasChanges(false);
-      
-      setTimeout(() => fitView({ padding: 0.1 }), 100); // Fit view after nodes are rendered
-    }
-    }, [bundle, fitView]);
+    if (!bundle) return;
+
+    const getRandomPosition = () => ({
+      x: Math.random() * 300 + 50,
+      y: Math.random() * 200 + 50,
+    });
+
+    // Creating nodes with separate canvas IDs
+    const nodesFromBundle: Node<NodeData>[] = bundle.nodes.map((node, index) => {
+      const canvasId = `canvas-${node.id}-${Date.now()}-${index}`;
+      const position = getRandomPosition();
+
+      console.log(node)
+      const data: NodeData = {
+        id: node.id,
+        label: node.label || 'Unnamed Service',
+        serviceId: node.service?.id, 
+      };
+
+      return createNodeObject(canvasId, data.label, 'selectorNode', position, data);
+    });
+
+    const edgesFromBundle = bundle.edges?.map(e => {
+      const sourceCanvas = `canvas-${e.source}`;
+      const targetCanvas = `canvas-${e.target}`;
+
+      return {
+        ...e,
+        source: sourceCanvas,
+        target: targetCanvas,
+        reactEdge: e.reactEdge || { id: e.id, source: sourceCanvas, target: targetCanvas },
+      };
+    }) || [];
+
+    setNodes(nodesFromBundle);
+    setEdges(edgesFromBundle);
+    setHasChanges(false);
+
+    setTimeout(() => fitView({ padding: 0.1 }), 100);
+  }, [bundle, fitView]);
+
 
     const onNodesChange = useCallback((changes: NodeChange[]) => {
         setNodes((nds) => applyNodeChanges(changes, nds));
@@ -107,32 +108,22 @@ const BundleCanvasContent: React.FC<{
 
 
     const addServiceToCanvas = (service: any) => {
-        const existingNode = nodes.find(node => node.data.serviceId === service.id);
-        if (existingNode) return;
+      const exists = nodes.find(n => n.data.serviceId === service.id);
+      if (exists) return;
 
-        const newNodeId = `service-${service.id}-${Date.now()}`; // Random spawn pos so services aren't on top of each other
-        const position = { 
-            x: Math.random() * 300 + 50, 
-            y: Math.random() * 200 + 50 
-        };
+      const newNodeId = `service-${service.id}-${Date.now()}`; // Only for ReactFlow ID
+      const backendNodeId = null;                              // Assigned by backend
+      const position = { x: Math.random() * 300 + 50, y: Math.random() * 200 + 50 };
 
-        const data: NodeData = {
-            id: newNodeId,
-            label: service.name || service.label || 'Unnamed Service',
-            serviceId: service.id,
-            icon: service.icon,
-            price: service.price,
-            description: service.description,
-            parameters: service.parameters || [],
-            allowedConnections: service.allowedConnections || [],
-            formData: [],
-            paramGroups: service.paramGroups || [],
-            additionalInstructions: '',
-        };
+      const data: NodeData = {
+        id: backendNodeId,
+        label: service.name || service.label || 'Unnamed Service',
+        serviceId: service.id,
+      };
 
-        const newNode = createNodeObject(newNodeId, data.label, 'selectorNode', position, data);
-        setNodes((nds) => [...nds, newNode]);
-        setHasChanges(true);
+      const newNode = createNodeObject(newNodeId, data.label, 'selectorNode', position, data);
+      setNodes((nds) => [...nds, newNode]);
+      setHasChanges(true);
   };
 
 
@@ -145,31 +136,17 @@ const BundleCanvasContent: React.FC<{
   };
 
   const handleSave = () => {
+    if (!bundle) return;
+
     const updatedNodes = nodes.map((node) => ({
-      id: node.id,
-      serviceId: node.data.serviceId,
+      id: node.data.id || `node-${node.data.serviceId}-${Date.now()}`, 
+      serviceId: node.data.serviceId,          
       label: node.data.label,
     }));
 
-    const updatedEdges = edges.map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      reactEdge: {
-        id: edge.id,
-        source: edge.source,
-        target: edge.target,
-        type: edge.type,
-        animated: edge.animated || false,
-        style: edge.style || {},
-        label: edge.label || '',
-      }
-    }));
-
-    onSave({
-      nodes: updatedNodes,
-      edges: updatedEdges,
-    });
+    const updatedEdges = transformEdgesToGQL(edges);
+    
+    onSave({ nodes: updatedNodes, edges: updatedEdges } as any);
   };
 
   const handleClose = () => {
