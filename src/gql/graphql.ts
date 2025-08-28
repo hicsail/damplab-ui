@@ -54,13 +54,38 @@ export type AddWorkflowInput = {
   nodes: Array<AddNodeInput>;
 };
 
+export type BundleNode = {
+  id: string;
+  label: string;
+  service: {
+    id: string;
+    name: string;
+  };
+  position?: {
+  x: number;
+  y: number;
+};
+};
+
+export type BundleEdge = {
+  id: string;
+  source: {
+    id: string;
+    label: string;
+  }
+  target: {
+    id: string;
+    label: string;
+  }
+  reactEdge?: any; 
+};
+
 export type Bundle = {
-  __typename?: 'Bundle';
-  icon: Scalars['String'];
-  /** unique database generated id */
-  id: Scalars['ID'];
-  label: Scalars['String'];
-  services: Array<DampLabService>;
+  id: string;
+  label: string;
+  icon?: string | null;
+  nodes: BundleNode[];
+  edges: BundleEdge[];
 };
 
 /** Represents a category of DampLab services */
