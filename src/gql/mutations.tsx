@@ -98,6 +98,10 @@ export const UPDATE_BUNDLE = gql`
           id
           name
         }
+        position {
+          x
+          y
+        }
       }
       edges {
         id

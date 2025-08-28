@@ -59,8 +59,9 @@ const BundleCanvasContent: React.FC<{
     // Creating nodes with separate canvas IDs
     const nodesFromBundle: Node<NodeData>[] = bundle.nodes.map((node, index) => {
       const canvasId = `canvas-${node.id}-${Date.now()}-${index}`;
-      const position = getRandomPosition();
-
+      const position = node.position ?? getRandomPosition(); // Use existing coords if they exist; new nodes create random
+      console.log('Position: ', position)
+      
       console.log(node)
       const data: NodeData = {
         id: node.id,
@@ -142,6 +143,7 @@ const BundleCanvasContent: React.FC<{
       id: node.data.id || `node-${node.data.serviceId}-${Date.now()}`, 
       serviceId: node.data.serviceId,          
       label: node.data.label,
+      position: node.position ? { x: node.position.x, y: node.position.y } : null,
     }));
 
     const updatedEdges = transformEdgesToGQL(edges);

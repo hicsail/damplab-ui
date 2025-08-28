@@ -58,6 +58,7 @@ useEffect(() => {
         id: n.id,
         label: n.label,
         serviceId: n.serviceId,
+        position: n.position ? { x: n.position.x, y: n.position.y } : null,
       }));
 
       // Map canvas IDs to backend node IDs for edges

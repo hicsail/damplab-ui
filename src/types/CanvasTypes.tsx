@@ -11,6 +11,10 @@ export type NodeData = {
     description?: string;
     paramGroups?: any[];
     dbNodeId?: string; // DB reference such that existing backend _id doesn't clash with new node creation
+    position?: {
+    x: number;
+    y: number;
+};
 }
 
 

@@ -61,6 +61,10 @@ export type BundleNode = {
     id: string;
     name: string;
   };
+  position?: {
+  x: number;
+  y: number;
+};
 };
 
 export type BundleEdge = {
