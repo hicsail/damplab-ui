@@ -12,6 +12,7 @@ export default [
     route("/canvas", "./pages/MainFlow.tsx"),
 
     layout("./layouts/PrivateRouteAuthed.tsx", [
+        route("/home", "./pages/Home.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),
