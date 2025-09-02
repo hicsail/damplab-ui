@@ -20,6 +20,55 @@ export const CREATE_JOB = gql`
     }
 `;
 
+// Template mutations
+export const CREATE_TEMPLATE = gql`
+    mutation CreateTemplate($input: CreateTemplateInput!) {
+        createTemplate(input: $input) {
+            id
+            name
+            description
+            createdAt
+            columnMapping {
+                field
+                headerName
+                type
+                width
+                order
+            }
+        }
+    }
+`;
+
+export const UPDATE_TEMPLATE = gql`
+    mutation UpdateTemplate($input: UpdateTemplateInput!) {
+        updateTemplate(input: $input) {
+            id
+            name
+            description
+            createdAt
+            columnMapping {
+                field
+                headerName
+                type
+                width
+                order
+            }
+        }
+    }
+`;
+
+export const DELETE_TEMPLATE = gql`
+    mutation DeleteTemplate($id: ID!) {
+        deleteTemplate(id: $id)
+    }
+`;
+
+export const DELETE_TEMPLATE_BY_NAME = gql`
+    mutation DeleteTemplateByName($name: String!) {
+        deleteTemplateByName(name: $name)
+    }
+`;
+
 export const UPDATE_WORKFLOW_STATE = gql`
     mutation updateWorkflowState($updateWorkflowState: UpdateWorkflowState!) {
         updateWorkflowState(updateWorkflowState: $updateWorkflowState) {
