@@ -11,8 +11,8 @@ export default function LoginForm() {
   const userProps = userContext.userProps;
 
   if (userProps?.isAuthenticated) {
-    // Redirect to home page with navigation options for authenticated users
-    return <Navigate to="/home" replace />;
+    // Redirect to protected home page
+    return <Navigate to="/" replace />;
   }
 
   return (
