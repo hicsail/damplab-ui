@@ -21,5 +21,7 @@ FROM nginx:1.28
 COPY nginx-http-server.conf /etc/nginx/conf.d/default.conf
 
 COPY --from=build /app/build/client /usr/share/nginx/html
+RUN mkdir -p /var/cache/nginx/client_temp \
+  && chown -R nginx:nginx /var/cache/nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
