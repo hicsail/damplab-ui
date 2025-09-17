@@ -1,30 +1,26 @@
-// src/pages/HomePage.tsx
 import { useContext } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Navigate } from 'react-router';
 import { useApolloClient } from '@apollo/client';
-import { Box, Button, Chip, Stack } from '@mui/material';
+import { Box, Button, Chip, Stack, Typography } from '@mui/material';
 
-import AccountTreeIcon        from '@mui/icons-material/AccountTree';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
-import ViewStreamIcon         from '@mui/icons-material/ViewStream';
-import CampaignIcon           from '@mui/icons-material/Campaign';
-import EditIcon               from '@mui/icons-material/Edit';
+import ViewStreamIcon from '@mui/icons-material/ViewStream';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import EditIcon from '@mui/icons-material/Edit';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
 
-function MenuButton({ onClick, navigateTo, children }) {
+function MenuButton({ onClick, navigateTo, children }: any) {
   const navigate = useNavigate();
   return (
-    <Button
-      variant="contained"
-      onClick={onClick ? onClick : () => navigate(navigateTo)}
-      sx={{ m:2, width: '210px', textTransform: 'none', '&:first-of-type': {
-          mt: 0, // custom top margin of none just for the first
-        },
-      }}
+    <Button 
+      variant="contained" 
+      onClick={onClick ? onClick : () => navigate(navigateTo)}  
+      sx={{ m: 2, width: '210px', textTransform: 'none' }}
     >
-      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {children[0]}
         <Box sx={{ width: '100%' }}>{children.slice(1)}</Box>
       </Box>
@@ -32,75 +28,97 @@ function MenuButton({ onClick, navigateTo, children }) {
   );
 }
 
-export default function HomePage() {
+export default function Home() {
   const apolloClient = useApolloClient();
+  const navigate = useNavigate();
   const userContext: UserContextProps = useContext(UserContext);
   const userProps: UserProps = userContext.userProps;
 
-  const appellation =
-    userProps?.idTokenParsed?.name ||
-    userProps?.idTokenParsed?.email ||
-    "DAMPLab User";
+  // Redirect to login if not authenticated
+  if (!userProps?.isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   function logout() {
     apolloClient.resetStore();
     userContext.keycloak.logout();
   }
 
+  const appellation = (userProps?.idTokenParsed as any)?.name || (userProps?.idTokenParsed as any)?.email || "DAMPLab User";
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', p: 3 }}>
+      <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+        Welcome to DAMPLab
+      </Typography>
+
       <Box sx={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' }}>
-        {/* Greeting */}
         <Box sx={{ mb: 3, textAlign: 'center' }}>
-          <p>Hello, {appellation}.</p>
+          <Typography variant="h6" gutterBottom>
+            Hello, {appellation}
+          </Typography>
           <Stack direction="row" spacing={1} sx={{ marginBottom: 5, justifyContent: 'center' }}>
             {userProps.isDamplabStaff && <Chip label="DAMPLab Staff" />}
             {userProps.isInternalCustomer && <Chip label="Internal Customer" />}
             {userProps.isExternalCustomer && <Chip label="External Customer" />}
           </Stack>
         </Box>
-      </Box>
 
-        {/* Main Content Row */}
-        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
-          {/* Left column with buttons */}
-          <Box sx={{ width: '300px', alignSelf: 'flex-start',mt: 0, pt: 0, minHeight: 0}}>
+        {/* Main Content Area */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            width: '100%',
+          }}
+        >
+          {/* User options buttons */}
+          <Box sx={{ width: '300px' }}>
             <MenuButton onClick={() => window.location.href = "https://www.damplab.org/services"}>
-              <img src='/damp-white.svg' height='30px' alt="DAMP Logo" />
+              <img src='/damp-white.svg' height='30px' alt="DAMP Logo"/>
               DAMPLab Site<br/>(See Service Prices)
             </MenuButton>
 
-
             <MenuButton navigateTo='/canvas'>
-              <AccountTreeIcon sx={{ transform: "rotate(90deg) scaleY(-1)" }} />
-              Canvas<br/>(Design Workflows)
+              <AccountTreeIcon sx={{transform: "rotate(90deg) scaleY(-1)"}}/>
+              Canvas<br />(Design Workflows)
             </MenuButton>
 
             {userProps.isDamplabStaff && (
               <>
                 <MenuButton navigateTo='/dashboard'>
-                  <ViewStreamIcon />Dashboard<br/>(See Submitted Jobs)
+                  <ViewStreamIcon />
+                  Dashboard<br />(See Submitted Jobs)
                 </MenuButton>
                 <MenuButton navigateTo='/edit'>
-                  <EditIcon />Admin Edit<br/>(Edit Services)
+                  <EditIcon />
+                  Admin Edit<br />(Edit Services)
                 </MenuButton>
                 <MenuButton navigateTo='/release_notes'>
-                  <FormatListBulletedIcon />Release Notes<br/>(+ Other Admin Info)
+                  <FormatListBulletedIcon />
+                  Release Notes<br />(+ Other Admin Info)
+                </MenuButton>
+                <MenuButton navigateTo='/data_translation'>
+                  <EditIcon />
+                  Data Translation<br />(Abbott to eLabs formatting)
                 </MenuButton>
                 <MenuButton navigateTo='/edit_announcements'>
-                  <CampaignIcon />Add Announcement<br/>(+ Edit)
+                  <CampaignIcon />
+                  Add Announcement<br />(+ Edit)
                 </MenuButton>
               </>
             )}
-
-            <Button variant="contained" color="error" onClick={logout} sx={{ m: 5 }}>
+            <Button variant="contained" color="secondary" onClick={logout} sx={{ m: 5 }}>
               Logout
             </Button>
           </Box>
 
           {/* Right Column: AnnouncementBox */}
-            <AnnouncementBox />
+          <AnnouncementBox />
         </Box>
+      </Box>
     </Box>
   );
 }

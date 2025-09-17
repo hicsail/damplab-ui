@@ -1,6 +1,8 @@
 import { GridColDef, GridRowsProp } from '@mui/x-data-grid';
 import * as XLSX from 'xlsx';
 import { DataType, FileData, Template } from './types';
+import { DateFilterCriteria } from './DateFilter';
+import { TimeFilterCriteria } from './TimeFilter';
 
 /**
  * Detects the data type of a given value
@@ -206,3 +208,284 @@ export const templateStorage = {
     };
   }
 };
+
+/**
+ * Parse various date formats commonly found in Excel/CSV files
+ */
+export const parseDate = (dateValue: any): Date | null => {
+  if (!dateValue) return null;
+  
+  // If it's already a Date object
+  if (dateValue instanceof Date) return dateValue;
+  
+  const dateStr = String(dateValue).trim();
+  if (!dateStr) return null;
+  
+  // Common date formats to try
+  const formats = [
+    // MM.DD.YYYY (like 02.18.2025)
+    /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/,
+    // MM/DD/YYYY
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+    // DD.MM.YYYY
+    /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/,
+    // DD/MM/YYYY
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+    // YYYY-MM-DD
+    /^(\d{4})-(\d{1,2})-(\d{1,2})$/,
+    // MM-DD-YYYY
+    /^(\d{1,2})-(\d{1,2})-(\d{4})$/
+  ];
+  
+  // Try MM.DD.YYYY and MM/DD/YYYY first (common US formats)
+  const mmddyyyy = dateStr.match(/^(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})$/);
+  if (mmddyyyy) {
+    const month = parseInt(mmddyyyy[1], 10);
+    const day = parseInt(mmddyyyy[2], 10);
+    const year = parseInt(mmddyyyy[3], 10);
+    
+    // Validate ranges
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900) {
+      const date = new Date(year, month - 1, day);
+      if (!isNaN(date.getTime())) return date;
+    }
+  }
+  
+  // Try YYYY-MM-DD (ISO format)
+  const yyyymmdd = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (yyyymmdd) {
+    const year = parseInt(yyyymmdd[1], 10);
+    const month = parseInt(yyyymmdd[2], 10);
+    const day = parseInt(yyyymmdd[3], 10);
+    
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900) {
+      const date = new Date(year, month - 1, day);
+      if (!isNaN(date.getTime())) return date;
+    }
+  }
+  
+  // Try native Date parsing as fallback
+  const nativeDate = new Date(dateStr);
+  if (!isNaN(nativeDate.getTime())) {
+    return nativeDate;
+  }
+  
+  return null;
+};
+
+/**
+ * Get date columns from file data
+ */
+export const getDateColumns = (fileData: FileData): string[] => {
+  return fileData.columns
+    .filter(col => col.type === 'date' || col.headerName?.toLowerCase().includes('date'))
+    .map(col => col.headerName || col.field);
+};
+
+/**
+ * Create a date in local timezone from YYYY-MM-DD string
+ */
+export const createLocalDate = (dateString: string): Date => {
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+  }
+  // Fallback to regular Date constructor
+  return new Date(dateString);
+};
+
+/**
+ * Format a date string consistently for display (MM/DD/YYYY)
+ */
+export const formatDateForDisplay = (dateString: string): string => {
+  const date = createLocalDate(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric'
+  });
+};
+
+/**
+ * Parse various time formats commonly found in Excel/CSV files
+ */
+export const parseTime = (timeValue: any): Date | null => {
+  if (!timeValue) return null;
+  
+  const timeStr = String(timeValue).trim();
+  if (!timeStr) return null;
+  
+  // Common time formats: HH:MM, H:MM, HH:MM:SS, H:MM:SS
+  const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+  const match = timeStr.match(timeRegex);
+  
+  if (match) {
+    const hours = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const seconds = match[3] ? parseInt(match[3], 10) : 0;
+    
+    // Validate ranges
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59 && seconds >= 0 && seconds <= 59) {
+      const today = new Date();
+      return new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes, seconds);
+    }
+  }
+  
+  // Try native Date parsing as fallback
+  const nativeTime = new Date(`1970-01-01T${timeStr}`);
+  if (!isNaN(nativeTime.getTime())) {
+    return nativeTime;
+  }
+  
+  return null;
+};
+
+/**
+ * Create a time in local timezone from HH:MM string
+ */
+export const createLocalTime = (timeString: string): Date => {
+  const parts = timeString.split(':');
+  if (parts.length >= 2) {
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    const seconds = parts[2] ? parseInt(parts[2], 10) : 0;
+    
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes, seconds);
+  }
+  // Fallback to regular Date constructor
+  return new Date(`1970-01-01T${timeString}`);
+};
+
+/**
+ * Format a time string consistently for display (HH:MM AM/PM)
+ */
+export const formatTimeForDisplay = (timeString: string): string => {
+  const time = createLocalTime(timeString);
+  return time.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+/**
+ * Detect if a column likely contains times based on sample values
+ */
+export const isLikelyTimeColumn = (values: any[]): boolean => {
+  if (values.length === 0) return false;
+  
+  const sampleSize = Math.min(10, values.length);
+  const sampleValues = values.slice(0, sampleSize).filter(v => v !== null && v !== undefined && v !== '');
+  
+  if (sampleValues.length === 0) return false;
+  
+  const timeCount = sampleValues.filter(val => parseTime(val) !== null).length;
+  const timeRatio = timeCount / sampleValues.length;
+  
+  // If more than 70% of sample values are valid times, consider it a time column
+  return timeRatio > 0.7;
+};
+
+/**
+ * Get time columns from file data
+ */
+export const getTimeColumns = (fileData: FileData): string[] => {
+  return fileData.columns
+    .filter(col => col.headerName?.toLowerCase().includes('time'))
+    .map(col => col.headerName || col.field);
+};
+
+/**
+ * Apply date filters to rows
+ */
+export const applyDateFilters = (rows: GridRowsProp, filters: DateFilterCriteria[], columns: GridColDef[]): GridRowsProp => {
+  if (filters.length === 0) return rows;
+  
+  return rows.filter(row => {
+    return filters.every(filter => {
+      // Find the column field by header name
+      const column = columns.find(col => col.headerName === filter.column || col.field === filter.column);
+      if (!column) return true;
+      
+      const cellValue = row[column.field];
+      const cellDate = parseDate(cellValue);
+      
+      if (!cellDate) return true; // Keep rows with invalid dates
+      
+      // Create filter dates in local timezone to match parsed dates
+      const filterStartDate = createLocalDate(filter.startDate);
+      
+      switch (filter.operator) {
+        case 'before':
+          return cellDate < filterStartDate;
+        case 'after':
+          return cellDate > filterStartDate;
+        case 'between':
+          if (!filter.endDate) return cellDate > filterStartDate;
+          const filterEndDate = createLocalDate(filter.endDate);
+          return cellDate >= filterStartDate && cellDate <= filterEndDate;
+        default:
+          return true;
+      }
+    });
+  });
+};
+
+/**
+ * Detect if a column likely contains dates based on sample values
+ */
+export const isLikelyDateColumn = (values: any[]): boolean => {
+  if (values.length === 0) return false;
+  
+  const sampleSize = Math.min(10, values.length);
+  const sampleValues = values.slice(0, sampleSize).filter(v => v !== null && v !== undefined && v !== '');
+  
+  if (sampleValues.length === 0) return false;
+  
+  const dateCount = sampleValues.filter(val => parseDate(val) !== null).length;
+  const dateRatio = dateCount / sampleValues.length;
+  
+  // If more than 70% of sample values are valid dates, consider it a date column
+  return dateRatio > 0.7;
+};
+
+/**
+ * Apply time filters to rows
+ */
+export const applyTimeFilters = (rows: GridRowsProp, filters: TimeFilterCriteria[], columns: GridColDef[]): GridRowsProp => {
+  if (filters.length === 0) return rows;
+  
+  return rows.filter(row => {
+    return filters.every(filter => {
+      // Find the column field by header name
+      const column = columns.find(col => col.headerName === filter.column || col.field === filter.column);
+      if (!column) return true;
+      
+      const cellValue = row[column.field];
+      const cellTime = parseTime(cellValue);
+      
+      if (!cellTime) return true; // Keep rows with invalid times
+      
+      // Create filter times in local timezone
+      const filterStartTime = createLocalTime(filter.startTime);
+      
+      switch (filter.operator) {
+        case 'before':
+          return cellTime < filterStartTime;
+        case 'after':
+          return cellTime > filterStartTime;
+        case 'between':
+          if (!filter.endTime) return cellTime > filterStartTime;
+          const filterEndTime = createLocalTime(filter.endTime);
+          return cellTime >= filterStartTime && cellTime <= filterEndTime;
+        default:
+          return true;
+      }
+    });
+  });
+};
+

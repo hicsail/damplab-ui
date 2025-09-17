@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -30,6 +30,9 @@ import {
   ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { FileData, Template } from './types';
+import DateFilter, { DateFilterCriteria } from './DateFilter';
+import TimeFilter, { TimeFilterCriteria } from './TimeFilter';
+import { getDateColumns, applyDateFilters, isLikelyDateColumn, getTimeColumns, applyTimeFilters, isLikelyTimeColumn } from './utils';
 
 interface DataGridSectionProps {
   fileData: FileData;
@@ -45,6 +48,7 @@ interface DataGridSectionProps {
   onOpenTemplateDialog: () => void;
   onOpenSaveTemplateDialog: () => void;
   onCopyData: () => void;
+  onFilteredDataChange: (filteredData: FileData) => void;
 }
 
 export default function DataGridSection({
@@ -60,9 +64,82 @@ export default function DataGridSection({
   onOpenColumnManager,
   onOpenTemplateDialog,
   onOpenSaveTemplateDialog,
-  onCopyData
+  onCopyData,
+  onFilteredDataChange
 }: DataGridSectionProps) {
   const gridApiRef = useGridApiRef();
+  
+  // Date and time filtering state
+  const [dateFilters, setDateFilters] = useState<DateFilterCriteria[]>([]);
+  const [timeFilters, setTimeFilters] = useState<TimeFilterCriteria[]>([]);
+
+  // Detect date columns including those that might not be typed as 'date' but contain date-like values
+  const dateColumns = useMemo(() => {
+    const typedDateColumns = getDateColumns(fileData);
+    
+    // Also check for columns that might contain dates but aren't typed as such
+    const potentialDateColumns = fileData.columns
+      .filter(col => {
+        // Skip if already identified as date column
+        if (typedDateColumns.includes(col.headerName || col.field)) return false;
+        
+        // Get sample values from this column
+        const sampleValues = fileData.rows
+          .slice(0, 10)
+          .map(row => row[col.field])
+          .filter(val => val !== null && val !== undefined && val !== '');
+        
+        return isLikelyDateColumn(sampleValues);
+      })
+      .map(col => col.headerName || col.field);
+    
+    return [...new Set([...typedDateColumns, ...potentialDateColumns])];
+  }, [fileData]);
+
+  // Detect time columns including those that might not be typed as 'time' but contain time-like values
+  const timeColumns = useMemo(() => {
+    const typedTimeColumns = getTimeColumns(fileData);
+    
+    // Also check for columns that might contain times but aren't typed as such
+    const potentialTimeColumns = fileData.columns
+      .filter(col => {
+        // Skip if already identified as time column
+        if (typedTimeColumns.includes(col.headerName || col.field)) return false;
+        
+        // Get sample values from this column
+        const sampleValues = fileData.rows
+          .slice(0, 10)
+          .map(row => row[col.field])
+          .filter(val => val !== null && val !== undefined && val !== '');
+        
+        return isLikelyTimeColumn(sampleValues);
+      })
+      .map(col => col.headerName || col.field);
+    
+    return [...new Set([...typedTimeColumns, ...potentialTimeColumns])];
+  }, [fileData]);
+
+  // Apply date and time filters to the data
+  const filteredRows = useMemo(() => {
+    let rows = fileData.rows;
+    
+    // Apply date filters first
+    rows = applyDateFilters(rows, dateFilters, fileData.columns);
+    
+    // Then apply time filters
+    rows = applyTimeFilters(rows, timeFilters, fileData.columns);
+    
+    return rows;
+  }, [fileData.rows, dateFilters, timeFilters, fileData.columns]);
+
+  // Notify parent component when filtered data changes
+  useEffect(() => {
+    const filteredFileData: FileData = {
+      ...fileData,
+      rows: filteredRows
+    };
+    onFilteredDataChange(filteredFileData);
+  }, [filteredRows, fileData, onFilteredDataChange]);
 
   // Enhanced columns with reorder and delete functionality
   const enhancedColumns: GridColDef[] = fileData.columns.map((col) => ({
@@ -227,10 +304,18 @@ export default function DataGridSection({
               icon={<DragIndicatorIcon />}
             />
             <Chip 
-              label={`${fileData.rows.length} rows`} 
+              label={`${filteredRows.length} of ${fileData.rows.length} rows`} 
               size="small" 
               color="secondary" 
             />
+            {(dateFilters.length > 0 || timeFilters.length > 0) && (
+              <Chip 
+                label={`${dateFilters.length + timeFilters.length} filter${dateFilters.length + timeFilters.length > 1 ? 's' : ''} active`} 
+                size="small" 
+                color="warning"
+                variant="outlined"
+              />
+            )}
           </Stack>
         </Box>
         
@@ -277,14 +362,37 @@ export default function DataGridSection({
         <Typography variant="body2" color="primary.main" sx={{ fontSize: '0.875rem' }}>
           🔧 <strong>Column Manager:</strong> Drag to reorder, rename, delete, or add new columns with default values
         </Typography>
+        {(dateColumns.length > 0 || timeColumns.length > 0) && (
+          <Typography variant="body2" color="info.main" sx={{ fontSize: '0.875rem' }}>
+            📅 <strong>Date & Time Filtering:</strong> Filter rows by date ranges and times using the filter panels below - supports formats like "02.18.2025" and "11:30"
+          </Typography>
+        )}
         <Typography variant="body2" color="success.main" sx={{ fontSize: '0.875rem' }}>
           📋 <strong>Copy Options:</strong> Choose to copy with or without headers when exporting to eLabs
         </Typography>
       </Stack>
 
+      {/* Date Filter Component */}
+      {dateColumns.length > 0 && (
+        <DateFilter
+          dateColumns={dateColumns}
+          onFilterChange={setDateFilters}
+          currentFilters={dateFilters}
+        />
+      )}
+
+      {/* Time Filter Component */}
+      {timeColumns.length > 0 && (
+        <TimeFilter
+          timeColumns={timeColumns}
+          onFilterChange={setTimeFilters}
+          currentFilters={timeFilters}
+        />
+      )}
+
       <Box sx={{ height: 620, width: '100%' }}>
         <DataGrid
-          rows={fileData.rows}
+          rows={filteredRows}
           columns={enhancedColumns}
           editMode="row"
           rowModesModel={rowModesModel}
