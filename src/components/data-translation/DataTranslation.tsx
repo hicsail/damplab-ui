@@ -22,7 +22,7 @@ import TemplateDialogs from './TemplateDialogs';
 import ColumnManagerDialog from './ColumnManagerDialog';
 
 // Import types and utilities
-import { AlertState } from './types';
+import { AlertState, FileData } from './types';
 import { generateCopyData } from './utils';
 
 export default function DataTranslation() {
@@ -33,6 +33,9 @@ export default function DataTranslation() {
   const [copyDialog, setCopyDialog] = useState(false);
   const [copyData, setCopyData] = useState('');
   const [copyIncludesHeaders, setCopyIncludesHeaders] = useState(true);
+  
+  // Filtered data state (for copying)
+  const [filteredFileData, setFilteredFileData] = useState<FileData | null>(null);
   
   // Template dialog state
   const [templateDialog, setTemplateDialog] = useState(false);
@@ -83,20 +86,28 @@ export default function DataTranslation() {
     }
   };
 
+  const handleFilteredDataChange = (filteredData: FileData) => {
+    setFilteredFileData(filteredData);
+  };
+
   const handleCopyData = () => {
-    if (!fileData) return;
+    // Use filtered data if available, otherwise use original data
+    const dataToCopy = filteredFileData || fileData;
+    if (!dataToCopy) return;
     
     // Start with headers by default
     setCopyIncludesHeaders(true);
-    const data = generateCopyData(fileData, true);
+    const data = generateCopyData(dataToCopy, true);
     setCopyData(data);
     setCopyDialog(true);
   };
 
   const handleToggleCopyHeaders = (includeHeaders: boolean) => {
-    if (!fileData) return;
+    // Use filtered data if available, otherwise use original data
+    const dataToCopy = filteredFileData || fileData;
+    if (!dataToCopy) return;
     
-    const data = generateCopyData(fileData, includeHeaders);
+    const data = generateCopyData(dataToCopy, includeHeaders);
     setCopyData(data);
     setCopyIncludesHeaders(includeHeaders);
   };
@@ -104,9 +115,12 @@ export default function DataTranslation() {
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(copyData);
+      const isFiltered = filteredFileData && filteredFileData.rows.length !== fileData?.rows.length;
+      const filterMessage = isFiltered ? ' (filtered data)' : '';
+      
       setAlert({
         open: true,
-        message: `Data ${copyIncludesHeaders ? 'with headers' : '(data only)'} copied to clipboard! You can now paste it into eLabs bulk uploader.`,
+        message: `Data ${copyIncludesHeaders ? 'with headers' : '(data only)'}${filterMessage} copied to clipboard! You can now paste it into eLabs bulk uploader.`,
         severity: 'success'
       });
       setCopyDialog(false);
@@ -214,6 +228,7 @@ export default function DataTranslation() {
           onOpenTemplateDialog={() => setTemplateDialog(true)}
           onOpenSaveTemplateDialog={() => setSaveTemplateDialog(true)}
           onCopyData={handleCopyData}
+          onFilteredDataChange={handleFilteredDataChange}
         />
       )}
 
