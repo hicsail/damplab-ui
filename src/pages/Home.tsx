@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { useNavigate, Navigate } from 'react-router';
 import { useApolloClient } from '@apollo/client';
-import { Box, Button, Chip, Stack, Typography, Paper } from '@mui/material';
+import { Box, Button, Chip, Stack, Typography } from '@mui/material';
 
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';

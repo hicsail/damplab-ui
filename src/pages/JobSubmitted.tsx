@@ -1,17 +1,14 @@
-// JobSubmitted.tsx
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router';
+import { useParams } from 'react-router';
 import { useQuery } from '@apollo/client';
 import { GET_JOB_BY_ID } from '../gql/queries';
 import { Workflow } from '../gql/graphql';
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
-import { Box } from '@mui/material';
+import { Box, Alert } from '@mui/material';
 import JobPDFDocument from '../components/JobPDFDocument';
 
 export default function JobSubmitted() {
-  // get job id from navigation state
-  const location = useLocation();
-  const [jobId, setJobId] = useState(location.state.id);
+  const { jobId } = useParams<{ jobId: string }>();
   const [value, setValue] = useState(`https://damplab.sail.codes/client_view/${jobId}`);
 
   const [workflowName, setWorkflowName] = useState('');
@@ -25,17 +22,16 @@ export default function JobSubmitted() {
   const [jobNotes, setJobNotes] = useState('');
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
 
-  const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
+  const { loading, error, data } = useQuery(GET_JOB_BY_ID, { //should later check logged in user token to access
     variables: { id: jobId },
     onCompleted: (data) => {
-      console.log('job successfully loaded: ', data);
       setWorkflowName(data.jobById.workflows[0].name);
       setWorkflowState(data.jobById.workflows[0].state);
       setJobName(data.jobById.name);
       setJobState(data.jobById.state);
       setJobTime(data.jobById.submitted);
       setJobUsername(data.jobById.username);
-      setJobInstitution(data.jobById.institute);
+      setJobInstitution(data.jobById.institute); 
       setJobEmail(data.jobById.email);
       setJobNotes(data.jobById.notes);
       setWorkflows(data.jobById.workflows);
@@ -49,10 +45,18 @@ export default function JobSubmitted() {
     console.log(workflows);
   }, [workflows]);
 
+  if (loading) return <p>Loading...</p>;
+  if (error) {
+    console.log("GraphQL error:", error);
+    return <Alert severity="error">Invalid Job ID.</Alert>;
+  }
+  if (!data || !data.jobById) return <p>No job found.</p>;
+
   return (
     <Box>
       <h1>Job Submitted</h1>
       <p>Job ID: {jobId}</p>
+      <p>Job submitted at: {jobTime}</p>
       <p>
         <PDFDownloadLink
           document={
