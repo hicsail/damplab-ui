@@ -219,11 +219,12 @@ const handleSubmitJob = async () => {
       showSpinner: true
     });
 
+    const token = await userContext.userProps?.getAccessToken();
     await createJob({ 
       variables: { createJobInput: data },
       context: {
         headers: {
-          authorization: `Bearer ${token}`,
+          authorization: token ? `Bearer ${token}` : "",
         },
       },
     });
