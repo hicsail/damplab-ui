@@ -1,6 +1,6 @@
 // SOWDocument.tsx - PDF document component for Statement of Work
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { SOWData } from '../types/SOWTypes';
 
 // Using default fonts to avoid font loading issues
@@ -12,16 +12,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 1.4,
   },
+  header: {
+    marginBottom: 20,
+  },
+  logoContainer: {
+    backgroundColor: '#000000',
+    padding: 10,
+    marginBottom: 10,
+    width: 280,
+  },
+  logo: {
+    width: 250,
+    height: 40,
+  },
   title: {
     fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 5,
   },
   address: {
     fontSize: 11,
-    textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   sowNumber: {
     fontSize: 12,
@@ -111,8 +122,16 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
     <Document>
       <Page style={styles.page}>
         {/* Header */}
-        <Text style={styles.title}>DAMP Lab</Text>
-        <Text style={styles.address}>610 Commonwealth Avenue, 4th Floor, Boston, MA 02215</Text>
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Image 
+              style={styles.logo} 
+              src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"
+            />
+          </View>
+          <Text style={styles.title}>DAMP Lab</Text>
+          <Text style={styles.address}>610 Commonwealth Avenue, 4th Floor, Boston, MA 02215</Text>
+        </View>
         <Text style={styles.sowNumber}>
           {sowData.sowNumber} for Agreement to Perform Research Services for {sowData.clientName}
         </Text>
@@ -280,6 +299,14 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           SOW price, schedule and other terms and conditions of the Agreement.
         </Text>
 
+        {/* Additional Information */}
+        {sowData.additionalInformation && (
+          <>
+            <Text style={styles.sectionTitle}>Additional Information</Text>
+            <Text style={styles.paragraph}>{sowData.additionalInformation}</Text>
+          </>
+        )}
+
         {/* Signature Section */}
         <Text style={styles.sectionTitle}>Signatures</Text>
         <Text style={styles.paragraph}>
@@ -312,9 +339,9 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           </View>
         </View>
 
-        <Text style={styles.footer}>
-          DAMP Lab © | Statement of Work | Generated on {sowData.date}
-        </Text>
+        <View style={styles.footer}>
+          <Text>DAMP Lab © | Statement of Work | Generated on {sowData.date}</Text>
+        </View>
       </Page>
     </Document>
   );

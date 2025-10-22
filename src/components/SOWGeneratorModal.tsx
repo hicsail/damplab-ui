@@ -26,9 +26,10 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PreviewIcon from '@mui/icons-material/Preview';
+import EditIcon from '@mui/icons-material/Edit';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment } from '../types/SOWTypes';
+import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWEditableSections } from '../types/SOWTypes';
 import { generateSOWData, getTeamMembers, storeSOW } from '../utils/sowGenerator';
 import SOWDocument from './SOWDocument';
 
@@ -53,6 +54,13 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
   const [generatedSOW, setGeneratedSOW] = useState<SOWData | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [editableSections, setEditableSections] = useState<SOWEditableSections>({
+    scopeOfWork: '',
+    deliverables: [],
+    services: [],
+    additionalInformation: '',
+  });
+  const [isEditingContent, setIsEditingContent] = useState(false);
 
   const teamMembers = getTeamMembers();
 
@@ -62,6 +70,14 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
       try {
         const sowData = generateSOWData(jobData, technicianInputs);
         setGeneratedSOW(sowData);
+        
+        // Initialize editable sections from generated data
+        setEditableSections({
+          scopeOfWork: sowData.scopeOfWork,
+          deliverables: sowData.deliverables,
+          services: sowData.services,
+          additionalInformation: '',
+        });
       } catch (error) {
         console.error('Error generating SOW:', error);
       }
@@ -135,12 +151,13 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
   };
 
   const handleGenerateSOW = () => {
-    if (!validateInputs() || !generatedSOW) {
+    const finalSOWData = getFinalSOWData();
+    if (!validateInputs() || !finalSOWData) {
       return;
     }
 
     // Store the SOW in localStorage
-    storeSOW(generatedSOW);
+    storeSOW(finalSOWData);
     
     // Close modal and show success message
     onClose();
@@ -158,6 +175,18 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
     setShowPreview(false);
   };
 
+  const getFinalSOWData = (): SOWData | null => {
+    if (!generatedSOW) return null;
+    
+    return {
+      ...generatedSOW,
+      scopeOfWork: editableSections.scopeOfWork,
+      deliverables: editableSections.deliverables,
+      services: editableSections.services,
+      additionalInformation: editableSections.additionalInformation,
+    };
+  };
+
   if (!jobData) {
     return null;
   }
@@ -173,60 +202,64 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
         </DialogTitle>
 
         <DialogContent>
-          {showPreview && generatedSOW ? (
-            <Box>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">SOW Ready for Download</Typography>
-                <Box>
-                  <Button
-                    variant="outlined"
-                    startIcon={<PreviewIcon />}
-                    onClick={handleClosePreview}
-                    sx={{ mr: 1 }}
-                  >
-                    Back to Edit
-                  </Button>
-                  <PDFDownloadLink
-                    document={<SOWDocument sowData={generatedSOW} />}
-                    fileName={`SOW-${generatedSOW.sowNumber.replace(' ', '-')}-${jobData.name}.pdf`}
-                  >
-                    {({ blob, url, loading, error }) => (
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        disabled={loading}
-                      >
-                        {loading ? 'Generating...' : 'Download SOW'}
-                      </Button>
-                    )}
-                  </PDFDownloadLink>
+          {showPreview && getFinalSOWData() ? (
+            (() => {
+              const finalSOWData = getFinalSOWData();
+              if (!finalSOWData) return null;
+              return (
+              <Box>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6">SOW Ready for Download</Typography>
+                  <Box>
+                    <Button
+                      variant="outlined"
+                      startIcon={<PreviewIcon />}
+                      onClick={handleClosePreview}
+                      sx={{ mr: 1 }}
+                    >
+                      Back to Edit
+                    </Button>
+                    <PDFDownloadLink
+                      document={<SOWDocument sowData={finalSOWData} />}
+                      fileName={`SOW-${finalSOWData.sowNumber.replace(' ', '-')}-${jobData.name}.pdf`}
+                    >
+                      {({ blob, url, loading, error }) => (
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          disabled={loading}
+                        >
+                          {loading ? 'Generating...' : 'Download SOW'}
+                        </Button>
+                      )}
+                    </PDFDownloadLink>
+                  </Box>
                 </Box>
-              </Box>
               
               {/* SOW Summary Preview */}
               <Card sx={{ p: 3, mb: 2 }}>
                 <Typography variant="h6" gutterBottom>SOW Summary</Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                   <Box sx={{ flex: '1 1 300px' }}>
-                    <Typography variant="body2"><strong>SOW Number:</strong> {generatedSOW.sowNumber}</Typography>
-                    <Typography variant="body2"><strong>Client:</strong> {generatedSOW.clientName}</Typography>
-                    <Typography variant="body2"><strong>Email:</strong> {generatedSOW.clientEmail}</Typography>
-                    <Typography variant="body2"><strong>Institution:</strong> {generatedSOW.clientInstitution}</Typography>
+                    <Typography variant="body2"><strong>SOW Number:</strong> {finalSOWData.sowNumber}</Typography>
+                    <Typography variant="body2"><strong>Client:</strong> {finalSOWData.clientName}</Typography>
+                    <Typography variant="body2"><strong>Email:</strong> {finalSOWData.clientEmail}</Typography>
+                    <Typography variant="body2"><strong>Institution:</strong> {finalSOWData.clientInstitution}</Typography>
                   </Box>
                   <Box sx={{ flex: '1 1 300px' }}>
-                    <Typography variant="body2"><strong>Project Manager:</strong> {generatedSOW.resources.projectManager}</Typography>
-                    <Typography variant="body2"><strong>Project Lead:</strong> {generatedSOW.resources.projectLead}</Typography>
-                    <Typography variant="body2"><strong>Timeline:</strong> {generatedSOW.timeline.startDate} - {generatedSOW.timeline.endDate}</Typography>
-                    <Typography variant="body2"><strong>Total Cost:</strong> ${generatedSOW.pricing.totalCost.toLocaleString()}</Typography>
+                    <Typography variant="body2"><strong>Project Manager:</strong> {finalSOWData.resources.projectManager}</Typography>
+                    <Typography variant="body2"><strong>Project Lead:</strong> {finalSOWData.resources.projectLead}</Typography>
+                    <Typography variant="body2"><strong>Timeline:</strong> {finalSOWData.timeline.startDate} - {finalSOWData.timeline.endDate}</Typography>
+                    <Typography variant="body2"><strong>Total Cost:</strong> ${finalSOWData.pricing.totalCost.toLocaleString()}</Typography>
                   </Box>
                 </Box>
                 
                 <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}><strong>Scope of Work:</strong></Typography>
-                <Typography variant="body2" sx={{ mb: 2 }}>{generatedSOW.scopeOfWork}</Typography>
+                <Typography variant="body2" sx={{ mb: 2 }}>{finalSOWData.scopeOfWork}</Typography>
                 
                 <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Deliverables:</strong></Typography>
                 <ul>
-                  {generatedSOW.deliverables.map((deliverable, index) => (
+                  {finalSOWData.deliverables.map((deliverable, index) => (
                     <li key={index}><Typography variant="body2">{deliverable}</Typography></li>
                   ))}
                 </ul>
@@ -239,6 +272,8 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                 </Typography>
               </Alert>
             </Box>
+              );
+            })()
           ) : (
             <Box>
               {/* Auto-populated information display */}
@@ -477,6 +512,97 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   onChange={(e) => handleInputChange('specialInstructions', e.target.value)}
                 />
               </Box>
+
+              {/* SOW Content Editing */}
+              {isEditingContent && (
+                <Card sx={{ mt: 3, p: 2, backgroundColor: '#f5f5f5' }}>
+                  <Typography variant="h6" gutterBottom>
+                    Edit SOW Content
+                  </Typography>
+                  
+                  {/* Scope of Work Editor */}
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    label="Scope of Work"
+                    value={editableSections.scopeOfWork}
+                    onChange={(e) => setEditableSections({
+                      ...editableSections,
+                      scopeOfWork: e.target.value
+                    })}
+                    sx={{ mb: 2 }}
+                  />
+                  
+                  {/* Deliverables Editor */}
+                  <Typography variant="subtitle1" sx={{ mb: 1 }}>Deliverables</Typography>
+                  {editableSections.deliverables.map((deliverable, index) => (
+                    <Box key={index} display="flex" gap={1} mb={1}>
+                      <TextField
+                        fullWidth
+                        value={deliverable}
+                        onChange={(e) => {
+                          const newDeliverables = [...editableSections.deliverables];
+                          newDeliverables[index] = e.target.value;
+                          setEditableSections({...editableSections, deliverables: newDeliverables});
+                        }}
+                      />
+                      <IconButton
+                        onClick={() => {
+                          const newDeliverables = editableSections.deliverables.filter((_, i) => i !== index);
+                          setEditableSections({...editableSections, deliverables: newDeliverables});
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  ))}
+                  <Button
+                    startIcon={<AddIcon />}
+                    onClick={() => setEditableSections({
+                      ...editableSections,
+                      deliverables: [...editableSections.deliverables, '']
+                    })}
+                  >
+                    Add Deliverable
+                  </Button>
+                  
+                  {/* Services Editor - only descriptions */}
+                  <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Services</Typography>
+                  {editableSections.services.map((service, index) => (
+                    <Card key={service.id} sx={{ mb: 1, p: 1 }}>
+                      <Typography variant="body2" fontWeight="bold">{service.name}</Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Description"
+                        value={service.description}
+                        onChange={(e) => {
+                          const newServices = [...editableSections.services];
+                          newServices[index] = {...service, description: e.target.value};
+                          setEditableSections({...editableSections, services: newServices});
+                        }}
+                        sx={{ mt: 1 }}
+                      />
+                    </Card>
+                  ))}
+                  
+                  {/* Additional Information */}
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    label="Additional Information (Optional)"
+                    value={editableSections.additionalInformation}
+                    onChange={(e) => setEditableSections({
+                      ...editableSections,
+                      additionalInformation: e.target.value
+                    })}
+                    helperText="Add any custom information that doesn't fit in standard sections"
+                    sx={{ mt: 2 }}
+                  />
+                </Card>
+              )}
             </Box>
             </Box>
           )}
@@ -489,9 +615,18 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
           {!showPreview && (
             <Button
               variant="outlined"
+              startIcon={<EditIcon />}
+              onClick={() => setIsEditingContent(!isEditingContent)}
+            >
+              {isEditingContent ? 'Done Editing' : 'Edit Content'}
+            </Button>
+          )}
+          {!showPreview && (
+            <Button
+              variant="outlined"
               startIcon={<PreviewIcon />}
               onClick={handleReviewSOW}
-              disabled={!generatedSOW}
+              disabled={!getFinalSOWData()}
             >
               Review SOW
             </Button>
@@ -500,7 +635,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
             <Button
               variant="contained"
               onClick={handleGenerateSOW}
-              disabled={!generatedSOW}
+              disabled={!getFinalSOWData()}
             >
               Generate & Save SOW
             </Button>

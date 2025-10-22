@@ -32,6 +32,7 @@ export interface SOWData {
   };
   services: SOWService[];
   terms: string;
+  additionalInformation?: string; // Add this field
   createdAt: string;
   createdBy: string;
 }
@@ -65,6 +66,13 @@ export interface SOWTechnicianInputs {
   specialInstructions?: string;
   clientProjectManager?: string;
   clientCostCenter?: string;
+}
+
+export interface SOWEditableSections {
+  scopeOfWork: string;
+  deliverables: string[]; // Array of deliverable items
+  services: SOWService[]; // Can edit service descriptions
+  additionalInformation?: string; // New custom section
 }
 
 // Future functionality interfaces (currently unused)
