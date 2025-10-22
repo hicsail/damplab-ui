@@ -3,6 +3,9 @@
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWService } from '../types/SOWTypes';
 import { Workflow } from '../gql/graphql';
 
+// Constants
+const SOW_STORAGE_KEY = 'damplab-sows';
+
 // Local interface for service generators
 interface ServiceContentGenerator {
   serviceId: string;
@@ -60,7 +63,8 @@ const serviceGenerators: ServiceContentGenerator[] = [
 
 // Get next SOW number from localStorage
 const getNextSOWNumber = (): string => {
-  const existingSOWs = getStoredSOWs();
+  const stored = localStorage.getItem(SOW_STORAGE_KEY);
+  const existingSOWs = stored ? JSON.parse(stored) : [];
   const nextNumber = existingSOWs.length + 1;
   return nextNumber.toString().padStart(3, '0');
 };
@@ -269,14 +273,10 @@ University shall have fulfilled its obligations when University completes the Se
 
 // localStorage utilities
 export const storeSOW = (sowData: SOWData): void => {
-  const existingSOWs = getStoredSOWs();
+  const stored = localStorage.getItem(SOW_STORAGE_KEY);
+  const existingSOWs = stored ? JSON.parse(stored) : [];
   existingSOWs.push(sowData);
-  localStorage.setItem('damplab-sows', JSON.stringify(existingSOWs));
-};
-
-export const getStoredSOWs = (): SOWData[] => {
-  const stored = localStorage.getItem('damplab-sows');
-  return stored ? JSON.parse(stored) : [];
+  localStorage.setItem(SOW_STORAGE_KEY, JSON.stringify(existingSOWs));
 };
 
 // Team members data (could be moved to a separate file or API)

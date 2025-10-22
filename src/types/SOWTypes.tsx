@@ -53,9 +53,6 @@ export interface SOWService {
   category: string;
 }
 
-// Future template functionality interfaces (currently unused)
-// export interface SOWTemplate { ... }
-// export interface SOWSectionConfig { ... }
 
 export interface SOWTechnicianInputs {
   projectManager: string;
@@ -75,6 +72,3 @@ export interface SOWEditableSections {
   additionalInformation?: string; // New custom section
 }
 
-// Future functionality interfaces (currently unused)
-// export interface SOWTeamMember { ... }
-// export interface ServiceContentGenerator { ... }

@@ -15,10 +15,8 @@ import {
   Typography,
   Card,
   CardContent,
-  Divider,
   Alert,
   IconButton,
-  Chip,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -476,8 +474,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                             {adj.type === 'discount' ? '-' : '+'} ${adj.amount.toLocaleString()} - {adj.description}
                           </Typography>
                         ))}
-                        <Divider sx={{ my: 1 }} />
-                        <Typography variant="h6">
+                        <Typography variant="h6" sx={{ mt: 2 }}>
                           Total Cost: ${generatedSOW.pricing.totalCost.toLocaleString()}
                         </Typography>
                       </CardContent>
