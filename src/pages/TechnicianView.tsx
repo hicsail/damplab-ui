@@ -6,6 +6,7 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import { Box, Button, Card, CardContent, Typography } from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check }  from '@mui/icons-material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
+import DescriptionIcon                                from '@mui/icons-material/Description';
 
 import { GET_JOB_BY_ID, }         from '../gql/queries';
 import { UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
@@ -14,6 +15,7 @@ import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 import WorkflowStepper            from '../components/WorkflowStepper';
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import JobPDFDocument             from '../components/JobPDFDocument';
+import SOWGeneratorModal          from '../components/SOWGeneratorModal';
 
 
 export default function TechnicianView() {
@@ -45,6 +47,7 @@ export default function TechnicianView() {
             setJobEmail(data.jobById.email);
             setJobNotes(data.jobById.notes);
             setWorklows(data.jobById.workflows);
+            setJobData(data.jobById); // Store complete job data for SOW generation
         },
         onError: (error: any) => {
             console.log(error.networkError?.result?.errors);
@@ -76,6 +79,8 @@ export default function TechnicianView() {
     }
 
     const [modalOpen, setModalOpen] = useState(false);
+    const [sowModalOpen, setSowModalOpen] = useState(false);
+    const [jobData, setJobData] = useState<any>(null);
 
     const handleOpenModal = () => {
         setModalOpen(true);
@@ -83,6 +88,14 @@ export default function TechnicianView() {
 
     const handleCloseModal = () => {
         setModalOpen(false);
+    };
+
+    const handleOpenSOWModal = () => {
+        setSowModalOpen(true);
+    };
+
+    const handleCloseSOWModal = () => {
+        setSowModalOpen(false);
     };
 
 
@@ -181,7 +194,7 @@ export default function TechnicianView() {
             <div style={{ textAlign: 'left', padding: '5vh' }}>
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}&nbsp;&nbsp;
-                    <Button color='primary' sx={{alignContent: 'right'}}>
+                    <Button color='primary' sx={{alignContent: 'right', mr: 1}}>
                         <PictureAsPdfIcon/>&nbsp;
                         <PDFDownloadLink
                             document={
@@ -200,6 +213,15 @@ export default function TechnicianView() {
                         >
                             {({ blob, url, loading, error }) => (loading ? 'Loading document...' : 'Download Summary')}
                         </PDFDownloadLink>
+                    </Button>
+                    <Button 
+                        color='secondary' 
+                        variant='contained'
+                        startIcon={<DescriptionIcon />}
+                        onClick={handleOpenSOWModal}
+                        disabled={!jobData}
+                    >
+                        Generate SOW
                     </Button>
                 </Typography>
                 <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
@@ -236,6 +258,11 @@ export default function TechnicianView() {
                     }
                 </Box>
                 <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id}/>
+                <SOWGeneratorModal 
+                    open={sowModalOpen} 
+                    onClose={handleCloseSOWModal} 
+                    jobData={jobData}
+                />
             </div>
         </div>
     )
