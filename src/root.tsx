@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext, useMemo } from "react";
+import { useEffect, useState, useContext } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 // someday: import from @apollo/client once Apollo Client 4 is out (which will address ESM issues) - see discussion at
 // https://github.com/apollographql/apollo-client/issues/9976#issuecomment-1768446694
