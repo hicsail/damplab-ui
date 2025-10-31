@@ -16,8 +16,13 @@ import { GET_BUNDLES, GET_SERVICES } from "./gql/queries";
 import { UserContext } from "./contexts/UserContext";
 import HeaderBar from "./components/HeaderBar";
 import './root.css';
+import { CircularProgress } from "@mui/material";
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './styles/themes';
+
+export function HydrateFallback() {
+    return <CircularProgress />;
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
