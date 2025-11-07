@@ -39,7 +39,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <body>
         <div className="App">
-          <HeaderBar />
           <div style={{ padding: 20 }}>
             {children}
           </div>
@@ -127,6 +126,7 @@ export default function Root() {
               setNodeParams: setNodeParams,
             }}
           >
+            <HeaderBar />
             <Outlet />
           </CanvasContext>
         </AppContext>
