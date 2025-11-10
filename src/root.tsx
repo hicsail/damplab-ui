@@ -16,8 +16,13 @@ import { GET_BUNDLES, GET_SERVICES } from "./gql/queries";
 import { UserContext } from "./contexts/UserContext";
 import HeaderBar from "./components/HeaderBar";
 import './root.css';
+import { CircularProgress } from "@mui/material";
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './styles/themes';
+
+export function HydrateFallback() {
+    return <CircularProgress />;
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -27,11 +32,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <link rel="icon" href="/favicon.ico?v=5" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#000000" />
-        {/*
-                manifest.json provides metadata used when your web app is installed on a
-                user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-        */}
-        <link rel="manifest" href="/manifest.json" />
         <title>DAMPLab Canvas</title>
         <Meta />
         <Links />
@@ -39,7 +39,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <body>
         <div className="App">
-          <HeaderBar />
           <div style={{ padding: 20 }}>
             {children}
           </div>
@@ -127,6 +126,7 @@ export default function Root() {
               setNodeParams: setNodeParams,
             }}
           >
+            <HeaderBar />
             <Outlet />
           </CanvasContext>
         </AppContext>

@@ -64,7 +64,6 @@ export default function MainFlow() {
     const onDrop = useCallback((event: any) => {
 
         event.preventDefault();
-        const reactFlowBounds = reactFlowWrapper.current!.getBoundingClientRect();
 
         let type = event.dataTransfer.getData('application/reactflow');
             type = JSON.parse(type);
@@ -77,9 +76,9 @@ export default function MainFlow() {
             return;
         }
        
-        const position = reactFlowInstance.project({
-            x: event.clientX - reactFlowBounds.left,
-            y: event.clientY - reactFlowBounds.top,
+        const position = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
         });
 
         const nodeId = Math.random().toString(36).substring(2, 9);
