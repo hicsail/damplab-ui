@@ -4,7 +4,7 @@ import ParamTable from './ParamTable';
 import CloseIcon from '@mui/icons-material/Close';
 
 type ColumnData = {
-  header: string;
+  headerName: string;
   field: string;
 };
 
@@ -45,7 +45,7 @@ const DisplayTable: React.FC<DisplayTableProps> = ({ title, columns, rows, onSav
         <TableHead>
           <TableRow>
             {columns.map((col, colIndex) => (
-              <TableCell key={colIndex}>{col.header}</TableCell>
+              <TableCell key={colIndex}>{col.headerName || col.field}</TableCell>
             ))}
           </TableRow>
         </TableHead>
