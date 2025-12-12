@@ -16,7 +16,6 @@ export default () => {
   const {setNodes, setEdges} = useContext(CanvasContext);
 
   const [category,         setCategory]         = useState('');
-  const [categories,       setCategories]       = useState<any>([]);
   const [alignment,        setAlignment]        = useState('bundles');
   const [filteredServices, setFilteredServices] = useState(services);
   const [searchText,      setSearchText]       = useState('');
@@ -51,14 +50,11 @@ export default () => {
   };
 
   // execute query to get categories
-  const { loading, error, data } = useQuery(GET_CATEGORIES, {
-    onCompleted: (data) => {
-      setCategories(data.categories);
-    },
-    onError: (error) => {
-      console.log('error', error);
-    }
-  });
+  const { loading, error, data } = useQuery(GET_CATEGORIES);
+  const categories = data?.categories || [];
+  if (error !== undefined) {
+    console.error(error);
+  }
 
   // filtering services by category, update filteredServices when category or services change
   useEffect(() => {

@@ -27,7 +27,7 @@ git clone git@github.com:hicsail/damplab-ui.git
 cd damplab-ui
 ```
 
-If necessary, install Node.js and npm (Node Package Manager) (tested on v18.16.0): 
+If necessary, install Node.js and npm (Node Package Manager) (tested on v22.14.0):
 
  - [Node.js and npm install instructions](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm#using-a-node-version-manager-to-install-nodejs-and-npm)
 
@@ -35,7 +35,7 @@ If necessary, install Node.js and npm (Node Package Manager) (tested on v18.16.0
 You can then install the dependencies and launch the program in development mode by running the following from the root folder: 
 
 ```console
-run npm install --legacy-peer-deps
+npm install
 npm start
 ```
 
@@ -70,16 +70,30 @@ Ultimately, the tool will have a wide variety of other features, such as a biose
  - Branching path workflows/stages (re-implementation)
 
 
-## Getting Started with Create React App
+### Some instructions on setting up auth with Keycloak
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+First, deploy a Keycloak instance. The exact method will depend on the platform.
+[Here](https://www.keycloak.org/getting-started/getting-started-docker) are the Keycloak quickstart docs for Docker.
+You will probably also want to [https://www.keycloak.org/server/db](set up a database) container alongside, and a Docker volume for the database.
+To [use Keycloak in production](https://www.keycloak.org/server/configuration-production), mount the appropriate TLS certificates into the container from Docker secrets, configure the cert/key locations accordingly, and configure the Keycloak hostname.
+
+You will need to set up a realm, register a (public) client, and create user(s).
+Be sure to carefully configure appropriate Redirect URIs and Web Origins on the client; since the app must use a public client, this is especially important for security.
+To additionally enable the use of Google as an IdP, set up a client on Google Auth Platform, then configure the use of the client on Keycloak under the damplab realm's identity providers.
+
+The damplab-ui app expects to see certain roles attached to its users.
+These are: `damplab-staff`, `internal-customer`, and `external-customer`.
+It often makes sense to assign roles to groups and then add users to groups, rather than configuring roles directly on the users.
+
+The damplab-ui app will then need the following environment variables to be set in order to talk to Keycloak:
+- `VITE_KEYCLOAK_URL`
+- `VITE_KEYCLOAK_REALM`
+- `VITE_KEYCLOAK_CLIENT_ID`
+
 
 ### Learn More
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
+This [React](https://reactjs.org/) app is built on [Vite](https://vite.dev/) and [React Router](https://reactrouter.com/).
 
 ## Credit
 

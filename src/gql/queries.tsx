@@ -1,10 +1,13 @@
-import { gql } from '@apollo/client';
+// someday: import from @apollo/client once Apollo Client 4 is out (which will address ESM issues) - see discussion at
+// https://github.com/apollographql/apollo-client/issues/9976#issuecomment-1768446694
+import { gql } from '@apollo/client/index.js';
 
 export const GET_SERVICES = gql`
     query GetServices {
         services {
             id
             name
+            price
             icon
             parameters
             description
@@ -70,9 +73,11 @@ export const GET_JOB_BY_ID = gql`
                     _id
                     id
                     label
+                    price
                     service {
                         id
                         name
+                        price
                         icon
                         parameters
                         allowedConnections {
@@ -204,6 +209,7 @@ export const CREATE_SERVICE = gql`
     createService(service: $service) {
       id
       name
+      price
       icon
       parameters
       description
@@ -211,6 +217,72 @@ export const CREATE_SERVICE = gql`
       allowedConnections {
           id
           name
+      }
+    }
+  }
+`;
+
+
+export const GET_ANNOUNCEMENTS = gql`
+  query{
+	announcements{
+    text
+    timestamp
+    is_displayed
+    }
+  }
+`;
+
+// Template queries
+export const GET_TEMPLATES = gql`
+  query GetTemplates {
+    templates {
+      id
+      name
+      description
+      createdAt
+      columnMapping {
+        field
+        headerName
+        type
+        width
+        order
+      }
+    }
+  }
+`;
+
+export const GET_TEMPLATE_BY_ID = gql`
+  query GetTemplateById($id: ID!) {
+    template(id: $id) {
+      id
+      name
+      description
+      createdAt
+      columnMapping {
+        field
+        headerName
+        type
+        width
+        order
+      }
+    }
+  }
+`;
+
+export const GET_TEMPLATE_BY_NAME = gql`
+  query GetTemplateByName($name: String!) {
+    templateByName(name: $name) {
+      id
+      name
+      description
+      createdAt
+      columnMapping {
+        field
+        headerName
+        type
+        width
+        order
       }
     }
   }

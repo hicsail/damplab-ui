@@ -1,28 +1,27 @@
-FROM node:18-alpine as builder
+FROM node:22 AS build
 
-ARG REACT_APP_BACKEND
-ARG REACT_APP_ADMIN_USERNAME
-ARG REACT_APP_ADMIN_PASSWORD
-ARG REACT_APP_CLIENT_USERNAME
-ARG REACT_APP_CLIENT_PASSWORD
+ARG VITE_BACKEND
+ARG VITE_KEYCLOAK_URL
+ARG VITE_KEYCLOAK_REALM
+ARG VITE_KEYCLOAK_CLIENT_ID
 
-ENV REACT_APP_BACKEND ${REACT_APP_BACKEND}
-ENV REACT_APP_ADMIN_USERNAME ${REACT_APP_ADMIN_USERNAME}
-ENV REACT_APP_ADMIN_PASSWORD ${REACT_APP_ADMIN_PASSWORD}
-ENV REACT_APP_CLIENT_USERNAME ${REACT_APP_CLIENT_USERNAME}
-ENV REACT_APP_CLIENT_PASSWORD ${REACT_APP_CLIENT_PASSWORD}
+ENV VITE_BACKEND=${VITE_BACKEND}
+ENV VITE_KEYCLOAK_URL=${VITE_KEYCLOAK_URL}
+ENV VITE_KEYCLOAK_REALM=${VITE_KEYCLOAK_REALM}
+ENV VITE_KEYCLOAK_CLIENT_ID=${VITE_KEYCLOAK_CLIENT_ID}
 
-WORKDIR /usr/src/app
-
+WORKDIR /app
 COPY . .
-
-RUN npm install --legacy-peer-deps
+RUN npm install
 RUN npm run build
 
-FROM registry.access.redhat.com/ubi7/nginx-120
 
-COPY --from=builder /usr/src/app/build .
+FROM nginx:1.28
 
-ADD ./nginx.conf "${NGINX_CONF_PATH}"
+COPY nginx-http-server.conf /etc/nginx/conf.d/default.conf
 
-CMD nginx -g "daemon off;"
+COPY --from=build /app/build/client /usr/share/nginx/html
+RUN mkdir -p /var/cache/nginx/client_temp \
+  && chown -R nginx:nginx /var/cache/nginx
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

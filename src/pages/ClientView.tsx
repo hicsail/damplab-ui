@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { useQuery } from '@apollo/client';
 import { Box, Card, CardContent, Typography }        from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check } from '@mui/icons-material';

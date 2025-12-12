@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useContext } from 'react';
-import { useParams } from 'react-router-dom';
-import { useMutation } from '@apollo/client';
+import { useParams } from 'react-router';
+import { useApolloClient, useMutation } from '@apollo/client';
 import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOptions, 
                     applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -28,7 +28,8 @@ const fitViewOptions: FitViewOptions = {
 };
 
 
-export default function MainFlow( client: any /*data: any*/) {
+export default function MainFlow() {
+    const apolloClient = useApolloClient();
     const { id }                                                   = useParams();
     const reactFlowWrapper                                         = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance]                = useState<any>(null);
@@ -63,7 +64,6 @@ export default function MainFlow( client: any /*data: any*/) {
     const onDrop = useCallback((event: any) => {
 
         event.preventDefault();
-        const reactFlowBounds = reactFlowWrapper.current!.getBoundingClientRect();
 
         let type = event.dataTransfer.getData('application/reactflow');
             type = JSON.parse(type);
@@ -76,16 +76,16 @@ export default function MainFlow( client: any /*data: any*/) {
             return;
         }
        
-        const position = reactFlowInstance.project({
-            x: event.clientX - reactFlowBounds.left,
-            y: event.clientY - reactFlowBounds.top,
+        const position = reactFlowInstance.screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
         });
 
         const nodeId = Math.random().toString(36).substring(2, 9);
         setActiveComponentId(nodeId);
 
         const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
-        const data: NodeData = { id: nodeId, label: name, description: type.description, allowedConnections: type.allowedConnections, 
+        const data: NodeData = { id: nodeId, label: name, price: type.price, description: type.description, allowedConnections: type.allowedConnections, 
             icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId, paramGroups: type.paramGroups };
         const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
@@ -106,7 +106,7 @@ export default function MainFlow( client: any /*data: any*/) {
 
     useEffect(() => {
         if (id !== undefined) {
-            client.client.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
+            apolloClient.query({ query: GET_JOB_BY_ID, variables: { id: id } }).then((result: any) => {
                 console.log('job loaded successfully', result);
                 if (workflows.length === 0) {
                     workflows = result.data.jobById.workflows;

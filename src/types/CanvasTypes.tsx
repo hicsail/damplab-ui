@@ -1,6 +1,7 @@
 export type NodeData = {
     id: string;
     label: string;
+    price: number;
     allowedConnections: string[];
     icon: string;
     parameters: NodeParameter[];

@@ -40,6 +40,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
     const nodeData = {
         id                    : nodeId,
         label                 : service.name,
+        price                 : service.price,
         description           : service.description,
         allowedConnections    : service.allowedConnections,
         icon                  : service.icon,
@@ -137,13 +138,13 @@ export const transformNodesToGQL = (nodes: any) => {
         gqlNode           = { ...node.data };
         gqlNode.reactNode = node;
         gqlNode.serviceId = node.data.serviceId  // random value for now 
-        // remove allowedConnections
+        // remove fields that are not part of backend's workflownode schema
         delete gqlNode.allowedConnections;
         delete gqlNode.icon;
-        //delete gqlNode.serviceId;
         delete gqlNode.parameters;
         delete gqlNode.description;
         delete gqlNode.paramGroups;
+
         console.log('gqlNode: ', gqlNode);
         gqlNodes.push(gqlNode);
     });
@@ -276,6 +277,7 @@ export const transformGQLToWorkflow = (workflow: any) => {
         return {
             id         : node._id,
             name       : node.service.name,
+            price      : node.price,
             state      : node.state,
             description: node.description,
             data: {

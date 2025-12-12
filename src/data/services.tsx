@@ -15,8 +15,7 @@ export let services: Service[] = [
     // icon: 'https://drive.google.com/thumbnail?id=1pld9hXCDV9u1MSkMbUBXg4mtvBwMpS1I',
     // icon: 'https://raw.githubusercontent.com/hicsail/damplab-ui/691ace7a9955f4539add30fe641a3dcc82cba31a/public/gibson-assembly.svg',
     icon: "https://drive.google.com/thumbnail?id=1S9H5ydQhe9jyFmRtz09yExg4a8j36-Mp",
-    description:
-      "Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously.",
+    description: "Gibson Assembly is a method of joining double-stranded DNA fragments in vitro. It is a rapid, reliable, and scarless method of DNA assembly that can be used to join both sticky and blunt ends, and can be used to assemble multiple DNA fragments simultaneously.",
     parameters: [
       {
         id: "vector",
@@ -56,8 +55,7 @@ export let services: Service[] = [
       {
         id: "plasmid-map",
         name: "Full plasmid map",
-        description:
-          "upload full annotated file of design including vectors, inserts and primers",
+        description: "upload full annotated file of design including vectors, inserts and primers",
         type: "file",
         // file type limited to .gb .fasta .svg maybe sbol in the future
         paramType: "input",
@@ -92,6 +90,7 @@ export let services: Service[] = [
     result: {
       // add gibson product result
     },
+    price: 0
   },
   {
     id: "m-cloning", // PRODUCES DNA; SCREENING REQUIRED
@@ -191,6 +190,7 @@ export let services: Service[] = [
       type: "MCloningResult",
     },
     description: "",
+    price: 0
   },
   {
     id: "restriction-digest",
@@ -244,6 +244,7 @@ export let services: Service[] = [
     ],
     categories: [],
     description: "",
+    price: 0
   },
   {
     id: "restriction-ligation",
@@ -281,12 +282,12 @@ export let services: Service[] = [
       "restriction-digest",
     ],
     categories: [],
+    price: 0
   },
   {
     id: "gel-electrophoresis",
     name: "Gel Electrophoresis",
-    description:
-      "Gel electrophoresis is a laboratory method used to separate mixtures of DNA, RNA, or proteins according to molecular size. In gel electrophoresis, the molecules to be separated are pushed by an electrical field through a gel that contains small pores.",
+    description: "Gel electrophoresis is a laboratory method used to separate mixtures of DNA, RNA, or proteins according to molecular size. In gel electrophoresis, the molecules to be separated are pushed by an electrical field through a gel that contains small pores.",
     // icon: 'https://drive.google.com/uc?id=1lIq60MG4kdCmu4iJrNZikAc60TUlta5M', // find real icon
     icon: "https://drive.google.com/thumbnail?id=1QzCvaWYcw7hwXhxjDbcYcbIvvft6sqv8",
     parameters: [
@@ -384,6 +385,7 @@ export let services: Service[] = [
       "gibson-assembly",
     ],
     categories: [],
+    price: 0
   },
   {
     id: "dna-gel",
@@ -410,6 +412,7 @@ export let services: Service[] = [
     ],
     allowedConnections: ["dna-storage", "gel-electrophoresis"],
     categories: ["dna-rna"],
+    price: 0
   },
   {
     id: "clean-up",
@@ -450,7 +453,7 @@ export let services: Service[] = [
         ],
       },
     ],
-    // add allowed connections
+    price: 0
   },
   {
     id: "eth-perc",
@@ -482,6 +485,7 @@ export let services: Service[] = [
       type: "EthPercResult",
       name: "Ethanol Precipitation Result",
     },
+    price: 0
   },
   {
     id: "dna-rna-extraction",
@@ -501,6 +505,7 @@ export let services: Service[] = [
     allowedConnections: ["qpcr"],
     categories: ["dna-rna"],
     description: "",
+    price: 0
   },
   {
     id: "miniprep-gs",
@@ -531,6 +536,7 @@ export let services: Service[] = [
       id: "miniprep-gs-product",
       type: "MiniprepGSResult",
     },
+    price: 0
   },
   {
     id: "glyc-storage",
@@ -554,6 +560,7 @@ export let services: Service[] = [
       type: "GlycStorageResult",
       name: "Glycerol Stock Storage Result",
     },
+    price: 0
   },
   {
     id: "rehydrate-primer",
@@ -581,6 +588,7 @@ export let services: Service[] = [
     allowedConnections: ["pcr"],
     categories: ["dna-assembly-cloning"],
     result: null,
+    price: 0
   },
   {
     id: "gene",
@@ -611,6 +619,7 @@ export let services: Service[] = [
       type: "GeneFragmentResult",
       text: "DNA suspended in solution to standard concentration",
     },
+    price: 0
   },
   {
     id: "design-primers",
@@ -663,6 +672,7 @@ export let services: Service[] = [
     categories: ["dna-assembly-cloning"],
     allowedConnections: ["rehydrate-primer"],
     result: null,
+    price: 0
   },
   {
     id: "spectro",
@@ -685,14 +695,14 @@ export let services: Service[] = [
       type: "SpectroResult",
       name: "Spectrophotometric Assay Result",
     },
+    price: 0
   },
   {
     id: "sii",
     name: "Sample Indexing Information",
     // icon: 'https://drive.google.com/uc?id=1WV97Xgtp-ZngdSS1A-f8Vk9lP2LAuOpt',
     icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM",
-    description:
-      "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.",
+    description: "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.",
     parameters: [
       {
         id: "param",
@@ -705,13 +715,13 @@ export let services: Service[] = [
     ],
     allowedConnections: [],
     categories: [],
+    price: 0
   },
   {
     id: "pcr",
     name: "PCR",
     icon: "https://drive.google.com/thumbnail?id=13yRKvw2299FCjbxxfSwyIhJxinB0SbpM",
-    description:
-      "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.",
+    description: "Polymerase chain reaction (abbreviated PCR) is a laboratory technique for rapidly producing (amplifying) millions to billions of copies of a specific segment of DNA, which can then be studied in greater detail. PCR involves using short synthetic DNA fragments called primers to select a segment of the genome to be amplified, and then multiple rounds of DNA synthesis to amplify that segment.",
     paramGroups: [
       {
         id: "g-block",
@@ -725,7 +735,7 @@ export let services: Service[] = [
         type: "number",
         paramType: "input",
         required: true,
-        paramGroupId: "g-block", 
+        paramGroupId: "g-block",
       },
       {
         id: "supplied-volume",
@@ -888,9 +898,10 @@ export let services: Service[] = [
       type: "PCRResult",
       result: {
         id: "pcr-result",
-        amount: "number", 
+        amount: "number",
       },
     },
+    price: 0
   },
 
   {
@@ -931,6 +942,7 @@ export let services: Service[] = [
     ],
     categories: [],
     allowedConnections: [],
+    price: 0
   },
   {
     id: "normalization",
@@ -993,6 +1005,7 @@ export let services: Service[] = [
     ],
     allowedConnections: [],
     categories: [],
+    price: 0
   },
   {
     id: "pooling",
@@ -1023,8 +1036,7 @@ export let services: Service[] = [
         type: "number",
         paramType: "input",
         required: false,
-        description:
-          "in uL, option to cap sample volume added to pool to a certain volume",
+        description: "in uL, option to cap sample volume added to pool to a certain volume",
       },
       {
         id: "dilute-final-pool",
@@ -1054,6 +1066,7 @@ export let services: Service[] = [
     ],
     allowedConnections: ["frag-analyzer"],
     categories: [],
+    price: 0
   },
 
   {
@@ -1141,6 +1154,7 @@ export let services: Service[] = [
         amount: "number", // this will be equal to reaction volume number
       },
     },
+    price: 0
   },
   {
     id: "seq",
@@ -1160,8 +1174,7 @@ export let services: Service[] = [
       {
         id: "plasmid-map",
         name: "Full plasmid map",
-        description:
-          "upload full annotated file of design including vectors, inserts and primers",
+        description: "upload full annotated file of design including vectors, inserts and primers",
         type: "file",
         // file type limited to .gb .fasta .svg maybe sbol in the future
         paramType: "input",
@@ -1223,6 +1236,7 @@ export let services: Service[] = [
     categories: ["dna-rna"],
     // need to think about to capture result that comes from a file they send
     result: null,
+    price: 0
   },
   {
     id: "next-gen-seq",
@@ -1247,7 +1261,6 @@ export let services: Service[] = [
         paramType: "input",
         required: false,
       },
-
       // add more
     ],
     result: {
@@ -1255,6 +1268,7 @@ export let services: Service[] = [
       type: "SeqResult",
       name: "NGS Sequencing Result",
     },
+    price: 0
   },
   {
     id: "cell-culture-induction",
@@ -1292,6 +1306,7 @@ export let services: Service[] = [
       type: "InducedSampleResult",
       name: "Induced Bacterial Culture Result",
     },
+    price: 0
   },
   {
     id: "cell-lysate",
@@ -1322,6 +1337,7 @@ export let services: Service[] = [
       type: "CellLysateResult",
       name: "Cell Lysate Result",
     },
+    price: 0
   },
   {
     id: "protein-production",
@@ -1357,6 +1373,7 @@ export let services: Service[] = [
       type: "LysateProteinResult",
       name: "Cell Lysate Containing Protein",
     },
+    price: 0
   },
   {
     id: "transformation",
@@ -1441,8 +1458,7 @@ export let services: Service[] = [
         type: "number",
         paramType: "input",
         required: true,
-        description:
-          "default is 37 degrees C and 250RPM, range is 30 - 42 degrees C",
+        description: "default is 37 degrees C and 250RPM, range is 30 - 42 degrees C",
       },
       {
         id: "antibiotic",
@@ -1497,6 +1513,7 @@ export let services: Service[] = [
       id: "transformation-product",
       type: "TransformationResult",
     },
+    price: 0
   },
   {
     id: "overnight-culture",
@@ -1624,6 +1641,7 @@ export let services: Service[] = [
       id: "overnight-culture-product",
       type: "OvernightCultureResult",
     },
+    price: 0
   },
   {
     id: "dna-storage",
@@ -1650,6 +1668,7 @@ export let services: Service[] = [
     categories: ["dna-assembly-cloning"],
     // add allowed connections
     allowedConnections: [],
+    price: 0
   },
   {
     id: "storage",
@@ -1680,6 +1699,7 @@ export let services: Service[] = [
       type: "OvernightCultureStorageResult",
       name: "Overnight Bacterial Culture Storage Result",
     },
+    price: 0
   },
   {
     id: "frag-analyzer",
@@ -1717,6 +1737,7 @@ export let services: Service[] = [
       type: "FragAnalyzerResult",
       name: "Fragment Analyzer Result",
     },
+    price: 0
   },
   {
     id: "mRNA-enrichment", // Removed temporarily from database/upload-mutation.gql; may re-add in future...
@@ -1747,5 +1768,6 @@ export let services: Service[] = [
       type: "MRnaEnrichmentResult",
       name: "mRNA Enrichment Result",
     },
+    price: 0
   },
 ];

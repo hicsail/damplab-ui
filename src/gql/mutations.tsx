@@ -12,11 +12,60 @@ export const CREATE_WORKFLOW = gql`
 `;
 
 export const CREATE_JOB = gql`
-    mutation createJob($createJobInput: CreateJob!) {
+    mutation createJob($createJobInput: CreateJobInput!) {
         createJob(createJobInput: $createJobInput) {
             id
             name
         }
+    }
+`;
+
+// Template mutations
+export const CREATE_TEMPLATE = gql`
+    mutation CreateTemplate($input: CreateTemplateInput!) {
+        createTemplate(input: $input) {
+            id
+            name
+            description
+            createdAt
+            columnMapping {
+                field
+                headerName
+                type
+                width
+                order
+            }
+        }
+    }
+`;
+
+export const UPDATE_TEMPLATE = gql`
+    mutation UpdateTemplate($input: UpdateTemplateInput!) {
+        updateTemplate(input: $input) {
+            id
+            name
+            description
+            createdAt
+            columnMapping {
+                field
+                headerName
+                type
+                width
+                order
+            }
+        }
+    }
+`;
+
+export const DELETE_TEMPLATE = gql`
+    mutation DeleteTemplate($id: ID!) {
+        deleteTemplate(id: $id)
+    }
+`;
+
+export const DELETE_TEMPLATE_BY_NAME = gql`
+    mutation DeleteTemplateByName($name: String!) {
+        deleteTemplateByName(name: $name)
     }
 `;
 
@@ -63,4 +112,23 @@ export const MUTATE_JOB_STATE = gql`
             state
         }
     }
+`;
+
+export const CREATE_ANNOUNCEMENT = gql`
+  mutation createAnnouncement($input: CreateAnnouncementInput!) {
+    createAnnouncement(input: $input) {
+      text
+      timestamp
+      is_displayed
+    }
+  }
+`;
+
+export const UPDATE_ANNOUNCEMENT = gql`
+  mutation UpdateAnnouncement($input: UpdateAnnouncementInput!) {
+    updateAnnouncement(input: $input) {
+      timestamp
+      is_displayed
+    }
+  }
 `;
