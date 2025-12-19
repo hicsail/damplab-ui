@@ -15,7 +15,7 @@ export default [
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),
-        route("/jobs/:jobId", "./pages/JobSubmitted.tsx") //config later so only owner of job or admin can access
+        route("/jobs/:jobId", "./pages/JobSubmitted.tsx")
     ]),
     layout("./layouts/PrivateRouteDamplabStaff.tsx", [
         route("/technician_view/:id", "./pages/TechnicianView.tsx"),
