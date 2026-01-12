@@ -102,6 +102,21 @@ export const GET_JOB_BY_ID = gql`
     }
 `;
 
+// For Dashboard page; requires admin role.
+export const GET_JOBS = gql`
+    query GetJobs {
+        jobs {
+            id
+            name
+            username
+            institute
+            email
+            submitted
+            notes
+            state
+        }
+    }
+`
 // get workflows from gql
 export const GET_WORKFLOWS_BY_STATE = gql`
     query GetWorkflowsByState($state: WorkflowState!) {
