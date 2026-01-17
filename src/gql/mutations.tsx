@@ -132,3 +132,63 @@ export const UPDATE_ANNOUNCEMENT = gql`
     }
   }
 `;
+
+export const UPDATE_BUNDLE = gql`
+  mutation UpdateBundle($bundle: ID!, $changes: UpdateBundleInput!) {
+    updateBundle(bundle: $bundle, changes: $changes) {
+      id
+      label
+      icon
+      nodes {
+        _id
+        id
+        label
+        service {
+          id
+          name
+        }
+        position {
+          x
+          y
+        }
+      }
+      edges {
+        id
+        source {
+          _id
+          id
+          label
+        }
+        target {
+          _id
+          id
+          label
+        }
+        reactEdge
+      }
+    }
+  }
+`;
+
+export const CREATE_BUNDLE = gql`
+  mutation CreateBundle($input: CreateBundleInput!) {
+    createBundle(input: $input) {
+      id
+      label
+      icon
+      nodes {
+        id
+        label
+      }
+      edges {
+        id
+      }
+    }
+  }
+`;
+
+export const DELETE_BUNDLE = gql `
+  mutation DeleteBundle($id: ID!) {
+    deleteBundle(id: $id)
+  }
+`;

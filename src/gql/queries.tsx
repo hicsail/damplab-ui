@@ -21,19 +21,34 @@ export const GET_SERVICES = gql`
 `;
 
 export const GET_BUNDLES = gql`
-    query GetBundles {
-        bundles {
-            id
-            label
-            icon
-            services {
-                id
-                name
-                icon
-                parameters
-            }
+  query GetBundles {
+    bundles{
+      id
+      label
+      nodes {
+        _id
+        id
+        label
+        service {
+          id
+          name
         }
+      }
+      edges {
+        id
+        source {
+          _id
+          id
+          label
+        }
+        target {
+          _id
+          id
+          label
+        }
+      }
     }
+  }
 `;
 
 export const GET_CATEGORIES = gql`
