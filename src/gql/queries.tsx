@@ -12,6 +12,7 @@ export const GET_SERVICES = gql`
             parameters
             description
             paramGroups
+            deliverables
             allowedConnections {
                 id
                 name
@@ -65,6 +66,14 @@ export const GET_JOB_BY_ID = gql`
             state
             submitted
             notes
+            sow {
+                id
+                sowNumber
+                date
+                status
+                createdAt
+                updatedAt
+            }
             workflows {
                 id
                 state
@@ -80,6 +89,7 @@ export const GET_JOB_BY_ID = gql`
                         price
                         icon
                         parameters
+                        deliverables
                         allowedConnections {
                             id
                             name
@@ -199,7 +209,10 @@ export const DELETE_SERVICE = gql`
 export const UPDATE_SERVICE = gql`
   mutation updateService($service: ID!, $changes: ServiceChange!) {
     updateService(service: $service, changes: $changes) {
+      id
       name
+      price
+      deliverables
     }
   }
 `;
@@ -214,6 +227,7 @@ export const CREATE_SERVICE = gql`
       parameters
       description
       paramGroups
+      deliverables
       allowedConnections {
           id
           name
@@ -284,6 +298,132 @@ export const GET_TEMPLATE_BY_NAME = gql`
         width
         order
       }
+    }
+  }
+`;
+
+// SOW Queries
+export const GET_SOW_BY_ID = gql`
+  query GetSOWById($id: ID!) {
+    sowById(id: $id) {
+      id
+      sowNumber
+      date
+      jobId
+      jobName
+      clientName
+      clientEmail
+      clientInstitution
+      clientAddress
+      scopeOfWork
+      deliverables
+      services {
+        id
+        name
+        description
+        cost
+        category
+      }
+      timeline {
+        startDate
+        endDate
+        duration
+      }
+      resources {
+        projectManager
+        projectLead
+      }
+      pricing {
+        baseCost
+        adjustments {
+          id
+          type
+          description
+          amount
+          reason
+        }
+        totalCost
+        discount {
+          amount
+          reason
+        }
+      }
+      terms
+      additionalInformation
+      createdAt
+      updatedAt
+      createdBy
+      status
+    }
+  }
+`;
+
+export const GET_SOW_BY_JOB_ID = gql`
+  query GetSOWByJobId($jobId: ID!) {
+    sowByJobId(jobId: $jobId) {
+      id
+      sowNumber
+      date
+      jobId
+      jobName
+      clientName
+      clientEmail
+      clientInstitution
+      clientAddress
+      scopeOfWork
+      deliverables
+      services {
+        id
+        name
+        description
+        cost
+        category
+      }
+      timeline {
+        startDate
+        endDate
+        duration
+      }
+      resources {
+        projectManager
+        projectLead
+      }
+      pricing {
+        baseCost
+        adjustments {
+          id
+          type
+          description
+          amount
+          reason
+        }
+        totalCost
+        discount {
+          amount
+          reason
+        }
+      }
+      terms
+      additionalInformation
+      createdAt
+      updatedAt
+      createdBy
+      status
+    }
+  }
+`;
+
+// Comments Queries
+export const GET_COMMENTS_BY_JOB_ID = gql`
+  query GetCommentsByJobId($jobId: ID!) {
+    commentsByJobId(jobId: $jobId) {
+      id
+      content
+      author
+      authorType
+      createdAt
+      updatedAt
+      isInternal
     }
   }
 `;

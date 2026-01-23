@@ -16,6 +16,8 @@ import WorkflowStepper            from '../components/WorkflowStepper';
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import JobPDFDocument             from '../components/JobPDFDocument';
 import SOWGeneratorModal          from '../components/SOWGeneratorModal';
+import { SOWViewer }              from '../components/SOWViewer';
+import { CommentsSection }        from '../components/CommentsSection';
 
 
 export default function TechnicianView() {
@@ -32,11 +34,11 @@ export default function TechnicianView() {
     const [jobEmail, setJobEmail]             = useState('');
     const [jobNotes, setJobNotes] = useState('');
     const [workflows, setWorklows]            = useState([]);  // ▶ URLSearchParams {}
+    const [sowData, setSowData] = useState<any>(null);
 
     const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
         onCompleted: (data) => {
-            console.log('job successfully loaded: ', data);
             setWorkflowName(data.jobById.workflows[0].name);
             setWorkflowState(data.jobById.workflows[0].state);
             setJobName(data.jobById.name);
@@ -48,19 +50,19 @@ export default function TechnicianView() {
             setJobNotes(data.jobById.notes);
             setWorklows(data.jobById.workflows);
             setJobData(data.jobById); // Store complete job data for SOW generation
+            setSowData(data.jobById.sow); // Store SOW data if it exists
         },
         onError: (error: any) => {
-            console.log(error.networkError?.result?.errors);
+            // Error handled by error state
         }
     });
 
     const [acceptWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
         onCompleted: (data) => {
-            console.log('successfully accepted workflow:', data);
+            // Workflow accepted successfully
         },
         onError: (error: any) => {
-            console.log(error.networkError?.result?.errors);
-            console.log('error accepting workflow', error);
+            // Error handled by error state
         }
     });
 
@@ -124,9 +126,6 @@ export default function TechnicianView() {
         }
     }, [workflows]);
 
-    useEffect(() => {
-        console.log('submitted workflows: ', submittedWorkflows);
-    }, [submittedWorkflows]);
 
     const jobStatus = () => {
         const submitText = "The job was submitted to the DAMP lab and is awaiting review.";
@@ -172,7 +171,7 @@ export default function TechnicianView() {
     const workflowCard = (
         workflows.map((workflow: any, index: number) => {
             return (
-                <Card key={index} sx={{m:1, boxShadow: 2}}>
+                <Card key={workflow.id || `workflow-${index}`} sx={{m:1, boxShadow: 2}}>
                     <CardContent>
                         <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
                             <Typography sx={{ fontSize: 15 }} color="text.secondary" align="left">{workflowName}</Typography>
@@ -180,7 +179,7 @@ export default function TechnicianView() {
                         </Box>
                         <Typography sx={{ fontSize: 13 }} color="text.secondary" align="left">{workflow.state.replace('_', ' ')}</Typography>
                         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
-                            <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
+                            <WorkflowStepper workflow={transformGQLToWorkflow(workflow).nodes} />
                         </Box>
                     </CardContent>
                 </Card>
@@ -250,6 +249,14 @@ export default function TechnicianView() {
                         {workflowCard}
                     </Box>
                 </Box>
+                {/* SOW Status Indicator */}
+                {sowData && (
+                    <SOWViewer 
+                        jobId={id || ''} 
+                        sowData={sowData}
+                    />
+                )}
+
                 <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: 30 }}>
                     {
                         jobState === 'SUBMITTED' 
@@ -257,6 +264,16 @@ export default function TechnicianView() {
                         : <p></p>
                     }
                 </Box>
+
+                {/* Comments Section */}
+                <CommentsSection 
+                    jobId={id || ''}
+                    currentUser={{
+                        email: 'technician@bu.edu', // TODO: Get from auth context
+                        isStaff: true
+                    }}
+                />
+
                 <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id}/>
                 <SOWGeneratorModal 
                     open={sowModalOpen} 

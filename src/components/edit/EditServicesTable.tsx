@@ -22,6 +22,7 @@ import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
 import { Button, Dialog, DialogContent, Alert, Snackbar } from '@mui/material';
 import { EditParametersTable } from './parameters/EditParametersTable';
+import { DeliverablesEditor } from './DeliverablesEditor';
 
 type ServiceRow = GridRowModel & {
   error?: string;
@@ -38,6 +39,8 @@ export const EditServicesTable: React.FC = () => {
 
 
   const [serviceDialogOpen, setServiceDialogOpen] = useState<boolean>(false);
+  const [deliverablesDialogOpen, setDeliverablesDialogOpen] = useState<boolean>(false);
+  const [deliverablesEditProps, setDeliverablesEditProps] = useState<GridRenderCellParams | GridRenderEditCellParams | null>(null);
 
   // Params when in view mode for the parameters
   const [paramsViewProps, setParamsViewProps] = useState<GridRenderCellParams | null>(null);
@@ -72,7 +75,8 @@ export const EditServicesTable: React.FC = () => {
       price: newRow.price == null ? null : Number(newRow.price),
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
-      parameters: newRow.parameters
+      parameters: newRow.parameters,
+      deliverables: newRow.deliverables || []
     };
 
     await client.mutate({
@@ -94,7 +98,8 @@ export const EditServicesTable: React.FC = () => {
       parameters: newRow.parameters || [],
       paramGroups: [],
       allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
-      description: newRow.description || ''
+      description: newRow.description || '',
+      deliverables: newRow.deliverables || []
     };
 
     const result = await client.mutate({
@@ -191,6 +196,34 @@ export const EditServicesTable: React.FC = () => {
       renderCell: (params) => <Button variant="contained" onClick={() => handleParamViewButton(params)}>View</Button>,
       renderEditCell: (params) => <Button variant="contained" onClick={() => handleParamEditButton(params)}>Edit</Button>
     },
+    {
+      field: 'deliverables',
+      headerName: 'Deliverables',
+      width: 200,
+      editable: true,
+      renderCell: (params) => (
+        <Button 
+          variant="outlined" 
+          onClick={() => {
+            setDeliverablesEditProps(params);
+            setDeliverablesDialogOpen(true);
+          }}
+        >
+          {params.row.deliverables?.length || 0} item{(params.row.deliverables?.length || 0) !== 1 ? 's' : ''}
+        </Button>
+      ),
+      renderEditCell: (params) => (
+        <Button 
+          variant="contained" 
+          onClick={() => {
+            setDeliverablesEditProps(params);
+            setDeliverablesDialogOpen(true);
+          }}
+        >
+          Edit ({params.row.deliverables?.length || 0})
+        </Button>
+      )
+    },
     getActionsColumn({
       handleDelete: (id) => handleDeletion(id),
       handleEdit: (id) => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } }),
@@ -242,6 +275,33 @@ export const EditServicesTable: React.FC = () => {
       <Dialog open={serviceDialogOpen} onClose={() => setServiceDialogOpen(false)} fullWidth PaperProps={{ sx: { maxWidth: '100%' }}}>
         <DialogContent>
           <EditParametersTable viewParams={paramsViewProps} editParams={paramsEditProps} gridRef={gridRef} />
+        </DialogContent>
+      </Dialog>
+      <Dialog 
+        open={deliverablesDialogOpen} 
+        onClose={() => {
+          setDeliverablesDialogOpen(false);
+          setDeliverablesEditProps(null);
+        }} 
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogContent>
+          {deliverablesEditProps && (
+            <DeliverablesEditor
+              deliverables={deliverablesEditProps.row.deliverables || []}
+              onSave={(updatedDeliverables) => {
+                // Update the row in the grid
+                const updatedRow = {
+                  ...deliverablesEditProps.row,
+                  deliverables: updatedDeliverables
+                };
+                gridRef.current.updateRows([updatedRow]);
+                setDeliverablesDialogOpen(false);
+                setDeliverablesEditProps(null);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>

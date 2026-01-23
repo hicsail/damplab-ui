@@ -69,36 +69,126 @@ const getNextSOWNumber = (): string => {
   return nextNumber.toString().padStart(3, '0');
 };
 
+// Extract sample/plate counts from formData
+const extractSamplePlateInfo = (formData: any): { samples?: number; plates?: number; description?: string } => {
+  if (!formData || typeof formData !== 'object') return {};
+  
+  let samples: number | undefined;
+  let plates: number | undefined;
+  let description: string | undefined;
+  
+  // Handle array of formData (NodeParameter[])
+  if (Array.isArray(formData)) {
+    formData.forEach((param: any) => {
+      const paramName = (param.name || '').toLowerCase();
+      const paramId = (param.id || '').toLowerCase();
+      const value = param.value;
+      
+      if ((paramName.includes('sample') || paramId.includes('sample-number') || paramId.includes('num-samples')) && typeof value === 'number') {
+        samples = value;
+      }
+      if ((paramName.includes('plate') || paramId.includes('plate')) && typeof value === 'number') {
+        plates = value;
+      }
+    });
+  } else {
+    // Handle object formData
+    Object.keys(formData).forEach(key => {
+      const lowerKey = key.toLowerCase();
+      const value = formData[key];
+      
+      if ((lowerKey.includes('sample') || lowerKey.includes('sample-number') || lowerKey.includes('num-samples')) && typeof value === 'number') {
+        samples = value;
+      }
+      if (lowerKey.includes('plate') && typeof value === 'number') {
+        plates = value;
+      }
+    });
+  }
+  
+  if (samples && plates) {
+    description = `${samples} samples across ${plates} plate${plates > 1 ? 's' : ''}`;
+  } else if (samples) {
+    description = `${samples} sample${samples > 1 ? 's' : ''}`;
+  } else if (plates) {
+    description = `${plates} plate${plates > 1 ? 's' : ''}`;
+  }
+  
+  return { samples, plates, description };
+};
+
 // Generate scope of work based on workflow analysis
-const generateScopeOfWork = (workflows: Workflow[]): string => {
-  const serviceTypes = new Set<string>();
-  const serviceNames = new Set<string>();
+const generateScopeOfWork = (workflows: Workflow[]): string[] => {
+  const scopeItems: string[] = [];
+  const serviceMap = new Map<string, { name: string; formData: any; count: number }>();
   
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        serviceTypes.add(node.service.id);
-        serviceNames.add(node.service.name);
+        const serviceId = node.service.id;
+        const existing = serviceMap.get(serviceId);
+        
+        if (existing) {
+          existing.count++;
+        } else {
+          serviceMap.set(serviceId, {
+            name: node.service.name,
+            formData: node.formData,
+            count: 1
+          });
+        }
       }
     });
   });
 
-  // Check for specific service combinations
-  if (serviceTypes.has('next-gen-seq')) {
-    return "The scope of this service will be to run an already prepared pool of samples on a P1 flow cell at the DAMP Lab.";
+  // Generate bullet points for each service
+  serviceMap.forEach((serviceInfo, serviceId) => {
+    const sampleInfo = extractSamplePlateInfo(serviceInfo.formData);
+    let itemText = '';
+    
+    // Build service description based on service type
+    switch (serviceId) {
+      case 'next-gen-seq':
+        itemText = 'Run an already prepared pool of samples on a P1 flow cell at the DAMP Lab';
+        break;
+      case 'pcr':
+        itemText = 'Perform PCR amplification of the provided DNA samples using the specified primers and conditions';
+        break;
+      case 'gel-electrophoresis':
+        itemText = 'Perform gel electrophoresis analysis of the provided DNA samples to verify size and quality';
+        break;
+      case 'gibson-assembly':
+        itemText = 'Perform Gibson assembly of the provided DNA fragments using the specified vector and insert sequences';
+        break;
+      case 'transformation':
+        itemText = 'Transform competent cells with the provided plasmid DNA and select for successful transformants';
+        break;
+      case 'miniprep':
+        itemText = 'Perform plasmid miniprep extraction from bacterial cultures and generate glycerol stocks';
+        break;
+      default:
+        itemText = `Perform ${serviceInfo.name}`;
+    }
+    
+    // Add sample/plate information if available
+    if (sampleInfo.description) {
+      itemText += ` (${sampleInfo.description})`;
+    }
+    
+    // Add count if service appears multiple times
+    if (serviceInfo.count > 1) {
+      itemText += ` - ${serviceInfo.count} instance${serviceInfo.count > 1 ? 's' : ''}`;
+    }
+    
+    scopeItems.push(itemText);
+  });
+
+  // If no services found, add a generic item
+  if (scopeItems.length === 0) {
+    scopeItems.push('Perform molecular biology services as specified in the workflow');
   }
-  
-  if (serviceTypes.has('pcr') && serviceTypes.has('gel-electrophoresis')) {
-    return "The scope of this service will be to perform PCR amplification and gel electrophoresis analysis of the provided DNA samples.";
-  }
-  
-  if (serviceTypes.has('gibson-assembly')) {
-    return "The scope of this service will be to perform Gibson assembly of the provided DNA fragments and subsequent transformation and verification.";
-  }
-  
-  // Generic scope based on services
-  const serviceList = Array.from(serviceNames).join(', ');
-  return `The scope of this service will be to perform the following molecular biology services: ${serviceList}.`;
+
+  return scopeItems;
 };
 
 // Generate deliverables based on services
@@ -108,11 +198,19 @@ const generateDeliverables = (workflows: Workflow[]): string[] => {
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-        if (generator) {
-          generator.deliverables(node.formData || {}).forEach(deliverable => {
+        // Use deliverables from service if available, otherwise fall back to hardcoded generators
+        if (node.service.deliverables && Array.isArray(node.service.deliverables) && node.service.deliverables.length > 0) {
+          node.service.deliverables.forEach((deliverable: string) => {
             deliverables.add(deliverable);
           });
+        } else {
+          // Fallback to hardcoded generators for backward compatibility
+          const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
+          if (generator) {
+            generator.deliverables(node.formData || {}).forEach(deliverable => {
+              deliverables.add(deliverable);
+            });
+          }
         }
       }
     });
@@ -165,9 +263,15 @@ const calculateBasePricing = (workflows: Workflow[]): number => {
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-        if (generator) {
-          totalCost += generator.baseCost(node.formData || {});
+        // Use price from service if available, otherwise fall back to hardcoded generators
+        if (node.service.price && typeof node.service.price === 'number') {
+          totalCost += node.service.price;
+        } else {
+          // Fallback to hardcoded generators for backward compatibility
+          const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
+          if (generator) {
+            totalCost += generator.baseCost(node.formData || {});
+          }
         }
       }
     });
@@ -183,16 +287,27 @@ const generateServicesList = (workflows: Workflow[]): SOWService[] => {
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
+        // Use price from service if available, otherwise fall back to hardcoded generators
+        const servicePrice = (node.service.price && typeof node.service.price === 'number') 
+          ? node.service.price 
+          : (() => {
+              const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
+              return generator ? generator.baseCost(node.formData || {}) : 0;
+            })();
+        
+        // Use scope description from generator (could be enhanced to come from service in future)
         const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-        if (generator) {
-          services.push({
-            id: node.service.id,
-            name: node.service.name,
-            description: generator.scopeOfWork(node.formData || {}),
-            cost: generator.baseCost(node.formData || {}),
-            category: 'molecular-biology'
-          });
-        }
+        const description = generator 
+          ? generator.scopeOfWork(node.formData || {})
+          : `Perform ${node.service.name}`;
+        
+        services.push({
+          id: node.service.id,
+          name: node.service.name,
+          description: description,
+          cost: servicePrice,
+          category: 'molecular-biology'
+        });
       }
     });
   });
@@ -225,7 +340,7 @@ export const generateSOWData = (
     date: new Date().toLocaleDateString(),
     jobId: jobData.id,
     jobName: jobData.name,
-    clientName: jobData.username,
+    clientName: technicianInputs.clientProjectManager || jobData.username || 'Client',
     clientEmail: jobData.email,
     clientInstitution: jobData.institute,
     clientAddress: jobData.institute, // Could be enhanced with address lookup
@@ -268,7 +383,7 @@ Fee Schedule:
 This engagement will be conducted on a Project basis. The total value for the Services pursuant to this SOW is presented in the pricing section below.
 
 Completion Criteria:
-University shall have fulfilled its obligations when University completes the Services described within this SOW, and Sponsor accepts such Services without unreasonable objections. No response from Sponsor within 2-business days of deliverables being delivered by University is deemed acceptance.`;
+DAMP Lab shall have fulfilled its obligations when DAMP Lab completes the Services described within this SOW, and Client accepts such Services without unreasonable objections. No response from Client within 2-business days of deliverables being delivered by DAMP Lab is deemed acceptance.`;
 };
 
 // localStorage utilities

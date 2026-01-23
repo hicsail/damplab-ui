@@ -13,6 +13,7 @@ export type Service = {
     categories: string[];
     description: string;
     paramGroups?: any[];
+    deliverables?: string[];  // Array of deliverable descriptions
 };  
 
 

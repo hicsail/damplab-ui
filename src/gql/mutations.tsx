@@ -132,3 +132,164 @@ export const UPDATE_ANNOUNCEMENT = gql`
     }
   }
 `;
+
+// SOW Mutations
+export const CREATE_SOW = gql`
+  mutation CreateSOW($input: CreateSOWInput!) {
+    createSOW(input: $input) {
+      id
+      sowNumber
+      date
+      jobId
+      jobName
+      clientName
+      clientEmail
+      clientInstitution
+      clientAddress
+      scopeOfWork
+      deliverables
+      services {
+        id
+        name
+        description
+        cost
+        category
+      }
+      timeline {
+        startDate
+        endDate
+        duration
+      }
+      resources {
+        projectManager
+        projectLead
+      }
+      pricing {
+        baseCost
+        adjustments {
+          id
+          type
+          description
+          amount
+          reason
+        }
+        totalCost
+        discount {
+          amount
+          reason
+        }
+      }
+      terms
+      additionalInformation
+      createdAt
+      updatedAt
+      createdBy
+      status
+    }
+  }
+`;
+
+export const UPDATE_SOW = gql`
+  mutation UpdateSOW($id: ID!, $input: UpdateSOWInput!) {
+    updateSOW(id: $id, input: $input) {
+      id
+      sowNumber
+      date
+      jobId
+      jobName
+      clientName
+      clientEmail
+      clientInstitution
+      clientAddress
+      scopeOfWork
+      deliverables
+      services {
+        id
+        name
+        description
+        cost
+        category
+      }
+      timeline {
+        startDate
+        endDate
+        duration
+      }
+      resources {
+        projectManager
+        projectLead
+      }
+      pricing {
+        baseCost
+        adjustments {
+          id
+          type
+          description
+          amount
+          reason
+        }
+        totalCost
+        discount {
+          amount
+          reason
+        }
+      }
+      terms
+      additionalInformation
+      createdAt
+      updatedAt
+      createdBy
+      status
+    }
+  }
+`;
+
+export const UPSERT_SOW_FOR_JOB = gql`
+  mutation UpsertSOWForJob($jobId: ID!, $input: CreateSOWInput!) {
+    upsertSOWForJob(jobId: $jobId, input: $input) {
+      id
+      sowNumber
+      date
+      jobId
+      jobName
+      status
+    }
+  }
+`;
+
+export const DELETE_SOW = gql`
+  mutation DeleteSOW($id: ID!) {
+    deleteSOW(id: $id)
+  }
+`;
+
+// Comments Mutations (TODO: Uncomment once backend is ready)
+export const CREATE_COMMENT = gql`
+  mutation CreateComment($input: CreateCommentInput!) {
+    createComment(input: $input) {
+      id
+      content
+      author
+      authorType
+      createdAt
+      isInternal
+    }
+  }
+`;
+
+export const UPDATE_COMMENT = gql`
+  mutation UpdateComment($id: ID!, $input: UpdateCommentInput!) {
+    updateComment(id: $id, input: $input) {
+      id
+      content
+      updatedAt
+      isInternal
+    }
+  }
+`;
+
+export const DELETE_COMMENT = gql`
+  mutation DeleteComment($id: ID!) {
+    deleteComment(id: $id)
+  }
+`;
