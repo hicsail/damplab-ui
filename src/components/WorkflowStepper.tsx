@@ -163,13 +163,14 @@ export default function WorkflowStepper(workflow: any) {
             <Stepper nonLinear activeStep={activeStep} alternativeLabel={!isSmall} 
             orientation={isSmall ? 'vertical' : 'horizontal'}>
                 {workflowServices.map((service: any, index: number) => (
-                    <Step key={service.id} style={{ maxWidth: 250, minWidth: 50, paddingLeft: 50, paddingRight: 50 }}>
+                    <Step key={`${service.id || 'service'}-${index}-${service.name || ''}`} style={{ maxWidth: 250, minWidth: 50, paddingLeft: 50, paddingRight: 50 }}>
                         <StepButton onClick={selectStep(index)}>
                             <StepLabel StepIconComponent={() => getStepIcon(service.state)}>
                             <div style={{display: 'flex', alignItems: 'end'}}>
                                     <Badge   anchorOrigin={{vertical: 'top', horizontal: 'right'}} badgeContent={
                                         <div>
                                             <Typography
+                                                component="span"
                                                 aria-owns={open ? 'mouse-over-popover' : undefined}
                                                 aria-haspopup="true"
                                                 onMouseEnter={handlePopoverOpen}
@@ -178,7 +179,7 @@ export default function WorkflowStepper(workflow: any) {
                                                 <sup>{
                                                     hazards.includes(service.name) ? (
                                                         <GppMaybeTwoTone style={{color:'grey'}}/>
-                                                    ) : <p/>
+                                                    ) : <span style={{display: 'inline-block', width: 0}} />
                                                 }</sup>
                                             </Typography>
                                             <Popover

@@ -188,7 +188,26 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
 
         {/* Scope of Work */}
         <Text style={styles.sectionTitle}>Scope of Work</Text>
-        <Text style={styles.paragraph}>{sowData.scopeOfWork}</Text>
+        {Array.isArray(sowData.scopeOfWork) ? (
+          sowData.scopeOfWork.map((item, index) => (
+            <Text key={index} style={styles.listItem}>
+              {index + 1}) {item}
+            </Text>
+          ))
+        ) : (
+          // Fallback for old string format - split by newlines if present
+          typeof sowData.scopeOfWork === 'string' ? (
+            sowData.scopeOfWork.split('\n').map((line, index) => (
+              line.trim() && (
+                <Text key={index} style={styles.listItem}>
+                  {index + 1}) {line.trim()}
+                </Text>
+              )
+            ))
+          ) : (
+            <Text style={styles.paragraph}>{String(sowData.scopeOfWork)}</Text>
+          )
+        )}
 
         {/* Deliverables */}
         <Text style={styles.sectionTitle}>Deliverables</Text>
@@ -242,7 +261,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         )}
 
         <Text style={styles.paragraph}>
-          Upon completion of the initial performance period, University and the Sponsor will have the option 
+          Upon completion of the initial performance period, University and the Client will have the option 
           to renew this SOW for an additional then-stated project for those resources identified.
         </Text>
 
@@ -253,30 +272,28 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         {/* Invoice Procedures */}
         <Text style={styles.sectionTitle}>Invoice Procedures</Text>
         <Text style={styles.paragraph}>
-          Sponsor will be invoiced for the Services. It is agreed by the parties that standard invoicing is acceptable. 
+          Client will be invoiced for the Services. It is agreed by the parties that standard invoicing is acceptable. 
           Payments are due upon receipt of such invoices.
         </Text>
         <Text style={styles.paragraph}>
           Invoices shall be submitted in arrears, referencing this SOW Number to the address indicated above. 
-          Terms of payment for the invoice is due upon receipt by Sponsor of a proper invoice. University shall 
-          provide Sponsor with sufficient details to support its invoices, including list of services performed 
-          and justifications for authorized expenses, unless otherwise agreed to by the parties. Payments for 
-          services invoiced that are not received within 30-days from the date of invoice will be subject to a 
-          5% penalty per calendar month.
+          Terms of payment for the invoice are due upon receipt by Client of a proper invoice. DAMP Lab shall 
+          provide Client with sufficient details to support its invoices, including list of services performed 
+          and justifications for authorized expenses, unless otherwise agreed to by the parties.
         </Text>
 
         {/* Completion Criteria */}
         <Text style={styles.sectionTitle}>Completion Criteria</Text>
         <Text style={styles.paragraph}>
-          University shall have fulfilled its obligations when any one of the following first occurs:
+          DAMP Lab shall have fulfilled its obligations when any one of the following first occurs:
         </Text>
         <Text style={styles.listItem}>
-          • University completes the Services described within this SOW, and Sponsor accepts such Services 
-          without unreasonable objections. No response from Sponsor within 2-business days of deliverables 
-          being delivered by University is deemed acceptance.
+          • DAMP Lab completes the Services described within this SOW, and Client accepts such Services 
+          without unreasonable objections. No response from Client within 2-business days of deliverables 
+          being delivered by DAMP Lab is deemed acceptance.
         </Text>
         <Text style={styles.listItem}>
-          • University and/or Sponsor has the right to cancel the Services not yet provided with 20 business 
+          • DAMP Lab and/or Client has the right to cancel the Services not yet provided with 20 business 
           days advance written notice to the other party.
         </Text>
 
@@ -290,7 +307,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           the change, the rationale for the change, and the effect the change will have on the Project.
         </Text>
         <Text style={styles.listItem}>
-          • The designated Project Manager of the requesting party (University or Sponsor) will review the 
+          • The designated Project Manager of the requesting party (University or Client) will review the 
           proposed change and determine whether to submit a request to the other party.
         </Text>
         <Text style={styles.listItem}>
@@ -333,9 +350,9 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
             <View style={styles.signatureLine}></View>
             <Text>Date:</Text>
             <View style={styles.signatureLine}></View>
-            <Text>Name: Courtney Tretheway</Text>
+            <Text>Name: {sowData.resources.projectManager}</Text>
             <View style={styles.signatureLine}></View>
-            <Text>Title: Operations Director</Text>
+            <Text>Title: Project Manager</Text>
           </View>
         </View>
 

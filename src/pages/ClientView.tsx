@@ -7,6 +7,8 @@ import { AccessTime, Publish, NotInterested, Check } from '@mui/icons-material';
 import { GET_JOB_BY_ID } from '../gql/queries';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 import TrackingStepper            from '../components/TrackingStepper';
+import { SOWViewer }              from '../components/SOWViewer';
+import { CommentsSection }        from '../components/CommentsSection';
 
 
 export default function Tracking() {
@@ -22,12 +24,11 @@ export default function Tracking() {
     const [workflowInstitution, setWorkflowInstitution] = useState('');
     const [workflowEmail,       setWorkflowEmail]       = useState('');  // ▶ URLSearchParams {}
     const [workflows,           setWorklows]            = useState([]);  // ▶ URLSearchParams {}
+    const [sowData, setSowData] = useState<any>(null);
 
     const { loading, error } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
         onCompleted: (data) => {
-            console.log('job successfully loaded: ', data);
-
             setWorkflowName(       data.jobById.workflows[0].name);
             setWorkflowState(      data.jobById.workflows[0].state);
             setJobName(            data.jobById.name);
@@ -37,9 +38,10 @@ export default function Tracking() {
             setWorkflowInstitution(data.jobById.institute);
             setWorkflowEmail(      data.jobById.email);
             setWorklows(           data.jobById.workflows);
+            setSowData(data.jobById.sow); // Store SOW data if it exists
         },
         onError: (error: any) => {
-            console.log(error.networkError?.result?.errors);
+            // Error handled by error state
         }
     });
     if (loading) return <p>Loading...</p>;
@@ -71,9 +73,9 @@ export default function Tracking() {
     const jobStatusText  = jobStatus()[2];
 
     const workflowCard = (
-        workflows.map((workflow: any) => {
+        workflows.map((workflow: any, index: number) => {
             return (
-                <Card sx={{m:1, boxShadow: 2}}>
+                <Card key={workflow.id || `workflow-${index}`} sx={{m:1, boxShadow: 2}}>
                     <CardContent>
                         <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
                             <Typography sx={{ fontSize: 15 }} color="text.secondary" align="left">{workflow.name}</Typography>
@@ -81,7 +83,7 @@ export default function Tracking() {
                         </Box>
                         <Typography sx={{ fontSize: 13 }} color="text.secondary" align="left">{workflow.state.replace('_', ' ')}</Typography>
                         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
-                            <TrackingStepper workflow={transformGQLToWorkflow(workflow).nodes} key={workflow.id} />
+                            <TrackingStepper workflow={transformGQLToWorkflow(workflow).nodes} />
                         </Box>
                     </CardContent>
                 </Card>
@@ -114,6 +116,23 @@ export default function Tracking() {
                         {workflowCard}
                     </Box>
                 </Box>
+
+                {/* SOW Status Indicator and Viewer */}
+                {sowData && (
+                    <SOWViewer 
+                        jobId={id || ''} 
+                        sowData={sowData}
+                    />
+                )}
+
+                {/* Comments Section */}
+                <CommentsSection 
+                    jobId={id || ''}
+                    currentUser={{
+                        email: workflowEmail,
+                        isStaff: false
+                    }}
+                />
             </div>
         </div>
     )

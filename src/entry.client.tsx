@@ -3,6 +3,12 @@ import ReactDOM from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
+import { Buffer } from 'buffer';
+
+// Polyfill for Buffer (needed for some libraries)
+if (typeof window !== 'undefined' && typeof window.Buffer === 'undefined') {
+  (window as any).Buffer = Buffer;
+}
 
 ReactDOM.hydrateRoot(
     document,

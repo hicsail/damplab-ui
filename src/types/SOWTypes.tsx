@@ -10,7 +10,7 @@ export interface SOWData {
   clientEmail: string;
   clientInstitution: string;
   clientAddress?: string;
-  scopeOfWork: string;
+  scopeOfWork: string[]; // Array of bullet points
   deliverables: string[];
   timeline: {
     startDate: string;
@@ -66,7 +66,7 @@ export interface SOWTechnicianInputs {
 }
 
 export interface SOWEditableSections {
-  scopeOfWork: string;
+  scopeOfWork: string[]; // Array of bullet points
   deliverables: string[]; // Array of deliverable items
   services: SOWService[]; // Can edit service descriptions
   additionalInformation?: string; // New custom section
