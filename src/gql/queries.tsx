@@ -112,6 +112,54 @@ export const GET_JOB_BY_ID = gql`
     }
 `;
 
+export const GET_OWN_JOB_BY_ID = gql`
+    query ownJobById($id: ID!) {
+        ownJobById(id: $id) {
+            id
+            name
+            username
+            institute
+            email
+            state
+            submitted
+            notes
+            workflows {
+                id
+                state
+                name
+                nodes {
+                    _id
+                    id
+                    label
+                    price
+                    service {
+                        id
+                        name
+                        price
+                        icon
+                        parameters
+                        allowedConnections {
+                            id
+                            name
+                        }
+                    }
+                    formData
+                    state
+                    additionalInstructions
+                }
+                edges {
+                    source {
+                        id
+                    }
+                    target {
+                        id
+                    }
+                }
+            }
+        }
+    }
+`;
+
 // get workflows from gql
 export const GET_WORKFLOWS_BY_STATE = gql`
     query GetWorkflowsByState($state: WorkflowState!) {
