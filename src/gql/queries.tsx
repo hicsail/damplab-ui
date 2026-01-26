@@ -123,6 +123,14 @@ export const GET_OWN_JOB_BY_ID = gql`
             state
             submitted
             notes
+            sow {
+                id
+                sowNumber
+                date
+                status
+                createdAt
+                updatedAt
+            }
             workflows {
                 id
                 state

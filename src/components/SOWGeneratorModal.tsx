@@ -65,37 +65,48 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [existingSOW, setExistingSOW] = useState<{ id: string; sowNumber: string } | null>(null);
 
   const teamMembers = getTeamMembers();
   const client = useApolloClient();
+
+  // Clear existing SOW when modal closes or job changes
+  useEffect(() => {
+    if (!open || !jobData?.id) {
+      setExistingSOW(null);
+    }
+  }, [open, jobData?.id]);
 
   // Load existing SOW if it exists
   useEffect(() => {
     const loadExistingSOW = async () => {
       if (jobData?.id && open) {
+        setExistingSOW(null);
         try {
           const { data } = await client.query({
             query: GET_SOW_BY_JOB_ID,
             variables: { jobId: jobData.id },
             fetchPolicy: 'network-only'
           });
-          
+
           if (data?.sowByJobId) {
-            const existingSOW = data.sowByJobId;
-            // Populate form with existing SOW data
+            const existing = data.sowByJobId;
+            setExistingSOW({
+              id: existing.id,
+              sowNumber: existing.sowNumber ?? `SOW-${jobData.id}-${Date.now().toString(36)}`,
+            });
             setTechnicianInputs(prev => ({
               ...prev,
-              projectManager: existingSOW.resources?.projectManager || '',
-              projectLead: existingSOW.resources?.projectLead || '',
-              startDate: existingSOW.timeline?.startDate ? new Date(existingSOW.timeline.startDate).toISOString().split('T')[0] : prev.startDate,
-              clientProjectManager: existingSOW.clientName || '',
+              projectManager: existing.resources?.projectManager || '',
+              projectLead: existing.resources?.projectLead || '',
+              startDate: existing.timeline?.startDate ? new Date(existing.timeline.startDate).toISOString().split('T')[0] : prev.startDate,
+              clientProjectManager: existing.clientName || '',
             }));
-            
             setEditableSections({
-              scopeOfWork: existingSOW.scopeOfWork || [],
-              deliverables: existingSOW.deliverables || [],
-              services: existingSOW.services || [],
-              additionalInformation: existingSOW.additionalInformation || '',
+              scopeOfWork: existing.scopeOfWork || [],
+              deliverables: existing.deliverables || [],
+              services: existing.services || [],
+              additionalInformation: existing.additionalInformation || '',
             });
           }
         } catch (error) {
@@ -107,25 +118,26 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
     loadExistingSOW();
   }, [open, jobData?.id, client]);
 
-  // Generate SOW data whenever inputs change
+  // Generate SOW data whenever inputs change; preserve existing SOW number when updating to avoid conflicts
   useEffect(() => {
     if (jobData && technicianInputs.projectManager && technicianInputs.projectLead) {
       try {
-        const sowData = generateSOWData(jobData, technicianInputs);
+        const sowData = generateSOWData(jobData, technicianInputs, existingSOW ?? undefined);
         setGeneratedSOW(sowData);
-        
-        // Initialize editable sections from generated data
-        setEditableSections({
-          scopeOfWork: Array.isArray(sowData.scopeOfWork) ? sowData.scopeOfWork : [sowData.scopeOfWork],
-          deliverables: sowData.deliverables,
-          services: sowData.services,
-          additionalInformation: '',
-        });
+        // Only initialize editable sections from generated data when creating new SOW (no existing)
+        if (!existingSOW) {
+          setEditableSections({
+            scopeOfWork: Array.isArray(sowData.scopeOfWork) ? sowData.scopeOfWork : [sowData.scopeOfWork],
+            deliverables: sowData.deliverables,
+            services: sowData.services,
+            additionalInformation: '',
+          });
+        }
       } catch (error) {
         console.error('Error generating SOW:', error);
       }
     }
-  }, [jobData, technicianInputs]);
+  }, [jobData, technicianInputs, existingSOW]);
 
   const handleInputChange = (field: keyof SOWTechnicianInputs, value: any) => {
     setTechnicianInputs(prev => ({
@@ -259,19 +271,12 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
           input: sowInput
         },
         refetchQueries: [
-          { query: GET_SOW_BY_JOB_ID, variables: { jobId: jobData.id } }
+          { query: GET_SOW_BY_JOB_ID, variables: { jobId: jobData.id } },
+          { query: GET_JOB_BY_ID, variables: { id: jobData.id } }
         ]
       });
 
       setSaveSuccess(true);
-      // Refetch job data to get updated SOW
-      if (jobData?.id) {
-        client.query({
-          query: GET_JOB_BY_ID,
-          variables: { id: jobData.id },
-          fetchPolicy: 'network-only'
-        });
-      }
       setTimeout(() => {
         onClose();
         setSaveSuccess(false);

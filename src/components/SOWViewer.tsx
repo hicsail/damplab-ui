@@ -110,23 +110,29 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
 
   return (
     <>
-      <Card sx={{ mt: 2, bgcolor: 'success.light', border: '2px solid', borderColor: 'success.main' }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CheckCircleIcon color="success" />
-              <Typography variant="h6" fontWeight="bold">
-                Statement of Work Generated
-              </Typography>
+      <Card sx={{ mt: 2, bgcolor: 'success.light', border: '2px solid', borderColor: 'success.main', boxShadow: 2 }}>
+        <CardContent sx={{ py: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1, flexWrap: 'wrap', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <CheckCircleIcon sx={{ fontSize: 32 }} color="success" />
+              <Box>
+                <Typography variant="h6" fontWeight="bold" color="success.dark">
+                  Statement of Work generated
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  You can view, download, or share the SOW for this job below.
+                </Typography>
+              </Box>
             </Box>
             <Chip
               label={sowDataFromJob.status}
               color={getStatusColor(sowDataFromJob.status) as any}
-              size="small"
+              size="medium"
+              sx={{ fontWeight: 600 }}
             />
           </Box>
-          <Typography variant="body2" sx={{ mb: 2 }}>
-            <strong>SOW Number:</strong> {sowDataFromJob.sowNumber} |{' '}
+          <Typography variant="body2" sx={{ mb: 2, mt: 1 }}>
+            <strong>SOW Number:</strong> {sowDataFromJob.sowNumber} &nbsp;|&nbsp;
             <strong>Created:</strong> {new Date(sowDataFromJob.createdAt).toLocaleDateString()}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>

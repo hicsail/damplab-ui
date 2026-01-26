@@ -3,8 +3,8 @@ import { useParams } from 'react-router';
 import { useQuery, useMutation } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Card, CardContent, Typography } from '@mui/material';
-import { AccessTime, Publish, NotInterested, Check }  from '@mui/icons-material';
+import { Box, Button, Card, CardContent, Typography, Alert, Chip } from '@mui/material';
+import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 
@@ -191,8 +191,17 @@ export default function TechnicianView() {
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
+                {sowData && (
+                    <Alert severity="success" sx={{ mb: 2 }} icon={<CheckCircleIcon />}>
+                        <strong>Statement of Work generated.</strong> This job has an SOW. You can view, edit, or regenerate it below.
+                    </Alert>
+                )}
                 <Typography variant="h5" fontWeight="bold">
-                    {jobName}&nbsp;&nbsp;
+                    {jobName}
+                    {sowData && (
+                        <Chip label="SOW generated" color="success" size="small" sx={{ ml: 1.5, fontWeight: 600 }} />
+                    )}
+                    &nbsp;&nbsp;
                     <Button color='primary' sx={{alignContent: 'right', mr: 1}}>
                         <PictureAsPdfIcon/>&nbsp;
                         <PDFDownloadLink
@@ -214,13 +223,13 @@ export default function TechnicianView() {
                         </PDFDownloadLink>
                     </Button>
                     <Button 
-                        color='secondary' 
+                        color={sowData ? 'primary' : 'secondary'}
                         variant='contained'
                         startIcon={<DescriptionIcon />}
                         onClick={handleOpenSOWModal}
                         disabled={!jobData}
                     >
-                        Generate SOW
+                        {sowData ? 'View / Edit SOW' : 'Generate SOW'}
                     </Button>
                 </Typography>
                 <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>

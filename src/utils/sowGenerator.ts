@@ -61,12 +61,17 @@ const serviceGenerators: ServiceContentGenerator[] = [
   }
 ];
 
-// Get next SOW number from localStorage
+// Get next SOW number from localStorage (legacy; prefer unique per-job number for new SOWs)
 const getNextSOWNumber = (): string => {
   const stored = localStorage.getItem(SOW_STORAGE_KEY);
   const existingSOWs = stored ? JSON.parse(stored) : [];
   const nextNumber = existingSOWs.length + 1;
   return nextNumber.toString().padStart(3, '0');
+};
+
+/** Unique SOW number for a new SOW so same job name across jobs never conflicts. */
+export const getUniqueSOWNumberForJob = (jobId: string): string => {
+  return `SOW-${jobId}-${Date.now().toString(36)}`;
 };
 
 // Extract sample/plate counts from formData
@@ -316,11 +321,13 @@ const generateServicesList = (workflows: Workflow[]): SOWService[] => {
 };
 
 // Generate complete SOW data
+/** existingSOW: when provided (updating existing SOW), re-use its id/sowNumber to avoid conflicts. */
 export const generateSOWData = (
   jobData: any,
-  technicianInputs: SOWTechnicianInputs
+  technicianInputs: SOWTechnicianInputs,
+  existingSOW?: { id?: string; sowNumber?: string }
 ): SOWData => {
-  const sowNumber = getNextSOWNumber();
+  const sowNumber = existingSOW?.sowNumber ?? getUniqueSOWNumberForJob(jobData.id);
   const baseCost = calculateBasePricing(jobData.workflows);
   const adjustments = technicianInputs.pricingAdjustments || [];
   const discountAmount = adjustments
@@ -335,8 +342,8 @@ export const generateSOWData = (
   const timeline = calculateTimeline(jobData.workflows, technicianInputs.startDate);
 
   return {
-    id: `sow-${Date.now()}`,
-    sowNumber: `SOW ${sowNumber}`,
+    id: existingSOW?.id ?? `sow-${Date.now()}`,
+    sowNumber: sowNumber.startsWith('SOW') ? sowNumber : `SOW ${sowNumber}`,
     date: new Date().toLocaleDateString(),
     jobId: jobData.id,
     jobName: jobData.name,

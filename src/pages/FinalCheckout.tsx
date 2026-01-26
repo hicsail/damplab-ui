@@ -122,7 +122,7 @@ export default function FinalCheckout() {
       const jobId = data.createJob.id;
 
       setTimeout(() => {
-        navigate(`/jobs/${jobId}`);
+        navigate(`/client_view/${jobId}`);
       }, 1000);
     },
     onError: (error: any) => {

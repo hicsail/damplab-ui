@@ -1,19 +1,21 @@
-import React, { useState } from 'react'
+import React, { useState, useContext } from 'react'
 import { useParams } from 'react-router';
 import { useQuery } from '@apollo/client';
-import { Box, Card, CardContent, Typography }        from '@mui/material';
-import { AccessTime, Publish, NotInterested, Check } from '@mui/icons-material';
+import { Box, Card, CardContent, Typography, Alert } from '@mui/material';
+import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 
-import { GET_JOB_BY_ID } from '../gql/queries';
+import { GET_OWN_JOB_BY_ID } from '../gql/queries';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 import TrackingStepper            from '../components/TrackingStepper';
 import { SOWViewer }              from '../components/SOWViewer';
 import { CommentsSection }        from '../components/CommentsSection';
+import { UserContext }            from '../contexts/UserContext';
 
 
 export default function Tracking() {
 
     const { id }                                        = useParams();
+    const userContext                                   = useContext(UserContext);
 
     const [workflowName,        setWorkflowName]        = useState('');
     const [workflowState,       setWorkflowState]       = useState('');
@@ -26,26 +28,43 @@ export default function Tracking() {
     const [workflows,           setWorklows]            = useState([]);  // ▶ URLSearchParams {}
     const [sowData, setSowData] = useState<any>(null);
 
-    const { loading, error } = useQuery(GET_JOB_BY_ID, {
-        variables: { id: id },
+    const skipQuery = !id || !userContext?.userProps?.isAuthenticated;
+
+    const { data, loading, error } = useQuery(GET_OWN_JOB_BY_ID, {
+        variables: { id: id! },
+        skip: skipQuery,
+        errorPolicy: 'all',
         onCompleted: (data) => {
-            setWorkflowName(       data.jobById.workflows[0].name);
-            setWorkflowState(      data.jobById.workflows[0].state);
-            setJobName(            data.jobById.name);
-            setJobState(           data.jobById.state);
-            setJobTime(            data.jobById.submitted);
-            setWorkflowUsername(   data.jobById.username);
-            setWorkflowInstitution(data.jobById.institute);
-            setWorkflowEmail(      data.jobById.email);
-            setWorklows(           data.jobById.workflows);
-            setSowData(data.jobById.sow); // Store SOW data if it exists
+            const job = data?.ownJobById;
+            if (!job?.workflows?.length) return;
+            setWorkflowName(       job.workflows[0].name);
+            setWorkflowState(      job.workflows[0].state);
+            setJobName(            job.name);
+            setJobState(           job.state);
+            setJobTime(            job.submitted);
+            setWorkflowUsername(   job.username);
+            setWorkflowInstitution(job.institute);
+            setWorkflowEmail(      job.email);
+            setWorklows(           job.workflows);
+            setSowData(job.sow ?? null);
         },
-        onError: (error: any) => {
-            // Error handled by error state
-        }
     });
+
+    if (skipQuery) return <p>Loading...</p>;
     if (loading) return <p>Loading...</p>;
-    if (error) return <p>Error :(</p>;
+    // When backend returns errors (e.g. not found, forbidden), treat as no access unless we have job data
+    if (error && !data?.ownJobById) {
+        const msg = error.graphQLErrors?.[0]?.message ?? error.message;
+        return (
+            <p>
+                Job not found. You may not have access to this job.
+                {import.meta.env.DEV && msg && (
+                    <span style={{ display: 'block', marginTop: 8, fontSize: 12, color: '#666' }}>{msg}</span>
+                )}
+            </p>
+        );
+    }
+    if (data && !data.ownJobById) return <p>Job not found. You may not have access to this job.</p>;
 
     const jobStatus = () => {
         const submitText = "Your job has been submitted to the DAMP lab and is awaiting review. Once the review is done, you will see the updated state over here.";
@@ -95,6 +114,11 @@ export default function Tracking() {
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
+                {sowData && (
+                    <Alert severity="success" sx={{ mb: 2 }} icon={<CheckCircleIcon />}>
+                        <strong>Statement of Work available.</strong> A Statement of Work has been generated for this job. View and download it in the section below.
+                    </Alert>
+                )}
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}
                 </Typography>
