@@ -465,6 +465,18 @@ export const GET_SOW_BY_JOB_ID = gql`
       updatedAt
       createdBy
       status
+      clientSignature {
+        name
+        title
+        signedAt
+        signatureDataUrl
+      }
+      technicianSignature {
+        name
+        title
+        signedAt
+        signatureDataUrl
+      }
     }
   }
 `;

@@ -146,6 +146,7 @@ export default function Tracking() {
                     <SOWViewer 
                         jobId={id || ''} 
                         sowData={sowData}
+                        currentUser={{ email: workflowEmail, name: workflowUsername, isStaff: false }}
                     />
                 )}
 

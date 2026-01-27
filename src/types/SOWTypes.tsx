@@ -35,6 +35,18 @@ export interface SOWData {
   additionalInformation?: string; // Add this field
   createdAt: string;
   createdBy: string;
+  /** Set when client signs through the UI */
+  clientSignature?: SOWSignature;
+  /** Set when technician/BU signs through the UI */
+  technicianSignature?: SOWSignature;
+}
+
+export interface SOWSignature {
+  name: string;
+  title?: string;
+  signedAt: string; // ISO date string
+  /** Data URL (e.g. from canvas) for drawn signature; if missing, PDF will show typed name */
+  signatureDataUrl?: string;
 }
 
 export interface SOWPricingAdjustment {

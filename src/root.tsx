@@ -7,8 +7,47 @@ import {
   InMemoryCache,
   ApolloProvider,
   createHttpLink,
+  ApolloLink,
 } from "@apollo/client/index.js";
 import { setContext } from "@apollo/client/link/context";
+
+function sanitizeVariables(vars: Record<string, unknown>): Record<string, unknown> {
+  if (!vars || typeof vars !== 'object') return vars;
+  const out = { ...vars };
+  if (typeof out.signatureDataUrl === 'string') {
+    out.signatureDataUrl = `[REDACTED base64, ${out.signatureDataUrl.length} chars]`;
+  }
+  if (out.input && typeof out.input === 'object' && out.input !== null) {
+    const input = { ...(out.input as Record<string, unknown>) };
+    if (typeof input.signatureDataUrl === 'string') {
+      input.signatureDataUrl = `[REDACTED base64, ${input.signatureDataUrl.length} chars]`;
+    }
+    out.input = input;
+  }
+  return out;
+}
+
+const logLink = new ApolloLink((operation, forward) => {
+  const opName = operation.operationName;
+  const vars = sanitizeVariables(operation.variables as Record<string, unknown> || {});
+  console.log('[GraphQL] request', { operationName: opName, variables: vars });
+  return forward(operation).map((response) => {
+    const errs = response.errors;
+    if (errs && errs.length > 0) {
+      console.warn('[GraphQL] response has errors', { operationName: opName, errorCount: errs.length });
+      errs.forEach((e, i) => {
+        console.error(`[GraphQL] error[${i}]`, {
+          message: e.message,
+          path: e.path,
+          extensions: e.extensions,
+        });
+      });
+    } else {
+      console.log('[GraphQL] response ok', { operationName: opName });
+    }
+    return response;
+  });
+});
 
 import { CanvasContext } from "./contexts/Canvas";
 import { AppContext } from "./contexts/App";
@@ -77,7 +116,7 @@ export default function Root() {
   });
 
   const client = new ApolloClient({
-    link: authLink.concat(httpLink),
+    link: logLink.concat(authLink.concat(httpLink)),
     cache: new InMemoryCache(),
   });
 

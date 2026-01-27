@@ -263,6 +263,7 @@ export default function TechnicianView() {
                     <SOWViewer 
                         jobId={id || ''} 
                         sowData={sowData}
+                        currentUser={{ email: jobEmail, name: jobUsername, isStaff: true }}
                     />
                 )}
 

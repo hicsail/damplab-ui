@@ -197,13 +197,13 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         ) : (
           // Fallback for old string format - split by newlines if present
           typeof sowData.scopeOfWork === 'string' ? (
-            sowData.scopeOfWork.split('\n').map((line, index) => (
-              line.trim() && (
+            (sowData.scopeOfWork as string).split('\n').map((line: string, index: number) =>
+              line.trim() ? (
                 <Text key={index} style={styles.listItem}>
                   {index + 1}) {line.trim()}
                 </Text>
-              )
-            ))
+              ) : null
+            )
           ) : (
             <Text style={styles.paragraph}>{String(sowData.scopeOfWork)}</Text>
           )
@@ -317,12 +317,12 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         </Text>
 
         {/* Additional Information */}
-        {sowData.additionalInformation && (
-          <>
+        {sowData.additionalInformation ? (
+          <View>
             <Text style={styles.sectionTitle}>Additional Information</Text>
             <Text style={styles.paragraph}>{sowData.additionalInformation}</Text>
-          </>
-        )}
+          </View>
+        ) : null}
 
         {/* Signature Section */}
         <Text style={styles.sectionTitle}>Signatures</Text>
@@ -336,23 +336,49 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
             <Text>{sowData.clientName}</Text>
             <Text>({sowData.clientEmail})</Text>
             <Text>{sowData.clientInstitution}</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Date:</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Name:</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Title:</Text>
+            {sowData.clientSignature && typeof sowData.clientSignature.name === 'string' && sowData.clientSignature.name.trim() !== '' ? (
+              <View>
+                {typeof sowData.clientSignature.signatureDataUrl === 'string' && sowData.clientSignature.signatureDataUrl.startsWith('data:') && sowData.clientSignature.signatureDataUrl.length < 500000 ? (
+                  <Image src={sowData.clientSignature.signatureDataUrl} style={{ width: 180, height: 50, marginVertical: 4 }} />
+                ) : null}
+                <Text>Date: {String(sowData.clientSignature.signedAt ?? '').slice(0, 10)}</Text>
+                <Text>Name: {String(sowData.clientSignature.name)}</Text>
+                {sowData.clientSignature.title ? <Text>Title: {String(sowData.clientSignature.title)}</Text> : null}
+              </View>
+            ) : (
+              <View>
+                <View style={styles.signatureLine}></View>
+                <Text>Date:</Text>
+                <View style={styles.signatureLine}></View>
+                <Text>Name:</Text>
+                <View style={styles.signatureLine}></View>
+                <Text>Title:</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.signatureBox}>
             <Text>Trustees of Boston University</Text>
             <Text>By:</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Date:</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Name: {sowData.resources.projectManager}</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Title: Project Manager</Text>
+            {sowData.technicianSignature && typeof sowData.technicianSignature.name === 'string' && sowData.technicianSignature.name.trim() !== '' ? (
+              <View>
+                {typeof sowData.technicianSignature.signatureDataUrl === 'string' && sowData.technicianSignature.signatureDataUrl.startsWith('data:') && sowData.technicianSignature.signatureDataUrl.length < 500000 ? (
+                  <Image src={sowData.technicianSignature.signatureDataUrl} style={{ width: 180, height: 50, marginVertical: 4 }} />
+                ) : null}
+                <Text>Date: {String(sowData.technicianSignature.signedAt ?? '').slice(0, 10)}</Text>
+                <Text>Name: {String(sowData.technicianSignature.name)}</Text>
+                <Text>Title: {String(sowData.technicianSignature.title || 'Project Manager')}</Text>
+              </View>
+            ) : (
+              <View>
+                <View style={styles.signatureLine}></View>
+                <Text>Date:</Text>
+                <View style={styles.signatureLine}></View>
+                <Text>Name: {sowData.resources?.projectManager ?? ''}</Text>
+                <View style={styles.signatureLine}></View>
+                <Text>Title: Project Manager</Text>
+              </View>
+            )}
           </View>
         </View>
 

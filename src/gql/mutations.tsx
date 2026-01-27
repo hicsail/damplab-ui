@@ -263,6 +263,26 @@ export const DELETE_SOW = gql`
   }
 `;
 
+export const SUBMIT_SOW_SIGNATURE = gql`
+  mutation SubmitSOWSignature($input: SubmitSOWSignatureInput!) {
+    submitSOWSignature(input: $input) {
+      id
+      clientSignature {
+        name
+        title
+        signedAt
+        signatureDataUrl
+      }
+      technicianSignature {
+        name
+        title
+        signedAt
+        signatureDataUrl
+      }
+    }
+  }
+`;
+
 // Comments Mutations (TODO: Uncomment once backend is ready)
 export const CREATE_COMMENT = gql`
   mutation CreateComment($input: CreateCommentInput!) {
