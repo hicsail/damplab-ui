@@ -168,6 +168,22 @@ export const GET_OWN_JOB_BY_ID = gql`
     }
 `;
 
+export const GET_OWN_JOBS = gql`
+    query ownJobs {
+        ownJobs {
+            id
+            name
+            state
+            submitted
+            sow {
+                id
+                sowNumber
+                status
+            }
+        }
+    }
+`;
+
 // get workflows from gql
 export const GET_WORKFLOWS_BY_STATE = gql`
     query GetWorkflowsByState($state: WorkflowState!) {

@@ -16,7 +16,8 @@ export default [
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),
         route("/jobs/:jobId", "./pages/JobSubmitted.tsx"), //config later so only owner of job or admin can access
-        route("/client_view/:id", "./pages/ClientView.tsx") // Client job tracking page with SOW viewer and comments
+        route("/client_view/:id", "./pages/ClientView.tsx"), // Client job tracking page with SOW viewer and comments
+        route("/my_jobs", "./pages/MyJobs.tsx") // List of current user's submitted jobs
     ]),
     layout("./layouts/PrivateRouteDamplabStaff.tsx", [
         route("/technician_view/:id", "./pages/TechnicianView.tsx"),

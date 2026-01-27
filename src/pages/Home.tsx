@@ -8,6 +8,7 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import EditIcon from '@mui/icons-material/Edit';
+import WorkHistoryIcon from '@mui/icons-material/WorkHistory';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
@@ -84,6 +85,11 @@ export default function Home() {
             <MenuButton navigateTo='/canvas'>
               <AccountTreeIcon sx={{transform: "rotate(90deg) scaleY(-1)"}}/>
               Canvas<br />(Design Workflows)
+            </MenuButton>
+
+            <MenuButton navigateTo='/my_jobs'>
+              <WorkHistoryIcon />
+              My Jobs<br />(View Submitted Jobs)
             </MenuButton>
 
             {userProps.isDamplabStaff && (
