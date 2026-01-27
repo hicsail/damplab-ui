@@ -71,6 +71,25 @@ function normalizeSignature(sig: unknown): SOWSignature | null {
   };
 }
 
+function logSOWDataSummary(label: string, data: { clientSignature?: unknown; technicianSignature?: unknown } | null) {
+  if (!data) {
+    console.log(`[SOWViewer] ${label}: mergedSOWData is null`);
+    return;
+  }
+  const c = data.clientSignature as { name?: string; signedAt?: string; signatureDataUrl?: string } | undefined;
+  const t = data.technicianSignature as { name?: string; signedAt?: string; signatureDataUrl?: string } | undefined;
+  console.log(`[SOWViewer] ${label}:`, {
+    hasClientSig: !!c,
+    clientName: c?.name,
+    clientSignedAt: c?.signedAt?.slice?.(0, 10),
+    clientDataUrlLen: typeof c?.signatureDataUrl === 'string' ? c.signatureDataUrl.length : 0,
+    hasTechSig: !!t,
+    techName: t?.name,
+    techSignedAt: t?.signedAt?.slice?.(0, 10),
+    techDataUrlLen: typeof t?.signatureDataUrl === 'string' ? t.signatureDataUrl.length : 0,
+  });
+}
+
 export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFromJob, currentUser }) => {
   const [fullSOWData, setFullSOWData] = useState<SOWData | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -79,20 +98,32 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
   const [signModalOpen, setSignModalOpen] = useState(false);
   const [signAs, setSignAs] = useState<'client' | 'technician'>('client');
   const [signErrorMessage, setSignErrorMessage] = useState<string | null>(null);
+  const [justSubmittedSignature, setJustSubmittedSignature] = useState(false);
 
   const sowId = fullSOWData?.id || sowDataFromJob?.id || jobId;
 
   const [submitSignature, { loading: signing, error: signError, reset: resetSignError }] = useMutation(SUBMIT_SOW_SIGNATURE, {
     refetchQueries: [{ query: GET_SOW_BY_JOB_ID, variables: { jobId } }],
     onCompleted: (data) => {
+      console.log('[SOWViewer] SubmitSOWSignature onCompleted', { hasData: !!data, hasUpdated: !!data?.submitSOWSignature });
+      setJustSubmittedSignature(false);
       resetSignError();
       setSignErrorMessage(null);
       const updated = data?.submitSOWSignature;
-      if (updated?.clientSignature) setClientSignature(normalizeSignature(updated.clientSignature));
-      if (updated?.technicianSignature) setTechnicianSignature(normalizeSignature(updated.technicianSignature));
+      if (updated?.clientSignature) {
+        const norm = normalizeSignature(updated.clientSignature);
+        console.log('[SOWViewer] setting clientSignature from mutation', { normalized: !!norm, name: norm?.name });
+        setClientSignature(norm);
+      }
+      if (updated?.technicianSignature) {
+        const norm = normalizeSignature(updated.technicianSignature);
+        console.log('[SOWViewer] setting technicianSignature from mutation', { normalized: !!norm, name: norm?.name });
+        setTechnicianSignature(norm);
+      }
       if (sowId && updated) storeSignatures(sowId, updated.clientSignature, updated.technicianSignature);
     },
     onError: (err) => {
+      setJustSubmittedSignature(false);
       setSignErrorMessage(err.message);
       console.error('[SubmitSOWSignature] mutation error (full):', err);
       console.error('[SubmitSOWSignature] message:', err.message);
@@ -111,6 +142,8 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
       }
     },
   });
+
+  const skipPdfRender = signing || justSubmittedSignature;
 
   // Fetch full SOW data if we only have summary
   const { data, loading, error } = useQuery(GET_SOW_BY_JOB_ID, {
@@ -183,6 +216,8 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
       }
     : null;
 
+  const pdfKey = `sow-pdf-${jobId}-${clientSignature?.signedAt ?? 'noclient'}-${technicianSignature?.signedAt ?? 'notech'}`;
+
   const handleSignSubmit = (signature: SOWSignature) => {
     if (!sowId) return;
     setSignModalOpen(false);
@@ -196,9 +231,15 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
     if (signature.title) input.title = signature.title;
     if (signature.signatureDataUrl) input.signatureDataUrl = signature.signatureDataUrl;
     const variables = { input };
-    console.log('[SubmitSOWSignature] sending variables:', {
-      input: { ...input, signatureDataUrl: input.signatureDataUrl ? `[base64, ${String(input.signatureDataUrl).length} chars]` : undefined },
+    console.log('[SOWViewer] handleSignSubmit: calling mutation', {
+      sowId,
+      role,
+      signAs,
+      inputKeys: Object.keys(input),
+      hasSignatureDataUrl: !!input.signatureDataUrl,
+      signatureDataUrlLen: input.signatureDataUrl ? String(input.signatureDataUrl).length : 0,
     });
+    setJustSubmittedSignature(true);
     submitSignature({ variables });
     if (signAs === 'client') {
       setClientSignature(signature);
@@ -303,20 +344,32 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
               View SOW
             </Button>
             {mergedSOWData && (
-              <PDFDownloadLink
-                document={<SOWDocument sowData={mergedSOWData} />}
-                fileName={`${sowDataFromJob.sowNumber}-${fullSOWData!.jobName}.pdf`}
-              >
-                {({ blob, url, loading: pdfLoading }) => (
-                  <Button
-                    variant="contained"
-                    startIcon={<PictureAsPdfIcon />}
-                    disabled={pdfLoading}
-                  >
-                    {pdfLoading ? 'Generating...' : 'Download SOW PDF'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
+              skipPdfRender ? (
+                <Button variant="contained" startIcon={<PictureAsPdfIcon />} disabled>
+                  Saving signature…
+                </Button>
+              ) : (
+                (() => {
+                  logSOWDataSummary('PDFDownloadLink (card) render', mergedSOWData);
+                  return (
+                    <PDFDownloadLink
+                      key={pdfKey}
+                      document={<SOWDocument sowData={mergedSOWData} />}
+                      fileName={`${sowDataFromJob.sowNumber}-${fullSOWData!.jobName}.pdf`}
+                    >
+                      {({ blob, url, loading: pdfLoading }) => (
+                        <Button
+                          variant="contained"
+                          startIcon={<PictureAsPdfIcon />}
+                          disabled={pdfLoading}
+                        >
+                          {pdfLoading ? 'Generating...' : 'Download SOW PDF'}
+                        </Button>
+                      )}
+                    </PDFDownloadLink>
+                  );
+                })()
+              )
             )}
             {currentUser && !isStaff && (
               <Button
@@ -366,23 +419,27 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
             <Typography variant="h6">
               {sowDataFromJob.sowNumber}
             </Typography>
-            {mergedSOWData && (
-              <PDFDownloadLink
-                document={<SOWDocument sowData={mergedSOWData} />}
-                fileName={`${sowDataFromJob.sowNumber}-${fullSOWData!.jobName}.pdf`}
-              >
-                {({ blob, url, loading: pdfLoading }) => (
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<PictureAsPdfIcon />}
-                    disabled={pdfLoading}
-                  >
-                    {pdfLoading ? 'Generating...' : 'Download PDF'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
-            )}
+            {mergedSOWData && !skipPdfRender && (() => {
+              logSOWDataSummary('PDFDownloadLink (modal) render', mergedSOWData);
+              return (
+                <PDFDownloadLink
+                  key={pdfKey}
+                  document={<SOWDocument sowData={mergedSOWData} />}
+                  fileName={`${sowDataFromJob.sowNumber}-${fullSOWData!.jobName}.pdf`}
+                >
+                  {({ blob, url, loading: pdfLoading }) => (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<PictureAsPdfIcon />}
+                      disabled={pdfLoading}
+                    >
+                      {pdfLoading ? 'Generating...' : 'Download PDF'}
+                    </Button>
+                  )}
+                </PDFDownloadLink>
+              );
+            })()}
           </Box>
         </DialogTitle>
         <DialogContent>

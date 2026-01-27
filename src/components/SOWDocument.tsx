@@ -114,6 +114,19 @@ interface SOWDocumentProps {
 }
 
 const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
+  const c = sowData?.clientSignature;
+  const t = sowData?.technicianSignature;
+  console.log('[SOWDocument] render', {
+    sowId: sowData?.id,
+    jobName: sowData?.jobName,
+    hasClientSig: !!c,
+    clientName: c && typeof c === 'object' && 'name' in c ? (c as { name?: string }).name : undefined,
+    clientDataUrlType: c && typeof c === 'object' && 'signatureDataUrl' in c ? typeof (c as { signatureDataUrl?: unknown }).signatureDataUrl : undefined,
+    hasTechSig: !!t,
+    techName: t && typeof t === 'object' && 'name' in t ? (t as { name?: string }).name : undefined,
+    techDataUrlType: t && typeof t === 'object' && 'signatureDataUrl' in t ? typeof (t as { signatureDataUrl?: unknown }).signatureDataUrl : undefined,
+  });
+
   const formatCurrency = (amount: number): string => {
     return `$${amount.toLocaleString()}`;
   };
@@ -197,13 +210,16 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         ) : (
           // Fallback for old string format - split by newlines if present
           typeof sowData.scopeOfWork === 'string' ? (
-            (sowData.scopeOfWork as string).split('\n').map((line: string, index: number) =>
-              line.trim() ? (
-                <Text key={index} style={styles.listItem}>
-                  {index + 1}) {line.trim()}
-                </Text>
-              ) : null
-            )
+            (sowData.scopeOfWork as string)
+              .split('\n')
+              .map((line: string, index: number) =>
+                line.trim() ? (
+                  <Text key={index} style={styles.listItem}>
+                    {index + 1}) {line.trim()}
+                  </Text>
+                ) : null
+              )
+              .filter(Boolean)
           ) : (
             <Text style={styles.paragraph}>{String(sowData.scopeOfWork)}</Text>
           )
@@ -317,12 +333,12 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         </Text>
 
         {/* Additional Information */}
-        {sowData.additionalInformation ? (
+        {sowData.additionalInformation && (
           <View>
             <Text style={styles.sectionTitle}>Additional Information</Text>
             <Text style={styles.paragraph}>{sowData.additionalInformation}</Text>
           </View>
-        ) : null}
+        )}
 
         {/* Signature Section */}
         <Text style={styles.sectionTitle}>Signatures</Text>
@@ -338,12 +354,12 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
             <Text>{sowData.clientInstitution}</Text>
             {sowData.clientSignature && typeof sowData.clientSignature.name === 'string' && sowData.clientSignature.name.trim() !== '' ? (
               <View>
-                {typeof sowData.clientSignature.signatureDataUrl === 'string' && sowData.clientSignature.signatureDataUrl.startsWith('data:') && sowData.clientSignature.signatureDataUrl.length < 500000 ? (
+                {typeof sowData.clientSignature.signatureDataUrl === 'string' && sowData.clientSignature.signatureDataUrl.startsWith('data:') && sowData.clientSignature.signatureDataUrl.length < 500000 && (
                   <Image src={sowData.clientSignature.signatureDataUrl} style={{ width: 180, height: 50, marginVertical: 4 }} />
-                ) : null}
+                )}
                 <Text>Date: {String(sowData.clientSignature.signedAt ?? '').slice(0, 10)}</Text>
                 <Text>Name: {String(sowData.clientSignature.name)}</Text>
-                {sowData.clientSignature.title ? <Text>Title: {String(sowData.clientSignature.title)}</Text> : null}
+                {!!sowData.clientSignature.title && <Text>Title: {String(sowData.clientSignature.title)}</Text>}
               </View>
             ) : (
               <View>
@@ -362,9 +378,9 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
             <Text>By:</Text>
             {sowData.technicianSignature && typeof sowData.technicianSignature.name === 'string' && sowData.technicianSignature.name.trim() !== '' ? (
               <View>
-                {typeof sowData.technicianSignature.signatureDataUrl === 'string' && sowData.technicianSignature.signatureDataUrl.startsWith('data:') && sowData.technicianSignature.signatureDataUrl.length < 500000 ? (
+                {typeof sowData.technicianSignature.signatureDataUrl === 'string' && sowData.technicianSignature.signatureDataUrl.startsWith('data:') && sowData.technicianSignature.signatureDataUrl.length < 500000 && (
                   <Image src={sowData.technicianSignature.signatureDataUrl} style={{ width: 180, height: 50, marginVertical: 4 }} />
-                ) : null}
+                )}
                 <Text>Date: {String(sowData.technicianSignature.signedAt ?? '').slice(0, 10)}</Text>
                 <Text>Name: {String(sowData.technicianSignature.name)}</Text>
                 <Text>Title: {String(sowData.technicianSignature.title || 'Project Manager')}</Text>
