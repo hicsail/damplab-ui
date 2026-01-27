@@ -246,6 +246,11 @@ export const GET_JOB_BY_WORKFLOW_ID = gql`
             submitted
             notes
             state
+            sow {
+                id
+                sowNumber
+                status
+            }
         }
     }
 `;
