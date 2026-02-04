@@ -156,15 +156,19 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
         {workflow.nodes.map((service, ind) => (
           <View key={ind} style={styles.section}>
             <Text style={styles.service}>{service.label}</Text>
-            {service.formData.map((parameter: any, i: number) => {
+            {(Array.isArray(service.formData) ? service.formData : []).map((parameter: any, i: number) => {
+              const label = parameter.name ?? parameter.id ?? 'Parameter';
+              const displayValue = Array.isArray(parameter.value)
+                ? parameter.value.filter((v: any) => v != null && String(v).trim() !== '').join(', ')
+                : parameter.value;
               if (parameter.type === 'boolean') {
                 if (parameter.value === true) {
-                  return(<Text key={i} style={styles.parameter}>{parameter.name}: true</Text>)
+                  return(<Text key={i} style={styles.parameter}>{label}: true</Text>)
                 } else {
-                  return(<Text key={i} style={styles.parameter}>{parameter.name}: {parameter.resultParamValue}</Text>)
+                  return(<Text key={i} style={styles.parameter}>{label}: {parameter.resultParamValue}</Text>)
                 }
               } else {
-                return(<Text key={i} style={styles.parameter}>{parameter.name}: {parameter.value}</Text>)
+                return(<Text key={i} style={styles.parameter}>{label}: {displayValue}</Text>)
               }
             })}
           </View>

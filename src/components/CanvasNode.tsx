@@ -55,8 +55,15 @@ export default memo((input: Input) => {
                     filled = false;
                 }
             }
-            else if (obj.required === true && (obj.value === '' || obj.value === undefined || obj.value === null)) {
-                filled = false;
+            else if (obj.required === true) {
+                const isMulti = obj.allowMultipleValues === true || Array.isArray(obj.value);
+                if (isMulti) {
+                    const arr = obj.value;
+                    const hasValue = Array.isArray(arr) && arr.some((v: any) => v != null && String(v).trim() !== '');
+                    if (!hasValue) filled = false;
+                } else if (obj.value === '' || obj.value === undefined || obj.value === null) {
+                    filled = false;
+                }
             }
         });
 

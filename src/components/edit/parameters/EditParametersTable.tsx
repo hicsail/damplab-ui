@@ -128,6 +128,13 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
     },
     {
+      field: 'allowMultipleValues',
+      headerName: 'Allow multiple values',
+      width: 200,
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
+    },
+    {
       field: 'options',
       width: 200,
       editable: isEdit,

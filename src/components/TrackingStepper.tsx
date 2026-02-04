@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState, useRef } from 'react'
-import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
+import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Popover, Step, StepButton, StepLabel, Stepper, Typography } from '@mui/material'
+import { DeleteForeverSharp, PlusOne } from '@mui/icons-material';
 import { GppMaybe, GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material';
 import LoopIcon    from '@mui/icons-material/Loop';
 import DoneIcon    from '@mui/icons-material/Done';
@@ -20,6 +21,7 @@ export default function TrackingStepper(workflow: any) {
         return service;
     }));
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [multiValueKey, setMultiValueKey] = useState(0);
 
     useEffect(() => {
         function handleResize() {
@@ -137,20 +139,56 @@ export default function TrackingStepper(workflow: any) {
                 <DialogContent>
                     <Box style={{ height: 400, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
-                            {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
+                            {(Array.isArray(workflow.workflow[activeStep]?.data?.formData)
+                                ? workflow.workflow[activeStep].data.formData
+                                : (workflow.workflow[activeStep]?.data?.formData && typeof workflow.workflow[activeStep].data.formData === 'object'
+                                    ? Object.values(workflow.workflow[activeStep].data.formData)
+                                    : [])
+                            ).map((parameter: any, paramIdx: number) => {
+                                const isMulti = parameter.allowMultipleValues || Array.isArray(parameter.value);
+                                const values = isMulti ? (parameter.value && parameter.value.length ? parameter.value : ['']) : [parameter.value ?? ''];
                                 return (
-                                    <div className='parameter' style={{ display: 'flex', marginBottom: 3 }} key={Math.random()}>
-                                        <div className='parameter-name'>
-                                            {parameter.name}
-                                        </div>
-                                        <div className='parameter-separator' style={{ marginLeft: 3, marginRight: 5 }}>
-                                            :
-                                        </div>
-                                        <div className='parameter-value' style={{ marginBottom: 3 }}>
-                                            <input type='text' value={parameter.value ? parameter.value : ""} onChange={(e) => parameter.value = e.target.value} />
-                                        </div>
+                                    <div key={`${paramIdx}-${multiValueKey}`}>
+                                        {values.map((val: string, valueIdx: number) => (
+                                            <div className='parameter' style={{ display: 'flex', marginBottom: 3, alignItems: 'center' }} key={valueIdx}>
+                                                <div className='parameter-name' style={{ minWidth: 120 }}>
+                                                    {valueIdx === 0 ? (parameter.name ?? parameter.id ?? 'Parameter') : ''}
+                                                </div>
+                                                <div className='parameter-separator' style={{ marginLeft: 3, marginRight: 5 }}>{valueIdx === 0 ? ':' : ''}</div>
+                                                <div className='parameter-value' style={{ marginBottom: 3 }}>
+                                                    <input type='text' value={val ?? ''}
+                                                        onChange={(e) => {
+                                                            if (isMulti) {
+                                                                const next = [...(parameter.value && parameter.value.length ? parameter.value : [''])];
+                                                                next[valueIdx] = e.target.value;
+                                                                parameter.value = next;
+                                                                setMultiValueKey(k => k + 1);
+                                                            } else {
+                                                                parameter.value = e.target.value;
+                                                            }
+                                                        }} />
+                                                </div>
+                                                {isMulti && valueIdx > 0 && (
+                                                    <IconButton size="small" onClick={() => {
+                                                        const next = (parameter.value || ['']).filter((_: any, i: number) => i !== valueIdx);
+                                                        parameter.value = next.length ? next : [''];
+                                                        setMultiValueKey(k => k + 1);
+                                                    }}>
+                                                        <DeleteForeverSharp fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                                {isMulti && valueIdx === values.length - 1 && (
+                                                    <IconButton size="small" onClick={() => {
+                                                        parameter.value = [...(parameter.value || ['']), ''];
+                                                        setMultiValueKey(k => k + 1);
+                                                    }} aria-label="Add another value">
+                                                        <PlusOne />
+                                                    </IconButton>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                )
+                                );
                             })}
                             {
                                 hazards.includes(workflow.workflow[activeStep].name) 

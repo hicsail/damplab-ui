@@ -1,7 +1,8 @@
 import React, { useContext, useEffect, useState, useRef } from 'react'
 import { useMutation } from '@apollo/client';
-import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, Popover, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
+import { Badge, Box, Button, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Popover, Step, StepButton, StepLabel, Stepper, Typography, Tooltip } from '@mui/material'
 import { GppMaybeTwoTone, CheckCircleRounded, WarningRounded, DangerousRounded, HelpRounded } from '@mui/icons-material';
+import { DeleteForeverSharp, PlusOne } from '@mui/icons-material';
 import LoopIcon    from '@mui/icons-material/Loop';
 import DoneIcon    from '@mui/icons-material/Done';
 import PendingIcon from '@mui/icons-material/Pending';
@@ -20,6 +21,7 @@ export default function WorkflowStepper(workflow: any) {
     const [isSmall, setIsSmall] = useState(false);
     const [activeStep, setActiveStep] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [multiValueKey, setMultiValueKey] = useState(0);
     const workflowServices = workflow.workflow.map((service: any) => {return service;});
     const [mutateNodeStatus] = useMutation(MUTATE_NODE_STATUS);
 
@@ -138,7 +140,7 @@ export default function WorkflowStepper(workflow: any) {
         // Stage options...
         // Screening of predicted sequences
 
-        // const value = workflow.workflow[activeStep].data.formData[0].value;  // First field is 'Vector'
+        // const value = workflow.workflow[activeStep]?.data?.formData?.[0]?.value;  // First field is 'Vector'
 
         return(
             <>{ value === "CAT"
@@ -194,7 +196,7 @@ export default function WorkflowStepper(workflow: any) {
                                             >
                                                 <Typography sx={{ px: 2}} >                              {/* POPOVER */}
                                                     {<p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Passed</p>}
-                                                    {<p>{demo_prep_screen('Screening of predicted sequences', workflow.workflow[activeStep].data.formData[0].value)}</p>}
+                                                    {<p>{demo_prep_screen('Screening of predicted sequences', workflow.workflow[activeStep]?.data?.formData?.[0]?.value)}</p>}
                                                     {<p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>}
                                                 </Typography>
                                             </Popover>
@@ -234,32 +236,67 @@ export default function WorkflowStepper(workflow: any) {
                 <DialogContent>
                     <Box style={{ height: 400, width: 550, overflow: 'auto' }}>
                         <div className='parameters' style={{ overflow: 'auto' }}>
-                            {workflow.workflow[activeStep].data.formData.map((parameter: any) => {
+                            {(Array.isArray(workflow.workflow[activeStep]?.data?.formData)
+                                ? workflow.workflow[activeStep].data.formData
+                                : (workflow.workflow[activeStep]?.data?.formData && typeof workflow.workflow[activeStep].data.formData === 'object'
+                                    ? Object.values(workflow.workflow[activeStep].data.formData)
+                                    : [])
+                            ).map((parameter: any, paramIdx: number) => {
+                                const isMulti = parameter.allowMultipleValues || Array.isArray(parameter.value);
+                                const values = isMulti ? (parameter.value && parameter.value.length ? parameter.value : ['']) : [parameter.value ?? parameter.resultParamValue ?? ''];
                                 return (
-                                    <div className='parameter' style={{ display: 'flex', marginBottom: 5 }} key={Math.random()}>
-                                        <div className='parameter-name'>
-                                            {parameter.name}
-                                        </div>
-                                        <div className='parameter-separator' style={{ marginLeft: 3, marginRight: 5 }}>
-                                            :
-                                        </div>
-                                        <div className='parameter-value' style={{ marginBottom: 3 }}>
-                                            <input type='text' value={parameter.value ? parameter.value : parameter.resultParamValue} 
-                                            onChange={(e) => parameter.value = e.target.value} />
-                                        </div>
+                                    <div key={`${paramIdx}-${multiValueKey}`}>
+                                        {values.map((val: string, valueIdx: number) => (
+                                            <div className='parameter' style={{ display: 'flex', marginBottom: 5, alignItems: 'center' }} key={valueIdx}>
+                                                <div className='parameter-name' style={{ minWidth: 120 }}>
+                                                    {valueIdx === 0 ? (parameter.name ?? parameter.id ?? 'Parameter') : ''}
+                                                </div>
+                                                <div className='parameter-separator' style={{ marginLeft: 3, marginRight: 5 }}>{valueIdx === 0 ? ':' : ''}</div>
+                                                <div className='parameter-value' style={{ marginBottom: 3 }}>
+                                                    <input type='text' value={val ?? ''}
+                                                        onChange={(e) => {
+                                                            if (isMulti) {
+                                                                const next = [...(parameter.value && parameter.value.length ? parameter.value : [''])];
+                                                                next[valueIdx] = e.target.value;
+                                                                parameter.value = next;
+                                                                setMultiValueKey(k => k + 1);
+                                                            } else {
+                                                                parameter.value = e.target.value;
+                                                            }
+                                                        }} />
+                                                </div>
+                                                {isMulti && valueIdx > 0 && (
+                                                    <IconButton size="small" onClick={() => {
+                                                        const next = (parameter.value || ['']).filter((_: any, i: number) => i !== valueIdx);
+                                                        parameter.value = next.length ? next : [''];
+                                                        setMultiValueKey(k => k + 1);
+                                                    }}>
+                                                        <DeleteForeverSharp fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                                {isMulti && valueIdx === values.length - 1 && (
+                                                    <IconButton size="small" onClick={() => {
+                                                        parameter.value = [...(parameter.value || ['']), ''];
+                                                        setMultiValueKey(k => k + 1);
+                                                    }} aria-label="Add another value">
+                                                        <PlusOne />
+                                                    </IconButton>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                )
+                                );
                             })}
                             {
                                 hazards.includes(workflow.workflow[activeStep].name)  // if includes Gibson or Moclo...
                                 ? (
                                     <> 
-                                        {/* {console.log('Vector: ', workflow.workflow[activeStep].data.formData[0].value)}; */}
+                                        {/* {console.log('Vector: ', workflow.workflow[activeStep]?.data?.formData?.[0]?.value)}; */}
                                         {/* {console.log('Screening Prep Vars: ', prepScreening(workflow.workflow[activeStep]))}; */}
                                         
                                         <Typography>                                                       {/* MODAL */}
                                             {<p><CheckCircleRounded style={{color:'green', verticalAlign:'bottom'}}/>&nbsp;Screening of user-provided sequences: Passed</p>}
-                                            {<p>{demo_prep_screen('Screening of predicted sequences', workflow.workflow[activeStep].data.formData[0].value)}</p>}
+                                            {<p>{demo_prep_screen('Screening of predicted sequences', workflow.workflow[activeStep]?.data?.formData?.[0]?.value)}</p>}
                                             {<p><WarningRounded style={{color:'grey', verticalAlign:'bottom'}}/>&nbsp;Screening of final sequences: Pending</p>}
                                         </Typography>
                                     </>)
