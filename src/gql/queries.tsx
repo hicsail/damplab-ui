@@ -168,6 +168,7 @@ export const GET_OWN_JOB_BY_ID = gql`
     }
 `;
 
+/** Legacy: unpaginated own jobs. Prefer OWN_JOBS (paginated) when backend supports it. */
 export const GET_OWN_JOBS = gql`
     query ownJobs {
         ownJobs {
@@ -180,6 +181,54 @@ export const GET_OWN_JOBS = gql`
                 sowNumber
                 status
             }
+        }
+    }
+`;
+
+/** Paginated, filterable own jobs (Jobs list API). */
+export const OWN_JOBS = gql`
+    query OwnJobs($input: OwnJobsInput) {
+        ownJobs(input: $input) {
+            items {
+                id
+                name
+                state
+                submitted
+                username
+                institute
+                email
+                sow {
+                    id
+                    sowNumber
+                    sowTitle
+                    status
+                }
+            }
+            totalCount
+        }
+    }
+`;
+
+/** Paginated, filterable all jobs – staff only (Dashboard). */
+export const ALL_JOBS = gql`
+    query AllJobs($input: AllJobsInput) {
+        allJobs(input: $input) {
+            items {
+                id
+                name
+                state
+                submitted
+                username
+                institute
+                email
+                sow {
+                    id
+                    sowNumber
+                    sowTitle
+                    status
+                }
+            }
+            totalCount
         }
     }
 `;
@@ -440,6 +489,7 @@ export const GET_SOW_BY_JOB_ID = gql`
     sowByJobId(jobId: $jobId) {
       id
       sowNumber
+      sowTitle
       date
       jobId
       jobName

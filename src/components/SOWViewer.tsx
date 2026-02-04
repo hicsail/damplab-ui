@@ -155,6 +155,7 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
         setFullSOWData({
           id: sow.id,
           sowNumber: sow.sowNumber,
+          sowTitle: (sow as { sowTitle?: string }).sowTitle,
           date: sow.date,
           jobId: sow.jobId,
           jobName: sow.jobName,

@@ -1,5 +1,6 @@
 // sowGenerator.ts - SOW content generation utilities
 
+import { addDays, format } from 'date-fns';
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWService } from '../types/SOWTypes';
 import { Workflow } from '../gql/graphql';
 
@@ -230,34 +231,35 @@ const generateDeliverables = (workflows: Workflow[]): string[] => {
   return Array.from(deliverables);
 };
 
-// Calculate timeline based on services
-const calculateTimeline = (workflows: Workflow[], startDate: string): { startDate: string; endDate: string; duration: string } => {
+/** Project length in days; used for Period of Performance text. */
+function getProjectLengthDays(workflows: Workflow[], overrideDays?: number): number {
+  if (overrideDays != null && overrideDays > 0) return overrideDays;
   let maxDuration = 0;
-  
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-        if (generator) {
-          maxDuration = Math.max(maxDuration, generator.estimatedDuration(node.formData || {}));
-        }
+        const g = serviceGenerators.find(x => x.serviceId === node.service.id);
+        if (g) maxDuration = Math.max(maxDuration, g.estimatedDuration(node.formData || {}));
       }
     });
   });
+  return maxDuration > 0 ? maxDuration : 14;
+}
 
-  // Default to 2 weeks if no specific duration found
-  if (maxDuration === 0) {
-    maxDuration = 14;
-  }
-
+/** Timeline for SOW. Uses technician override duration when provided and > 0. */
+const calculateTimeline = (
+  workflows: Workflow[],
+  startDate: string,
+  overrideDurationDays?: number
+): { startDate: string; endDate: string; duration: string; days: number } => {
+  const days = getProjectLengthDays(workflows, overrideDurationDays);
   const start = new Date(startDate);
-  const end = new Date(start);
-  end.setDate(start.getDate() + maxDuration);
+  const end = addDays(start, days);
 
   return {
-    startDate: start.toLocaleDateString(),
-    endDate: end.toLocaleDateString(),
-    duration: `${maxDuration} days`
+    startDate: format(start, 'yyyy-MM-dd'),
+    endDate: format(end, 'yyyy-MM-dd'),
+    duration: `${days} day${days !== 1 ? 's' : ''}`,
   };
 };
 
@@ -339,12 +341,19 @@ export const generateSOWData = (
       .filter(adj => adj.type === 'additional_cost')
       .reduce((sum, adj) => sum + adj.amount, 0);
 
-  const timeline = calculateTimeline(jobData.workflows, technicianInputs.startDate);
+  const timeline = calculateTimeline(
+    jobData.workflows,
+    technicianInputs.startDate,
+    technicianInputs.duration
+  );
+
+  const sowTitle = (technicianInputs.sowTitle || '').trim() || 'Agreement to Perform Research Services';
 
   return {
     id: existingSOW?.id ?? `sow-${Date.now()}`,
     sowNumber: sowNumber.startsWith('SOW') ? sowNumber : `SOW ${sowNumber}`,
-    date: new Date().toLocaleDateString(),
+    date: format(new Date(), 'yyyy-MM-dd'),
+    sowTitle,
     jobId: jobData.id,
     jobName: jobData.name,
     clientName: technicianInputs.clientProjectManager || jobData.username || 'Client',

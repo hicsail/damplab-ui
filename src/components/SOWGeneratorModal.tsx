@@ -41,9 +41,11 @@ interface SOWGeneratorModalProps {
 }
 
 const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jobData }) => {
+  const defaultSowTitle = 'Agreement to Perform Research Services';
   const [technicianInputs, setTechnicianInputs] = useState<SOWTechnicianInputs>({
     projectManager: '',
     projectLead: '',
+    sowTitle: defaultSowTitle,
     startDate: new Date().toISOString().split('T')[0],
     duration: 14,
     pricingAdjustments: [],
@@ -95,13 +97,25 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
               id: existing.id,
               sowNumber: existing.sowNumber ?? `SOW-${jobData.id}-${Date.now().toString(36)}`,
             });
-            setTechnicianInputs(prev => ({
-              ...prev,
-              projectManager: existing.resources?.projectManager || '',
-              projectLead: existing.resources?.projectLead || '',
-              startDate: existing.timeline?.startDate ? new Date(existing.timeline.startDate).toISOString().split('T')[0] : prev.startDate,
-              clientProjectManager: existing.clientName || '',
-            }));
+            setTechnicianInputs(prev => {
+              const startDate = existing.timeline?.startDate
+                ? new Date(existing.timeline.startDate).toISOString().split('T')[0]
+                : prev.startDate;
+              const durStr = existing.timeline?.duration;
+              let duration = prev.duration;
+              if (typeof durStr === 'string' && /^\d+/.test(durStr)) {
+                duration = parseInt(durStr, 10) || prev.duration;
+              }
+              return {
+                ...prev,
+                projectManager: existing.resources?.projectManager || '',
+                projectLead: existing.resources?.projectLead || '',
+                sowTitle: (existing as { sowTitle?: string }).sowTitle || defaultSowTitle,
+                startDate,
+                duration,
+                clientProjectManager: existing.clientName || '',
+              };
+            });
             setEditableSections({
               scopeOfWork: existing.scopeOfWork || [],
               deliverables: existing.deliverables || [],
@@ -220,6 +234,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
       const sowInput = {
         jobId: jobData.id,
         sowNumber: finalSOWData.sowNumber,
+        sowTitle: finalSOWData.sowTitle || defaultSowTitle,
         date: new Date(finalSOWData.date).toISOString(),
         clientName: finalSOWData.clientName,
         clientEmail: finalSOWData.clientEmail,
@@ -438,6 +453,16 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   </Box>
                 </CardContent>
               </Card>
+
+              <TextField
+                fullWidth
+                label="SOW Title"
+                value={technicianInputs.sowTitle}
+                onChange={(e) => handleInputChange('sowTitle', e.target.value)}
+                placeholder={defaultSowTitle}
+                helperText="Document title shown on the SOW (e.g. Agreement to Perform Research Services)"
+                sx={{ mb: 3 }}
+              />
 
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {/* Team Assignment */}

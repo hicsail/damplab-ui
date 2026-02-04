@@ -2,6 +2,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { SOWData } from '../types/SOWTypes';
+import { formatSOWDate, formatSOWDateShort } from '../utils/sowDateUtils';
 
 // Using default fonts to avoid font loading issues
 
@@ -114,19 +115,6 @@ interface SOWDocumentProps {
 }
 
 const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
-  const c = sowData?.clientSignature;
-  const t = sowData?.technicianSignature;
-  console.log('[SOWDocument] render', {
-    sowId: sowData?.id,
-    jobName: sowData?.jobName,
-    hasClientSig: !!c,
-    clientName: c && typeof c === 'object' && 'name' in c ? (c as { name?: string }).name : undefined,
-    clientDataUrlType: c && typeof c === 'object' && 'signatureDataUrl' in c ? typeof (c as { signatureDataUrl?: unknown }).signatureDataUrl : undefined,
-    hasTechSig: !!t,
-    techName: t && typeof t === 'object' && 'name' in t ? (t as { name?: string }).name : undefined,
-    techDataUrlType: t && typeof t === 'object' && 'signatureDataUrl' in t ? typeof (t as { signatureDataUrl?: unknown }).signatureDataUrl : undefined,
-  });
-
   const formatCurrency = (amount: number): string => {
     return `$${amount.toLocaleString()}`;
   };
@@ -146,12 +134,12 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           <Text style={styles.address}>610 Commonwealth Avenue, 4th Floor, Boston, MA 02215</Text>
         </View>
         <Text style={styles.sowNumber}>
-          {sowData.sowNumber} for Agreement to Perform Research Services for {sowData.clientName}
+          {sowData.sowNumber} for {sowData.sowTitle || 'Agreement to Perform Research Services'} for {sowData.clientName}
         </Text>
 
         {/* Date and Parties */}
         <View>
-          <Text>Date Services Performed By: {sowData.date}</Text>
+          <Text>Date Services Performed By: {formatSOWDate(sowData.date)}</Text>
           <Text>Services Performed For:</Text>
           <Text style={styles.bold}>Trustees of Boston University</Text>
           <Text>DAMP Lab of Boston University</Text>
@@ -176,28 +164,28 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         </Text>
 
         <Text style={styles.paragraph}>
-          {sowData.sowNumber}, effective as of {sowData.date} is entered into by and between DAMP and {sowData.clientName} 
-          and is subject to the terms and conditions specified below. The Exhibit(s) to this SOW, if any, shall 
-          be deemed to be a part hereof. In the event of any inconsistency between the terms of the body of this 
+          {sowData.sowNumber}, effective as of {formatSOWDate(sowData.date)} is entered into by and between DAMP and {sowData.clientName}
+          {' '}and is subject to the terms and conditions specified below. The Exhibit(s) to this SOW, if any, shall
+          be deemed to be a part hereof. In the event of any inconsistency between the terms of the body of this
           SOW and the terms of the Exhibit(s) hereto, the terms of the body of this SOW shall prevail.
         </Text>
 
         {/* Period of Performance */}
         <Text style={styles.sectionTitle}>Period of Performance</Text>
         <Text style={styles.paragraph}>
-          The total turn-around time is estimated to be within {sowData.timeline.duration} from the start date. 
-          Therefore, the services herewith mentioned shall commence on {sowData.timeline.startDate} and continue 
-          until {sowData.timeline.endDate}.
+          The total turn-around time is estimated to be within {sowData.timeline.duration} from the start date.
+          Therefore, the services herewith mentioned shall commence on {formatSOWDate(sowData.timeline.startDate)} and continue
+          until {formatSOWDate(sowData.timeline.endDate)}.
         </Text>
 
         {/* Engagement Resources */}
         <Text style={styles.sectionTitle}>Engagement Resources</Text>
         <Text style={styles.paragraph}>
-          The Services contemplated by this SOW shall be performed by the DAMP team, which shall include the 
+          The Services contemplated by this SOW shall be performed by the DAMP team, which shall include the
           following individuals:
         </Text>
         <Text style={styles.listItem}>{sowData.resources.projectManager} – Project Manager</Text>
-        <Text style={styles.listItem}>{sowData.resources.projectLead} - Project Lead</Text>
+        <Text style={styles.listItem}>{sowData.resources.projectLead} – Project Lead</Text>
 
         {/* Scope of Work */}
         <Text style={styles.sectionTitle}>Scope of Work</Text>
@@ -357,7 +345,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
                 {typeof sowData.clientSignature.signatureDataUrl === 'string' && sowData.clientSignature.signatureDataUrl.startsWith('data:') && sowData.clientSignature.signatureDataUrl.length < 500000 && (
                   <Image src={sowData.clientSignature.signatureDataUrl} style={{ width: 180, height: 50, marginVertical: 4 }} />
                 )}
-                <Text>Date: {String(sowData.clientSignature.signedAt ?? '').slice(0, 10)}</Text>
+                <Text>Date: {formatSOWDateShort(sowData.clientSignature.signedAt)}</Text>
                 <Text>Name: {String(sowData.clientSignature.name)}</Text>
                 {!!sowData.clientSignature.title && <Text>Title: {String(sowData.clientSignature.title)}</Text>}
               </View>
@@ -381,7 +369,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
                 {typeof sowData.technicianSignature.signatureDataUrl === 'string' && sowData.technicianSignature.signatureDataUrl.startsWith('data:') && sowData.technicianSignature.signatureDataUrl.length < 500000 && (
                   <Image src={sowData.technicianSignature.signatureDataUrl} style={{ width: 180, height: 50, marginVertical: 4 }} />
                 )}
-                <Text>Date: {String(sowData.technicianSignature.signedAt ?? '').slice(0, 10)}</Text>
+                <Text>Date: {formatSOWDateShort(sowData.technicianSignature.signedAt)}</Text>
                 <Text>Name: {String(sowData.technicianSignature.name)}</Text>
                 <Text>Title: {String(sowData.technicianSignature.title || 'Project Manager')}</Text>
               </View>
@@ -399,7 +387,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         </View>
 
         <View style={styles.footer}>
-          <Text>DAMP Lab © | Statement of Work | Generated on {sowData.date}</Text>
+          <Text>DAMP Lab © | Statement of Work | Generated on {formatSOWDate(sowData.createdAt ?? sowData.date)}</Text>
         </View>
       </Page>
     </Document>

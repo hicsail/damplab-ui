@@ -3,7 +3,10 @@
 export interface SOWData {
   id: string;
   sowNumber: string;
+  /** Human-readable date (or ISO) for display; format in PDF. */
   date: string;
+  /** Technician-entered document title, e.g. "Agreement to Perform Research Services". */
+  sowTitle?: string;
   jobId: string;
   jobName: string;
   clientName: string;
@@ -69,6 +72,8 @@ export interface SOWService {
 export interface SOWTechnicianInputs {
   projectManager: string;
   projectLead: string;
+  /** Technician-entered SOW document title. */
+  sowTitle: string;
   startDate: string;
   duration: number; // in days
   pricingAdjustments: SOWPricingAdjustment[];

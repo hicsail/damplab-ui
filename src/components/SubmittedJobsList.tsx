@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { Link } from 'react-router';
 import {
   Box,
@@ -26,97 +26,104 @@ export interface JobListItem {
   name: string;
   state: string;
   submitted: string;
-  sow?: { id: string; sowNumber: string; status: string } | null;
+  sow?: { id: string; sowNumber: string; sowTitle?: string; status: string } | null;
   username?: string;
   institute?: string;
   email?: string;
 }
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
-const STATE_OPTIONS = ['', 'SUBMITTED', 'QUEUED', 'IN_PROGRESS', 'COMPLETE'];
-
-function matchSearch(job: JobListItem, q: string): boolean {
-  if (!q.trim()) return true;
-  const lower = q.toLowerCase().trim();
-  const name = (job.name ?? '').toLowerCase();
-  const id = (job.id ?? '').toLowerCase();
-  const username = (job.username ?? '').toLowerCase();
-  const institute = (job.institute ?? '').toLowerCase();
-  const email = (job.email ?? '').toLowerCase();
-  return (
-    name.includes(lower) ||
-    id.includes(lower) ||
-    username.includes(lower) ||
-    institute.includes(lower) ||
-    email.includes(lower)
-  );
-}
+const PAGE_SIZE_OPTIONS = [10, 20, 25, 50] as const;
+export const STATE_OPTIONS = ['', 'SUBMITTED', 'QUEUED', 'IN_PROGRESS', 'COMPLETE'];
 
 export interface SubmittedJobsListProps {
-  jobs: JobListItem[];
-  isStaff?: boolean;
-  getJobLink: (job: JobListItem) => string;
+  /** Server-provided items for current page. */
+  items: JobListItem[];
+  /** Total count from API (for pagination). */
+  totalCount: number;
   loading?: boolean;
-  emptyMessage?: string;
+  page: number;
+  limit: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+  stateFilter: string;
+  onStateFilterChange: (value: string) => void;
+  hasSowFilter: 'all' | 'yes' | 'no';
+  onHasSowFilterChange: (value: 'all' | 'yes' | 'no') => void;
+  showHasSowFilter?: boolean;
+  getJobLink: (job: JobListItem) => string;
+  isStaff?: boolean;
   title: string;
   subtitle?: string;
+  emptyMessage?: string;
   onBack?: () => void;
   backLabel?: string;
-  showHasSowFilter?: boolean;
 }
 
 export default function SubmittedJobsList({
-  jobs,
-  isStaff = false,
-  getJobLink,
+  items,
+  totalCount,
   loading = false,
-  emptyMessage = 'No jobs found.',
+  page,
+  limit,
+  onPageChange,
+  onLimitChange,
+  search,
+  onSearchChange,
+  stateFilter,
+  onStateFilterChange,
+  hasSowFilter,
+  onHasSowFilterChange,
+  showHasSowFilter = false,
+  getJobLink,
+  isStaff = false,
   title,
   subtitle,
+  emptyMessage = 'No jobs found.',
   onBack,
   backLabel = 'Back to Home',
-  showHasSowFilter = false,
 }: SubmittedJobsListProps) {
-  const [search, setSearch] = useState('');
-  const [stateFilter, setStateFilter] = useState<string>(STATE_OPTIONS[0]);
-  const [hasSowFilter, setHasSowFilter] = useState<'all' | 'yes' | 'no'>('all');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(10);
-
-  const filteredAndSorted = useMemo(() => {
-    let list = [...jobs];
-    list = list.filter((j) => matchSearch(j, search));
-    if (stateFilter) {
-      list = list.filter((j) => (j.state ?? '').toUpperCase() === stateFilter);
-    }
-    if (showHasSowFilter && hasSowFilter !== 'all') {
-      if (hasSowFilter === 'yes') list = list.filter((j) => !!j?.sow);
-      else list = list.filter((j) => !j?.sow);
-    }
-    list.sort((a, b) => {
-      const da = new Date(a.submitted || 0).getTime();
-      const db = new Date(b.submitted || 0).getTime();
-      return db - da;
-    });
-    return list;
-  }, [jobs, search, stateFilter, showHasSowFilter, hasSowFilter]);
-
-  const totalCount = filteredAndSorted.length;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
   const pageSafe = Math.min(Math.max(1, page), totalPages);
-  const start = (pageSafe - 1) * pageSize;
-  const pageJobs = filteredAndSorted.slice(start, start + pageSize);
 
-  const handlePageChange = useCallback((_: unknown, p: number) => setPage(p), []);
-  const handlePageSizeChange = useCallback(
+  const handlePageChange = useCallback(
+    (_: unknown, p: number) => onPageChange(p),
+    [onPageChange]
+  );
+  const handleLimitChange = useCallback(
     (e: { target: { value: string } }) => {
       const v = Number(e.target.value);
       if (PAGE_SIZE_OPTIONS.includes(v as (typeof PAGE_SIZE_OPTIONS)[number])) {
-        setPageSize(v);
-        setPage(1);
+        onLimitChange(v);
+        onPageChange(1);
       }
     },
-    []
+    [onLimitChange, onPageChange]
+  );
+
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onSearchChange(e.target.value);
+      onPageChange(1);
+    },
+    [onSearchChange, onPageChange]
+  );
+
+  const handleStateChange = useCallback(
+    (e: { target: { value: string } }) => {
+      onStateFilterChange(e.target.value);
+      onPageChange(1);
+    },
+    [onStateFilterChange, onPageChange]
+  );
+
+  const handleHasSowChange = useCallback(
+    (e: { target: { value: string } }) => {
+      onHasSowFilterChange(e.target.value as 'all' | 'yes' | 'no');
+      onPageChange(1);
+    },
+    [onHasSowFilterChange, onPageChange]
   );
 
   return (
@@ -140,7 +147,6 @@ export default function SubmittedJobsList({
         </Typography>
       )}
 
-      {/* Search & filters */}
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={2}
@@ -152,10 +158,7 @@ export default function SubmittedJobsList({
           size="small"
           placeholder="Search by name, ID, username, institution, email…"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+          onChange={handleSearchChange}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -167,14 +170,7 @@ export default function SubmittedJobsList({
         />
         <FormControl size="small" sx={{ minWidth: 160 }}>
           <InputLabel>Status</InputLabel>
-          <Select
-            value={stateFilter}
-            label="Status"
-            onChange={(e) => {
-              setStateFilter(e.target.value);
-              setPage(1);
-            }}
-          >
+          <Select value={stateFilter} label="Status" onChange={handleStateChange}>
             <MenuItem value="">All</MenuItem>
             {STATE_OPTIONS.slice(1).map((s) => (
               <MenuItem key={s} value={s}>
@@ -186,14 +182,7 @@ export default function SubmittedJobsList({
         {showHasSowFilter && (
           <FormControl size="small" sx={{ minWidth: 140 }}>
             <InputLabel>SOW</InputLabel>
-            <Select
-              value={hasSowFilter}
-              label="SOW"
-              onChange={(e) => {
-                setHasSowFilter(e.target.value as 'all' | 'yes' | 'no');
-                setPage(1);
-              }}
-            >
+            <Select value={hasSowFilter} label="SOW" onChange={handleHasSowChange}>
               <MenuItem value="all">Any</MenuItem>
               <MenuItem value="yes">Has SOW</MenuItem>
               <MenuItem value="no">No SOW</MenuItem>
@@ -213,7 +202,7 @@ export default function SubmittedJobsList({
       ) : (
         <>
           <Stack spacing={2} sx={{ mb: 3 }}>
-            {pageJobs.map((job) => (
+            {items.map((job) => (
               <Card
                 key={job.id}
                 component={Link}
@@ -282,7 +271,6 @@ export default function SubmittedJobsList({
             ))}
           </Stack>
 
-          {/* Pagination */}
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={2}
@@ -298,9 +286,9 @@ export default function SubmittedJobsList({
               <FormControl size="small" sx={{ minWidth: 90 }}>
                 <InputLabel>Per page</InputLabel>
                 <Select
-                  value={String(pageSize)}
+                  value={String(limit)}
                   label="Per page"
-                  onChange={handlePageSizeChange}
+                  onChange={handleLimitChange}
                 >
                   {PAGE_SIZE_OPTIONS.map((n) => (
                     <MenuItem key={n} value={String(n)}>
