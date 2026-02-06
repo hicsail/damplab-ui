@@ -44,7 +44,8 @@ const getMultiValueParamIds = (parameters: unknown, rawFormData?: unknown): Set<
   if (Array.isArray(rawFormData)) {
     for (const entry of rawFormData as FormDataEntry[]) {
       if (!entry || typeof entry !== 'object') continue;
-      if (entry.allowMultipleValues !== true) continue;
+      const isMultiValue = entry.allowMultipleValues === true || Array.isArray(entry.value);
+      if (!isMultiValue) continue;
       const id = typeof entry.id === 'string' ? entry.id : undefined;
       if (id) ids.add(id);
     }
@@ -152,7 +153,11 @@ export const calculateServiceCost = (
 ): number => {
   const pricingMode = normalizePricingMode(service?.pricingMode);
   if (pricingMode === 'PARAMETER') {
-    return calculateParameterCost(service?.parameters, rawFormData);
+    const parameterPriceMap = buildParameterPriceMap(service?.parameters);
+    if (parameterPriceMap.size > 0) {
+      return calculateParameterCost(service?.parameters, rawFormData);
+    }
+    // If there are no priced parameters, fall through to service-level or fallback pricing.
   }
 
   const servicePrice = normalizePrice(service?.price);
