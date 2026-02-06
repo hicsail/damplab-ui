@@ -36,7 +36,7 @@ import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
 import { CanvasContext } from "../contexts/Canvas";
 import { getWorkflowsFromGraph } from "../controllers/GraphHelpers";
-import { calculateServiceCost, calculateParameterLineItems } from "../utils/servicePricing";
+import { calculateServiceCost } from "../utils/servicePricing";
 
 
 import { PausePresentationRounded } from "@mui/icons-material";
@@ -218,7 +218,36 @@ export default function Checkout() {
   };
 
   const getParameterLineItems = (node: WorkflowNode) => {
-    return calculateParameterLineItems(node.data.parameters, node.data.formData);
+    const parameters = node.data.parameters || [];
+    const formData = node.data.formData || [];
+    const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
+
+    return parameters
+      .filter((param) => param.price !== undefined && param.price !== null)
+      .map((param) => {
+        const value = formDataMap.get(param.id);
+        const isMulti = param.allowMultipleValues === true || Array.isArray(value);
+        let count = 0;
+        if (isMulti) {
+          if (Array.isArray(value)) count = value.length;
+          else if (value !== null && value !== undefined) count = 1;
+        } else if (value !== null && value !== undefined) {
+          count = 1;
+        }
+        const unitPrice = Number(param.price);
+        if (!Number.isFinite(unitPrice) || count === 0) {
+          return null;
+        }
+        const total = unitPrice * count;
+        return {
+          id: param.id,
+          name: param.name,
+          count,
+          unitPrice,
+          total
+        };
+      })
+      .filter((item): item is { id: string; name: string; count: number; unitPrice: number; total: number } => !!item);
   };
 
 

@@ -181,7 +181,8 @@ export const calculateParameterLineItems = (
     const count = countValue(value, multiValueParamIds.has(id));
     if (count === 0) continue;
 
-    const name = typeof (param as any).name === 'string' ? (param as any).name : id;
+    const paramWithName = param as any;
+    const name = typeof paramWithName.name === 'string' ? paramWithName.name : id;
     const total = unitPrice * count;
 
     lineItems.push({
