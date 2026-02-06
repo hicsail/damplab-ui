@@ -3,6 +3,7 @@
 import { addDays, format } from 'date-fns';
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWService } from '../types/SOWTypes';
 import { Workflow } from '../gql/graphql';
+import { calculateServiceCost } from './servicePricing';
 
 // Constants
 const SOW_STORAGE_KEY = 'damplab-sows';
@@ -263,24 +264,34 @@ const calculateTimeline = (
   };
 };
 
+const getNodeCost = (node: any): number => {
+  if (!node?.service?.id) return 0;
+
+  const computedCost = calculateServiceCost(
+    node.service,
+    node.formData,
+    node.price
+  );
+
+  const hasPricingData =
+    (node.service?.price !== undefined && node.service?.price !== null) ||
+    (node.price !== undefined && node.price !== null) ||
+    (node.service?.pricingMode === 'PARAMETER' && computedCost > 0);
+  if (hasPricingData) {
+    return computedCost;
+  }
+
+  const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
+  return generator ? generator.baseCost(node.formData || {}) : 0;
+};
+
 // Calculate base pricing
 const calculateBasePricing = (workflows: Workflow[]): number => {
   let totalCost = 0;
   
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
-      if (node.service?.id) {
-        // Use price from service if available, otherwise fall back to hardcoded generators
-        if (node.service.price && typeof node.service.price === 'number') {
-          totalCost += node.service.price;
-        } else {
-          // Fallback to hardcoded generators for backward compatibility
-          const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-          if (generator) {
-            totalCost += generator.baseCost(node.formData || {});
-          }
-        }
-      }
+      totalCost += getNodeCost(node);
     });
   });
 
@@ -294,13 +305,7 @@ const generateServicesList = (workflows: Workflow[]): SOWService[] => {
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        // Use price from service if available, otherwise fall back to hardcoded generators
-        const servicePrice = (node.service.price && typeof node.service.price === 'number') 
-          ? node.service.price 
-          : (() => {
-              const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-              return generator ? generator.baseCost(node.formData || {}) : 0;
-            })();
+        const servicePrice = getNodeCost(node);
         
         // Use scope description from generator (could be enhanced to come from service in future)
         const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
@@ -313,7 +318,8 @@ const generateServicesList = (workflows: Workflow[]): SOWService[] => {
           name: node.service.name,
           description: description,
           cost: servicePrice,
-          category: 'molecular-biology'
+          category: 'molecular-biology',
+          formData: node.formData
         });
       }
     });

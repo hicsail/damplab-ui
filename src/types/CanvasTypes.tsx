@@ -1,7 +1,8 @@
 export type NodeData = {
     id: string;
     label: string;
-    price: number;
+    price: number | null;
+    pricingMode?: 'SERVICE' | 'PARAMETER';
     allowedConnections: string[];
     icon: string;
     parameters: NodeParameter[];
@@ -28,6 +29,8 @@ export type NodeParameter = {
     dynamicAdd: boolean;
     /** When true, customer can add multiple values via plus button in sidebar. */
     allowMultipleValues?: boolean;
+    /** Optional per-parameter price used when pricingMode is PARAMETER. */
+    price?: number;
     tableData: any;
     paramGroups?: any[];
     paramGroupId?: string;

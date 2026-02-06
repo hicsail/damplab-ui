@@ -73,6 +73,7 @@ export const EditServicesTable: React.FC = () => {
     const changes = {
       name: newRow.name,
       price: newRow.price == null ? null : Number(newRow.price),
+      pricingMode: newRow.pricingMode ?? 'SERVICE',
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters,
@@ -95,6 +96,7 @@ export const EditServicesTable: React.FC = () => {
       name: newRow.name || '',
       icon: '',
       price: newRow.price == null ? null : Number(newRow.price),
+      pricingMode: newRow.pricingMode ?? 'SERVICE',
       parameters: newRow.parameters || [],
       paramGroups: [],
       allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
@@ -174,6 +176,22 @@ export const EditServicesTable: React.FC = () => {
           setErrorMessage(null);
         }
         return { ...params.props, error: hasError };
+      }
+    },
+    {
+      field: 'pricingMode',
+      headerName: 'Pricing Mode',
+      width: 220,
+      editable: true,
+      type: 'singleSelect',
+      valueGetter: (_value, row) => row.pricingMode ?? 'SERVICE',
+      valueOptions: [
+        { value: 'SERVICE', label: 'Service price' },
+        { value: 'PARAMETER', label: 'Parameter-based' }
+      ],
+      valueFormatter: (value) => {
+        if (value === 'PARAMETER') return 'Parameter-based';
+        return 'Service price';
       }
     },
     {

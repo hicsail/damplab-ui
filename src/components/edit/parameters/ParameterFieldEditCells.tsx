@@ -253,6 +253,32 @@ export function ParameterRangeValueInput(props: GridRenderEditCellParams) {
   );
 }
 
+export function ParameterPriceInput(props: GridRenderEditCellParams) {
+  const { id, field, hasFocus } = props;
+  const apiRef = useGridApiContext();
+  const ref = React.useRef();
+
+  React.useLayoutEffect(() => {
+    if (hasFocus) {
+      ref.current.focus();
+    }
+  }, [hasFocus]);
+
+  const handleValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    apiRef.current.setEditCellValue({ id, field, value: event.target.value });
+  };
+
+  return (
+    <GridEditInputCell
+      ref={ref}
+      type={"number"}
+      onChange={handleValueChange}
+      placeholder={"Price"}
+      {...props}
+    />
+  );
+}
+
 export function ParameterTableDataButton(props: GridRenderEditCellParams) {
   const { id } = props;
   const [isHover, setIsHover] = React.useState(false);
