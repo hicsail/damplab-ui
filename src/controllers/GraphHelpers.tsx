@@ -41,6 +41,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         id                    : nodeId,
         label                 : service.name,
         price                 : service.price,
+        pricingMode           : service.pricingMode,
         description           : service.description,
         allowedConnections    : service.allowedConnections,
         icon                  : service.icon,
@@ -144,6 +145,7 @@ export const transformNodesToGQL = (nodes: any) => {
         delete gqlNode.parameters;
         delete gqlNode.description;
         delete gqlNode.paramGroups;
+        delete gqlNode.pricingMode;
 
         console.log('gqlNode: ', gqlNode);
         gqlNodes.push(gqlNode);

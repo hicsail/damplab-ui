@@ -66,6 +66,8 @@ export interface SOWService {
   description: string;
   cost: number;
   category: string;
+  /** Parameter values for pricing calculations when needed. */
+  formData?: any;
 }
 
 

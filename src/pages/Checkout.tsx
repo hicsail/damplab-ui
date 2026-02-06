@@ -36,6 +36,7 @@ import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
 import { CanvasContext } from "../contexts/Canvas";
 import { getWorkflowsFromGraph } from "../controllers/GraphHelpers";
+import { calculateServiceCost } from "../utils/servicePricing";
 
 
 import { PausePresentationRounded } from "@mui/icons-material";
@@ -52,7 +53,8 @@ interface WorkflowNode {
   data: {
       id: string;
       label: string;
-      price: number;
+      price: number | null;
+      pricingMode?: 'SERVICE' | 'PARAMETER';
       description: string;
       serviceId: string;
       icon?: string;
@@ -62,12 +64,15 @@ interface WorkflowNode {
           type: string;
           paramType: string;
           required: boolean;
+          allowMultipleValues?: boolean;
+          price?: number;
       }>;
       formData?: Array<{
           id: string;
           nodeId: string;
           name: string;
           value: any;
+          allowMultipleValues?: boolean;
       }>;
   };
   width: number;
@@ -141,7 +146,7 @@ export default function Checkout() {
       workflows: workflows,
       workflowCosts: workflows.map(workflow => ({
         workflowId: workflow[0]?.id,
-        cost: calculateServiceCost(workflow)
+        cost: calculateWorkflowCost(workflow)
       })),
       totalCost: calculateTotalJobCost(workflows),
       serviceDetails: workflows.map(workflow => groupServicesByLabel(workflow))
@@ -162,8 +167,20 @@ export default function Checkout() {
     }
   };
 
-  const calculateServiceCost = (workflow: WorkflowNode[]) => {
-    return workflow.reduce((total, node) => total + (node.data.price), 0);
+  const getNodeCost = (node: WorkflowNode) => {
+    return calculateServiceCost(
+      {
+        pricingMode: node.data.pricingMode,
+        price: node.data.price,
+        parameters: node.data.parameters
+      },
+      node.data.formData,
+      node.data.price
+    );
+  };
+
+  const calculateWorkflowCost = (workflow: WorkflowNode[]) => {
+    return workflow.reduce((total, node) => total + getNodeCost(node), 0);
   };
 
   const formatPriceLabel = (price: number | null | undefined): string => {
@@ -178,14 +195,16 @@ export default function Checkout() {
   const groupServicesByLabel = (workflow: WorkflowNode[]) => {
     return workflow.reduce((acc, node) => {
       const label = node.data.label;
+      const nodeCost = getNodeCost(node);
       if (!acc[label]) {
         acc[label] = {
           count: 1,
-          cost: node.data.price,
+          cost: nodeCost,
           nodes: [node]  // Store array of nodes instead of single node
         };
       } else {
         acc[label].count += 1;
+        acc[label].cost += nodeCost;
         acc[label].nodes.push(node);  // Add node to array
       }
       return acc;
@@ -194,8 +213,41 @@ export default function Checkout() {
 
   const calculateTotalJobCost = (workflows: WorkflowNode[][]) => {
     return workflows.reduce((total, workflow) => {
-      return total + calculateServiceCost(workflow);
+      return total + calculateWorkflowCost(workflow);
     }, 0);
+  };
+
+  const getParameterLineItems = (node: WorkflowNode) => {
+    const parameters = node.data.parameters || [];
+    const formData = node.data.formData || [];
+    const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
+
+    return parameters
+      .filter((param) => param.price !== undefined && param.price !== null)
+      .map((param) => {
+        const value = formDataMap.get(param.id);
+        const isMulti = param.allowMultipleValues === true || Array.isArray(value);
+        let count = 0;
+        if (isMulti) {
+          if (Array.isArray(value)) count = value.length;
+          else if (value !== null && value !== undefined) count = 1;
+        } else if (value !== null && value !== undefined) {
+          count = 1;
+        }
+        const unitPrice = Number(param.price);
+        if (!Number.isFinite(unitPrice) || count === 0) {
+          return null;
+        }
+        const total = unitPrice * count;
+        return {
+          id: param.id,
+          name: param.name,
+          count,
+          unitPrice,
+          total
+        };
+      })
+      .filter((item): item is { id: string; name: string; count: number; unitPrice: number; total: number } => !!item);
   };
 
 
@@ -275,7 +327,7 @@ export default function Checkout() {
             }}
           >
             <Typography variant="h6" color="textPrimary">
-              Workflow {index + 1} ({`~$${calculateServiceCost(workflow).toFixed(2)}`})
+              Workflow {index + 1} ({`~$${calculateWorkflowCost(workflow).toFixed(2)}`})
             </Typography>
 
             <Box sx={{ display: 'flex', gap: 1 }}>
@@ -418,6 +470,15 @@ export default function Checkout() {
                                   </Typography>
                                 )}
                                 <Box sx={{ ml: service.count > 1 ? 2 : 0 }}>
+                                  {node.data.pricingMode === 'PARAMETER' && (
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                      sx={{ fontSize: '0.875rem' }}
+                                    >
+                                      Estimated cost: {formatPriceLabel(getNodeCost(node))}
+                                    </Typography>
+                                  )}
                                   {node.data?.formData?.map((param) => (
                                     <Typography
                                       key={param.id}
@@ -428,6 +489,20 @@ export default function Checkout() {
                                       {param.name}: {param.value}
                                     </Typography>
                                   ))}
+                                  {node.data.pricingMode === 'PARAMETER' && (
+                                    <Box sx={{ mt: 0.5 }}>
+                                      {getParameterLineItems(node).map((item) => (
+                                        <Typography
+                                          key={item.id}
+                                          variant="body2"
+                                          color="text.secondary"
+                                          sx={{ fontSize: '0.8rem' }}
+                                        >
+                                          {item.name}: {item.count} × ${item.unitPrice.toFixed(2)} = ${item.total.toFixed(2)}
+                                        </Typography>
+                                      ))}
+                                    </Box>
+                                  )}
                                 </Box>
                               </Stack>
                             </Box>
@@ -509,7 +584,7 @@ export default function Checkout() {
                     variant="body2"
                     sx={{ fontSize: '0.85rem', textAlign: 'right', minWidth: '80px' }}
                   >
-                    {formatPriceLabel(node.data.price)}
+                    {formatPriceLabel(getNodeCost(node))}
                   </Typography>
                 </ListItem>
               ))}

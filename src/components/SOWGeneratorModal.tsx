@@ -247,7 +247,8 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
           name: s.name,
           description: s.description,
           cost: s.cost,
-          category: s.category
+          category: s.category,
+          formData: s.formData
         })),
         timeline: {
           startDate: new Date(finalSOWData.timeline.startDate).toISOString(),

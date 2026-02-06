@@ -8,6 +8,7 @@ export const GET_SERVICES = gql`
             id
             name
             price
+            pricingMode
             icon
             parameters
             description
@@ -87,6 +88,7 @@ export const GET_JOB_BY_ID = gql`
                         id
                         name
                         price
+                        pricingMode
                         icon
                         parameters
                         deliverables
@@ -144,6 +146,7 @@ export const GET_OWN_JOB_BY_ID = gql`
                         id
                         name
                         price
+                        pricingMode
                         icon
                         parameters
                         allowedConnections {
@@ -338,6 +341,7 @@ export const UPDATE_SERVICE = gql`
       id
       name
       price
+      pricingMode
       deliverables
     }
   }
@@ -349,6 +353,7 @@ export const CREATE_SERVICE = gql`
       id
       name
       price
+      pricingMode
       icon
       parameters
       description

@@ -35,6 +35,7 @@ import {
   ParameterNameInput,
   ParameterOptionsButton,
   ParameterParamTypeSelect,
+  ParameterPriceInput,
   ParameterRangeValueInput,
   ParameterTableDataButton,
   ParameterTypeSelect
@@ -133,6 +134,33 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       width: 200,
       editable: isEdit,
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
+    },
+    {
+      field: 'price',
+      headerName: 'Price',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === "") return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterPriceInput {...params} />),
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
     },
     {
       field: 'options',

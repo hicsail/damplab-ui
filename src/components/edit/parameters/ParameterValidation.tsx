@@ -27,5 +27,14 @@ export function validateParameter(row: GridRowModel): ParameterValidationError {
     });
   }
 
+  if (row.price !== undefined && row.price !== null) {
+    const numericPrice = Number(row.price);
+    if (Number.isNaN(numericPrice)) {
+      errors.push({ field: "price", errorMsg: "Price must be a number." });
+    } else if (numericPrice < 0) {
+      errors.push({ field: "price", errorMsg: "Price cannot be negative." });
+    }
+  }
+
   return errors;
 }

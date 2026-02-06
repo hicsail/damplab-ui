@@ -93,6 +93,10 @@ export type DampLabService = {
   __typename?: 'DampLabService';
   /** List of services this service can connect to */
   allowedConnections: Array<DampLabService>;
+  /** Array of deliverable descriptions for this service */
+  deliverables?: Maybe<Array<Scalars['String']>>;
+  /** Description of the service */
+  description?: Maybe<Scalars['String']>;
   /** URL to the icon of the service */
   icon: Scalars['String'];
   /** unique database generated ID */
@@ -101,11 +105,22 @@ export type DampLabService = {
   name: Scalars['String'];
   /** Parameters that are part of the service */
   parameters: Scalars['JSON'];
+  /** The approximate cost to use this service */
+  price?: Maybe<Scalars['Float']>;
+  /** How pricing is determined for this service */
+  pricingMode?: Maybe<ServicePricingMode>;
+  /** Parameter groups for this service */
+  paramGroups?: Maybe<Scalars['JSON']>;
   /** The by-product of the service */
   result?: Maybe<Scalars['JSON']>;
   /** The expected fields in the result of the service */
   resultParams?: Maybe<Array<Scalars['String']>>;
 };
+
+export enum ServicePricingMode {
+  Parameter = 'PARAMETER',
+  Service = 'SERVICE'
+}
 
 /** Jobs encapsulate many workflows that were submitted together */
 export type Job = {
@@ -223,6 +238,8 @@ export type WorkflowNode = {
   id: Scalars['ID'];
   /** Human readable name of the service */
   label: Scalars['String'];
+  /** Calculated price for this workflow node */
+  price?: Maybe<Scalars['Float']>;
   /** React Flow representation of the graph for re-generating */
   reactNode: Scalars['JSON'];
   /** The service this node represents */
