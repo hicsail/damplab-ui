@@ -146,6 +146,56 @@ export const calculateParameterCost = (parameters: unknown, rawFormData: unknown
   return total;
 };
 
+export interface ParameterLineItem {
+  id: string;
+  name: string;
+  count: number;
+  unitPrice: number;
+  total: number;
+}
+
+export const calculateParameterLineItems = (
+  parameters: unknown,
+  rawFormData: unknown
+): ParameterLineItem[] => {
+  const priceMap = buildParameterPriceMap(parameters);
+  if (priceMap.size === 0) return [];
+
+  const multiValueParamIds = getMultiValueParamIds(parameters, rawFormData);
+  const formData = normalizeFormDataToArray(rawFormData, multiValueParamIds);
+  const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
+
+  const lineItems: ParameterLineItem[] = [];
+
+  if (!Array.isArray(parameters)) return lineItems;
+
+  for (const param of parameters as ServiceParameterDefinition[]) {
+    if (!param || typeof param !== 'object') continue;
+    const id = typeof param.id === 'string' ? param.id : undefined;
+    if (!id) continue;
+
+    const unitPrice = priceMap.get(id);
+    if (unitPrice === undefined) continue;
+
+    const value = formDataMap.get(id);
+    const count = countValue(value, multiValueParamIds.has(id));
+    if (count === 0) continue;
+
+    const name = typeof (param as any).name === 'string' ? (param as any).name : id;
+    const total = unitPrice * count;
+
+    lineItems.push({
+      id,
+      name,
+      count,
+      unitPrice,
+      total,
+    });
+  }
+
+  return lineItems;
+};
+
 export const calculateServiceCost = (
   service: { pricingMode?: unknown; price?: unknown; parameters?: unknown } | null | undefined,
   rawFormData: unknown,
