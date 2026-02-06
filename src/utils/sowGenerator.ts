@@ -267,17 +267,16 @@ const calculateTimeline = (
 const getNodeCost = (node: any): number => {
   if (!node?.service?.id) return 0;
 
-  const hasPricingData =
-    node.service?.pricingMode === 'PARAMETER' ||
-    (node.service?.price !== undefined && node.service?.price !== null) ||
-    (node.price !== undefined && node.price !== null);
-
   const computedCost = calculateServiceCost(
     node.service,
     node.formData,
     node.price
   );
 
+  const hasPricingData =
+    (node.service?.price !== undefined && node.service?.price !== null) ||
+    (node.price !== undefined && node.price !== null) ||
+    (node.service?.pricingMode === 'PARAMETER' && computedCost > 0);
   if (hasPricingData) {
     return computedCost;
   }
