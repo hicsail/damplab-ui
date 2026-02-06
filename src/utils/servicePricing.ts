@@ -44,7 +44,8 @@ const getMultiValueParamIds = (parameters: unknown, rawFormData?: unknown): Set<
   if (Array.isArray(rawFormData)) {
     for (const entry of rawFormData as FormDataEntry[]) {
       if (!entry || typeof entry !== 'object') continue;
-      if (entry.allowMultipleValues !== true) continue;
+      const isMultiValue = entry.allowMultipleValues === true || Array.isArray(entry.value);
+      if (!isMultiValue) continue;
       const id = typeof entry.id === 'string' ? entry.id : undefined;
       if (id) ids.add(id);
     }
@@ -145,6 +146,57 @@ export const calculateParameterCost = (parameters: unknown, rawFormData: unknown
   return total;
 };
 
+export interface ParameterLineItem {
+  id: string;
+  name: string;
+  count: number;
+  unitPrice: number;
+  total: number;
+}
+
+export const calculateParameterLineItems = (
+  parameters: unknown,
+  rawFormData: unknown
+): ParameterLineItem[] => {
+  const priceMap = buildParameterPriceMap(parameters);
+  if (priceMap.size === 0) return [];
+
+  const multiValueParamIds = getMultiValueParamIds(parameters, rawFormData);
+  const formData = normalizeFormDataToArray(rawFormData, multiValueParamIds);
+  const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
+
+  const lineItems: ParameterLineItem[] = [];
+
+  if (!Array.isArray(parameters)) return lineItems;
+
+  for (const param of parameters as ServiceParameterDefinition[]) {
+    if (!param || typeof param !== 'object') continue;
+    const id = typeof param.id === 'string' ? param.id : undefined;
+    if (!id) continue;
+
+    const unitPrice = priceMap.get(id);
+    if (unitPrice === undefined) continue;
+
+    const value = formDataMap.get(id);
+    const count = countValue(value, multiValueParamIds.has(id));
+    if (count === 0) continue;
+
+    const paramWithName = param as any;
+    const name = typeof paramWithName.name === 'string' ? paramWithName.name : id;
+    const total = unitPrice * count;
+
+    lineItems.push({
+      id,
+      name,
+      count,
+      unitPrice,
+      total,
+    });
+  }
+
+  return lineItems;
+};
+
 export const calculateServiceCost = (
   service: { pricingMode?: unknown; price?: unknown; parameters?: unknown } | null | undefined,
   rawFormData: unknown,
@@ -152,7 +204,11 @@ export const calculateServiceCost = (
 ): number => {
   const pricingMode = normalizePricingMode(service?.pricingMode);
   if (pricingMode === 'PARAMETER') {
-    return calculateParameterCost(service?.parameters, rawFormData);
+    const parameterPriceMap = buildParameterPriceMap(service?.parameters);
+    if (parameterPriceMap.size > 0) {
+      return calculateParameterCost(service?.parameters, rawFormData);
+    }
+    // If there are no priced parameters, fall through to service-level or fallback pricing.
   }
 
   const servicePrice = normalizePrice(service?.price);
