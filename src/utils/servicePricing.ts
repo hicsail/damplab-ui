@@ -1,9 +1,17 @@
 export type ServicePricingMode = 'SERVICE' | 'PARAMETER';
 
+interface ServiceParameterOption {
+  id?: unknown;
+  name?: unknown;
+  price?: unknown;
+}
+
 interface ServiceParameterDefinition {
   id?: unknown;
   allowMultipleValues?: boolean;
   price?: unknown;
+  type?: unknown;
+  options?: ServiceParameterOption[] | unknown;
 }
 
 interface FormDataEntry {
@@ -101,23 +109,6 @@ const normalizeFormDataToArray = (
   return [];
 };
 
-const buildParameterPriceMap = (parameters: unknown): Map<string, number> => {
-  const map = new Map<string, number>();
-  if (!Array.isArray(parameters)) return map;
-
-  for (const param of parameters as ServiceParameterDefinition[]) {
-    if (!param || typeof param !== 'object') continue;
-    const id = typeof param.id === 'string' ? param.id : undefined;
-    if (!id) continue;
-    const price = normalizePrice(param.price);
-    if (price !== undefined) {
-      map.set(id, price);
-    }
-  }
-
-  return map;
-};
-
 const countValue = (value: unknown, isMulti: boolean): number => {
   if (isMulti) {
     if (Array.isArray(value)) return value.length;
@@ -128,17 +119,61 @@ const countValue = (value: unknown, isMulti: boolean): number => {
 };
 
 export const calculateParameterCost = (parameters: unknown, rawFormData: unknown): number => {
-  const priceMap = buildParameterPriceMap(parameters);
-  if (priceMap.size === 0) return 0;
+  if (!Array.isArray(parameters)) return 0;
+
+  const paramsById = new Map<string, ServiceParameterDefinition>();
+  for (const param of parameters as ServiceParameterDefinition[]) {
+    if (!param || typeof param !== 'object') continue;
+    const id = typeof param.id === 'string' ? param.id : undefined;
+    if (!id) continue;
+    paramsById.set(id, param);
+  }
 
   const multiValueParamIds = getMultiValueParamIds(parameters, rawFormData);
   const formData = normalizeFormDataToArray(rawFormData, multiValueParamIds);
-  const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
 
   let total = 0;
-  for (const [id, unitPrice] of priceMap) {
-    const value = formDataMap.get(id);
-    const count = countValue(value, multiValueParamIds.has(id));
+
+  for (const entry of formData) {
+    const param = paramsById.get(entry.id);
+    if (!param) continue;
+
+    const isDropdown =
+      typeof param.type === 'string' &&
+      (param.type === 'dropdown' || param.type === 'enum');
+
+    const options = Array.isArray(param.options)
+      ? (param.options as ServiceParameterOption[])
+      : undefined;
+
+    const hasOptionPricing =
+      isDropdown &&
+      !!options &&
+      options.some((opt) => normalizePrice(opt.price) !== undefined);
+
+    // When option-level pricing is configured, use that instead of parameter-level price.
+    if (hasOptionPricing && options) {
+      const rawValue = entry.value;
+      const values: unknown[] = Array.isArray(rawValue) ? rawValue : [rawValue];
+
+      for (const v of values) {
+        if (v === null || v === undefined || v === '') continue;
+        const id = typeof v === 'string' ? v : String(v);
+        const option = options.find((opt) => typeof opt.id === 'string' && opt.id === id);
+        if (!option) continue;
+        const price = normalizePrice(option.price);
+        if (price === undefined) continue;
+        total += price;
+      }
+
+      continue;
+    }
+
+    // Fallback: original parameter-level pricing behavior.
+    const unitPrice = normalizePrice(param.price);
+    if (unitPrice === undefined) continue;
+
+    const count = countValue(entry.value, multiValueParamIds.has(entry.id));
     total += unitPrice * count;
   }
 

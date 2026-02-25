@@ -16,14 +16,14 @@ export function validateParameter(row: GridRowModel): ParameterValidationError {
   if (row.type === undefined) {
     errors.push({ field: "type", errorMsg: "Type is a required field." });
   }
-  // Options is required if param is of type enum
+  // Options is required if param is of type dropdown (enum-style)
   if (
-    row.type === "enum" &&
+    row.type === "dropdown" &&
     (row.options === undefined || row.options.length === 0)
   ) {
     errors.push({
       field: "options",
-      errorMsg: "Options are required for parameters of type 'enum'.",
+      errorMsg: "Options are required for parameters of type 'dropdown'.",
     });
   }
 

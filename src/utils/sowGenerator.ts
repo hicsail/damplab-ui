@@ -71,9 +71,9 @@ const getNextSOWNumber = (): string => {
   return nextNumber.toString().padStart(3, '0');
 };
 
-/** Unique SOW number for a new SOW so same job name across jobs never conflicts. */
-export const getUniqueSOWNumberForJob = (jobId: string): string => {
-  return `SOW-${jobId}-${Date.now().toString(36)}`;
+/** Unique SOW number for a new SOW. Uses a time-based suffix; jobId is kept internal, not exposed in the SOW number. */
+export const getUniqueSOWNumberForJob = (_jobId: string): string => {
+  return `SOW-${Date.now().toString(36)}`;
 };
 
 // Extract sample/plate counts from formData
@@ -285,6 +285,85 @@ const getNodeCost = (node: any): number => {
   return generator ? generator.baseCost(node.formData || {}) : 0;
 };
 
+const getNodePricingDetails = (node: any): SOWService['pricingDetails'] => {
+  if (!node?.service) return [];
+  const service: any = node.service;
+  const parameters: any[] = Array.isArray(service.parameters) ? service.parameters : [];
+  const formData: any[] = Array.isArray(node.formData) ? node.formData : [];
+  const formDataMap = new Map(formData.map((entry: any) => [entry.id, entry.value]));
+
+  const items: NonNullable<SOWService['pricingDetails']> = [];
+
+  parameters.forEach((param: any) => {
+    if (!param || !param.id) return;
+
+    const rawValue = formDataMap.get(param.id);
+    const isMulti = param.allowMultipleValues === true || Array.isArray(rawValue);
+
+    const options = Array.isArray(param.options) ? param.options : undefined;
+    const hasOptionPricing =
+      param.type === 'dropdown' &&
+      options &&
+      options.some(
+        (opt: any) =>
+          opt &&
+          opt.price !== undefined &&
+          opt.price !== null &&
+          Number.isFinite(Number(opt.price))
+      );
+
+    // When dropdown options have prices, create line items per selected option.
+    if (hasOptionPricing && options) {
+      const valuesArray = Array.isArray(rawValue)
+        ? rawValue
+        : rawValue != null
+        ? [rawValue]
+        : [];
+
+      valuesArray.forEach((v: any) => {
+        if (v === null || v === undefined || v === '') return;
+        const optId = String(v);
+        const opt = options.find((o: any) => o && o.id === optId);
+        if (!opt) return;
+        const unitPrice = Number(opt.price);
+        if (!Number.isFinite(unitPrice)) return;
+
+        items.push({
+          label: `${param.name} – ${opt.name ?? optId}`,
+          quantity: 1,
+          unitPrice,
+          total: unitPrice,
+        });
+      });
+
+      return;
+    }
+
+    // Fallback: parameter-level pricing (per-parameter price and count of values).
+    if (param.price === undefined || param.price === null) return;
+    const unitPrice = Number(param.price);
+    if (!Number.isFinite(unitPrice)) return;
+
+    let quantity = 0;
+    if (isMulti) {
+      if (Array.isArray(rawValue)) quantity = rawValue.length;
+      else if (rawValue !== null && rawValue !== undefined) quantity = 1;
+    } else if (rawValue !== null && rawValue !== undefined) {
+      quantity = 1;
+    }
+    if (quantity === 0) return;
+
+    items.push({
+      label: param.name,
+      quantity,
+      unitPrice,
+      total: unitPrice * quantity,
+    });
+  });
+
+  return items;
+};
+
 // Calculate base pricing
 const calculateBasePricing = (workflows: Workflow[]): number => {
   let totalCost = 0;
@@ -306,6 +385,7 @@ const generateServicesList = (workflows: Workflow[]): SOWService[] => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
         const servicePrice = getNodeCost(node);
+        const pricingDetails = getNodePricingDetails(node);
         
         // Use scope description from generator (could be enhanced to come from service in future)
         const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
@@ -319,7 +399,8 @@ const generateServicesList = (workflows: Workflow[]): SOWService[] => {
           description: description,
           cost: servicePrice,
           category: 'molecular-biology',
-          formData: node.formData
+          formData: node.formData,
+          pricingDetails: pricingDetails && pricingDetails.length > 0 ? pricingDetails : undefined
         });
       }
     });

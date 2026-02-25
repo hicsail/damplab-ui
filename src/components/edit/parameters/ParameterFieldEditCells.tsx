@@ -150,9 +150,9 @@ export function ParameterOptionsButton(props: GridRenderEditCellParams) {
   useGridSelector(apiRef, editingTypeSelector(id));
   const currentEditType = apiRef.current.getRowWithUpdatedValues(id).type;
 
-  const isDisabled = currentEditType !== "enum";
+  const isDisabled = currentEditType !== "dropdown";
   const disabledTooltipMsg =
-    "Options is only applicable for parameters of type enum.";
+    "Options is only applicable for parameters of type dropdown.";
 
   return (
     <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
@@ -394,7 +394,7 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
         });
       }
     } else if (
-      value === "enum" &&
+      value === "dropdown" &&
       !!props.row.options &&
       props.row.options?.length > 0
     ) {
@@ -468,7 +468,7 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
         <MenuItem value={"number"}>number</MenuItem>
         <MenuItem value={"file"}>file</MenuItem>
         <MenuItem value={"boolean"}>boolean</MenuItem>
-        <MenuItem value={"enum"}>enum (dropdown)</MenuItem>
+        <MenuItem value={"dropdown"}>enum (dropdown)</MenuItem>
         <MenuItem value={"table"}>table</MenuItem>
       </Select>
     </FormControl>

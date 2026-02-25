@@ -80,6 +80,10 @@ const styles = StyleSheet.create({
     flex: 2,
     paddingHorizontal: 5,
   },
+  tableSubLine: {
+    fontSize: 9,
+    marginTop: 2,
+  },
   bold: {
     fontWeight: 'bold',
   },
@@ -136,6 +140,11 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         <Text style={styles.sowNumber}>
           {sowData.sowNumber} for {sowData.sowTitle || 'Agreement to Perform Research Services'} for {sowData.clientName}
         </Text>
+        {sowData.jobName && (
+          <Text style={{ marginBottom: 10 }}>
+            Project: {sowData.jobName}
+          </Text>
+        )}
 
         {/* Date and Parties */}
         <View>
@@ -248,8 +257,21 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           </View>
           {sowData.services.map((service, index) => (
             <View key={index} style={styles.tableRow}>
-              <Text style={styles.tableCellLarge}>{service.name}</Text>
-              <Text style={styles.tableCell}>{formatCurrency(service.cost)}</Text>
+              <View style={styles.tableCellLarge}>
+                <Text>{service.name}</Text>
+                {Array.isArray(service.pricingDetails) && service.pricingDetails.length > 0 && (
+                  <View style={{ marginTop: 2 }}>
+                    {service.pricingDetails.map((item, idx) => (
+                      <Text key={idx} style={styles.tableSubLine}>
+                        • {item.label}: {item.quantity} × {formatCurrency(item.unitPrice)} = {formatCurrency(item.total)}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <View style={styles.tableCell}>
+                <Text>{formatCurrency(service.cost)}</Text>
+              </View>
             </View>
           ))}
           <View style={[styles.tableRow, { fontWeight: 'bold', backgroundColor: '#f9f9f9' }]}>

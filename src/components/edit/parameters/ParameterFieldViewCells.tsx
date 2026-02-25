@@ -8,12 +8,12 @@ import { Box, Button, Tooltip } from "@mui/material";
 
 export function ParameterOptionsViewCell(props: GridRenderCellParams) {
   const [isHover, setIsHover] = React.useState(false);
-  const isDisabled = props.row.type !== "enum";
+  const isDisabled = props.row.type !== "dropdown";
 
   return (
     <Tooltip
       open={isDisabled && isHover}
-      title={"Options is only applicable for parameters of type enum."}
+      title={"Options is only applicable for parameters of type dropdown."}
       arrow
     >
       <Box

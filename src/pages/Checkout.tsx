@@ -222,32 +222,78 @@ export default function Checkout() {
     const formData = node.data.formData || [];
     const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
 
-    return parameters
-      .filter((param) => param.price !== undefined && param.price !== null)
-      .map((param) => {
-        const value = formDataMap.get(param.id);
-        const isMulti = param.allowMultipleValues === true || Array.isArray(value);
-        let count = 0;
-        if (isMulti) {
-          if (Array.isArray(value)) count = value.length;
-          else if (value !== null && value !== undefined) count = 1;
-        } else if (value !== null && value !== undefined) {
-          count = 1;
-        }
-        const unitPrice = Number(param.price);
-        if (!Number.isFinite(unitPrice) || count === 0) {
-          return null;
-        }
-        const total = unitPrice * count;
-        return {
-          id: param.id,
-          name: param.name,
-          count,
-          unitPrice,
-          total
-        };
-      })
-      .filter((item): item is { id: string; name: string; count: number; unitPrice: number; total: number } => !!item);
+    const items: { id: string; name: string; count: number; unitPrice: number; total: number }[] = [];
+
+    parameters.forEach((param: any) => {
+      if (!param || !param.id) return;
+
+      const rawValue = formDataMap.get(param.id);
+      const isMulti = param.allowMultipleValues === true || Array.isArray(rawValue);
+
+      const options = Array.isArray(param.options) ? param.options : undefined;
+      const hasOptionPricing =
+        param.type === 'dropdown' &&
+        options &&
+        options.some(
+          (opt: any) =>
+            opt &&
+            opt.price !== undefined &&
+            opt.price !== null &&
+            Number.isFinite(Number(opt.price))
+        );
+
+      // When dropdown options have prices, show line items per option value.
+      if (hasOptionPricing && options) {
+        const valuesArray = Array.isArray(rawValue)
+          ? rawValue
+          : rawValue != null
+          ? [rawValue]
+          : [];
+
+        valuesArray.forEach((v: any) => {
+          if (v === null || v === undefined || v === '') return;
+          const optId = String(v);
+          const opt = options.find((o: any) => o && o.id === optId);
+          if (!opt) return;
+          const unitPrice = Number(opt.price);
+          if (!Number.isFinite(unitPrice)) return;
+
+          items.push({
+            id: `${param.id}:${optId}`,
+            name: `${param.name} – ${opt.name ?? optId}`,
+            count: 1,
+            unitPrice,
+            total: unitPrice
+          });
+        });
+
+        return;
+      }
+
+      // Fallback: parameter-level pricing (original behavior).
+      if (param.price === undefined || param.price === null) return;
+      const unitPrice = Number(param.price);
+      if (!Number.isFinite(unitPrice)) return;
+
+      let count = 0;
+      if (isMulti) {
+        if (Array.isArray(rawValue)) count = rawValue.length;
+        else if (rawValue !== null && rawValue !== undefined) count = 1;
+      } else if (rawValue !== null && rawValue !== undefined) {
+        count = 1;
+      }
+      if (count === 0) return;
+
+      items.push({
+        id: param.id,
+        name: param.name,
+        count,
+        unitPrice,
+        total: unitPrice * count
+      });
+    });
+
+    return items;
   };
 
 

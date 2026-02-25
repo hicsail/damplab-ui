@@ -68,6 +68,13 @@ export interface SOWService {
   category: string;
   /** Parameter values for pricing calculations when needed. */
   formData?: any;
+  /** Optional line-item breakdown for parameter/option-level pricing. */
+  pricingDetails?: Array<{
+    label: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
 }
 
 
