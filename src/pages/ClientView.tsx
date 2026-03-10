@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react'
 import { useParams } from 'react-router';
 import { useQuery } from '@apollo/client';
-import { Box, Card, CardContent, Typography, Alert } from '@mui/material';
+import { Box, Card, CardContent, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 
 import { GET_OWN_JOB_BY_ID } from '../gql/queries';
@@ -27,15 +27,18 @@ export default function Tracking() {
     const [workflowEmail,       setWorkflowEmail]       = useState('');  // ▶ URLSearchParams {}
     const [workflows,           setWorklows]            = useState([]);  // ▶ URLSearchParams {}
     const [sowData, setSowData] = useState<any>(null);
+    const [attachments, setAttachments] = useState<any[]>([]);
 
     const skipQuery = !id || !userContext?.userProps?.isAuthenticated;
 
     const { data, loading, error } = useQuery(GET_OWN_JOB_BY_ID, {
         variables: { id: id! },
         skip: skipQuery,
+        fetchPolicy: 'network-only',
         errorPolicy: 'all',
         onCompleted: (data) => {
             const job = data?.ownJobById;
+            console.log('ownJobById onCompleted attachments:', job?.attachments);
             if (!job?.workflows?.length) return;
             setWorkflowName(       job.workflows[0].name);
             setWorkflowState(      job.workflows[0].state);
@@ -47,6 +50,7 @@ export default function Tracking() {
             setWorkflowEmail(      job.email);
             setWorklows(           job.workflows);
             setSowData(job.sow ?? null);
+            setAttachments(job.attachments ?? []);
         },
     });
 
@@ -135,6 +139,33 @@ export default function Tracking() {
                     <p><b>User:</b>         {workflowUsername} ({workflowEmail})</p>
                     <p><b>Organization:</b> {workflowInstitution}</p>
                 </Box>
+                {attachments.length > 0 && (
+                    <Box sx={{ mx: 3, my: 2 }}>
+                        <Typography variant="h6" sx={{ mb: 1 }}>Attachments</Typography>
+                        <List dense>
+                            {attachments.map((att, idx) => (
+                                <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
+                                    <ListItemText
+                                        primary={
+                                            att.url ? (
+                                                <MuiLink href={att.url} target="_blank" rel="noopener noreferrer">
+                                                    {att.filename}
+                                                </MuiLink>
+                                            ) : (
+                                                att.filename
+                                            )
+                                        }
+                                        secondary={
+                                            att.uploadedAt
+                                                ? new Date(att.uploadedAt).toLocaleString()
+                                                : undefined
+                                        }
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Box>
+                )}
                 <Box>
                     <Box sx={{ flexDirection: 'column', pt: 1 }}>
                         {workflowCard}

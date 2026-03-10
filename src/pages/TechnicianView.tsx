@@ -3,7 +3,7 @@ import { useParams } from 'react-router';
 import { useQuery, useMutation } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Card, CardContent, Typography, Alert, Chip } from '@mui/material';
+import { Box, Button, Card, CardContent, Typography, Alert, Chip, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
@@ -35,10 +35,13 @@ export default function TechnicianView() {
     const [jobNotes, setJobNotes] = useState('');
     const [workflows, setWorklows]            = useState([]);  // ▶ URLSearchParams {}
     const [sowData, setSowData] = useState<any>(null);
+    const [attachments, setAttachments] = useState<any[]>([]);
 
     const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
+        fetchPolicy: 'network-only',
         onCompleted: (data) => {
+            console.log('JobById onCompleted attachments:', data?.jobById?.attachments);
             setWorkflowName(data.jobById.workflows[0].name);
             setWorkflowState(data.jobById.workflows[0].state);
             setJobName(data.jobById.name);
@@ -51,6 +54,7 @@ export default function TechnicianView() {
             setWorklows(data.jobById.workflows);
             setJobData(data.jobById); // Store complete job data for SOW generation
             setSowData(data.jobById.sow); // Store SOW data if it exists
+            setAttachments(data.jobById.attachments ?? []);
         },
         onError: (error: any) => {
             // Error handled by error state
@@ -253,6 +257,33 @@ export default function TechnicianView() {
                     <p><b>User:</b> {jobUsername} ({jobEmail})</p>
                     <p><b>Organization:</b> {jobInstitution}</p>
                 </Box>
+                {attachments.length > 0 && (
+                    <Box sx={{ mx: 3, my: 2 }}>
+                        <Typography variant="h6" sx={{ mb: 1 }}>Attachments</Typography>
+                        <List dense>
+                            {attachments.map((att, idx) => (
+                                <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
+                                    <ListItemText
+                                        primary={
+                                            att.url ? (
+                                                <MuiLink href={att.url} target="_blank" rel="noopener noreferrer">
+                                                    {att.filename}
+                                                </MuiLink>
+                                            ) : (
+                                                att.filename
+                                            )
+                                        }
+                                        secondary={
+                                            att.uploadedAt
+                                                ? new Date(att.uploadedAt).toLocaleString()
+                                                : undefined
+                                        }
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Box>
+                )}
                 <Box>
                     <Box sx={{ flexDirection: 'column', pt: 1 }}>
                         {workflowCard}

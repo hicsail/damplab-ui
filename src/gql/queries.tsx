@@ -67,6 +67,11 @@ export const GET_JOB_BY_ID = gql`
             state
             submitted
             notes
+            attachments {
+                filename
+                url
+                uploadedAt
+            }
             sow {
                 id
                 sowNumber
@@ -125,6 +130,11 @@ export const GET_OWN_JOB_BY_ID = gql`
             state
             submitted
             notes
+            attachments {
+                filename
+                url
+                uploadedAt
+            }
             sow {
                 id
                 sowNumber
