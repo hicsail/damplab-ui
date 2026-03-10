@@ -7,6 +7,11 @@ export type Parameter = {
     required: boolean;
     workflowId?: string;
     description?: string;
+    /**
+     * Optional text shown to clients describing how pricing is determined for this parameter.
+     * Used for transparency when pricing is not purely programmatic.
+     */
+    pricingExplanation?: string;
     options?: any[];
     defaultValue?: any;
     rangeValueMin?: number;

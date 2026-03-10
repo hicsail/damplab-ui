@@ -64,6 +64,12 @@ export const EditParameterOptions: React.FC<EditParametersOptionsProps> = (props
         if (!Number.isFinite(numeric)) return '';
         return `$${numeric.toFixed(2)}`;
       }
+    },
+    {
+      field: 'pricingExplanation',
+      headerName: 'Pricing explanation',
+      width: 380,
+      editable: isEdit,
     }
   ];
 

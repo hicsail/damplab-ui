@@ -31,6 +31,8 @@ export type NodeParameter = {
     allowMultipleValues?: boolean;
     /** Optional per-parameter price used when pricingMode is PARAMETER. */
     price?: number;
+    /** Optional text shown to clients describing how pricing is determined. */
+    pricingExplanation?: string;
     tableData: any;
     paramGroups?: any[];
     paramGroupId?: string;

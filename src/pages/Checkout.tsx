@@ -222,7 +222,14 @@ export default function Checkout() {
     const formData = node.data.formData || [];
     const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
 
-    const items: { id: string; name: string; count: number; unitPrice: number; total: number }[] = [];
+    const items: {
+      id: string;
+      name: string;
+      count: number;
+      unitPrice: number;
+      total: number;
+      pricingExplanation?: string;
+    }[] = [];
 
     parameters.forEach((param: any) => {
       if (!param || !param.id) return;
@@ -257,13 +264,18 @@ export default function Checkout() {
           if (!opt) return;
           const unitPrice = Number(opt.price);
           if (!Number.isFinite(unitPrice)) return;
+          const pricingExplanation =
+            typeof opt.pricingExplanation === 'string' && opt.pricingExplanation.trim() !== ''
+              ? opt.pricingExplanation.trim()
+              : undefined;
 
           items.push({
             id: `${param.id}:${optId}`,
             name: `${param.name} – ${opt.name ?? optId}`,
             count: 1,
             unitPrice,
-            total: unitPrice
+            total: unitPrice,
+            pricingExplanation
           });
         });
 
@@ -289,7 +301,11 @@ export default function Checkout() {
         name: param.name,
         count,
         unitPrice,
-        total: unitPrice * count
+        total: unitPrice * count,
+        pricingExplanation:
+          typeof param.pricingExplanation === 'string' && param.pricingExplanation.trim() !== ''
+            ? param.pricingExplanation.trim()
+            : undefined
       });
     });
 
@@ -538,14 +554,24 @@ export default function Checkout() {
                                   {node.data.pricingMode === 'PARAMETER' && (
                                     <Box sx={{ mt: 0.5 }}>
                                       {getParameterLineItems(node).map((item) => (
-                                        <Typography
-                                          key={item.id}
-                                          variant="body2"
-                                          color="text.secondary"
-                                          sx={{ fontSize: '0.8rem' }}
-                                        >
-                                          {item.name}: {item.count} × ${item.unitPrice.toFixed(2)} = ${item.total.toFixed(2)}
-                                        </Typography>
+                                        <Box key={item.id} sx={{ mb: item.pricingExplanation ? 0.5 : 0 }}>
+                                          <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{ fontSize: '0.8rem' }}
+                                          >
+                                            {item.name}: {item.count} × ${item.unitPrice.toFixed(2)} = ${item.total.toFixed(2)}
+                                          </Typography>
+                                          {item.pricingExplanation ? (
+                                            <Typography
+                                              variant="body2"
+                                              color="text.secondary"
+                                              sx={{ fontSize: '0.78rem', fontStyle: 'italic' }}
+                                            >
+                                              {item.pricingExplanation}
+                                            </Typography>
+                                          ) : null}
+                                        </Box>
                                       ))}
                                     </Box>
                                   )}

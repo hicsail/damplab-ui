@@ -91,6 +91,7 @@ export default function FinalCheckout() {
     institute: false,
   });
   const [redirecting, setRedirecting] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
   
   // Form data state management
   const [formData, setFormData] = useState({
@@ -187,6 +188,13 @@ export default function FinalCheckout() {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
   };
 
+  const handleAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+    // Demo-only: store in local state, do not send to backend
+    setAttachments(Array.from(files));
+  };
+
 /**
   * Handles the job submission process
   * Transforms workflow data and submits to backend
@@ -212,6 +220,8 @@ const handleSubmitJob = async () => {
         )
       }))
     };
+    // Note: attachments are currently demo-only and not persisted or sent to the backend.
+
     setSnackbarState({
       open: true,
       message: 'Submitting job...',
@@ -352,6 +362,40 @@ const handleSubmitJob = async () => {
           />
         </Grid>
       </Grid>
+
+      <Typography variant="h6" sx={{ mt: 3, mb: 1, textAlign: 'left', fontWeight: 500 }}>
+        Attach Supporting Documents (Demo)
+      </Typography>
+      <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', textAlign: 'left' }}>
+        You can select files to attach to this job. For now, these uploads are for demonstration only and are not stored.
+      </Typography>
+      <Grid item xs={12} sx={{ mb: 2 }}>
+        <Button
+          variant="outlined"
+          component="label"
+          sx={{ textTransform: 'none' }}
+        >
+          Choose Files
+          <input
+            type="file"
+            multiple
+            hidden
+            onChange={handleAttachmentChange}
+          />
+        </Button>
+      </Grid>
+      {attachments.length > 0 && (
+        <Box sx={{ mb: 3, textAlign: 'left' }}>
+          <Typography variant="body2" sx={{ mb: 0.5 }}>
+            Selected files (not yet uploaded):
+          </Typography>
+          {attachments.map((file) => (
+            <Typography key={file.name} variant="body2" color="text.secondary">
+              • {file.name} ({Math.round(file.size / 1024)} KB)
+            </Typography>
+          ))}
+        </Box>
+      )}
     </Box>
 
 

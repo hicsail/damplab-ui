@@ -11,6 +11,7 @@ import NodeButton from './AllowedConnectionButton';
 import { AppContext }    from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas'
 import { trunc } from '../utils';
+import { calculateServiceCost } from '../utils/servicePricing';
 
 import { RecState } from '../types/Types';
 
@@ -30,6 +31,7 @@ export default function ContextTestComponent(props: SidebarProps) {
     const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
     const [openToast,  setOpenToast]  = useState(false);
     const [open,       setOpen]       = useState(false);
+    const [, setPricingTick]          = useState(0);
     const [record,     setRecord]     = useState<RecState>({ id: "", sequence: { name: "", type: "unknown", seq: "", annotations: [] },  // from Database
                                                              azentaLibs: undefined, azentaOrder: undefined, azentaSample: undefined });
     const [pool,      setPool]      = useState<string>('');
@@ -98,6 +100,105 @@ export default function ContextTestComponent(props: SidebarProps) {
         setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
     }, [val.activeComponentId]);
 
+    const normalizePrice = (value: unknown): number | undefined => {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim() !== '') {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
+    };
+
+    const hasPricingConfigured = (node: any): boolean => {
+        if (!node?.data) return false;
+        const pricingMode = node.data.pricingMode ?? 'SERVICE';
+        if (pricingMode !== 'PARAMETER') {
+            return normalizePrice(node.data.price) !== undefined;
+        }
+
+        const params: any[] = Array.isArray(node.data.parameters) ? node.data.parameters : [];
+        return params.some((p) => {
+            if (normalizePrice(p?.price) !== undefined) return true;
+            const options = Array.isArray(p?.options) ? p.options : [];
+            return options.some((o: any) => normalizePrice(o?.price) !== undefined);
+        });
+    };
+
+    const getSelectedPricingExplanations = (node: any): string[] => {
+        const params: any[] = Array.isArray(node?.data?.parameters) ? node.data.parameters : [];
+        const formData: any[] = Array.isArray(node?.data?.formData) ? node.data.formData : [];
+        const formDataMap = new Map(formData.map((entry: any) => [entry.id, entry.value]));
+
+        const notes: string[] = [];
+
+        const hasValue = (val: any, isMulti: boolean): boolean => {
+            if (isMulti) {
+                if (Array.isArray(val)) return val.some((v) => v != null && String(v).trim() !== '');
+                return val != null && String(val).trim() !== '';
+            }
+            return val != null && String(val).trim() !== '';
+        };
+
+        for (const param of params) {
+            if (!param?.id) continue;
+            const rawValue = formDataMap.get(param.id);
+            const isMulti = param.allowMultipleValues === true || Array.isArray(rawValue);
+
+            // Option-level notes for dropdown/enum params
+            if (
+                typeof param.type === 'string' &&
+                (param.type === 'dropdown' || param.type === 'enum') &&
+                Array.isArray(param.options)
+            ) {
+                const valuesArray = Array.isArray(rawValue)
+                    ? rawValue
+                    : rawValue != null
+                      ? [rawValue]
+                      : [];
+
+                for (const v of valuesArray) {
+                    if (v === null || v === undefined || v === '') continue;
+                    const optId = String(v);
+                    const opt = (param.options as any[]).find((o) => o && String(o.id) === optId);
+                    const note = typeof opt?.pricingExplanation === 'string' ? opt.pricingExplanation.trim() : '';
+                    if (!note) continue;
+                    const label = `${param.name ?? param.id} – ${opt?.name ?? optId}`;
+                    notes.push(`${label}: ${note}`);
+                }
+                continue;
+            }
+
+            // Parameter-level notes
+            const paramNote =
+                typeof param.pricingExplanation === 'string' ? param.pricingExplanation.trim() : '';
+            if (!paramNote) continue;
+            if (!hasValue(rawValue, isMulti)) continue;
+            notes.push(`${param.name ?? param.id}: ${paramNote}`);
+        }
+
+        // De-dupe while preserving order
+        const seen = new Set<string>();
+        return notes.filter((n) => {
+            if (seen.has(n)) return false;
+            seen.add(n);
+            return true;
+        });
+    };
+
+    const estimatedCost = activeNode
+        ? calculateServiceCost(
+            {
+                pricingMode: activeNode.data?.pricingMode,
+                price: activeNode.data?.price,
+                parameters: activeNode.data?.parameters,
+            },
+            activeNode.data?.formData,
+            activeNode.data?.price
+        )
+        : 0;
+    const showPending = activeNode ? !hasPricingConfigured(activeNode) : false;
+    const pricingNotes = activeNode ? getSelectedPricingExplanations(activeNode) : [];
+
     const action = (
         <React.Fragment>
             <Button onClick={handleCloseToast} color="secondary" size="small">
@@ -131,8 +232,39 @@ export default function ContextTestComponent(props: SidebarProps) {
                     }
                 </div>
                 {
+                    activeNode
+                    ? (
+                        <div style={{ marginTop: 8, marginBottom: 12 }}>
+                            <p style={{ margin: 0 }}>
+                                <b>Estimated price:</b>{' '}
+                                {showPending ? '[Price Pending Review]' : `$${estimatedCost.toFixed(2)}`}
+                            </p>
+                            {pricingNotes.length > 0 ? (
+                                <div style={{ marginTop: 6 }}>
+                                    <b>Pricing notes</b>
+                                    <ul style={{ marginTop: 6, paddingLeft: 18 }}>
+                                        {pricingNotes.map((note) => (
+                                            <li key={note} style={{ fontSize: 13 }}>
+                                                {note}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
+                        </div>
+                    )
+                    : null
+                }
+                {
                     activeNode?.data.formData 
-                    ? <div><Params activeNode={activeNode}/></div>
+                    ? (
+                        <div>
+                            <Params
+                                activeNode={activeNode}
+                                onFormDataChange={() => setPricingTick((t) => t + 1)}
+                            />
+                        </div>
+                    )
                     : null
                 }
                         <br />

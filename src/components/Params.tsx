@@ -16,9 +16,10 @@ import ParamTableOnForm from "./ParamTableOnForm";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
+  onFormDataChange?: () => void;
 }
 
-export default function ({ activeNode }: ParamFormProps) {
+export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
 
   // Backend may return formData with value as array for multi-value params without allowMultipleValues set
@@ -392,6 +393,7 @@ export default function ({ activeNode }: ParamFormProps) {
     if (Object(errors).length !== paramErrors.length) {
       setParamErrors(errors);
     }
+    onFormDataChange?.();
   }, [formik.values]);
 
 

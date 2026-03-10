@@ -128,6 +128,15 @@ export function ParameterDescriptionInput(props: GridRenderEditCellParams) {
   return <GridEditInputCell {...props} placeholder={"Description"} />;
 }
 
+export function ParameterPricingExplanationInput(props: GridRenderEditCellParams) {
+  return (
+    <GridEditInputCell
+      {...props}
+      placeholder={"Pricing explanation (shown to client)"}
+    />
+  );
+}
+
 export function ParameterIdInput(props: GridRenderEditCellParams) {
   return <GridEditInputCell {...props} placeholder={"id"} />;
 }
