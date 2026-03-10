@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useContext } from 'react';
 import { useMutation } from "@apollo/client";
-import { CREATE_JOB } from "../gql/mutations";
+import { ADD_JOB_ATTACHMENTS, CREATE_JOB, CREATE_JOB_ATTACHMENT_UPLOAD_URLS } from "../gql/mutations";
 import { CanvasContext } from "../contexts/Canvas";
 import { useLocation, useNavigate } from 'react-router';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
@@ -100,42 +100,10 @@ export default function FinalCheckout() {
     notes: ''
   });
 
-  // GraphQL mutation for job creation
-  const [createJob, { loading: jobLoading }] = useMutation(CREATE_JOB, {
-    onCompleted: (data) => {
-      // Store job details in localStorage for persistence
-      let fileName = `${data.createJob.id}_${new Date().toLocaleString()}`;
-      let file = {
-        fileName: fileName,
-        nodes: val.nodes,
-        edges: val.edges,
-      };
-      localStorage.setItem(fileName, JSON.stringify(file));
-      
-      setSnackbarState({
-        open: true,
-        message: 'Job submitted successfully!',
-        severity: 'success',
-        showSpinner: true     
-      });
-      
-      // Navigate after showing the success message
-      const jobId = data.createJob.id;
-
-      setTimeout(() => {
-        navigate(`/client_view/${jobId}`);
-      }, 1000);
-    },
-    onError: (error: any) => {
-      console.error("Error creating job:", error);
-      setSnackbarState({
-        open: true,
-        message: 'Failed to submit job. Please try again.',
-        severity: 'error',
-        showSpinner:false
-      });
-    },
-  });
+  // GraphQL mutations
+  const [createJob, { loading: jobLoading }] = useMutation(CREATE_JOB);
+  const [createAttachmentUploadUrls] = useMutation(CREATE_JOB_ATTACHMENT_UPLOAD_URLS);
+  const [addJobAttachments] = useMutation(ADD_JOB_ATTACHMENTS);
 
   useEffect(() => {
     // Guard: redirect if didn't come from previous page/state parsed
@@ -191,7 +159,6 @@ export default function FinalCheckout() {
   const handleAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
-    // Demo-only: store in local state, do not send to backend
     setAttachments(Array.from(files));
   };
 
@@ -220,7 +187,6 @@ const handleSubmitJob = async () => {
         )
       }))
     };
-    // Note: attachments are currently demo-only and not persisted or sent to the backend.
 
     setSnackbarState({
       open: true,
@@ -230,7 +196,7 @@ const handleSubmitJob = async () => {
     });
 
     const token = await userContext.userProps?.getAccessToken();
-    await createJob({ 
+    const jobResult = await createJob({ 
       variables: { createJobInput: data },
       context: {
         headers: {
@@ -238,8 +204,99 @@ const handleSubmitJob = async () => {
         },
       },
     });
+
+    const jobId = jobResult.data?.createJob?.id;
+    if (!jobId) {
+      throw new Error('Job was created but no ID was returned.');
+    }
+
+    // Persist graph locally for convenience (existing behavior)
+    const localFileName = `${jobId}_${new Date().toLocaleString()}`;
+    const localFile = {
+      fileName: localFileName,
+      nodes: val.nodes,
+      edges: val.edges,
+    };
+    localStorage.setItem(localFileName, JSON.stringify(localFile));
+
+    // If there are attachments, request presigned URLs, upload to S3, then register on the job
+    if (attachments.length > 0) {
+      const filesForRequest = attachments.map((file) => ({
+        filename: file.name,
+        contentType: file.type || 'application/octet-stream',
+        size: file.size,
+      }));
+
+      const uploadUrlResult = await createAttachmentUploadUrls({
+        variables: {
+          jobId,
+          files: filesForRequest,
+        },
+        context: {
+          headers: {
+            authorization: token ? `Bearer ${token}` : "",
+          },
+        },
+      });
+
+      const uploads = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
+
+      await Promise.all(
+        uploads.map(async (u: any) => {
+          const file = attachments.find((f) => f.name === u.filename && f.size === u.size);
+          if (!file) {
+            return;
+          }
+          await fetch(u.uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': u.contentType || 'application/octet-stream',
+            },
+            body: file,
+          });
+        })
+      );
+
+      const attachmentInputs = uploads.map((u: any) => ({
+        filename: u.filename,
+        key: u.key,
+        contentType: u.contentType,
+        size: u.size,
+      }));
+
+      if (attachmentInputs.length > 0) {
+        await addJobAttachments({
+          variables: {
+            jobId,
+            attachments: attachmentInputs,
+          },
+          context: {
+            headers: {
+              authorization: token ? `Bearer ${token}` : "",
+            },
+          },
+        });
+      }
+    }
+
+    setSnackbarState({
+      open: true,
+      message: 'Job submitted successfully!',
+      severity: 'success',
+      showSpinner: true
+    });
+
+    setTimeout(() => {
+      navigate(`/client_view/${jobId}`);
+    }, 1000);
   } catch (error) {
     console.error('Job submission failed:', error);
+    setSnackbarState({
+      open: true,
+      message: 'Failed to submit job. Please try again.',
+      severity: 'error',
+      showSpinner: false,
+    });
   }}
 
   const formatPriceLabel = (price: number | null | undefined): string => {

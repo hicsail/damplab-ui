@@ -20,6 +20,26 @@ export const CREATE_JOB = gql`
     }
 `;
 
+export const CREATE_JOB_ATTACHMENT_UPLOAD_URLS = gql`
+  mutation CreateJobAttachmentUploadUrls($jobId: ID!, $files: [JobAttachmentUploadRequest!]!) {
+    createJobAttachmentUploadUrls(jobId: $jobId, files: $files) {
+      filename
+      uploadUrl
+      key
+      contentType
+      size
+    }
+  }
+`;
+
+export const ADD_JOB_ATTACHMENTS = gql`
+  mutation AddJobAttachments($jobId: ID!, $attachments: [JobAttachmentInput!]!) {
+    addJobAttachments(jobId: $jobId, attachments: $attachments) {
+      id
+    }
+  }
+`;
+
 // Template mutations
 export const CREATE_TEMPLATE = gql`
     mutation CreateTemplate($input: CreateTemplateInput!) {
