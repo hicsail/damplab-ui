@@ -296,6 +296,22 @@ export const GET_WORKFLOWS_FOR_DOMINOS = gql`
     }
 `;
 
+// Lab monitor: workflows with parent job (name, submitted for sort)
+export const GET_WORKFLOWS_FOR_LAB_MONITOR = gql`
+    query GetWorkflowsForLabMonitor($state: WorkflowState!) {
+        getWorkflowByState(state: $state) {
+            id
+            name
+            state
+            job {
+                id
+                name
+                submitted
+            }
+        }
+    }
+`;
+
 // generally run with IDs retrieved from GetWorkflowsByState; needed for Dashboard (which displays all submitted jobs)
 export const GET_JOB_BY_WORKFLOW_ID = gql`
     query JobByWorkflowId($id: ID!) {

@@ -109,7 +109,10 @@ export default function HeaderBar() {
         };
     }, [areChangesUnsaved])
 
-    
+    // Hide header on lab monitor screens (dedicated display, no nav)
+    if (windowLocation.pathname.startsWith('/lab-monitor')) {
+        return null;
+    }
 
     return (
         <div>

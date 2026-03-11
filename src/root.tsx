@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext } from "react";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from "react-router";
 // someday: import from @apollo/client once Apollo Client 4 is out (which will address ESM issues) - see discussion at
 // https://github.com/apollographql/apollo-client/issues/9976#issuecomment-1768446694
 import {
@@ -64,6 +64,8 @@ export function HydrateFallback() {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  const isLabMonitor = location.pathname.startsWith('/lab-monitor');
   return (
     <html lang="en">
       <head>
@@ -78,7 +80,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <body>
         <div className="App">
-          <div style={{ padding: 20 }}>
+          <div style={{ padding: isLabMonitor ? 0 : 20 }}>
             {children}
           </div>
         </div>

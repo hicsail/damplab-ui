@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@apollo/client';
-import { Box, Button, Alert } from '@mui/material';
+import { Box, Button, Alert, Stack } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SubmittedJobsList, {
   type JobListItem,
@@ -68,20 +68,11 @@ export default function Dashboard() {
     setPage(1);
   }, []);
 
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')} sx={{ mb: 2 }}>
-          Back to Home
-        </Button>
-        <Alert severity="error">
-          Failed to load submitted jobs. Please try again later.
-        </Alert>
-      </Box>
-    );
-  }
-
-  return (
+  const content = error ? (
+    <Alert severity="error">
+      Failed to load submitted jobs. Please try again later.
+    </Alert>
+  ) : (
     <SubmittedJobsList
       items={items}
       totalCount={totalCount}
@@ -105,5 +96,40 @@ export default function Dashboard() {
       onBack={() => navigate('/')}
       backLabel="Back to Home"
     />
+  );
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        justifyContent="space-between"
+        alignItems={{ xs: 'stretch', sm: 'center' }}
+        spacing={2}
+        sx={{ mb: 2 }}
+      >
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
+          Back to Home
+        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate('/lab-monitor/north')}
+            sx={{ textTransform: 'none' }}
+          >
+            Lab Monitor North
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate('/lab-monitor/south')}
+            sx={{ textTransform: 'none' }}
+          >
+            Lab Monitor South
+          </Button>
+        </Stack>
+      </Stack>
+      {content}
+    </Box>
   );
 }
