@@ -9,6 +9,7 @@ import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import EditIcon from '@mui/icons-material/Edit';
 import WorkHistoryIcon from '@mui/icons-material/WorkHistory';
+import SchoolIcon from '@mui/icons-material/School';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
@@ -109,6 +110,10 @@ export default function Home() {
           <MenuButton navigateTo="/my_jobs">
             <WorkHistoryIcon />
             My Jobs<br />(View Submitted Jobs)
+          </MenuButton>
+          <MenuButton navigateTo="/training">
+            <SchoolIcon />
+            Training<br />(How to use the app)
           </MenuButton>
           {userProps.isDamplabStaff && (
             <>
