@@ -200,12 +200,14 @@ export default function TechnicianView() {
                         <strong>Statement of Work generated.</strong> This job has an SOW. You can view, edit, or regenerate it below.
                     </Alert>
                 )}
-                <Typography variant="h5" fontWeight="bold">
-                    {jobName}
-                    {sowData && (
-                        <Chip label="SOW generated" color="success" size="small" sx={{ ml: 1.5, fontWeight: 600 }} />
-                    )}
-                    &nbsp;&nbsp;
+                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1 }}>
+                    <Typography variant="h5" fontWeight="bold">
+                        {jobName}
+                        {sowData && (
+                            <Chip label="SOW generated" color="success" size="small" sx={{ ml: 1.5, fontWeight: 600 }} />
+                        )}
+                    </Typography>
+                    <Box sx={{ flexGrow: 1 }} />
                     <Button color='primary' sx={{alignContent: 'right', mr: 1}}>
                         <PictureAsPdfIcon/>&nbsp;
                         <PDFDownloadLink
@@ -232,10 +234,19 @@ export default function TechnicianView() {
                         startIcon={<DescriptionIcon />}
                         onClick={handleOpenSOWModal}
                         disabled={!jobData}
+                        sx={{ mr: 1 }}
                     >
                         {sowData ? 'View / Edit SOW' : 'Generate SOW'}
                     </Button>
-                </Typography>
+                    <Button 
+                        variant="contained"
+                        color="error"
+                        onClick={handleOpenModal}
+                        disabled={jobState !== 'SUBMITTED'}
+                    >
+                        Review Job
+                    </Button>
+                </Box>
                 <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', ml: -0.5 }}>
                         <Typography>
@@ -297,14 +308,6 @@ export default function TechnicianView() {
                         currentUser={{ email: jobEmail, name: jobUsername, isStaff: true }}
                     />
                 )}
-
-                <Box style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', margin: 30 }}>
-                    {
-                        jobState === 'SUBMITTED' 
-                        ? <Button onClick={handleOpenModal} color={"error"} variant="contained">Review Job</Button>
-                        : <p></p>
-                    }
-                </Box>
 
                 {/* Comments Section */}
                 <CommentsSection 

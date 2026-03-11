@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useQuery, useMutation } from '@apollo/client';
 import {
   Box,
@@ -23,7 +23,8 @@ import BusinessIcon from '@mui/icons-material/Business';
 import { format } from 'date-fns';
 
 import { GET_COMMENTS_BY_JOB_ID } from '../gql/queries';
-import { CREATE_COMMENT, DELETE_COMMENT } from '../gql/mutations';
+import { CREATE_COMMENT, DELETE_COMMENT, CREATE_JOB_ATTACHMENT_UPLOAD_URLS, ADD_JOB_ATTACHMENTS } from '../gql/mutations';
+import { UserContext } from '../contexts/UserContext';
 
 interface Comment {
   id: string;
@@ -49,9 +50,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
   const [isInternal, setIsInternal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
 
   // Use actual GraphQL queries - backend is ready
   const USE_BACKEND = true;
+
+  const userContext = useContext(UserContext);
 
   const { data, loading, error, refetch } = useQuery(GET_COMMENTS_BY_JOB_ID, {
     variables: { jobId },
@@ -85,11 +89,80 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
     },
   });
 
+  const [createAttachmentUploadUrls] = useMutation(CREATE_JOB_ATTACHMENT_UPLOAD_URLS);
+  const [addJobAttachments] = useMutation(ADD_JOB_ATTACHMENTS);
+
+  const handleAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+    setAttachmentFiles(Array.from(files));
+  };
+
   const handleSubmitComment = async () => {
     if (!newComment.trim() || !jobId) return;
 
     try {
       if (USE_BACKEND) {
+        const token = await userContext.userProps?.getAccessToken();
+
+        // If there are attachments, upload them first
+        if (attachmentFiles.length > 0) {
+          const filesForRequest = attachmentFiles.map((file) => ({
+            filename: file.name,
+            contentType: file.type || 'application/octet-stream',
+            size: file.size,
+          }));
+
+          const uploadUrlResult = await createAttachmentUploadUrls({
+            variables: {
+              jobId,
+              files: filesForRequest,
+            },
+            context: {
+              headers: {
+                authorization: token ? `Bearer ${token}` : '',
+              },
+            },
+          });
+
+          const uploads = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
+
+          await Promise.all(
+            uploads.map(async (u: any) => {
+              const file = attachmentFiles.find((f) => f.name === u.filename && f.size === u.size);
+              if (!file) return;
+              await fetch(u.uploadUrl, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': u.contentType || 'application/octet-stream',
+                },
+                body: file,
+              });
+            })
+          );
+
+          const attachmentInputs = uploads.map((u: any) => ({
+            filename: u.filename,
+            key: u.key,
+            contentType: u.contentType,
+            size: u.size,
+          }));
+
+          if (attachmentInputs.length > 0) {
+            await addJobAttachments({
+              variables: {
+                jobId,
+                attachments: attachmentInputs,
+              },
+              context: {
+                headers: {
+                  authorization: token ? `Bearer ${token}` : '',
+                },
+              },
+            });
+          }
+        }
+
         await createCommentMutation({
           variables: {
             input: {
@@ -115,6 +188,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
       }
       setNewComment('');
       setIsInternal(false);
+      setAttachmentFiles([]);
     } catch (error) {
       console.error('Error submitting comment:', error);
     }
@@ -258,6 +332,27 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
             onChange={(e) => setNewComment(e.target.value)}
             sx={{ mb: 1 }}
           />
+          <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              variant="outlined"
+              component="label"
+              size="small"
+              sx={{ textTransform: 'none' }}
+            >
+              Attach files
+              <input
+                type="file"
+                multiple
+                hidden
+                onChange={handleAttachmentChange}
+              />
+            </Button>
+            {attachmentFiles.length > 0 && (
+              <Typography variant="body2" color="text.secondary">
+                {attachmentFiles.length} file(s) selected
+              </Typography>
+            )}
+          </Box>
           {currentUser.isStaff && (
             <FormControlLabel
               control={
