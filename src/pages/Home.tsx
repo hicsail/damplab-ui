@@ -7,6 +7,7 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import ViewStreamIcon from '@mui/icons-material/ViewStream';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import BugReportIcon from '@mui/icons-material/BugReport';
 import EditIcon from '@mui/icons-material/Edit';
 import WorkHistoryIcon from '@mui/icons-material/WorkHistory';
 import SchoolIcon from '@mui/icons-material/School';
@@ -110,6 +111,10 @@ export default function Home() {
           <MenuButton navigateTo="/my_jobs">
             <WorkHistoryIcon />
             My Jobs<br />(View Submitted Jobs)
+          </MenuButton>
+          <MenuButton navigateTo="/bugs">
+            <BugReportIcon />
+            Bugs<br />(Report & View Issues)
           </MenuButton>
           <MenuButton navigateTo="/training">
             <SchoolIcon />

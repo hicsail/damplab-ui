@@ -15,6 +15,7 @@ export default [
         route("/training", "./pages/Training.tsx"),
         route("/training/admin-edit", "./pages/TrainingAdminEdit.tsx"),
         route("/training/canvas", "./pages/TrainingCanvas.tsx"),
+        route("/bugs", "./pages/Bugs.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),

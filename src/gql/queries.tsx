@@ -581,3 +581,38 @@ export const GET_COMMENTS_BY_JOB_ID = gql`
     }
   }
 `;
+
+// Bug report queries
+export const GET_BUG_REPORTS = gql`
+  query BugReports($filter: BugReportsFilterInput) {
+    bugReports(filter: $filter) {
+      items {
+        id
+        description
+        reporterName
+        reporterEmail
+        createdAt
+        attachments {
+          filename
+          url
+        }
+      }
+    }
+  }
+`;
+
+export const GET_BUG_REPORT_BY_ID = gql`
+  query BugReportById($id: ID!) {
+    bugReportById(id: $id) {
+      id
+      description
+      reporterName
+      reporterEmail
+      createdAt
+      attachments {
+        filename
+        url
+      }
+    }
+  }
+`;

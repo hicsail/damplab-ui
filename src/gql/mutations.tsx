@@ -333,3 +333,36 @@ export const DELETE_COMMENT = gql`
     deleteComment(id: $id)
   }
 `;
+
+// Bug report mutations
+export const CREATE_BUG_REPORT = gql`
+  mutation CreateBugReport($input: CreateBugReportInput!) {
+    createBugReport(input: $input) {
+      id
+      description
+      reporterName
+      reporterEmail
+      createdAt
+    }
+  }
+`;
+
+export const CREATE_BUG_ATTACHMENT_UPLOAD_URLS = gql`
+  mutation CreateBugAttachmentUploadUrls($bugId: ID!, $files: [BugAttachmentUploadRequest!]!) {
+    createBugAttachmentUploadUrls(bugId: $bugId, files: $files) {
+      filename
+      uploadUrl
+      key
+      contentType
+      size
+    }
+  }
+`;
+
+export const ADD_BUG_ATTACHMENTS = gql`
+  mutation AddBugAttachments($bugId: ID!, $attachments: [BugAttachmentInput!]!) {
+    addBugAttachments(bugId: $bugId, attachments: $attachments) {
+      id
+    }
+  }
+`;
