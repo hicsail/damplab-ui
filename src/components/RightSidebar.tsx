@@ -126,23 +126,18 @@ export default function ContextTestComponent(props: SidebarProps) {
 
     const getSelectedPricingExplanations = (node: any): string[] => {
         const params: any[] = Array.isArray(node?.data?.parameters) ? node.data.parameters : [];
-        const formData: any[] = Array.isArray(node?.data?.formData) ? node.data.formData : [];
-        const formDataMap = new Map(formData.map((entry: any) => [entry.id, entry.value]));
 
         const notes: string[] = [];
 
-        const hasValue = (val: any, isMulti: boolean): boolean => {
-            if (isMulti) {
-                if (Array.isArray(val)) return val.some((v) => v != null && String(v).trim() !== '');
-                return val != null && String(val).trim() !== '';
-            }
-            return val != null && String(val).trim() !== '';
-        };
-
         for (const param of params) {
-            if (!param?.id) continue;
-            const rawValue = formDataMap.get(param.id);
-            const isMulti = param.allowMultipleValues === true || Array.isArray(rawValue);
+            if (!param) continue;
+
+            // Parameter-level note
+            const paramNote =
+                typeof param.pricingExplanation === 'string' ? param.pricingExplanation.trim() : '';
+            if (paramNote) {
+                notes.push(`${param.name ?? param.id}: ${paramNote}`);
+            }
 
             // Option-level notes for dropdown/enum params
             if (
@@ -150,30 +145,17 @@ export default function ContextTestComponent(props: SidebarProps) {
                 (param.type === 'dropdown' || param.type === 'enum') &&
                 Array.isArray(param.options)
             ) {
-                const valuesArray = Array.isArray(rawValue)
-                    ? rawValue
-                    : rawValue != null
-                      ? [rawValue]
-                      : [];
-
-                for (const v of valuesArray) {
-                    if (v === null || v === undefined || v === '') continue;
-                    const optId = String(v);
-                    const opt = (param.options as any[]).find((o) => o && String(o.id) === optId);
-                    const note = typeof opt?.pricingExplanation === 'string' ? opt.pricingExplanation.trim() : '';
-                    if (!note) continue;
-                    const label = `${param.name ?? param.id} – ${opt?.name ?? optId}`;
-                    notes.push(`${label}: ${note}`);
+                for (const opt of param.options as any[]) {
+                    if (!opt) continue;
+                    const optNote =
+                        typeof opt.pricingExplanation === 'string'
+                            ? opt.pricingExplanation.trim()
+                            : '';
+                    if (!optNote) continue;
+                    const label = `${param.name ?? param.id} – ${opt.name ?? opt.id}`;
+                    notes.push(`${label}: ${optNote}`);
                 }
-                continue;
             }
-
-            // Parameter-level notes
-            const paramNote =
-                typeof param.pricingExplanation === 'string' ? param.pricingExplanation.trim() : '';
-            if (!paramNote) continue;
-            if (!hasValue(rawValue, isMulti)) continue;
-            notes.push(`${param.name ?? param.id}: ${paramNote}`);
         }
 
         // De-dupe while preserving order
