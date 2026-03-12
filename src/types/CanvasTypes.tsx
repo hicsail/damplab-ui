@@ -33,6 +33,8 @@ export type NodeParameter = {
     price?: number;
     /** Optional text shown to clients describing how pricing is determined. */
     pricingExplanation?: string;
+    /** When true, this parameter's numeric value acts as a price multiplier. */
+    isPriceMultiplier?: boolean;
     tableData: any;
     paramGroups?: any[];
     paramGroupId?: string;

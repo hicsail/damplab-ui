@@ -12,6 +12,8 @@ export type Parameter = {
      * Used for transparency when pricing is not purely programmatic.
      */
     pricingExplanation?: string;
+    /** When true, this parameter's numeric value acts as a price multiplier. */
+    isPriceMultiplier?: boolean;
     options?: any[];
     defaultValue?: any;
     rangeValueMin?: number;

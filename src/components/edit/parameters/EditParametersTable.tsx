@@ -137,6 +137,13 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
     },
     {
+      field: 'isPriceMultiplier',
+      headerName: 'Price multiplier',
+      width: 180,
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
+    },
+    {
       field: 'price',
       headerName: 'Price',
       width: 160,
