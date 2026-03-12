@@ -118,6 +118,33 @@ export const MUTATE_NODE_STATUS = gql`
         ) {
             _id
             state
+            startedAt
+        }
+    }
+`;
+
+export const UPDATE_WORKFLOW_NODE_ASSIGNEE = gql`
+    mutation UpdateWorkflowNodeAssignee($workflowNode: ID!, $assigneeId: String, $assigneeDisplayName: String) {
+        updateWorkflowNodeAssignee(
+            workflowNode: $workflowNode,
+            assigneeId: $assigneeId,
+            assigneeDisplayName: $assigneeDisplayName
+        ) {
+            _id
+            assigneeId
+            assigneeDisplayName
+        }
+    }
+`;
+
+export const UPDATE_WORKFLOW_NODE_ESTIMATED_TIME = gql`
+    mutation UpdateWorkflowNodeEstimatedTime($workflowNode: ID!, $estimatedMinutes: Float) {
+        updateWorkflowNodeEstimatedTime(
+            workflowNode: $workflowNode,
+            estimatedMinutes: $estimatedMinutes
+        ) {
+            _id
+            estimatedMinutes
         }
     }
 `;

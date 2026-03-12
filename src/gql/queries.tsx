@@ -312,6 +312,70 @@ export const GET_WORKFLOWS_FOR_LAB_MONITOR = gql`
     }
 `;
 
+// Lab monitor: only approved-job workflows, with nodes and service names (for service-level cards)
+export const GET_LAB_MONITOR_OPERATIONS = gql`
+    query GetLabMonitorOperations($state: WorkflowState!) {
+        getWorkflowsByStateForLabMonitor(state: $state) {
+            id
+            state
+            job {
+                id
+                name
+                submitted
+            }
+            nodes {
+                _id
+                id
+                label
+                state
+                assigneeId
+                assigneeDisplayName
+                estimatedMinutes
+                startedAt
+                service {
+                    name
+                }
+            }
+        }
+    }
+`;
+
+// Lab monitor: nodes by node state (for drag-drop columns). One query per column.
+export const GET_LAB_MONITOR_NODES = gql`
+    query GetLabMonitorNodes($nodeState: WorkflowNodeState!) {
+        getLabMonitorNodes(nodeState: $nodeState) {
+            _id
+            id
+            label
+            state
+            assigneeId
+            assigneeDisplayName
+            estimatedMinutes
+            startedAt
+            service {
+                name
+            }
+            workflow {
+                id
+                job {
+                    id
+                    name
+                    submitted
+                }
+            }
+        }
+    }
+`;
+
+export const GET_LAB_MONITOR_STAFF_LIST = gql`
+    query GetLabMonitorStaffList {
+        getLabMonitorStaffList {
+            id
+            displayName
+        }
+    }
+`;
+
 // generally run with IDs retrieved from GetWorkflowsByState; needed for Dashboard (which displays all submitted jobs)
 export const GET_JOB_BY_WORKFLOW_ID = gql`
     query JobByWorkflowId($id: ID!) {
