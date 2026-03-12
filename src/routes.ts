@@ -9,8 +9,6 @@ import {
 export default [
     route("/canvas", "./pages/MainFlow.tsx"),
     route("/login", "./pages/LoginForm.tsx"),
-    route("/lab-monitor/:screen", "./pages/LabMonitor.tsx"),
-
     layout("./layouts/PrivateRouteAuthed.tsx", [
         index("./pages/Home.tsx"),
         route("/training", "./pages/Training.tsx"),
@@ -25,6 +23,7 @@ export default [
         route("/my_jobs", "./pages/MyJobs.tsx") // List of current user's submitted jobs
     ]),
     layout("./layouts/PrivateRouteDamplabStaff.tsx", [
+        route("/lab-monitor/:screen", "./pages/LabMonitor.tsx"),
         route("/technician_view/:id", "./pages/TechnicianView.tsx"),
         route("/dashboard", "./pages/Dashboard.tsx"),
         route("/dominos", "./pages/Dominos.tsx"),
