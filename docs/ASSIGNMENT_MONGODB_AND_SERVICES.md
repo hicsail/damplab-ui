@@ -6,11 +6,10 @@ In this assignment you will:
 
 1. Run **MongoDB** locally using **Docker Compose** (no system-wide MongoDB install).
 2. Connect the **DAMP Lab backend** to MongoDB and confirm it is running.
-3. Use **environment variables** (provided separately, e.g. via Slack) to authenticate with **Keycloak** using your **BU Gmail**.
-4. Apply **code changes** so your Keycloak user (as external/customer) can access all relevant pages and APIs.
-5. Capture **Milestone 1** screenshots: empty services on the **Canvas** and empty data on the **Admin Edit** screen.
-6. Run the backend **database initialization script** to load services, categories, and bundles.
-7. Capture **Milestone 2** screenshots: services visible on the Canvas and data visible on the Admin Edit screen.
+3. Use **disabled auth** for local development (no Keycloak required).
+4. Capture **Milestone 1** screenshots: empty services on the **Canvas** and empty data on the **Admin Edit** screen.
+5. Run the backend **database initialization script** to load services, categories, and bundles.
+6. Capture **Milestone 2** screenshots: services visible on the Canvas and data visible on the Admin Edit screen.
 
 You should have already completed the first assignment (Hello World) so that both the frontend and backend repositories are cloned and you can run them locally.
 
@@ -53,24 +52,17 @@ The backend uses **MongoDB** (not PostgreSQL). The repo includes a `docker-compo
 
 ## Part 2: Backend Environment Variables
 
-Environment variables are posted **separately** (e.g. in Slack). You will copy those into a `.env` file in the **backend** repo so the backend can connect to MongoDB and to Keycloak for authentication.
+For this assignment we **disable authentication** so you do not need Keycloak or any auth configuration.
 
 1. In the **backend** repo root (`damplab-backend`), create or edit `.env`.
 
-2. Ensure at least the following are set (values come from your instructor/Slack):
-
-   **MongoDB (required for this assignment):**
+2. Set at least:
    ```env
    MONGO_URI=mongodb://localhost:27017/damplab
+   DISABLE_AUTH=true
    ```
-   This matches the Docker Compose MongoDB port. If your instructor gives a different URL, use that instead.
-
-   **Authentication (from Slack / instructor):**  
-   Copy the variables they provide. Typically they will include things like:
-   - `JWKS_ENDPOINT` – URL where the backend fetches keys to verify JWT tokens.
-   - Keycloak-related variables if the backend talks to Keycloak (e.g. `KEYCLOAK_SERVER_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`).
-
-   **Do not** set `DISABLE_AUTH=true` unless your instructor says so; for this assignment you will authenticate with Keycloak and then adjust code so your user can access everything.
+   - `MONGO_URI` matches the Docker Compose MongoDB port. If your instructor gives a different URL, use that instead.
+   - `DISABLE_AUTH=true` tells the backend to allow all requests without checking JWT tokens or roles.
 
 3. Save `.env` and **do not commit it** (it should already be in `.gitignore`).
 
@@ -98,102 +90,31 @@ Environment variables are posted **separately** (e.g. in Slack). You will copy t
 
 ---
 
-## Part 4: Frontend Environment Variables and Keycloak
+## Part 4: Frontend Environment Variables (Auth Disabled)
 
-1. In the **frontend** repo root (`damplab-ui`), ensure you have a `.env` file (from Assignment 1 or create from `.env.example`).
+So the frontend does not require login, we use a **dev bypass** that matches the backend’s disabled auth.
 
-2. Set (or update) these; **use the values provided in Slack** for Keycloak and backend URL:
+1. In the **frontend** repo root (`damplab-ui`), create or edit `.env`.
+
+2. Set:
    ```env
-   VITE_KEYCLOAK_URL=<Keycloak URL from Slack>
-   VITE_KEYCLOAK_REALM=damplab
-   VITE_KEYCLOAK_CLIENT_ID=damplabclient
-
    VITE_BACKEND=http://localhost:3000/graphql
+   VITE_DISABLE_AUTH=true
    ```
-   Replace the placeholder with the actual Keycloak URL and port if different. Use the same realm and client ID as given by your instructor.
+   - `VITE_BACKEND` must match the URL and port where your backend GraphQL endpoint runs.
+   - `VITE_DISABLE_AUTH=true` makes the app treat you as a logged-in staff user **without** Keycloak. You can open all pages (Home, Canvas, Admin Edit) without signing in.
 
-3. Save `.env`. Restart the frontend dev server if it is already running so it picks up the new variables.
+3. Save `.env`. **Restart the frontend dev server** if it is already running so it picks up the new variables.
 
-4. **Authenticate with Gmail (BU email):**
-   - Start the frontend (`npm start` or `npm run dev`) and open the app in your browser.
-   - When prompted to log in, use **Keycloak** and sign in with your **BU Gmail** account (or the identity provider configured for the class).
-   - After login, you should see the home page and have a valid session.
-
-If Keycloak is not yet set up for your BU email, follow your instructor’s instructions to register or get access.
+4. Start the frontend (`npm start` or `npm run dev`) and open the app in your browser. You should go straight to the **Home** page (no login screen). From there you can open the Canvas and Admin Edit.
 
 ---
 
-## Part 5: Give Your User Access to All Pages and APIs
+## Part 5: Milestone 1 – Empty State Screenshots
 
-By default, some routes and GraphQL operations are restricted to **DAMPLab staff**. Your Keycloak user is likely an **external customer** (or internal customer). So you need two kinds of changes:
+With the backend running, MongoDB up, and frontend configured with auth disabled:
 
-- **Backend:** Allow the **external customer** (and optionally internal customer) role on resolvers that are currently staff-only.
-- **Frontend:** Allow users with **external** or **internal customer** role to access pages that are currently **staff-only** (e.g. Admin Edit, Lab Monitor).
-
-### 5.1 Backend: Allow Customer Roles on Staff-Only Resolvers
-
-The backend uses `@Roles(Role.DamplabStaff)` on many resolvers. For this assignment, add `Role.ExternalCustomer` and `Role.InternalCustomer` so that any authenticated customer can call those APIs.
-
-**Files to edit (add the two extra roles next to `Role.DamplabStaff`):**
-
-1. **`damplab-backend/src/workflow/resolvers/node.resolver.ts`**  
-   - Find every `@Roles(Role.DamplabStaff)` and change to:
-     ```ts
-     @Roles(Role.DamplabStaff, Role.InternalCustomer, Role.ExternalCustomer)
-     ```
-   - Do the same for the `labMonitorStaffList` resolver if it has `@Roles(Role.DamplabStaff)`.
-
-2. **`damplab-backend/src/workflow/workflow.resolver.ts`**  
-   - Replace each `@Roles(Role.DamplabStaff)` with:
-     ```ts
-     @Roles(Role.DamplabStaff, Role.InternalCustomer, Role.ExternalCustomer)
-     ```
-
-3. **`damplab-backend/src/job/job.resolver.ts`**  
-   - Same replacement for every `@Roles(Role.DamplabStaff)`.
-
-4. **`damplab-backend/src/services/damplab-services.resolver.ts`**  
-   - Same for `updateService`, `deleteService`, `createService`.
-
-5. **`damplab-backend/src/categories/categories.resolver.ts`**  
-   - Same for `updateCategory`, `deleteCategory`, `createCategory`.
-
-6. **`damplab-backend/src/bundles/bundles.resolver.ts`**  
-   - Same for `updateBundle`.
-
-7. **`damplab-backend/src/announcements/announcement.resolver.ts`**  
-   - Same for `createAnnouncement`, `updateAnnouncement`.
-
-**Quick way:** In each file, you can do a find-and-replace:
-- Find: `@Roles(Role.DamplabStaff)`
-- Replace: `@Roles(Role.DamplabStaff, Role.InternalCustomer, Role.ExternalCustomer)`
-
-Restart the backend after editing so the changes are loaded.
-
-### 5.2 Frontend: Allow Customers on Staff-Only Routes
-
-The **Admin Edit** screen (`/edit`) and other staff pages are protected by `PrivateRouteDamplabStaff`, which only allows `isDamplabStaff`. You will allow **internal** and **external** customers as well.
-
-1. Open **`damplab-ui/src/layouts/PrivateRouteDamplabStaff.tsx`**.
-
-2. Replace the condition so that staff **or** internal **or** external customer can access the route:
-   ```tsx
-   return (userProps?.isDamplabStaff || userProps?.isInternalCustomer || userProps?.isExternalCustomer)
-     ? <Outlet />
-     : <Navigate to="/login" />;
-   ```
-
-3. Save the file. The frontend dev server will hot-reload.
-
-After this, logging in with your BU Gmail (as external or internal customer) should let you open **Home → Admin Edit (Edit Services)** and reach the **Admin Edit** screen at `/edit`, and the canvas at `/canvas` will work with the same user.
-
----
-
-## Part 6: Milestone 1 – Empty State Screenshots
-
-With the backend running, MongoDB up, frontend configured, and code changes applied:
-
-1. Log in to the app with your BU Gmail (Keycloak).
+1. Open the app in your browser. You should see the Home page without logging in.
 2. Go to the **Canvas** (workflow builder):
    - From Home, click the button that opens the canvas (e.g. “Canvas” or “Build workflow”).
    - Or navigate directly to **`/canvas`**.
@@ -208,7 +129,7 @@ These two screenshots are your **Milestone 1** deliverables: empty canvas sideba
 
 ---
 
-## Part 7: Populate the Database (Services, Categories, Bundles)
+## Part 6: Populate the Database (Services, Categories, Bundles)
 
 The backend repo includes a **database initialization script** that loads **services**, **categories**, and **bundles** from JSON assets into MongoDB.
 
@@ -248,11 +169,11 @@ The backend repo includes a **database initialization script** that loads **serv
 
 ---
 
-## Part 8: Milestone 2 – Loaded Data Screenshots
+## Part 7: Milestone 2 – Loaded Data Screenshots
 
 With the database populated and the backend running:
 
-1. **Refresh** the frontend (or reopen the app) and stay logged in.
+1. **Refresh** the frontend in your browser.
 2. Go to the **Canvas** again (`/canvas`).
 3. Take a **screenshot** showing:
    - The **left sidebar** with **services** (and/or categories and bundles) **loaded** from the database (e.g. categories with service names, or bundles listed).
@@ -273,22 +194,14 @@ These two screenshots are your **Milestone 2** deliverables: canvas with service
   `lsof -i :27017` (Mac/Linux) or `netstat -ano | findstr :27017` (Windows).
 - Confirm `MONGO_URI=mongodb://localhost:27017/damplab` in the backend `.env`.
 
+### Redirected to login or cannot open Home / Canvas / Admin Edit
+
+- Ensure the frontend `.env` has `VITE_DISABLE_AUTH=true`.
+- Restart the frontend dev server after changing `.env` (Vite only loads env at startup).
+
 ### “No token found” or 401 from GraphQL
 
-- Ensure you are **logged in** in the frontend (Keycloak).
-- Check that the frontend `.env` has the correct `VITE_BACKEND` and Keycloak settings.
-- Ensure the backend has the correct `JWKS_ENDPOINT` (and Keycloak env vars) from Slack so it can verify your JWT.
-
-### 403 Forbidden on some operations
-
-- Confirm you applied the **backend** role changes: every staff-only resolver should include `Role.InternalCustomer` and `Role.ExternalCustomer`.
-- Restart the backend after editing.
-- Confirm your Keycloak user has the **external-customer** (or internal-customer) role in the realm.
-
-### Cannot open Admin Edit (`/edit`) – redirected to login
-
-- Apply the **frontend** change in `PrivateRouteDamplabStaff.tsx` so that `isInternalCustomer` and `isExternalCustomer` are allowed.
-- Hard-refresh or restart the frontend dev server so the updated layout is used.
+- With auth disabled, the backend should not require a token. Confirm the backend `.env` has `DISABLE_AUTH=true` and restart the backend.
 
 ### `npm run initdb` fails
 
@@ -300,19 +213,16 @@ These two screenshots are your **Milestone 2** deliverables: canvas with service
 ### Canvas or sidebar still empty after initdb
 
 - Restart the backend after running initdb.
-- Refresh the browser (and ensure you’re logged in so the frontend sends the JWT to the backend).
+- Refresh the browser.
 
 ---
 
 ## Submission Checklist
 
 - [ ] MongoDB running via Docker Compose from `damplab-backend`.
-- [ ] Backend `.env` has `MONGO_URI` and auth variables (from Slack).
+- [ ] Backend `.env` has `MONGO_URI` and `DISABLE_AUTH=true`.
 - [ ] Backend starts and connects to MongoDB without errors.
-- [ ] Frontend `.env` has Keycloak and `VITE_BACKEND` set.
-- [ ] Logged in with BU Gmail (Keycloak).
-- [ ] Backend resolvers updated to allow `InternalCustomer` and `ExternalCustomer` where needed.
-- [ ] Frontend `PrivateRouteDamplabStaff` updated to allow customer roles.
+- [ ] Frontend `.env` has `VITE_BACKEND` and `VITE_DISABLE_AUTH=true`.
 - [ ] **Milestone 1:** Screenshot of canvas with **empty** services/sidebar.
 - [ ] **Milestone 1:** Screenshot of Admin Edit with **empty** Services (and/or Categories/Bundles) tables.
 - [ ] `npm run initdb` run successfully from backend root.
@@ -332,11 +242,6 @@ Submit the following:
    - Screenshot 3: Canvas page with services (and/or categories/bundles) loaded in the sidebar.
    - Screenshot 4: Admin Edit screen with data in the tables.
 
-If your instructor asks for code changes, submit the modified files (or a patch) for:
-
-- Backend: the resolver files where you added `Role.InternalCustomer` and `Role.ExternalCustomer`.
-- Frontend: `PrivateRouteDamplabStaff.tsx`.
-
 ---
 
 ## Summary of Key Paths and Commands
@@ -344,11 +249,11 @@ If your instructor asks for code changes, submit the modified files (or a patch)
 | Item | Location / Command |
 |------|--------------------|
 | MongoDB (Docker) | From `damplab-backend`: `docker compose up -d` |
-| Backend .env | `damplab-backend/.env` (MONGO_URI, JWKS_ENDPOINT, Keycloak vars from Slack) |
-| Frontend .env | `damplab-ui/.env` (VITE_KEYCLOAK_*, VITE_BACKEND) |
+| Backend .env | `damplab-backend/.env` — `MONGO_URI`, `DISABLE_AUTH=true` |
+| Frontend .env | `damplab-ui/.env` — `VITE_BACKEND`, `VITE_DISABLE_AUTH=true` |
 | Start backend | In `damplab-backend`: `npm run start:dev` |
 | Load seed data | In `damplab-backend`: `npm run initdb` |
 | Canvas (empty/loaded) | Navigate to `/canvas` |
-| Admin Edit (empty/loaded) | Navigate to `/edit` (after frontend role change) |
+| Admin Edit (empty/loaded) | Navigate to `/edit` |
 
 Good luck.

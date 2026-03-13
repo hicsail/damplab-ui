@@ -44,10 +44,23 @@ async function getAccessToken() : Promise<string | undefined> {
 }
 
 
+/** When true, skip Keycloak and act as a logged-in staff user (for local dev with backend DISABLE_AUTH=true). */
+const isAuthDisabled = import.meta.env.VITE_DISABLE_AUTH === 'true';
+
 async function initKeycloak(): Promise<UserProps | null> {
   // Do not attempt to initialize during SSR
   if (typeof window === 'undefined') {
     return null;
+  }
+  if (isAuthDisabled) {
+    return {
+      isAuthenticated: true,
+      isDamplabStaff: true,
+      isInternalCustomer: false,
+      isExternalCustomer: false,
+      getAccessToken: async () => undefined,
+      idTokenParsed: { email: 'dev@local', name: 'Dev User' },
+    } as UserProps;
   }
   try {
     await keycloak.init({
