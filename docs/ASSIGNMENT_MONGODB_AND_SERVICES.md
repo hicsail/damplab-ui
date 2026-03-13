@@ -29,10 +29,12 @@ You should have already completed the first assignment (Hello World) so that bot
 
 The backend uses **MongoDB** (not PostgreSQL). The repo includes a `docker-compose.yml` that runs only MongoDB for local development.
 
-1. Open a terminal and go to the **backend** repo root:
+1. **Pull the latest** from the backend repo so you have the `docker-compose.yml` file:
    ```bash
    cd path/to/damplab-backend
+   git pull origin main
    ```
+   (Use `master` instead of `main` if that is your default branch.)
 
 2. Start MongoDB in the background:
    ```bash
