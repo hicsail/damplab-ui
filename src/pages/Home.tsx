@@ -121,6 +121,10 @@ export default function Home() {
             <SchoolIcon />
             Training<br />(How to use the app)
           </MenuButton>
+          <MenuButton navigateTo="/admin/services-catalog">
+            <EditIcon />
+            Admin Services<br />(Read-only Catalog)
+          </MenuButton>
           {userProps.isDamplabStaff && (
             <>
               <MenuButton navigateTo="/lab-monitor/north">

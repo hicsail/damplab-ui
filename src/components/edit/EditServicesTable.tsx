@@ -14,15 +14,18 @@ import {
   GridRenderEditCellParams,
   useGridApiRef
 } from '@mui/x-data-grid';
+import { Box, Button, Dialog, DialogContent, Alert, Snackbar, Stack } from '@mui/material';
+import UploadIcon from '@mui/icons-material/Upload';
+import DownloadIcon from '@mui/icons-material/Download';
 import { ServiceSelection } from './ServiceSelection';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
-import { Button, Dialog, DialogContent, Alert, Snackbar } from '@mui/material';
 import { EditParametersTable } from './parameters/EditParametersTable';
 import { DeliverablesEditor } from './DeliverablesEditor';
+import { processCSVFile, processExcelFile, validateFileType } from '../data-translation/utils';
 
 type ServiceRow = GridRowModel & {
   error?: string;
@@ -47,6 +50,8 @@ export const EditServicesTable: React.FC = () => {
 
   // Params when in edit mode for the parameters
   const [paramsEditProps, setParamsEditProps] = useState<GridRenderEditCellParams | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
 
   useEffect(() => {
@@ -133,6 +138,163 @@ export const EditServicesTable: React.FC = () => {
   const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
     if (params.reason === GridRowEditStopReasons.rowFocusOut) {
       event.defaultMuiPrevented = true;
+    }
+  };
+
+  const handleDownloadPricingSheet = () => {
+    try {
+      const headers = ['id', 'name', 'price'];
+      const dataLines = rows.map((row) => {
+        const id = row.id ?? '';
+        const name = row.name ?? '';
+        const price = row.price ?? '';
+        return [id, name, price].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',');
+      });
+
+      const csvContent = [headers.join(','), ...dataLines].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'services-pricing.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating pricing CSV:', error);
+      setErrorMessage('Failed to generate pricing spreadsheet.');
+    }
+  };
+
+  const handleUploadPricingSheet = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    // Reset input so the same file can be selected again if needed
+    event.target.value = '';
+
+    if (!validateFileType(file.name)) {
+      setErrorMessage('Please upload a .csv, .xlsx or .xls file.');
+      return;
+    }
+
+    try {
+      let data: any[][];
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        data = await processCSVFile(file);
+      } else {
+        data = await processExcelFile(file);
+      }
+
+      if (!data || data.length < 2) {
+        setErrorMessage('Spreadsheet appears to be empty or missing data rows.');
+        return;
+      }
+
+      const [headerRow, ...dataRows] = data;
+      const normalizedHeaders = headerRow.map((h) => String(h || '').trim().toLowerCase());
+
+      const idIndex = normalizedHeaders.findIndex((h) => h === 'id' || h === 'service id');
+      const nameIndex = normalizedHeaders.findIndex((h) => h === 'name' || h === 'service name');
+      const priceIndex = normalizedHeaders.findIndex((h) => h === 'price' || h === 'service price');
+
+      if (idIndex === -1 || nameIndex === -1 || priceIndex === -1) {
+        setErrorMessage('Spreadsheet must have columns for id, name, and price.');
+        return;
+      }
+
+      let updateCount = 0;
+      let createCount = 0;
+
+      for (const row of dataRows) {
+        const rawId = row[idIndex];
+        const rawName = row[nameIndex];
+        const rawPrice = row[priceIndex];
+
+        const id = rawId !== undefined && rawId !== null ? String(rawId).trim() : '';
+        const name = rawName !== undefined && rawName !== null ? String(rawName).trim() : '';
+        const priceStr = rawPrice !== undefined && rawPrice !== null ? String(rawPrice).trim() : '';
+
+        if (!id && !name && !priceStr) {
+          continue;
+        }
+
+        const price =
+          priceStr === ''
+            ? null
+            : Number(priceStr.replace(/[^0-9.\-]/g, ''));
+
+        if (price !== null && (isNaN(price) || price < 0)) {
+          console.warn('Skipping row with invalid price:', row);
+          continue;
+        }
+
+        if (id) {
+          const existingRow = rows.find((r) => String(r.id) === id);
+
+          if (existingRow) {
+            const changes: any = {};
+            if (name && name !== existingRow.name) {
+              changes.name = name;
+            }
+            if (priceStr !== '') {
+              changes.price = price;
+            }
+
+            if (Object.keys(changes).length === 0) {
+              continue;
+            }
+
+            await client.mutate({
+              mutation: UPDATE_SERVICE,
+              variables: {
+                service: id,
+                changes
+              }
+            });
+            updateCount += 1;
+            continue;
+          }
+        }
+
+        if (!name) {
+          console.warn('Skipping row without name for new service:', row);
+          continue;
+        }
+
+        const newService = {
+          name,
+          icon: '',
+          price,
+          pricingMode: 'SERVICE',
+          parameters: [],
+          paramGroups: [],
+          allowedConnections: [],
+          description: '',
+          deliverables: []
+        };
+
+        await client.mutate({
+          mutation: CREATE_SERVICE,
+          variables: {
+            service: newService
+          }
+        });
+        createCount += 1;
+      }
+
+      await client.resetStore();
+
+      setErrorMessage(
+        `Pricing upload complete: updated ${updateCount} service(s), created ${createCount} new service(s).`
+      );
+    } catch (error) {
+      console.error('Error processing pricing spreadsheet:', error);
+      setErrorMessage('Failed to process pricing spreadsheet.');
     }
   };
 
@@ -256,30 +418,55 @@ export const EditServicesTable: React.FC = () => {
 
   return (
     <>
-      <DataGrid
-        rows={rows}
-        columns={columns}
-        rowModesModel={rowModesModel}
-        onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
-        onRowEditStop={handleRowEditStop}
-        onProcessRowUpdateError={(error) => {
-          console.error("Row update error:", error);
-          if (error instanceof Error) {
-            setErrorMessage(error.message);
-          } else {
-            setErrorMessage("An unexpected error occurred.");
-          }
-        }}
-        editMode="row"
-        processRowUpdate={processRowUpdate}
-        slots={{
-          toolbar: GridToolBar as GridSlots['toolbar']
-        }}
-        slotProps={{
-          toolbar: { setRowModesModel, setRows },
-        }}
-        apiRef={gridRef}
-      />
+      <Stack spacing={2}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownloadPricingSheet}
+          >
+            Download pricing sheet
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<UploadIcon />}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Upload pricing sheet
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            style={{ display: 'none' }}
+            onChange={handleUploadPricingSheet}
+          />
+        </Box>
+        <DataGrid
+          rows={rows}
+          columns={columns}
+          rowModesModel={rowModesModel}
+          onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
+          onRowEditStop={handleRowEditStop}
+          onProcessRowUpdateError={(error) => {
+            console.error("Row update error:", error);
+            if (error instanceof Error) {
+              setErrorMessage(error.message);
+            } else {
+              setErrorMessage("An unexpected error occurred.");
+            }
+          }}
+          editMode="row"
+          processRowUpdate={processRowUpdate}
+          slots={{
+            toolbar: GridToolBar as GridSlots['toolbar']
+          }}
+          slotProps={{
+            toolbar: { setRowModesModel, setRows },
+          }}
+          apiRef={gridRef}
+        />
+      </Stack>
       <Snackbar
         open={!!errorMessage}
         autoHideDuration={4000}
