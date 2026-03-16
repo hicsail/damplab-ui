@@ -41,6 +41,8 @@ export interface LabMonitorItem {
   /** When from node-based API, this is the workflow node _id for mutations and drag. */
   nodeId?: string;
   serviceName: string;
+  protocolTitle?: string;
+  protocolUrl?: string;
   jobName?: string;
   workflowId: string;
   jobSubmitted?: string;
@@ -115,10 +117,21 @@ function flattenToItems(workflows: WorkflowWithNodes[]): LabMonitorItem[] {
     } else {
       for (const node of nodes) {
         const serviceName = node.label?.trim() || node.service?.name || 'Service';
+        const proto = (node.service as any)?.protocolsIoMetadata;
+        const protoTitle: string | undefined =
+          typeof proto?.title === 'string' && proto.title.trim() !== '' ? proto.title : undefined;
+        const protoUrl: string | undefined =
+          typeof (node.service as any)?.protocolsIoUrl === 'string' && (node.service as any).protocolsIoUrl.trim() !== ''
+            ? (node.service as any).protocolsIoUrl
+            : typeof proto?.url === 'string'
+            ? proto.url
+            : undefined;
         list.push({
           id: `${wf.id}-${node._id}`,
           nodeId: node._id,
           serviceName,
+          protocolTitle: protoTitle,
+          protocolUrl: protoUrl,
           jobName,
           workflowId: wf.id,
           jobSubmitted,
@@ -175,18 +188,32 @@ function nodesToItems(nodes: LabMonitorNode[]): LabMonitorItem[] {
     const bSub = b.workflow?.job?.submitted ? new Date(b.workflow.job.submitted).getTime() : 0;
     return bSub - aSub;
   });
-  return sorted.map((node) => ({
-    id: node._id,
-    nodeId: node._id,
-    serviceName: node.label?.trim() || node.service?.name || 'Service',
+  return sorted.map((node: any) => {
+    const serviceName = node.label?.trim() || node.service?.name || 'Service';
+    const proto = node.service?.protocolsIoMetadata;
+    const protoTitle: string | undefined =
+      typeof proto?.title === 'string' && proto.title.trim() !== '' ? proto.title : undefined;
+    const protoUrl: string | undefined =
+      typeof node.service?.protocolsIoUrl === 'string' && node.service.protocolsIoUrl.trim() !== ''
+        ? node.service.protocolsIoUrl
+        : typeof proto?.url === 'string'
+        ? proto.url
+        : undefined;
+    return {
+      id: node._id,
+      nodeId: node._id,
+      serviceName,
+      protocolTitle: protoTitle,
+      protocolUrl: protoUrl,
     jobName: node.workflow?.job?.name,
-    workflowId: node.workflow?.id ?? '',
+      workflowId: node.workflow?.id ?? '',
     jobSubmitted: node.workflow?.job?.submitted,
     assigneeId: node.assigneeId ?? undefined,
     assigneeDisplayName: node.assigneeDisplayName ?? undefined,
-    estimatedMinutes: node.estimatedMinutes ?? undefined,
-    startedAt: node.startedAt ?? undefined,
-  }));
+      estimatedMinutes: node.estimatedMinutes ?? undefined,
+      startedAt: node.startedAt ?? undefined,
+    };
+  });
 }
 
 function useLabMonitorNodes(nodeState: WorkflowNodeState) {
@@ -348,6 +375,19 @@ function OperationCard({
             <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#111827' }}>
               {item.serviceName}
             </Typography>
+            {item.protocolTitle && item.protocolUrl && (
+              <Typography variant="caption" sx={{ display: 'block', color: '#4b5563', mt: 0.25 }}>
+                Protocol:{' '}
+                <a
+                  href={item.protocolUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#2563eb', textDecoration: 'underline' }}
+                >
+                  {item.protocolTitle}
+                </a>
+              </Typography>
+            )}
             {item.jobName && (
               <Typography variant="caption" sx={{ display: 'block', color: '#6b7280', mt: 0.5 }}>
                 Job: {item.jobName}

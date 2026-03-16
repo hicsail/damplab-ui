@@ -191,6 +191,24 @@ export default function TechnicianView() {
         })
     );
 
+    const protocolLinks: { key: string; serviceName: string; title: string; url: string }[] = [];
+    workflows.forEach((wf: any) => {
+        (wf.nodes ?? []).forEach((node: any, idx: number) => {
+            const svc = node.service;
+            const id = svc?.protocolsIoId;
+            if (!id) return;
+            const meta = svc.protocolsIoMetadata;
+            const title: string = (meta?.title && String(meta.title).trim()) || `protocols.io ID ${id}`;
+            const url: string =
+                (svc.protocolsIoUrl && String(svc.protocolsIoUrl).trim()) ||
+                (meta?.url && String(meta.url).trim()) ||
+                '';
+            if (!url) return;
+            const key = `${id}-${wf.id}-${idx}`;
+            protocolLinks.push({ key, serviceName: svc.name ?? node.label ?? 'Service', title, url });
+        });
+    });
+
     return (
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
@@ -300,6 +318,31 @@ export default function TechnicianView() {
                         {workflowCard}
                     </Box>
                 </Box>
+                {protocolLinks.length > 0 && (
+                    <Box sx={{ mx: 3, my: 3 }}>
+                        <Typography variant="h6" sx={{ mb: 1 }}>
+                            Protocols attached to services
+                        </Typography>
+                        <List dense>
+                            {protocolLinks.map((p) => (
+                                <ListItem key={p.key} sx={{ pl: 0 }}>
+                                    <ListItemText
+                                        primary={
+                                            <span>
+                                                <b>{p.serviceName}</b>{' – '}{p.title}
+                                            </span>
+                                        }
+                                        secondary={
+                                            <MuiLink href={p.url} target="_blank" rel="noopener noreferrer">
+                                                View protocol on protocols.io
+                                            </MuiLink>
+                                        }
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Box>
+                )}
                 {/* SOW Status Indicator */}
                 {sowData && (
                     <SOWViewer 

@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react'
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, Link as MuiLink } from '@mui/material';
 import Snackbar   from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon  from '@mui/icons-material/Close';
@@ -207,6 +207,20 @@ export default function ContextTestComponent(props: SidebarProps) {
                     </h2>
                 </div>
                 <div>
+                    {activeNode?.data.protocolsIoId && (
+                        <p style={{ marginTop: 4, marginBottom: 8, fontSize: 13 }}>
+                            <b>Protocol:</b>{' '}
+                            <MuiLink
+                                href={activeNode.data.protocolsIoUrl || activeNode.data.protocolsIoMetadata?.url || '#'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                underline="hover"
+                                sx={{ fontWeight: 500 }}
+                            >
+                                {activeNode.data.protocolsIoMetadata?.title || `protocols.io ID ${activeNode.data.protocolsIoId}`}
+                            </MuiLink>
+                        </p>
+                    )}
                     {
                         activeNode?.data.description 
                         ? <p>{activeNode?.data.description}</p>

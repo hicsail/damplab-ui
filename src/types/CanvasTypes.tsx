@@ -3,6 +3,9 @@ export type NodeData = {
     label: string;
     price: number | null;
     pricingMode?: 'SERVICE' | 'PARAMETER';
+    protocolsIoId?: string | null;
+    protocolsIoUrl?: string | null;
+    protocolsIoMetadata?: any;
     allowedConnections: string[];
     icon: string;
     parameters: NodeParameter[];

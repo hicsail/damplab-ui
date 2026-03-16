@@ -80,6 +80,7 @@ export const EditServicesTable: React.FC = () => {
       price: newRow.price == null ? null : Number(newRow.price),
       pricingMode: newRow.pricingMode ?? 'SERVICE',
       description: newRow.description,
+      protocolsIoId: newRow.protocolsIoId || null,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
       parameters: newRow.parameters,
       deliverables: newRow.deliverables || []
@@ -106,6 +107,7 @@ export const EditServicesTable: React.FC = () => {
       paramGroups: [],
       allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
       description: newRow.description || '',
+      protocolsIoId: newRow.protocolsIoId || null,
       deliverables: newRow.deliverables || []
     };
 
@@ -314,6 +316,12 @@ export const EditServicesTable: React.FC = () => {
     {
       field: 'name',
       width: 500,
+      editable: true
+    },
+    {
+      field: 'protocolsIoId',
+      headerName: 'Protocols.io ID',
+      width: 180,
       editable: true
     },
     {

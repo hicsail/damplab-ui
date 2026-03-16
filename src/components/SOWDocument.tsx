@@ -268,6 +268,11 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
                     ))}
                   </View>
                 )}
+                {service.protocolTitle && service.protocolsIoUrl && (
+                  <Text style={styles.tableSubLine}>
+                    Protocol: {service.protocolTitle} ({service.protocolsIoUrl})
+                  </Text>
+                )}
               </View>
               <View style={styles.tableCell}>
                 <Text>{formatCurrency(service.cost)}</Text>

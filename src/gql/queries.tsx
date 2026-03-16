@@ -7,6 +7,9 @@ export const GET_SERVICES = gql`
         services {
             id
             name
+            protocolsIoId
+            protocolsIoUrl
+            protocolsIoMetadata
             price
             pricingMode
             icon
@@ -92,6 +95,9 @@ export const GET_JOB_BY_ID = gql`
                     service {
                         id
                         name
+                        protocolsIoId
+                        protocolsIoUrl
+                        protocolsIoMetadata
                         price
                         pricingMode
                         icon
@@ -155,6 +161,9 @@ export const GET_OWN_JOB_BY_ID = gql`
                     service {
                         id
                         name
+                        protocolsIoId
+                        protocolsIoUrl
+                        protocolsIoMetadata
                         price
                         pricingMode
                         icon
@@ -334,6 +343,9 @@ export const GET_LAB_MONITOR_OPERATIONS = gql`
                 startedAt
                 service {
                     name
+                    protocolsIoId
+                    protocolsIoUrl
+                    protocolsIoMetadata
                 }
             }
         }
@@ -354,6 +366,9 @@ export const GET_LAB_MONITOR_NODES = gql`
             startedAt
             service {
                 name
+                protocolsIoId
+                protocolsIoUrl
+                protocolsIoMetadata
             }
             workflow {
                 id
@@ -430,6 +445,9 @@ export const UPDATE_SERVICE = gql`
     updateService(service: $service, changes: $changes) {
       id
       name
+      protocolsIoId
+      protocolsIoUrl
+      protocolsIoMetadata
       price
       pricingMode
       deliverables
@@ -442,6 +460,9 @@ export const CREATE_SERVICE = gql`
     createService(service: $service) {
       id
       name
+      protocolsIoId
+      protocolsIoUrl
+      protocolsIoMetadata
       price
       pricingMode
       icon
@@ -544,6 +565,9 @@ export const GET_SOW_BY_ID = gql`
         description
         cost
         category
+        protocolsIoId
+        protocolsIoUrl
+        protocolTitle
       }
       timeline {
         startDate
@@ -600,6 +624,9 @@ export const GET_SOW_BY_JOB_ID = gql`
         description
         cost
         category
+        protocolsIoId
+        protocolsIoUrl
+        protocolTitle
       }
       timeline {
         startDate
