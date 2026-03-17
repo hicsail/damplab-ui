@@ -14,7 +14,7 @@ import {
   GridRenderEditCellParams,
   useGridApiRef
 } from '@mui/x-data-grid';
-import { Box, Button, Dialog, DialogContent, Alert, Snackbar, Stack } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, Alert, Snackbar, Stack, TextField, Typography } from '@mui/material';
 import UploadIcon from '@mui/icons-material/Upload';
 import DownloadIcon from '@mui/icons-material/Download';
 import { ServiceSelection } from './ServiceSelection';
@@ -45,6 +45,14 @@ export const EditServicesTable: React.FC = () => {
   const [deliverablesDialogOpen, setDeliverablesDialogOpen] = useState<boolean>(false);
   const [deliverablesEditProps, setDeliverablesEditProps] = useState<GridRenderCellParams | GridRenderEditCellParams | null>(null);
 
+  const [pricingDialogOpen, setPricingDialogOpen] = useState(false);
+  const [pricingEditProps, setPricingEditProps] = useState<GridRenderCellParams | GridRenderEditCellParams | null>(null);
+  const [pricingForm, setPricingForm] = useState<{ internal: string; external: string; legacy: string }>({
+    internal: '',
+    external: '',
+    legacy: ''
+  });
+
   // Params when in view mode for the parameters
   const [paramsViewProps, setParamsViewProps] = useState<GridRenderCellParams | null>(null);
 
@@ -74,12 +82,21 @@ export const EditServicesTable: React.FC = () => {
 
   const handleUpdate = async (newRow: GridRowModel) => {
     console.log(newRow);
+    const pricingObj = (newRow as any).pricing ?? {};
+    const internal = (newRow as any).internalPrice ?? pricingObj.internal ?? null;
+    const external = (newRow as any).externalPrice ?? pricingObj.external ?? null;
+    const legacy = newRow.price ?? pricingObj.legacy ?? null;
     // The services need to be a list of IDs
     const changes = {
       name: newRow.name,
-      price: newRow.price == null ? null : Number(newRow.price),
-      internalPrice: newRow.internalPrice == null ? null : Number(newRow.internalPrice),
-      externalPrice: newRow.externalPrice == null ? null : Number(newRow.externalPrice),
+      price: legacy == null ? null : Number(legacy),
+      internalPrice: internal == null ? null : Number(internal),
+      externalPrice: external == null ? null : Number(external),
+      pricing: {
+        internal: internal == null ? null : Number(internal),
+        external: external == null ? null : Number(external),
+        legacy: legacy == null ? null : Number(legacy),
+      },
       pricingMode: newRow.pricingMode ?? 'SERVICE',
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
@@ -99,12 +116,21 @@ export const EditServicesTable: React.FC = () => {
   };
 
   const handleCreate = async (newRow: GridRowModel) => {
+    const pricingObj = (newRow as any).pricing ?? {};
+    const internal = (newRow as any).internalPrice ?? pricingObj.internal ?? null;
+    const external = (newRow as any).externalPrice ?? pricingObj.external ?? null;
+    const legacy = newRow.price ?? pricingObj.legacy ?? null;
     const newService = {
       name: newRow.name || '',
       icon: '',
-      price: newRow.price == null ? null : Number(newRow.price),
-      internalPrice: newRow.internalPrice == null ? null : Number(newRow.internalPrice),
-      externalPrice: newRow.externalPrice == null ? null : Number(newRow.externalPrice),
+      price: legacy == null ? null : Number(legacy),
+      internalPrice: internal == null ? null : Number(internal),
+      externalPrice: external == null ? null : Number(external),
+      pricing: {
+        internal: internal == null ? null : Number(internal),
+        external: external == null ? null : Number(external),
+        legacy: legacy == null ? null : Number(legacy),
+      },
       pricingMode: newRow.pricingMode ?? 'SERVICE',
       parameters: newRow.parameters || [],
       paramGroups: [],
@@ -147,14 +173,15 @@ export const EditServicesTable: React.FC = () => {
 
   const handleDownloadPricingSheet = () => {
     try {
-      const headers = ['id', 'name', 'internalPrice', 'externalPrice', 'price'];
+      const headers = ['id', 'name', 'pricingInternal', 'pricingExternal', 'pricingLegacy'];
       const dataLines = rows.map((row) => {
         const id = row.id ?? '';
         const name = row.name ?? '';
-        const internalPrice = (row as any).internalPrice ?? '';
-        const externalPrice = (row as any).externalPrice ?? '';
-        const price = row.price ?? '';
-        return [id, name, internalPrice, externalPrice, price]
+        const pricing = (row as any).pricing ?? {};
+        const internalPrice = pricing.internal ?? (row as any).internalPrice ?? '';
+        const externalPrice = pricing.external ?? (row as any).externalPrice ?? '';
+        const legacyPrice = pricing.legacy ?? (row as any).price ?? '';
+        return [id, name, internalPrice, externalPrice, legacyPrice]
           .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
           .join(',');
       });
@@ -208,9 +235,12 @@ export const EditServicesTable: React.FC = () => {
 
       const idIndex = normalizedHeaders.findIndex((h) => h === 'id' || h === 'service id');
       const nameIndex = normalizedHeaders.findIndex((h) => h === 'name' || h === 'service name');
-      const internalPriceIndex = normalizedHeaders.findIndex((h) => h === 'internalprice' || h === 'internal price');
-      const externalPriceIndex = normalizedHeaders.findIndex((h) => h === 'externalprice' || h === 'external price');
-      const priceIndex = normalizedHeaders.findIndex((h) => h === 'price' || h === 'service price' || h === 'legacy price');
+      const internalPriceIndex =
+        normalizedHeaders.findIndex((h) => h === 'pricinginternal' || h === 'internalprice' || h === 'internal price');
+      const externalPriceIndex =
+        normalizedHeaders.findIndex((h) => h === 'pricingexternal' || h === 'externalprice' || h === 'external price');
+      const priceIndex =
+        normalizedHeaders.findIndex((h) => h === 'pricinglegacy' || h === 'price' || h === 'service price' || h === 'legacy price');
 
       if (idIndex === -1 || nameIndex === -1 || (internalPriceIndex === -1 && externalPriceIndex === -1 && priceIndex === -1)) {
         setErrorMessage('Spreadsheet must have columns for id, name, and at least one price column (internalPrice/externalPrice/price).');
@@ -275,6 +305,13 @@ export const EditServicesTable: React.FC = () => {
             if (priceStr !== '') {
               changes.price = price;
             }
+            if (internalPriceStr !== '' || externalPriceStr !== '' || priceStr !== '') {
+              changes.pricing = {
+                internal: internalPrice,
+                external: externalPrice,
+                legacy: price,
+              };
+            }
 
             if (Object.keys(changes).length === 0) {
               continue;
@@ -303,6 +340,11 @@ export const EditServicesTable: React.FC = () => {
           price,
           internalPrice,
           externalPrice,
+          pricing: {
+            internal: internalPrice,
+            external: externalPrice,
+            legacy: price,
+          },
           pricingMode: 'SERVICE',
           parameters: [],
           paramGroups: [],
@@ -343,6 +385,44 @@ export const EditServicesTable: React.FC = () => {
     setServiceDialogOpen(true);
   };
 
+  const openPricingDialog = (params: GridRenderCellParams | GridRenderEditCellParams) => {
+    const row: any = params.row ?? {};
+    const pricing = row.pricing ?? {};
+    setPricingEditProps(params);
+    setPricingForm({
+      internal: pricing.internal ?? row.internalPrice ?? '',
+      external: pricing.external ?? row.externalPrice ?? '',
+      legacy: pricing.legacy ?? row.price ?? '',
+    });
+    setPricingDialogOpen(true);
+  };
+
+  const commitPricingDialog = () => {
+    if (!pricingEditProps) return;
+    const parse = (s: string): number | null => {
+      if (s == null) return null;
+      const t = String(s).trim();
+      if (t === '') return null;
+      const n = Number(t);
+      return Number.isFinite(n) ? n : null;
+    };
+    const internal = parse(pricingForm.internal);
+    const external = parse(pricingForm.external);
+    const legacy = parse(pricingForm.legacy);
+
+    const updatedRow: any = {
+      ...pricingEditProps.row,
+      pricing: { internal, external, legacy },
+      // keep legacy scalar fields for now (backward compat)
+      internalPrice: internal,
+      externalPrice: external,
+      price: legacy,
+    };
+    gridRef.current.updateRows([updatedRow]);
+    setPricingDialogOpen(false);
+    setPricingEditProps(null);
+  };
+
   const columns: GridColDef[] = [
     {
       field: 'name',
@@ -350,67 +430,22 @@ export const EditServicesTable: React.FC = () => {
       editable: true
     },
     {
-      field: 'price',
-      headerName: 'Legacy price',
+      field: 'pricing',
+      headerName: 'Pricing',
       width: 160,
       editable: true,
-      type: 'number',
-      preProcessEditCellProps: (params) => {
-        const raw = params.props.value;
-        // Allow empty / untouched values
-        if (raw === undefined || raw === null || raw === '') {
-          setErrorMessage(null); // clear the previous warnings
-          return { ...params.props, error: false };
-        }
-
-        const value = Number(params.props.value);
-        const hasError = isNaN(value) || value < 0;
-
-        if (hasError && value < 0) {
-          setErrorMessage("Warning! Price is negative.");
-        } else if (!hasError) {
-          setErrorMessage(null);
-        }
-        return { ...params.props, error: hasError };
-      }
-    },
-    {
-      field: 'internalPrice',
-      headerName: 'Internal price',
-      width: 160,
-      editable: true,
-      type: 'number',
-      preProcessEditCellProps: (params) => {
-        const raw = params.props.value;
-        if (raw === undefined || raw === null || raw === '') {
-          setErrorMessage(null);
-          return { ...params.props, error: false };
-        }
-        const value = Number(raw);
-        const hasError = isNaN(value) || value < 0;
-        if (hasError && value < 0) setErrorMessage("Warning! Price is negative.");
-        else if (!hasError) setErrorMessage(null);
-        return { ...params.props, error: hasError };
-      }
-    },
-    {
-      field: 'externalPrice',
-      headerName: 'External price',
-      width: 160,
-      editable: true,
-      type: 'number',
-      preProcessEditCellProps: (params) => {
-        const raw = params.props.value;
-        if (raw === undefined || raw === null || raw === '') {
-          setErrorMessage(null);
-          return { ...params.props, error: false };
-        }
-        const value = Number(raw);
-        const hasError = isNaN(value) || value < 0;
-        if (hasError && value < 0) setErrorMessage("Warning! Price is negative.");
-        else if (!hasError) setErrorMessage(null);
-        return { ...params.props, error: hasError };
-      }
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => (
+        <Button variant="outlined" size="small" onClick={() => openPricingDialog(params)}>
+          View
+        </Button>
+      ),
+      renderEditCell: (params) => (
+        <Button variant="contained" size="small" onClick={() => openPricingDialog(params)}>
+          Edit
+        </Button>
+      )
     },
     {
       field: 'pricingMode',
@@ -553,6 +588,58 @@ export const EditServicesTable: React.FC = () => {
         <DialogContent>
           <EditParametersTable viewParams={paramsViewProps} editParams={paramsEditProps} gridRef={gridRef} />
         </DialogContent>
+      </Dialog>
+      <Dialog
+        open={pricingDialogOpen}
+        onClose={() => {
+          setPricingDialogOpen(false);
+          setPricingEditProps(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogContent>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Service pricing
+          </Typography>
+          <Stack spacing={2}>
+            <TextField
+              label="Internal price"
+              value={pricingForm.internal}
+              onChange={(e) => setPricingForm((p) => ({ ...p, internal: e.target.value }))}
+              type="number"
+              inputProps={{ min: 0, step: '0.01' }}
+            />
+            <TextField
+              label="External price"
+              value={pricingForm.external}
+              onChange={(e) => setPricingForm((p) => ({ ...p, external: e.target.value }))}
+              type="number"
+              inputProps={{ min: 0, step: '0.01' }}
+            />
+            <TextField
+              label="Legacy fallback price"
+              value={pricingForm.legacy}
+              onChange={(e) => setPricingForm((p) => ({ ...p, legacy: e.target.value }))}
+              type="number"
+              inputProps={{ min: 0, step: '0.01' }}
+              helperText="Used only if internal/external are not set."
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setPricingDialogOpen(false);
+              setPricingEditProps(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={commitPricingDialog}>
+            Save
+          </Button>
+        </DialogActions>
       </Dialog>
       <Dialog 
         open={deliverablesDialogOpen} 

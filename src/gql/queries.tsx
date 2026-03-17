@@ -456,6 +456,11 @@ export const UPDATE_SERVICE = gql`
       price
       internalPrice
       externalPrice
+      pricing {
+        internal
+        external
+        legacy
+      }
       pricingMode
       deliverables
     }
@@ -470,6 +475,11 @@ export const CREATE_SERVICE = gql`
       price
       internalPrice
       externalPrice
+      pricing {
+        internal
+        external
+        legacy
+      }
       pricingMode
       icon
       parameters

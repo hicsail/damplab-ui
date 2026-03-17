@@ -8,6 +8,11 @@ export type Service = {
     price?: number | null;
     internalPrice?: number | null;
     externalPrice?: number | null;
+    pricing?: {
+        internal?: number | null;
+        external?: number | null;
+        legacy?: number | null;
+    } | null;
     pricingMode?: ServicePricingMode;
     icon: string;
     // optional result params
