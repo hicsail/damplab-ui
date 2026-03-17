@@ -3,7 +3,7 @@
 import { addDays, format } from 'date-fns';
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWService } from '../types/SOWTypes';
 import { Workflow } from '../gql/graphql';
-import { calculateServiceCost } from './servicePricing';
+import { calculateServiceCost, CustomerCategory } from './servicePricing';
 
 // Constants
 const SOW_STORAGE_KEY = 'damplab-sows';
@@ -264,13 +264,14 @@ const calculateTimeline = (
   };
 };
 
-const getNodeCost = (node: any): number => {
+const getNodeCost = (node: any, customerCategory?: CustomerCategory): number => {
   if (!node?.service?.id) return 0;
 
   const computedCost = calculateServiceCost(
     node.service,
     node.formData,
-    node.price
+    node.price,
+    customerCategory
   );
 
   const hasPricingData =
@@ -285,7 +286,7 @@ const getNodeCost = (node: any): number => {
   return generator ? generator.baseCost(node.formData || {}) : 0;
 };
 
-const getNodePricingDetails = (node: any): SOWService['pricingDetails'] => {
+const getNodePricingDetails = (node: any, customerCategory?: CustomerCategory): SOWService['pricingDetails'] => {
   if (!node?.service) return [];
   const service: any = node.service;
   const parameters: any[] = Array.isArray(service.parameters) ? service.parameters : [];
@@ -293,6 +294,25 @@ const getNodePricingDetails = (node: any): SOWService['pricingDetails'] => {
   const formDataMap = new Map(formData.map((entry: any) => [entry.id, entry.value]));
 
   const items: NonNullable<SOWService['pricingDetails']> = [];
+
+  const normalizePrice = (value: unknown): number | undefined => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  };
+  const resolveCategoryPrice = (obj: any): number | undefined => {
+    if (customerCategory === 'INTERNAL') {
+      const p = normalizePrice(obj?.internalPrice);
+      if (p !== undefined) return p;
+    } else if (customerCategory === 'EXTERNAL') {
+      const p = normalizePrice(obj?.externalPrice);
+      if (p !== undefined) return p;
+    }
+    return normalizePrice(obj?.price);
+  };
 
   parameters.forEach((param: any) => {
     if (!param || !param.id) return;
@@ -307,9 +327,7 @@ const getNodePricingDetails = (node: any): SOWService['pricingDetails'] => {
       options.some(
         (opt: any) =>
           opt &&
-          opt.price !== undefined &&
-          opt.price !== null &&
-          Number.isFinite(Number(opt.price))
+          resolveCategoryPrice(opt) !== undefined
       );
 
     // When dropdown options have prices, create line items per selected option.
@@ -325,8 +343,8 @@ const getNodePricingDetails = (node: any): SOWService['pricingDetails'] => {
         const optId = String(v);
         const opt = options.find((o: any) => o && o.id === optId);
         if (!opt) return;
-        const unitPrice = Number(opt.price);
-        if (!Number.isFinite(unitPrice)) return;
+        const unitPrice = resolveCategoryPrice(opt);
+        if (unitPrice === undefined) return;
 
         items.push({
           label: `${param.name} – ${opt.name ?? optId}`,
@@ -340,9 +358,8 @@ const getNodePricingDetails = (node: any): SOWService['pricingDetails'] => {
     }
 
     // Fallback: parameter-level pricing (per-parameter price and count of values).
-    if (param.price === undefined || param.price === null) return;
-    const unitPrice = Number(param.price);
-    if (!Number.isFinite(unitPrice)) return;
+    const unitPrice = resolveCategoryPrice(param);
+    if (unitPrice === undefined) return;
 
     let quantity = 0;
     if (isMulti) {
@@ -366,11 +383,12 @@ const getNodePricingDetails = (node: any): SOWService['pricingDetails'] => {
 
 // Calculate base pricing
 const calculateBasePricing = (workflows: Workflow[]): number => {
+  // Prefer job/category-aware pricing when present on nodes.
   let totalCost = 0;
   
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
-      totalCost += getNodeCost(node);
+      totalCost += getNodeCost(node, (workflow as any)?.job?.customerCategory);
     });
   });
 
@@ -378,14 +396,14 @@ const calculateBasePricing = (workflows: Workflow[]): number => {
 };
 
 // Generate services list for SOW
-const generateServicesList = (workflows: Workflow[]): SOWService[] => {
+const generateServicesList = (workflows: Workflow[], customerCategory?: CustomerCategory): SOWService[] => {
   const services: SOWService[] = [];
   
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        const servicePrice = getNodeCost(node);
-        const pricingDetails = getNodePricingDetails(node);
+        const servicePrice = getNodeCost(node, customerCategory);
+        const pricingDetails = getNodePricingDetails(node, customerCategory);
         
         // Use scope description from generator (could be enhanced to come from service in future)
         const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
@@ -417,7 +435,11 @@ export const generateSOWData = (
   existingSOW?: { id?: string; sowNumber?: string }
 ): SOWData => {
   const sowNumber = existingSOW?.sowNumber ?? getUniqueSOWNumberForJob(jobData.id);
-  const baseCost = calculateBasePricing(jobData.workflows);
+  const jobCustomerCategory = jobData?.customerCategory as CustomerCategory | undefined;
+  const baseCost = jobData.workflows.reduce((sum: number, wf: any) => {
+    const nodes = wf?.nodes ?? [];
+    return sum + nodes.reduce((wSum: number, node: any) => wSum + getNodeCost(node, jobCustomerCategory), 0);
+  }, 0);
   const adjustments = technicianInputs.pricingAdjustments || [];
   const discountAmount = adjustments
     .filter(adj => adj.type === 'discount')
@@ -463,7 +485,7 @@ export const generateSOWData = (
         reason: adjustments.find(adj => adj.type === 'discount')?.reason || 'Special pricing'
       } : undefined
     },
-    services: generateServicesList(jobData.workflows),
+    services: generateServicesList(jobData.workflows, jobCustomerCategory),
     terms: getStandardTerms(),
     createdAt: new Date().toISOString(),
     createdBy: 'technician' // Could be enhanced with actual user info

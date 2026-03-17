@@ -10,6 +10,7 @@ export interface UserProps {
   isDamplabStaff?: boolean;
   isInternalCustomer?: boolean;
   isExternalCustomer?: boolean;
+  customerCategory?: 'INTERNAL' | 'EXTERNAL';
   subject?: string;
   roles?: string[];
   // access token is refreshed as necessary and passed to the backend in graphql queries.
@@ -58,6 +59,7 @@ async function initKeycloak(): Promise<UserProps | null> {
       isDamplabStaff: true,
       isInternalCustomer: false,
       isExternalCustomer: false,
+      customerCategory: undefined,
       getAccessToken: async () => undefined,
       idTokenParsed: { email: 'dev@local', name: 'Dev User' },
     } as UserProps;
@@ -67,11 +69,14 @@ async function initKeycloak(): Promise<UserProps | null> {
       onLoad: "check-sso",
       silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
     });
+    const isInternalCustomer = keycloak.realmAccess?.roles.includes("internal-customer");
+    const isExternalCustomer = keycloak.realmAccess?.roles.includes("external-customer");
     return {
       isAuthenticated: keycloak.authenticated,
       isDamplabStaff: keycloak.realmAccess?.roles.includes("damplab-staff"),
-      isInternalCustomer: keycloak.realmAccess?.roles.includes("internal-customer"),
-      isExternalCustomer: keycloak.realmAccess?.roles.includes("external-customer"),
+      isInternalCustomer,
+      isExternalCustomer,
+      customerCategory: isInternalCustomer ? 'INTERNAL' : isExternalCustomer ? 'EXTERNAL' : undefined,
       subject: keycloak.subject,
       roles: keycloak.realmAccess,
       getAccessToken: getAccessToken,

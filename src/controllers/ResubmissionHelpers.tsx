@@ -77,6 +77,8 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
         id: nodeId,
         label: service.service.name,
         price: service.price ?? service.service.price ?? 0,
+        internalPrice: service.service.internalPrice,
+        externalPrice: service.service.externalPrice,
         pricingMode: service.service.pricingMode,
         description: service.description,
         allowedConnections: service.service.allowedConnections,

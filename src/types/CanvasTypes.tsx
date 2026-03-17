@@ -2,6 +2,8 @@ export type NodeData = {
     id: string;
     label: string;
     price: number | null;
+    internalPrice?: number | null;
+    externalPrice?: number | null;
     pricingMode?: 'SERVICE' | 'PARAMETER';
     allowedConnections: string[];
     icon: string;
@@ -31,6 +33,8 @@ export type NodeParameter = {
     allowMultipleValues?: boolean;
     /** Optional per-parameter price used when pricingMode is PARAMETER. */
     price?: number;
+    internalPrice?: number;
+    externalPrice?: number;
     /** Optional text shown to clients describing how pricing is determined. */
     pricingExplanation?: string;
     /** When true, this parameter's numeric value acts as a price multiplier. */

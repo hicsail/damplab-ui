@@ -41,6 +41,8 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         id                    : nodeId,
         label                 : service.name,
         price                 : service.price,
+        internalPrice         : service.internalPrice,
+        externalPrice         : service.externalPrice,
         pricingMode           : service.pricingMode,
         description           : service.description,
         allowedConnections    : service.allowedConnections,

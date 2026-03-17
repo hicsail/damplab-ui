@@ -35,6 +35,7 @@ import CircleIcon from '@mui/icons-material/Circle';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
 import { CanvasContext } from "../contexts/Canvas";
+import { UserContext, UserContextProps } from "../contexts/UserContext";
 import { getWorkflowsFromGraph } from "../controllers/GraphHelpers";
 import { calculateServiceCost } from "../utils/servicePricing";
 
@@ -103,6 +104,8 @@ const Item = styled(Paper)(({ theme }) => ({
 export default function Checkout() {
   const navigate = useNavigate();
   const val = useContext(CanvasContext);
+  const userContext: UserContextProps = useContext(UserContext);
+  const customerCategory = userContext.userProps?.customerCategory;
   const rawWorkflows = getWorkflowsFromGraph(val.nodes, val.edges) || [];
 
   const [workflows, setWorkflows] = useState<WorkflowNode[][]>(rawWorkflows);
@@ -172,10 +175,13 @@ export default function Checkout() {
       {
         pricingMode: node.data.pricingMode,
         price: node.data.price,
+        internalPrice: (node.data as any).internalPrice,
+        externalPrice: (node.data as any).externalPrice,
         parameters: node.data.parameters
       },
       node.data.formData,
-      node.data.price
+      node.data.price,
+      customerCategory
     );
   };
 
@@ -222,6 +228,26 @@ export default function Checkout() {
     const formData = node.data.formData || [];
     const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
 
+    const normalizePrice = (value: unknown): number | undefined => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return undefined;
+    };
+
+    const resolveCategoryPrice = (obj: any): number | undefined => {
+      if (customerCategory === 'INTERNAL') {
+        const p = normalizePrice(obj?.internalPrice);
+        if (p !== undefined) return p;
+      } else if (customerCategory === 'EXTERNAL') {
+        const p = normalizePrice(obj?.externalPrice);
+        if (p !== undefined) return p;
+      }
+      return normalizePrice(obj?.price);
+    };
+
     const items: {
       id: string;
       name: string;
@@ -244,9 +270,7 @@ export default function Checkout() {
         options.some(
           (opt: any) =>
             opt &&
-            opt.price !== undefined &&
-            opt.price !== null &&
-            Number.isFinite(Number(opt.price))
+            resolveCategoryPrice(opt) !== undefined
         );
 
       // When dropdown options have prices, show line items per option value.
@@ -262,8 +286,8 @@ export default function Checkout() {
           const optId = String(v);
           const opt = options.find((o: any) => o && o.id === optId);
           if (!opt) return;
-          const unitPrice = Number(opt.price);
-          if (!Number.isFinite(unitPrice)) return;
+          const unitPrice = resolveCategoryPrice(opt);
+          if (unitPrice === undefined) return;
           const pricingExplanation =
             typeof opt.pricingExplanation === 'string' && opt.pricingExplanation.trim() !== ''
               ? opt.pricingExplanation.trim()
@@ -283,9 +307,8 @@ export default function Checkout() {
       }
 
       // Fallback: parameter-level pricing (original behavior).
-      if (param.price === undefined || param.price === null) return;
-      const unitPrice = Number(param.price);
-      if (!Number.isFinite(unitPrice)) return;
+      const unitPrice = resolveCategoryPrice(param);
+      if (unitPrice === undefined) return;
 
       let count = 0;
       if (isMulti) {

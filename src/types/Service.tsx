@@ -6,6 +6,8 @@ export type Service = {
     id: string;
     name: string;
     price?: number | null;
+    internalPrice?: number | null;
+    externalPrice?: number | null;
     pricingMode?: ServicePricingMode;
     icon: string;
     // optional result params

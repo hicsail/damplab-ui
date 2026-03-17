@@ -10,6 +10,7 @@ import Params from './Params';
 import NodeButton from './AllowedConnectionButton';
 import { AppContext }    from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas'
+import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { trunc } from '../utils';
 import { calculateServiceCost } from '../utils/servicePricing';
 
@@ -26,6 +27,8 @@ export default function ContextTestComponent(props: SidebarProps) {
     
     const val                   = useContext(CanvasContext);
     const { services, hazards } = useContext(AppContext);
+    const userContext: UserContextProps = useContext(UserContext);
+    const customerCategory = userContext.userProps?.customerCategory;
 
     const [ID, setID]                 = useState('');
     const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
@@ -113,14 +116,28 @@ export default function ContextTestComponent(props: SidebarProps) {
         if (!node?.data) return false;
         const pricingMode = node.data.pricingMode ?? 'SERVICE';
         if (pricingMode !== 'PARAMETER') {
-            return normalizePrice(node.data.price) !== undefined;
+            return (
+              normalizePrice(node.data.internalPrice) !== undefined ||
+              normalizePrice(node.data.externalPrice) !== undefined ||
+              normalizePrice(node.data.price) !== undefined
+            );
         }
 
         const params: any[] = Array.isArray(node.data.parameters) ? node.data.parameters : [];
         return params.some((p) => {
-            if (normalizePrice(p?.price) !== undefined) return true;
+            if (
+              normalizePrice(p?.internalPrice) !== undefined ||
+              normalizePrice(p?.externalPrice) !== undefined ||
+              normalizePrice(p?.price) !== undefined
+            )
+              return true;
             const options = Array.isArray(p?.options) ? p.options : [];
-            return options.some((o: any) => normalizePrice(o?.price) !== undefined);
+            return options.some(
+              (o: any) =>
+                normalizePrice(o?.internalPrice) !== undefined ||
+                normalizePrice(o?.externalPrice) !== undefined ||
+                normalizePrice(o?.price) !== undefined
+            );
         });
     };
 
@@ -172,10 +189,13 @@ export default function ContextTestComponent(props: SidebarProps) {
             {
                 pricingMode: activeNode.data?.pricingMode,
                 price: activeNode.data?.price,
+                internalPrice: activeNode.data?.internalPrice,
+                externalPrice: activeNode.data?.externalPrice,
                 parameters: activeNode.data?.parameters,
             },
             activeNode.data?.formData,
-            activeNode.data?.price
+            activeNode.data?.price,
+            customerCategory
         )
         : 0;
     const showPending = activeNode ? !hasPricingConfigured(activeNode) : false;

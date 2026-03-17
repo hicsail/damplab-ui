@@ -78,6 +78,8 @@ export const EditServicesTable: React.FC = () => {
     const changes = {
       name: newRow.name,
       price: newRow.price == null ? null : Number(newRow.price),
+      internalPrice: newRow.internalPrice == null ? null : Number(newRow.internalPrice),
+      externalPrice: newRow.externalPrice == null ? null : Number(newRow.externalPrice),
       pricingMode: newRow.pricingMode ?? 'SERVICE',
       description: newRow.description,
       allowedConnections: newRow.allowedConnections.map((service: any) => service.id),
@@ -101,6 +103,8 @@ export const EditServicesTable: React.FC = () => {
       name: newRow.name || '',
       icon: '',
       price: newRow.price == null ? null : Number(newRow.price),
+      internalPrice: newRow.internalPrice == null ? null : Number(newRow.internalPrice),
+      externalPrice: newRow.externalPrice == null ? null : Number(newRow.externalPrice),
       pricingMode: newRow.pricingMode ?? 'SERVICE',
       parameters: newRow.parameters || [],
       paramGroups: [],
@@ -143,12 +147,16 @@ export const EditServicesTable: React.FC = () => {
 
   const handleDownloadPricingSheet = () => {
     try {
-      const headers = ['id', 'name', 'price'];
+      const headers = ['id', 'name', 'internalPrice', 'externalPrice', 'price'];
       const dataLines = rows.map((row) => {
         const id = row.id ?? '';
         const name = row.name ?? '';
+        const internalPrice = (row as any).internalPrice ?? '';
+        const externalPrice = (row as any).externalPrice ?? '';
         const price = row.price ?? '';
-        return [id, name, price].map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',');
+        return [id, name, internalPrice, externalPrice, price]
+          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+          .join(',');
       });
 
       const csvContent = [headers.join(','), ...dataLines].join('\n');
@@ -200,10 +208,12 @@ export const EditServicesTable: React.FC = () => {
 
       const idIndex = normalizedHeaders.findIndex((h) => h === 'id' || h === 'service id');
       const nameIndex = normalizedHeaders.findIndex((h) => h === 'name' || h === 'service name');
-      const priceIndex = normalizedHeaders.findIndex((h) => h === 'price' || h === 'service price');
+      const internalPriceIndex = normalizedHeaders.findIndex((h) => h === 'internalprice' || h === 'internal price');
+      const externalPriceIndex = normalizedHeaders.findIndex((h) => h === 'externalprice' || h === 'external price');
+      const priceIndex = normalizedHeaders.findIndex((h) => h === 'price' || h === 'service price' || h === 'legacy price');
 
-      if (idIndex === -1 || nameIndex === -1 || priceIndex === -1) {
-        setErrorMessage('Spreadsheet must have columns for id, name, and price.');
+      if (idIndex === -1 || nameIndex === -1 || (internalPriceIndex === -1 && externalPriceIndex === -1 && priceIndex === -1)) {
+        setErrorMessage('Spreadsheet must have columns for id, name, and at least one price column (internalPrice/externalPrice/price).');
         return;
       }
 
@@ -213,22 +223,37 @@ export const EditServicesTable: React.FC = () => {
       for (const row of dataRows) {
         const rawId = row[idIndex];
         const rawName = row[nameIndex];
-        const rawPrice = row[priceIndex];
+        const rawInternalPrice = internalPriceIndex !== -1 ? row[internalPriceIndex] : undefined;
+        const rawExternalPrice = externalPriceIndex !== -1 ? row[externalPriceIndex] : undefined;
+        const rawPrice = priceIndex !== -1 ? row[priceIndex] : undefined;
 
         const id = rawId !== undefined && rawId !== null ? String(rawId).trim() : '';
         const name = rawName !== undefined && rawName !== null ? String(rawName).trim() : '';
+        const internalPriceStr =
+          rawInternalPrice !== undefined && rawInternalPrice !== null ? String(rawInternalPrice).trim() : '';
+        const externalPriceStr =
+          rawExternalPrice !== undefined && rawExternalPrice !== null ? String(rawExternalPrice).trim() : '';
         const priceStr = rawPrice !== undefined && rawPrice !== null ? String(rawPrice).trim() : '';
 
         if (!id && !name && !priceStr) {
           continue;
         }
 
-        const price =
-          priceStr === ''
-            ? null
-            : Number(priceStr.replace(/[^0-9.\-]/g, ''));
+        const parseMoney = (s: string): number | null => {
+          if (s === '') return null;
+          const n = Number(s.replace(/[^0-9.\-]/g, ''));
+          return Number.isFinite(n) ? n : null;
+        };
 
-        if (price !== null && (isNaN(price) || price < 0)) {
+        const internalPrice = parseMoney(internalPriceStr);
+        const externalPrice = parseMoney(externalPriceStr);
+        const price = parseMoney(priceStr);
+
+        const hasInvalid =
+          (internalPriceStr !== '' && (internalPrice === null || internalPrice < 0)) ||
+          (externalPriceStr !== '' && (externalPrice === null || externalPrice < 0)) ||
+          (priceStr !== '' && (price === null || price < 0));
+        if (hasInvalid) {
           console.warn('Skipping row with invalid price:', row);
           continue;
         }
@@ -240,6 +265,12 @@ export const EditServicesTable: React.FC = () => {
             const changes: any = {};
             if (name && name !== existingRow.name) {
               changes.name = name;
+            }
+            if (internalPriceStr !== '') {
+              changes.internalPrice = internalPrice;
+            }
+            if (externalPriceStr !== '') {
+              changes.externalPrice = externalPrice;
             }
             if (priceStr !== '') {
               changes.price = price;
@@ -270,6 +301,8 @@ export const EditServicesTable: React.FC = () => {
           name,
           icon: '',
           price,
+          internalPrice,
+          externalPrice,
           pricingMode: 'SERVICE',
           parameters: [],
           paramGroups: [],
@@ -318,7 +351,8 @@ export const EditServicesTable: React.FC = () => {
     },
     {
       field: 'price',
-      width: 200,
+      headerName: 'Legacy price',
+      width: 160,
       editable: true,
       type: 'number',
       preProcessEditCellProps: (params) => {
@@ -337,6 +371,44 @@ export const EditServicesTable: React.FC = () => {
         } else if (!hasError) {
           setErrorMessage(null);
         }
+        return { ...params.props, error: hasError };
+      }
+    },
+    {
+      field: 'internalPrice',
+      headerName: 'Internal price',
+      width: 160,
+      editable: true,
+      type: 'number',
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          setErrorMessage(null);
+          return { ...params.props, error: false };
+        }
+        const value = Number(raw);
+        const hasError = isNaN(value) || value < 0;
+        if (hasError && value < 0) setErrorMessage("Warning! Price is negative.");
+        else if (!hasError) setErrorMessage(null);
+        return { ...params.props, error: hasError };
+      }
+    },
+    {
+      field: 'externalPrice',
+      headerName: 'External price',
+      width: 160,
+      editable: true,
+      type: 'number',
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          setErrorMessage(null);
+          return { ...params.props, error: false };
+        }
+        const value = Number(raw);
+        const hasError = isNaN(value) || value < 0;
+        if (hasError && value < 0) setErrorMessage("Warning! Price is negative.");
+        else if (!hasError) setErrorMessage(null);
         return { ...params.props, error: hasError };
       }
     },

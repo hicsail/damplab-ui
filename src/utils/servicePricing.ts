@@ -1,15 +1,22 @@
 export type ServicePricingMode = 'SERVICE' | 'PARAMETER';
+export type CustomerCategory = 'INTERNAL' | 'EXTERNAL';
 
 interface ServiceParameterOption {
   id?: unknown;
   name?: unknown;
   price?: unknown;
+  internalPrice?: unknown;
+  externalPrice?: unknown;
+  pricing?: { internal?: unknown; external?: unknown; legacy?: unknown } | unknown;
 }
 
 interface ServiceParameterDefinition {
   id?: unknown;
   allowMultipleValues?: boolean;
   price?: unknown;
+  internalPrice?: unknown;
+  externalPrice?: unknown;
+  pricing?: { internal?: unknown; external?: unknown; legacy?: unknown } | unknown;
   type?: unknown;
   options?: ServiceParameterOption[] | unknown;
   isPriceMultiplier?: boolean;
@@ -36,6 +43,30 @@ const normalizePrice = (value: unknown): number | undefined => {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   return undefined;
+};
+
+const resolveCategoryPrice = (
+  input:
+    | {
+        internalPrice?: unknown;
+        externalPrice?: unknown;
+        price?: unknown;
+        pricing?: { internal?: unknown; external?: unknown; legacy?: unknown } | unknown;
+      }
+    | null
+    | undefined,
+  category?: CustomerCategory
+): number | undefined => {
+  if (!input) return undefined;
+  const pricing = input.pricing && typeof input.pricing === 'object' ? (input.pricing as any) : undefined;
+  if (category === 'INTERNAL') {
+    const p = normalizePrice(pricing?.internal ?? input.internalPrice);
+    if (p !== undefined) return p;
+  } else if (category === 'EXTERNAL') {
+    const p = normalizePrice(pricing?.external ?? input.externalPrice);
+    if (p !== undefined) return p;
+  }
+  return normalizePrice(pricing?.legacy ?? input.price);
 };
 
 const getMultiValueParamIds = (parameters: unknown, rawFormData?: unknown): Set<string> => {
@@ -120,6 +151,14 @@ const countValue = (value: unknown, isMulti: boolean): number => {
 };
 
 export const calculateParameterCost = (parameters: unknown, rawFormData: unknown): number => {
+  return calculateParameterCostWithCategory(parameters, rawFormData, undefined);
+};
+
+export const calculateParameterCostWithCategory = (
+  parameters: unknown,
+  rawFormData: unknown,
+  customerCategory?: CustomerCategory
+): number => {
   if (!Array.isArray(parameters)) return 0;
 
   const paramsById = new Map<string, ServiceParameterDefinition>();
@@ -150,7 +189,7 @@ export const calculateParameterCost = (parameters: unknown, rawFormData: unknown
     const hasOptionPricing =
       isDropdown &&
       !!options &&
-      options.some((opt) => normalizePrice(opt.price) !== undefined);
+      options.some((opt) => resolveCategoryPrice(opt, customerCategory) !== undefined);
 
     // When option-level pricing is configured, use that instead of parameter-level price.
     if (hasOptionPricing && options) {
@@ -162,7 +201,7 @@ export const calculateParameterCost = (parameters: unknown, rawFormData: unknown
         const id = typeof v === 'string' ? v : String(v);
         const option = options.find((opt) => typeof opt.id === 'string' && opt.id === id);
         if (!option) continue;
-        const price = normalizePrice(option.price);
+        const price = resolveCategoryPrice(option, customerCategory);
         if (price === undefined) continue;
         total += price;
       }
@@ -171,7 +210,7 @@ export const calculateParameterCost = (parameters: unknown, rawFormData: unknown
     }
 
     // Fallback: original parameter-level pricing behavior.
-    const unitPrice = normalizePrice(param.price);
+    const unitPrice = resolveCategoryPrice(param, customerCategory);
     if (unitPrice === undefined) continue;
 
     const count = countValue(entry.value, multiValueParamIds.has(entry.id));
@@ -229,17 +268,25 @@ const getMultiplier = (parameters: unknown, rawFormData: unknown): number => {
 };
 
 export const calculateServiceCost = (
-  service: { pricingMode?: unknown; price?: unknown; parameters?: unknown } | null | undefined,
+  service: {
+    pricingMode?: unknown;
+    price?: unknown;
+    internalPrice?: unknown;
+    externalPrice?: unknown;
+    pricing?: { internal?: unknown; external?: unknown; legacy?: unknown } | unknown;
+    parameters?: unknown;
+  } | null | undefined,
   rawFormData: unknown,
-  fallbackCost?: unknown
+  fallbackCost?: unknown,
+  customerCategory?: CustomerCategory
 ): number => {
   const pricingMode = normalizePricingMode(service?.pricingMode);
   let baseCost = 0;
 
   if (pricingMode === 'PARAMETER') {
-    baseCost = calculateParameterCost(service?.parameters, rawFormData);
+    baseCost = calculateParameterCostWithCategory(service?.parameters, rawFormData, customerCategory);
   } else {
-    const servicePrice = normalizePrice(service?.price);
+    const servicePrice = resolveCategoryPrice(service, customerCategory);
     if (servicePrice !== undefined) {
       baseCost = servicePrice;
     } else {
