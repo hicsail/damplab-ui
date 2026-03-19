@@ -26,6 +26,7 @@ import { GridToolBar } from './GridToolBar';
 import { EditParametersTable } from './parameters/EditParametersTable';
 import { DeliverablesEditor } from './DeliverablesEditor';
 import { processCSVFile, processExcelFile, validateFileType } from '../data-translation/utils';
+import { useNavigate } from 'react-router';
 
 type ServiceRow = GridRowModel & {
   error?: string;
@@ -33,6 +34,7 @@ type ServiceRow = GridRowModel & {
 
 
 export const EditServicesTable: React.FC = () => {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const { services } = useContext(AppContext);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
@@ -115,54 +117,7 @@ export const EditServicesTable: React.FC = () => {
     return newRow;
   };
 
-  const handleCreate = async (newRow: GridRowModel) => {
-    const pricingObj = (newRow as any).pricing ?? {};
-    const internal = (newRow as any).internalPrice ?? pricingObj.internal ?? null;
-    const external = (newRow as any).externalPrice ?? pricingObj.external ?? null;
-    const legacy = newRow.price ?? pricingObj.legacy ?? null;
-    const newService = {
-      name: newRow.name || '',
-      icon: '',
-      price: legacy == null ? null : Number(legacy),
-      internalPrice: internal == null ? null : Number(internal),
-      externalPrice: external == null ? null : Number(external),
-      pricing: {
-        internal: internal == null ? null : Number(internal),
-        external: external == null ? null : Number(external),
-        legacy: legacy == null ? null : Number(legacy),
-      },
-      pricingMode: newRow.pricingMode ?? 'SERVICE',
-      parameters: newRow.parameters || [],
-      paramGroups: [],
-      allowedConnections: newRow.allowedConnections ? newRow.allowedConnections.map((service: any) => service.id) : [],
-      description: newRow.description || '',
-      deliverables: newRow.deliverables || []
-    };
-
-    const result = await client.mutate({
-      mutation: CREATE_SERVICE,
-      variables: {
-        service: newService
-      }
-    });
-
-    // GridToolBar.tsx creates a temporary row id, but since the backend issues a different id, 
-    // This code, setRows, replaces the temp id with the real id.
-    setRows(prevRows => 
-      prevRows.map(row =>
-        row.id === newRow.id ? { ...result.data.createService, isNew: false } : row
-    ));
-
-    return { ...result.data.createService, isNew: false };
-  }
-
-  const processRowUpdate = async (newRow: ServiceRow) => {
-    if (!newRow.isNew) {
-      return handleUpdate(newRow);
-    } else {
-      return handleCreate(newRow);
-    }
-  };
+  const processRowUpdate = async (newRow: ServiceRow) => handleUpdate(newRow);
 
 
   const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
@@ -569,7 +524,11 @@ export const EditServicesTable: React.FC = () => {
             toolbar: GridToolBar as GridSlots['toolbar']
           }}
           slotProps={{
-            toolbar: { setRowModesModel, setRows },
+            toolbar: {
+              setRowModesModel,
+              addButtonLabel: 'Add new service',
+              onAdd: () => navigate('/edit/services/new')
+            },
           }}
           apiRef={gridRef}
         />
