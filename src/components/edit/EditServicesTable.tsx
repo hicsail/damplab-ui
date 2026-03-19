@@ -433,10 +433,22 @@ export const EditServicesTable: React.FC = () => {
     },
     {
       field: 'parameters',
-      width: 200,
+      width: 340,
       editable: true,
       renderCell: (params) => <Button variant="contained" onClick={() => handleParamViewButton(params)}>View</Button>,
-      renderEditCell: (params) => <Button variant="contained" onClick={() => handleParamEditButton(params)}>Edit</Button>
+      renderEditCell: (params) => (
+        <Stack direction="row" spacing={1}>
+          <Button variant="contained" onClick={() => handleParamEditButton(params)}>
+            Quick edit
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => navigate(`/edit/services/${params.row.id}/parameters`)}
+          >
+            Full edit
+          </Button>
+        </Stack>
+      )
     },
     {
       field: 'deliverables',
