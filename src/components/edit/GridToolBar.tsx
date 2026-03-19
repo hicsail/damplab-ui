@@ -34,7 +34,7 @@ export const GridToolBar: React.FC<GridToolBarProps> = (props) => {
 
   return (
     <GridToolbarContainer>
-      <Button color='primary' startIcon={<Add />} onClick={handleNewRecord}>Add Record</Button>
+      <Button color='primary' startIcon={<Add />} onClick={handleNewRecord}>Add new item</Button>
     </GridToolbarContainer>
   );
 };

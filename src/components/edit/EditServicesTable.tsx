@@ -449,17 +449,17 @@ export const EditServicesTable: React.FC = () => {
     },
     {
       field: 'pricingMode',
-      headerName: 'Pricing Mode',
+      headerName: 'How price is calculated',
       width: 220,
       editable: true,
       type: 'singleSelect',
       valueGetter: (_value, row) => row.pricingMode ?? 'SERVICE',
       valueOptions: [
         { value: 'SERVICE', label: 'Service price' },
-        { value: 'PARAMETER', label: 'Parameter-based' }
+        { value: 'PARAMETER', label: 'Based on selected options' }
       ],
       valueFormatter: (value) => {
-        if (value === 'PARAMETER') return 'Parameter-based';
+        if (value === 'PARAMETER') return 'Based on selected options';
         return 'Service price';
       }
     },
@@ -470,7 +470,7 @@ export const EditServicesTable: React.FC = () => {
     },
     {
       field: 'allowedConnections',
-      headerName: 'Allowed Connections',
+      headerName: 'Can be combined with',
       width: 500,
       editable: true,
       renderCell: (params) => <ServiceList services={params.row.allowedConnections} />,
@@ -618,7 +618,7 @@ export const EditServicesTable: React.FC = () => {
               inputProps={{ min: 0, step: '0.01' }}
             />
             <TextField
-              label="Legacy fallback price"
+              label="Fallback price"
               value={pricingForm.legacy}
               onChange={(e) => setPricingForm((p) => ({ ...p, legacy: e.target.value }))}
               type="number"

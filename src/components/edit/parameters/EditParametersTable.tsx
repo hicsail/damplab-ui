@@ -47,6 +47,23 @@ import {
 } from './ParameterFieldViewCells';
 import {validateParameter} from './ParameterValidation';
 
+const TYPE_LABELS: Record<string, string> = {
+  string: 'Text',
+  number: 'Number',
+  file: 'File upload',
+  boolean: 'Yes/No',
+  dropdown: 'Pick from list',
+  table: 'Table'
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  defaultValue: 'Starting value',
+  rangeValueMin: 'Minimum allowed value',
+  rangeValueMax: 'Maximum allowed value',
+  options: 'Choices',
+  tableData: 'Table setup'
+};
+
 interface EditParametersTableProps {
   viewParams: GridRenderCellParams | null;
   editParams: GridRenderEditCellParams | null;
@@ -95,6 +112,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const columns: GridColDef[] = [
     {
       field: 'id',
+      headerName: 'Internal ID',
       width: 200,
       editable: isEdit,
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterIdInput {...params} />),
@@ -113,39 +131,47 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'type',
+      headerName: 'Answer format',
       width: 200,
       editable: isEdit,
+      valueFormatter: (value) => TYPE_LABELS[String(value)] ?? String(value ?? ''),
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterTypeSelect {...params} setTypeChangeDialog={setTypeChangeDialog} />)
     },
     {
       field: 'paramType',
+      headerName: 'Where this appears',
       width: 200,
       editable: isEdit,
+      valueFormatter: (value) => {
+        if (value === 'input') return 'User input';
+        return String(value ?? '');
+      },
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterParamTypeSelect {...params} />),
     },
     {
       field: 'required',
+      headerName: 'Required?',
       width: 200,
       editable: isEdit,
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
     },
     {
       field: 'allowMultipleValues',
-      headerName: 'Allow multiple values',
+      headerName: 'Allow multiple selections?',
       width: 200,
       editable: isEdit,
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
     },
     {
       field: 'isPriceMultiplier',
-      headerName: 'Price multiplier',
+      headerName: 'Affects price?',
       width: 180,
       editable: isEdit,
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
     },
     {
       field: 'price',
-      headerName: 'Legacy price',
+      headerName: 'Fallback price',
       width: 160,
       editable: isEdit,
       type: 'number',
@@ -226,7 +252,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'pricingExplanation',
-      headerName: 'Pricing explanation',
+      headerName: 'Price note shown to customer',
       width: 320,
       editable: isEdit,
       renderEditCell: (params: GridRenderEditCellParams) => (
@@ -235,6 +261,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'options',
+      headerName: 'Choices',
       width: 200,
       editable: isEdit,
       renderCell: (params: GridRenderCellParams) => (
@@ -247,6 +274,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'defaultValue',
+      headerName: 'Starting value',
       width: 200,
       editable: isEdit,
       valueParser: (value, row, column, apiRef) => {
@@ -280,6 +308,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'rangeValueMin',
+      headerName: 'Minimum allowed value',
       width: 200,
       editable: isEdit,
       // comments on valueParser for 'defaultValue' field apply here
@@ -288,6 +317,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'rangeValueMax',
+      headerName: 'Maximum allowed value',
       width: 200,
       editable: isEdit,
       // comments on valueParser for 'defaultValue' field apply here
@@ -309,6 +339,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     */
     {
       field: 'tableData',
+      headerName: 'Table setup',
       width: 200,
       editable: isEdit,
       renderCell: (params: GridRenderCellParams) => (
@@ -420,9 +451,9 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       </Dialog>
       <Dialog open={typeChangeDialog.open} onClose={typeChangeDialog.onCancel}>
         <DialogContent>
-            You are changing the parameter type from <strong>{typeChangeDialog.oldType}</strong> to <strong>{typeChangeDialog.newType}</strong>.
-            The following fields are not applicable for the new type and will be reset:
-            <ul>{typeChangeDialog.fieldsToReset?.map((f) => <li key={f}>{f}</li>)}</ul>
+            You are changing the answer format from <strong>{TYPE_LABELS[String(typeChangeDialog.oldType)] ?? String(typeChangeDialog.oldType ?? '')}</strong> to <strong>{TYPE_LABELS[String(typeChangeDialog.newType)] ?? String(typeChangeDialog.newType ?? '')}</strong>.
+            The following fields will be cleared because they do not apply to the new format:
+            <ul>{typeChangeDialog.fieldsToReset?.map((f) => <li key={f}>{FIELD_LABELS[String(f)] ?? String(f)}</li>)}</ul>
         </DialogContent>
         <DialogActions>
           <Button onClick={typeChangeDialog.onCancel}>Cancel</Button>
