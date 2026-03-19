@@ -4,14 +4,25 @@ import { GridRowModes, GridRowModesModel, GridRowsProp, GridToolbarContainer } f
 import { v4 as uuid } from 'uuid';
 
 export interface GridToolBarProps {
-  setRows: (newRows: (oldRows: GridRowsProp) => GridRowsProp) => void;
+  setRows?: (newRows: (oldRows: GridRowsProp) => GridRowsProp) => void;
   setRowModesModel: (
     newModel: (oldModel: GridRowModesModel) => GridRowModesModel
   ) => void;
+  addButtonLabel?: string;
+  onAdd?: () => void;
 }
 
 export const GridToolBar: React.FC<GridToolBarProps> = (props) => {
   const handleNewRecord = () => {
+    if (props.onAdd) {
+      props.onAdd();
+      return;
+    }
+
+    if (!props.setRows) {
+      return;
+    }
+
     // Needed by the grid view, later will be replaced with real UUID
     const id = uuid();
 
@@ -34,7 +45,9 @@ export const GridToolBar: React.FC<GridToolBarProps> = (props) => {
 
   return (
     <GridToolbarContainer>
-      <Button color='primary' startIcon={<Add />} onClick={handleNewRecord}>Add Record</Button>
+      <Button color='primary' startIcon={<Add />} onClick={handleNewRecord}>
+        {props.addButtonLabel ?? 'Add new item'}
+      </Button>
     </GridToolbarContainer>
   );
 };

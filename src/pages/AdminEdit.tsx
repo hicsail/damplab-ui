@@ -21,7 +21,7 @@ export default function AdminEdit () {
 
   return (
     <Stack spacing={3}>
-      <Typography variant='h2'>Admin Edit Screen</Typography>
+      <Typography variant='h2'>Catalog Editor</Typography>
       <ToolBar
         editType={editType}
         setEditType={setEditType}

@@ -28,10 +28,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWEditableSections } from '../types/SOWTypes';
-import { generateSOWData, getTeamMembers } from '../utils/sowGenerator';
-import { GET_SOW_BY_JOB_ID, GET_JOB_BY_ID } from '../gql/queries';
+import { generateSOWData } from '../utils/sowGenerator';
+import { GET_SOW_BY_JOB_ID, GET_JOB_BY_ID, GET_LAB_MONITOR_STAFF_LIST } from '../gql/queries';
 import { UPSERT_SOW_FOR_JOB } from '../gql/mutations';
-import { useApolloClient } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import SOWDocument from './SOWDocument';
 
 interface SOWGeneratorModalProps {
@@ -69,7 +69,33 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [existingSOW, setExistingSOW] = useState<{ id: string; sowNumber: string } | null>(null);
 
-  const teamMembers = getTeamMembers();
+  type TeamMemberOption = { id: string; name: string; title?: string };
+  const { data: staffData } = useQuery(GET_LAB_MONITOR_STAFF_LIST, { pollInterval: 60000 });
+  const staffMembers: TeamMemberOption[] = React.useMemo(
+    () =>
+      (staffData?.getLabMonitorStaffList ?? []).map((m: { id: string; displayName: string }) => ({
+        id: m.id,
+        name: m.displayName,
+        title: 'DAMP Staff',
+      })),
+    [staffData],
+  );
+
+  // If an existing SOW references a name that's not in the current staff list, keep it visible.
+  const projectManagerOptions = React.useMemo(() => {
+    const current = technicianInputs.projectManager;
+    if (!current) return staffMembers;
+    if (staffMembers.some((m) => m.name === current)) return staffMembers;
+    return [...staffMembers, { id: '__current_project_manager__', name: current }];
+  }, [staffMembers, technicianInputs.projectManager]);
+
+  const projectLeadOptions = React.useMemo(() => {
+    const current = technicianInputs.projectLead;
+    if (!current) return staffMembers;
+    if (staffMembers.some((m) => m.name === current)) return staffMembers;
+    return [...staffMembers, { id: '__current_project_lead__', name: current }];
+  }, [staffMembers, technicianInputs.projectLead]);
+
   const client = useApolloClient();
 
   // Clear existing SOW when modal closes or job changes
@@ -434,7 +460,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                     <Box sx={{ flex: '1 1 300px' }}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Client:</strong> {jobData.username}
+                        <strong>Client:</strong> {jobData.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         <strong>Email:</strong> {jobData.email}
@@ -478,9 +504,9 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                       onChange={(e) => handleInputChange('projectManager', e.target.value)}
                       label="Project Manager"
                     >
-                      {teamMembers.map((member) => (
+                      {projectManagerOptions.map((member) => (
                         <MenuItem key={member.id} value={member.name}>
-                          {member.name} - {member.title}
+                          {member.name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -498,9 +524,9 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                       onChange={(e) => handleInputChange('projectLead', e.target.value)}
                       label="Project Lead"
                     >
-                      {teamMembers.map((member) => (
+                      {projectLeadOptions.map((member) => (
                         <MenuItem key={member.id} value={member.name}>
-                          {member.name} - {member.title}
+                          {member.name}
                         </MenuItem>
                       ))}
                     </Select>

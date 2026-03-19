@@ -8,6 +8,16 @@ export const GET_SERVICES = gql`
             id
             name
             price
+            internalPrice
+            externalPrice
+            pricing {
+                internal
+                external
+                externalAcademic
+                externalMarket
+                externalNoSalary
+                legacy
+            }
             pricingMode
             icon
             parameters
@@ -64,6 +74,7 @@ export const GET_JOB_BY_ID = gql`
             username
             institute
             email
+            customerCategory
             state
             submitted
             notes
@@ -93,6 +104,16 @@ export const GET_JOB_BY_ID = gql`
                         id
                         name
                         price
+                        internalPrice
+                        externalPrice
+                        pricing {
+                            internal
+                            external
+                            externalAcademic
+                            externalMarket
+                            externalNoSalary
+                            legacy
+                        }
                         pricingMode
                         icon
                         parameters
@@ -127,6 +148,7 @@ export const GET_OWN_JOB_BY_ID = gql`
             username
             institute
             email
+            customerCategory
             state
             submitted
             notes
@@ -156,6 +178,16 @@ export const GET_OWN_JOB_BY_ID = gql`
                         id
                         name
                         price
+                        internalPrice
+                        externalPrice
+                        pricing {
+                            internal
+                            external
+                            externalAcademic
+                            externalMarket
+                            externalNoSalary
+                            legacy
+                        }
                         pricingMode
                         icon
                         parameters
@@ -431,6 +463,16 @@ export const UPDATE_SERVICE = gql`
       id
       name
       price
+      internalPrice
+      externalPrice
+      pricing {
+        internal
+        external
+        externalAcademic
+        externalMarket
+        externalNoSalary
+        legacy
+      }
       pricingMode
       deliverables
     }
@@ -443,6 +485,16 @@ export const CREATE_SERVICE = gql`
       id
       name
       price
+      internalPrice
+      externalPrice
+      pricing {
+        internal
+        external
+        externalAcademic
+        externalMarket
+        externalNoSalary
+        legacy
+      }
       pricingMode
       icon
       parameters

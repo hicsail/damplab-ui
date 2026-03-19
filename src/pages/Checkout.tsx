@@ -35,6 +35,7 @@ import CircleIcon from '@mui/icons-material/Circle';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 
 import { CanvasContext } from "../contexts/Canvas";
+import { UserContext, UserContextProps } from "../contexts/UserContext";
 import { getWorkflowsFromGraph } from "../controllers/GraphHelpers";
 import { calculateServiceCost } from "../utils/servicePricing";
 
@@ -103,6 +104,8 @@ const Item = styled(Paper)(({ theme }) => ({
 export default function Checkout() {
   const navigate = useNavigate();
   const val = useContext(CanvasContext);
+  const userContext: UserContextProps = useContext(UserContext);
+  const customerCategory = userContext.userProps?.customerCategory;
   const rawWorkflows = getWorkflowsFromGraph(val.nodes, val.edges) || [];
 
   const [workflows, setWorkflows] = useState<WorkflowNode[][]>(rawWorkflows);
@@ -172,10 +175,17 @@ export default function Checkout() {
       {
         pricingMode: node.data.pricingMode,
         price: node.data.price,
+        internalPrice: (node.data as any).internalPrice,
+        externalPrice: (node.data as any).externalPrice,
+        externalAcademicPrice: (node.data as any).externalAcademicPrice,
+        externalMarketPrice: (node.data as any).externalMarketPrice,
+        externalNoSalaryPrice: (node.data as any).externalNoSalaryPrice,
+        pricing: (node.data as any).pricing,
         parameters: node.data.parameters
       },
       node.data.formData,
-      node.data.price
+      node.data.price,
+      customerCategory
     );
   };
 
@@ -222,6 +232,33 @@ export default function Checkout() {
     const formData = node.data.formData || [];
     const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
 
+    const normalizePrice = (value: unknown): number | undefined => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return undefined;
+    };
+
+    const resolveCategoryPrice = (obj: any): number | undefined => {
+      const pricing = obj?.pricing;
+      if (customerCategory === 'INTERNAL_CUSTOMERS') {
+        const p = normalizePrice(pricing?.internal ?? obj?.internalPrice);
+        if (p !== undefined) return p;
+      } else if (customerCategory === 'EXTERNAL_CUSTOMER_ACADEMIC') {
+        const p = normalizePrice(pricing?.externalAcademic ?? pricing?.external ?? obj?.externalAcademicPrice ?? obj?.externalPrice);
+        if (p !== undefined) return p;
+      } else if (customerCategory === 'EXTERNAL_CUSTOMER_MARKET') {
+        const p = normalizePrice(pricing?.externalMarket ?? pricing?.external ?? obj?.externalMarketPrice ?? obj?.externalPrice);
+        if (p !== undefined) return p;
+      } else if (customerCategory === 'EXTERNAL_CUSTOMER_NO_SALARY') {
+        const p = normalizePrice(pricing?.externalNoSalary ?? pricing?.external ?? obj?.externalNoSalaryPrice ?? obj?.externalPrice);
+        if (p !== undefined) return p;
+      }
+      return normalizePrice(pricing?.legacy ?? obj?.price);
+    };
+
     const items: {
       id: string;
       name: string;
@@ -244,9 +281,7 @@ export default function Checkout() {
         options.some(
           (opt: any) =>
             opt &&
-            opt.price !== undefined &&
-            opt.price !== null &&
-            Number.isFinite(Number(opt.price))
+            resolveCategoryPrice(opt) !== undefined
         );
 
       // When dropdown options have prices, show line items per option value.
@@ -262,8 +297,8 @@ export default function Checkout() {
           const optId = String(v);
           const opt = options.find((o: any) => o && o.id === optId);
           if (!opt) return;
-          const unitPrice = Number(opt.price);
-          if (!Number.isFinite(unitPrice)) return;
+          const unitPrice = resolveCategoryPrice(opt);
+          if (unitPrice === undefined) return;
           const pricingExplanation =
             typeof opt.pricingExplanation === 'string' && opt.pricingExplanation.trim() !== ''
               ? opt.pricingExplanation.trim()
@@ -283,9 +318,8 @@ export default function Checkout() {
       }
 
       // Fallback: parameter-level pricing (original behavior).
-      if (param.price === undefined || param.price === null) return;
-      const unitPrice = Number(param.price);
-      if (!Number.isFinite(unitPrice)) return;
+      const unitPrice = resolveCategoryPrice(param);
+      if (unitPrice === undefined) return;
 
       let count = 0;
       if (isMulti) {

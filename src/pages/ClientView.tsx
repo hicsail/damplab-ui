@@ -114,6 +114,39 @@ export default function Tracking() {
         })
     );
 
+    const getParameterFiles = (): Array<{ label: string; filename: string; url?: string }> => {
+        const files: Array<{ label: string; filename: string; url?: string }> = [];
+        workflows.forEach((workflow: any) => {
+            (workflow?.nodes ?? []).forEach((node: any) => {
+                const serviceParams = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
+                const fileParamMap = new Map(
+                    serviceParams
+                        .filter((p: any) => p && p.type === 'file' && typeof p.id === 'string')
+                        .map((p: any) => [p.id, p.name ?? p.id])
+                );
+                if (!fileParamMap.size) return;
+
+                (node?.formData ?? []).forEach((entry: any) => {
+                    if (!fileParamMap.has(entry?.id)) return;
+                    const paramLabel = fileParamMap.get(entry.id);
+                    const rawValues = Array.isArray(entry.value) ? entry.value : [entry.value];
+                    rawValues.forEach((raw: any) => {
+                        const parsed = typeof raw === 'string' ? (() => {
+                            try { return JSON.parse(raw); } catch { return null; }
+                        })() : raw;
+                        if (!parsed || typeof parsed !== 'object' || !parsed.filename) return;
+                        files.push({
+                            label: `${node.label} - ${paramLabel}`,
+                            filename: parsed.filename,
+                            url: parsed.url
+                        });
+                    });
+                });
+            });
+        });
+        return files;
+    };
+
     return (
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
@@ -160,6 +193,29 @@ export default function Tracking() {
                                                 ? new Date(att.uploadedAt).toLocaleString()
                                                 : undefined
                                         }
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Box>
+                )}
+                {getParameterFiles().length > 0 && (
+                    <Box sx={{ mx: 3, my: 2 }}>
+                        <Typography variant="h6" sx={{ mb: 1 }}>Parameter Files</Typography>
+                        <List dense>
+                            {getParameterFiles().map((f, idx) => (
+                                <ListItem key={`${f.label}-${f.filename}-${idx}`} sx={{ pl: 0 }}>
+                                    <ListItemText
+                                        primary={
+                                            f.url ? (
+                                                <MuiLink href={f.url} target="_blank" rel="noopener noreferrer">
+                                                    {f.filename}
+                                                </MuiLink>
+                                            ) : (
+                                                f.filename
+                                            )
+                                        }
+                                        secondary={f.label}
                                     />
                                 </ListItem>
                             ))}

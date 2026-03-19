@@ -9,6 +9,7 @@ import {
   Select,
   TextField,
   Box,
+  Button,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
@@ -18,6 +19,21 @@ interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
   onFormDataChange?: () => void;
 }
+
+type PendingParamFile = {
+  __kind: "pending-file";
+  localId: string;
+  file: File;
+  filename: string;
+  contentType: string;
+  size: number;
+};
+
+const isPendingParamFile = (value: unknown): value is PendingParamFile =>
+  !!value &&
+  typeof value === "object" &&
+  (value as PendingParamFile).__kind === "pending-file" &&
+  typeof (value as PendingParamFile).filename === "string";
 
 export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
@@ -39,11 +55,20 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
           ? obj.resultParamValue
           : "";
       } else if (isMultiValueParam(obj)) {
+        if (obj.type === "file") {
+          const arr = Array.isArray(obj.value) ? obj.value : obj.value ? [obj.value] : [];
+          initValues[obj.id] = arr;
+          return;
+        }
         const arr = Array.isArray(obj.value)
           ? (obj.value.length ? obj.value : [""])
           : [obj.value ?? ""];
         initValues[obj.id] = arr;
       } else {
+        if (obj.type === "file") {
+          initValues[obj.id] = obj.value ?? null;
+          return;
+        }
         initValues[obj.id] = obj.value != null ? obj.value : "";
       }
     });
@@ -62,10 +87,16 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
       if (isMultiValueParam(obj)) {
         if (obj.required) {
           const arr = values[key];
-          const hasValue = Array.isArray(arr) && arr.some((v: any) => v != null && String(v).trim() !== "");
+          const hasValue = obj.type === "file"
+            ? Array.isArray(arr) && arr.length > 0
+            : Array.isArray(arr) && arr.some((v: any) => v != null && String(v).trim() !== "");
           if (!hasValue) errors[key] = "Required (at least one value)";
         }
       } else {
+        if (obj.type === "file") {
+          if (obj.required && !values[key]) errors[key] = "Required";
+          return;
+        }
         if (
           values[key] === "" ||
           values[key] === undefined ||
@@ -89,6 +120,18 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
     });
     // Now a dedicated field in each service (should always accompany other params)
     // activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
+  };
+
+  const toPendingFiles = (files: FileList | null): PendingParamFile[] => {
+    if (!files) return [];
+    return Array.from(files).map((file) => ({
+      __kind: "pending-file",
+      localId: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      file,
+      filename: file.name,
+      contentType: file.type || "application/octet-stream",
+      size: file.size,
+    }));
   };
 
   // formik hook init
@@ -291,6 +334,77 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                             {param.description ? param.description : null}
                           </FormHelperText>
                         </FormControl>
+                      );
+                    }
+                    if (param.type === "file") {
+                      if (isMultiValueParam(param)) {
+                        const files = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [];
+                        return (
+                          <div key={param.id} style={{ marginTop: 12 }}>
+                            <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                              {param.name}
+                              <input
+                                hidden
+                                type="file"
+                                multiple
+                                onChange={(e) => {
+                                  const selected = toPendingFiles(e.target.files);
+                                  formik.setFieldValue(param.id, [...files, ...selected]);
+                                  e.currentTarget.value = "";
+                                }}
+                              />
+                            </Button>
+                            {param.description ? (
+                              <FormHelperText>{param.description}</FormHelperText>
+                            ) : null}
+                            <Box sx={{ mt: 1 }}>
+                              {files.map((f: any, idx: number) => (
+                                <Box key={f?.localId ?? idx} display="flex" alignItems="center" gap={0.5}>
+                                  <FormHelperText sx={{ m: 0 }}>
+                                    {isPendingParamFile(f) ? f.filename : "Uploaded file"}
+                                  </FormHelperText>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx))}
+                                    aria-label="Remove file"
+                                  >
+                                    <DeleteForeverSharp fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              ))}
+                            </Box>
+                          </div>
+                        );
+                      }
+                      const fileValue = formik.values[param.id];
+                      return (
+                        <div key={param.id} style={{ marginTop: 12 }}>
+                          <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                            {param.name}
+                            <input
+                              hidden
+                              type="file"
+                              onChange={(e) => {
+                                const selected = toPendingFiles(e.target.files);
+                                formik.setFieldValue(param.id, selected[0] ?? null);
+                                e.currentTarget.value = "";
+                              }}
+                            />
+                          </Button>
+                          {param.description ? (
+                            <FormHelperText>{param.description}</FormHelperText>
+                          ) : null}
+                          {fileValue ? (
+                            <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5 }}>
+                              <FormHelperText sx={{ m: 0 }}>
+                                {isPendingParamFile(fileValue) ? fileValue.filename : "Uploaded file"}
+                              </FormHelperText>
+                              <IconButton size="small" onClick={() => formik.setFieldValue(param.id, null)} aria-label="Remove file">
+                                <DeleteForeverSharp fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          ) : null}
+                        </div>
                       );
                     }
                     if (param.type !== "dropdown" && isMultiValueParam(param)) {
@@ -566,6 +680,73 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                         </IconButton>
                       </Box>
                     </Box>
+                  </div>
+                );
+              }
+              if (param.type === "file") {
+                if (isMultiValueParam(param)) {
+                  const files = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [];
+                  return (
+                    <div key={param.id} style={{ marginTop: 12 }}>
+                      <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                        {param.name}
+                        <input
+                          hidden
+                          type="file"
+                          multiple
+                          onChange={(e) => {
+                            const selected = toPendingFiles(e.target.files);
+                            formik.setFieldValue(param.id, [...files, ...selected]);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                      </Button>
+                      {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
+                      <Box sx={{ mt: 1 }}>
+                        {files.map((f: any, idx: number) => (
+                          <Box key={f?.localId ?? idx} display="flex" alignItems="center" gap={0.5}>
+                            <FormHelperText sx={{ m: 0 }}>
+                              {isPendingParamFile(f) ? f.filename : "Uploaded file"}
+                            </FormHelperText>
+                            <IconButton
+                              size="small"
+                              onClick={() => formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx))}
+                              aria-label="Remove file"
+                            >
+                              <DeleteForeverSharp fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        ))}
+                      </Box>
+                    </div>
+                  );
+                }
+                const fileValue = formik.values[param.id];
+                return (
+                  <div key={param.id} style={{ marginTop: 12 }}>
+                    <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                      {param.name}
+                      <input
+                        hidden
+                        type="file"
+                        onChange={(e) => {
+                          const selected = toPendingFiles(e.target.files);
+                          formik.setFieldValue(param.id, selected[0] ?? null);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                    </Button>
+                    {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
+                    {fileValue ? (
+                      <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5 }}>
+                        <FormHelperText sx={{ m: 0 }}>
+                          {isPendingParamFile(fileValue) ? fileValue.filename : "Uploaded file"}
+                        </FormHelperText>
+                        <IconButton size="small" onClick={() => formik.setFieldValue(param.id, null)} aria-label="Remove file">
+                          <DeleteForeverSharp fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ) : null}
                   </div>
                 );
               }

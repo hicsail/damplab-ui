@@ -20,6 +20,15 @@ import {
   Tooltip,
 } from "@mui/material";
 
+const PARAMETER_TYPE_LABELS: Record<string, string> = {
+  string: "Text",
+  number: "Number",
+  file: "File upload",
+  boolean: "Yes/No",
+  dropdown: "Pick from list",
+  table: "Table",
+};
+
 /* FIXME: Error "MUI: The `children` component of the Tooltip is not forwarding its props correctly" -
    this occurs when a GridEditInputCell is focused that has a Tooltip wrapping it.
    See this open issue https://github.com/mui/material-ui/issues/33476
@@ -65,11 +74,10 @@ export function ParameterBooleanSelect(props: GridRenderEditCellParams) {
         displayEmpty={true}
         renderValue={(val) => {
           if (val === true) {
-            return "true";
+            return "Yes";
           } else if (val === false) {
-            return "false";
+            return "No";
           } else {
-            //return <span color={"textDisabled"}>{field}</span>;
             return <MenuItem disabled>{field}</MenuItem>;
           }
         }}
@@ -77,8 +85,8 @@ export function ParameterBooleanSelect(props: GridRenderEditCellParams) {
         <MenuItem disabled value={""}>
           <em>{field}</em>
         </MenuItem>
-        <MenuItem value={true}>true</MenuItem>
-        <MenuItem value={false}>false</MenuItem>
+        <MenuItem value={true}>Yes</MenuItem>
+        <MenuItem value={false}>No</MenuItem>
       </Select>
     </FormControl>
   );
@@ -96,7 +104,7 @@ export function ParameterDefaultValueInput(props: GridRenderEditCellParams) {
   const isDisabled = !(
     currentEditType === "string" || currentEditType === "number"
   );
-  const disabledTooltipMsg = `${field} is only applicable for parameters of type string or number.`;
+  const disabledTooltipMsg = "Starting value is only used when the answer format is Text or Number.";
 
   React.useLayoutEffect(() => {
     if (hasFocus) {
@@ -117,7 +125,7 @@ export function ParameterDefaultValueInput(props: GridRenderEditCellParams) {
         onChange={handleValueChange}
         onMouseOver={() => setIsHover(true)}
         onMouseOut={() => setIsHover(false)}
-        placeholder={"Default value"}
+        placeholder={"Starting value"}
         {...props}
       />
     </Tooltip>
@@ -132,13 +140,13 @@ export function ParameterPricingExplanationInput(props: GridRenderEditCellParams
   return (
     <GridEditInputCell
       {...props}
-      placeholder={"Pricing explanation (shown to client)"}
+      placeholder={"Price note shown to customer"}
     />
   );
 }
 
 export function ParameterIdInput(props: GridRenderEditCellParams) {
-  return <GridEditInputCell {...props} placeholder={"id"} />;
+  return <GridEditInputCell {...props} placeholder={"Internal ID"} />;
 }
 
 export function ParameterNameInput(props: GridRenderEditCellParams) {
@@ -161,7 +169,7 @@ export function ParameterOptionsButton(props: GridRenderEditCellParams) {
 
   const isDisabled = currentEditType !== "dropdown";
   const disabledTooltipMsg =
-    "Options is only applicable for parameters of type dropdown.";
+    "Choices are only used when the answer format is Pick from list.";
 
   return (
     <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
@@ -175,7 +183,7 @@ export function ParameterOptionsButton(props: GridRenderEditCellParams) {
           disabled={isDisabled}
           onClick={() => props.handleOptionsEditButton(props)}
         >
-          Edit
+          Edit choices
         </Button>
       </Box>
     </Tooltip>
@@ -206,16 +214,18 @@ export function ParameterParamTypeSelect(props: GridRenderEditCellParams) {
         displayEmpty={true}
         renderValue={(val) => {
           if (val === "") {
-            //return <span color={"textDisabled"}>ParamType</span>;
-            return <MenuItem disabled>ParamType</MenuItem>;
+            return <MenuItem disabled>Where this appears</MenuItem>;
           }
-          return val;
+          if (val === "input") {
+            return "User input";
+          }
+          return String(val);
         }}
       >
         <MenuItem disabled value={""}>
-          <em>ParamType</em>
+          <em>Where this appears</em>
         </MenuItem>
-        <MenuItem value={"input"}>input</MenuItem>
+        <MenuItem value={"input"}>User input</MenuItem>
         {/*<MenuItem value={"result"}>result</MenuItem> only input for now... */}
         {/*<MenuItem value={"flow"}>flow</MenuItem> only input for now... */}
       </Select>
@@ -233,7 +243,7 @@ export function ParameterRangeValueInput(props: GridRenderEditCellParams) {
   const currentEditType = apiRef.current.getRowWithUpdatedValues(id).type;
 
   const isDisabled = currentEditType !== "number";
-  const disabledTooltipMsg = `${field} is only applicable for parameters of type number.`;
+  const disabledTooltipMsg = `${field} is only used when the answer format is Number.`;
 
   React.useLayoutEffect(() => {
     if (hasFocus) {
@@ -298,7 +308,7 @@ export function ParameterTableDataButton(props: GridRenderEditCellParams) {
 
   const isDisabled = currentEditType !== "table";
   const disabledTooltipMsg =
-    "TableData is only applicable for parameters of type table.";
+    "Table setup is only used when the answer format is Table.";
 
   return (
     <Tooltip open={isDisabled && isHover} title={disabledTooltipMsg} arrow>
@@ -312,7 +322,7 @@ export function ParameterTableDataButton(props: GridRenderEditCellParams) {
           disabled={isDisabled}
           onClick={() => props.handleTableDataButton(props)}
         >
-          Edit
+          Edit table
         </Button>
       </Box>
     </Tooltip>
@@ -464,21 +474,20 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
         endAdornment={<InputAdornment position={"end"}>*</InputAdornment>}
         renderValue={(val) => {
           if (val === "") {
-            //return <span color={"textDisabled"}>Type (required)</span>;
-            return <MenuItem disabled>Type (required)</MenuItem>;
+            return <MenuItem disabled>Answer format (required)</MenuItem>;
           }
-          return val;
+          return PARAMETER_TYPE_LABELS[String(val)] ?? String(val);
         }}
       >
         <MenuItem disabled value={""}>
-          <em>Type (required)</em>
+          <em>Answer format (required)</em>
         </MenuItem>
-        <MenuItem value={"string"}>string</MenuItem>
-        <MenuItem value={"number"}>number</MenuItem>
-        <MenuItem value={"file"}>file</MenuItem>
-        <MenuItem value={"boolean"}>boolean</MenuItem>
-        <MenuItem value={"dropdown"}>enum (dropdown)</MenuItem>
-        <MenuItem value={"table"}>table</MenuItem>
+        <MenuItem value={"string"}>Text</MenuItem>
+        <MenuItem value={"number"}>Number</MenuItem>
+        <MenuItem value={"file"}>File upload</MenuItem>
+        <MenuItem value={"boolean"}>Yes/No</MenuItem>
+        <MenuItem value={"dropdown"}>Pick from list</MenuItem>
+        <MenuItem value={"table"}>Table</MenuItem>
       </Select>
     </FormControl>
   );

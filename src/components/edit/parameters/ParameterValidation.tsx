@@ -10,11 +10,11 @@ export function validateParameter(row: GridRowModel): ParameterValidationError {
 
   // Name is required
   if (row.name === undefined || row.name === "") {
-    errors.push({ field: "name", errorMsg: "Name is a required field." });
+    errors.push({ field: "Name", errorMsg: "Name is required." });
   }
   // Type is required
   if (row.type === undefined) {
-    errors.push({ field: "type", errorMsg: "Type is a required field." });
+    errors.push({ field: "Answer format", errorMsg: "Answer format is required." });
   }
   // Options is required if param is of type dropdown (enum-style)
   if (
@@ -22,17 +22,17 @@ export function validateParameter(row: GridRowModel): ParameterValidationError {
     (row.options === undefined || row.options.length === 0)
   ) {
     errors.push({
-      field: "options",
-      errorMsg: "Options are required for parameters of type 'dropdown'.",
+      field: "Choices",
+      errorMsg: "Add at least one choice when answer format is Pick from list.",
     });
   }
 
   if (row.price !== undefined && row.price !== null) {
     const numericPrice = Number(row.price);
     if (Number.isNaN(numericPrice)) {
-      errors.push({ field: "price", errorMsg: "Price must be a number." });
+      errors.push({ field: "Fallback price", errorMsg: "Fallback price must be a number." });
     } else if (numericPrice < 0) {
-      errors.push({ field: "price", errorMsg: "Price cannot be negative." });
+      errors.push({ field: "Fallback price", errorMsg: "Fallback price cannot be negative." });
     }
   }
 
