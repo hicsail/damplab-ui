@@ -8,9 +8,15 @@ export type Service = {
     price?: number | null;
     internalPrice?: number | null;
     externalPrice?: number | null;
+    externalAcademicPrice?: number | null;
+    externalMarketPrice?: number | null;
+    externalNoSalaryPrice?: number | null;
     pricing?: {
         internal?: number | null;
         external?: number | null;
+        externalAcademic?: number | null;
+        externalMarket?: number | null;
+        externalNoSalary?: number | null;
         legacy?: number | null;
     } | null;
     pricingMode?: ServicePricingMode;

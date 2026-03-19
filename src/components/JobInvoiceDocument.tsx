@@ -160,7 +160,12 @@ function getSowShortNumber(sowNumber: string | undefined | null, fallbackInvoice
 export interface JobInvoiceDocumentProps {
   jobId: string;
   jobName: string;
-  customerCategory?: 'INTERNAL' | 'EXTERNAL' | null;
+  customerCategory?:
+    | 'INTERNAL_CUSTOMERS'
+    | 'EXTERNAL_CUSTOMER_ACADEMIC'
+    | 'EXTERNAL_CUSTOMER_MARKET'
+    | 'EXTERNAL_CUSTOMER_NO_SALARY'
+    | null;
   sow: SOWData | null;
 }
 
@@ -179,7 +184,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
   const services = sow?.services ?? [];
   const invoiceTotal = services.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
 
-  const isInternal = customerCategory === 'INTERNAL';
+  const isInternal = customerCategory === 'INTERNAL_CUSTOMERS';
 
   return (
     <Document>

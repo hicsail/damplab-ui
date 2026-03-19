@@ -1,5 +1,9 @@
 export type ServicePricingMode = 'SERVICE' | 'PARAMETER';
-export type CustomerCategory = 'INTERNAL' | 'EXTERNAL';
+export type CustomerCategory =
+  | 'INTERNAL_CUSTOMERS'
+  | 'EXTERNAL_CUSTOMER_ACADEMIC'
+  | 'EXTERNAL_CUSTOMER_MARKET'
+  | 'EXTERNAL_CUSTOMER_NO_SALARY';
 
 interface ServiceParameterOption {
   id?: unknown;
@@ -7,7 +11,14 @@ interface ServiceParameterOption {
   price?: unknown;
   internalPrice?: unknown;
   externalPrice?: unknown;
-  pricing?: { internal?: unknown; external?: unknown; legacy?: unknown } | unknown;
+  pricing?: {
+    internal?: unknown;
+    external?: unknown;
+    externalAcademic?: unknown;
+    externalMarket?: unknown;
+    externalNoSalary?: unknown;
+    legacy?: unknown;
+  } | unknown;
 }
 
 interface ServiceParameterDefinition {
@@ -16,7 +27,14 @@ interface ServiceParameterDefinition {
   price?: unknown;
   internalPrice?: unknown;
   externalPrice?: unknown;
-  pricing?: { internal?: unknown; external?: unknown; legacy?: unknown } | unknown;
+  pricing?: {
+    internal?: unknown;
+    external?: unknown;
+    externalAcademic?: unknown;
+    externalMarket?: unknown;
+    externalNoSalary?: unknown;
+    legacy?: unknown;
+  } | unknown;
   type?: unknown;
   options?: ServiceParameterOption[] | unknown;
   isPriceMultiplier?: boolean;
@@ -50,8 +68,18 @@ const resolveCategoryPrice = (
     | {
         internalPrice?: unknown;
         externalPrice?: unknown;
+        externalAcademicPrice?: unknown;
+        externalMarketPrice?: unknown;
+        externalNoSalaryPrice?: unknown;
         price?: unknown;
-        pricing?: { internal?: unknown; external?: unknown; legacy?: unknown } | unknown;
+        pricing?: {
+          internal?: unknown;
+          external?: unknown;
+          externalAcademic?: unknown;
+          externalMarket?: unknown;
+          externalNoSalary?: unknown;
+          legacy?: unknown;
+        } | unknown;
       }
     | null
     | undefined,
@@ -59,11 +87,17 @@ const resolveCategoryPrice = (
 ): number | undefined => {
   if (!input) return undefined;
   const pricing = input.pricing && typeof input.pricing === 'object' ? (input.pricing as any) : undefined;
-  if (category === 'INTERNAL') {
+  if (category === 'INTERNAL_CUSTOMERS') {
     const p = normalizePrice(pricing?.internal ?? input.internalPrice);
     if (p !== undefined) return p;
-  } else if (category === 'EXTERNAL') {
-    const p = normalizePrice(pricing?.external ?? input.externalPrice);
+  } else if (category === 'EXTERNAL_CUSTOMER_ACADEMIC') {
+    const p = normalizePrice(pricing?.externalAcademic ?? pricing?.external ?? input.externalAcademicPrice ?? input.externalPrice);
+    if (p !== undefined) return p;
+  } else if (category === 'EXTERNAL_CUSTOMER_MARKET') {
+    const p = normalizePrice(pricing?.externalMarket ?? pricing?.external ?? input.externalMarketPrice ?? input.externalPrice);
+    if (p !== undefined) return p;
+  } else if (category === 'EXTERNAL_CUSTOMER_NO_SALARY') {
+    const p = normalizePrice(pricing?.externalNoSalary ?? pricing?.external ?? input.externalNoSalaryPrice ?? input.externalPrice);
     if (p !== undefined) return p;
   }
   return normalizePrice(pricing?.legacy ?? input.price);
@@ -273,7 +307,17 @@ export const calculateServiceCost = (
     price?: unknown;
     internalPrice?: unknown;
     externalPrice?: unknown;
-    pricing?: { internal?: unknown; external?: unknown; legacy?: unknown } | unknown;
+    pricing?: {
+      internal?: unknown;
+      external?: unknown;
+      externalAcademic?: unknown;
+      externalMarket?: unknown;
+      externalNoSalary?: unknown;
+      legacy?: unknown;
+    } | unknown;
+    externalAcademicPrice?: unknown;
+    externalMarketPrice?: unknown;
+    externalNoSalaryPrice?: unknown;
     parameters?: unknown;
   } | null | undefined,
   rawFormData: unknown,

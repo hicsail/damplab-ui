@@ -49,9 +49,17 @@ export const EditServicesTable: React.FC = () => {
 
   const [pricingDialogOpen, setPricingDialogOpen] = useState(false);
   const [pricingEditProps, setPricingEditProps] = useState<GridRenderCellParams | GridRenderEditCellParams | null>(null);
-  const [pricingForm, setPricingForm] = useState<{ internal: string; external: string; legacy: string }>({
+  const [pricingForm, setPricingForm] = useState<{
+    internal: string;
+    externalAcademic: string;
+    externalMarket: string;
+    externalNoSalary: string;
+    legacy: string;
+  }>({
     internal: '',
-    external: '',
+    externalAcademic: '',
+    externalMarket: '',
+    externalNoSalary: '',
     legacy: ''
   });
 
@@ -86,7 +94,10 @@ export const EditServicesTable: React.FC = () => {
     console.log(newRow);
     const pricingObj = (newRow as any).pricing ?? {};
     const internal = (newRow as any).internalPrice ?? pricingObj.internal ?? null;
-    const external = (newRow as any).externalPrice ?? pricingObj.external ?? null;
+    const externalAcademic = (newRow as any).externalAcademicPrice ?? pricingObj.externalAcademic ?? null;
+    const externalMarket = (newRow as any).externalMarketPrice ?? pricingObj.externalMarket ?? null;
+    const externalNoSalary = (newRow as any).externalNoSalaryPrice ?? pricingObj.externalNoSalary ?? null;
+    const external = (newRow as any).externalPrice ?? pricingObj.external ?? externalMarket ?? null;
     const legacy = newRow.price ?? pricingObj.legacy ?? null;
     // The services need to be a list of IDs
     const changes = {
@@ -94,9 +105,15 @@ export const EditServicesTable: React.FC = () => {
       price: legacy == null ? null : Number(legacy),
       internalPrice: internal == null ? null : Number(internal),
       externalPrice: external == null ? null : Number(external),
+      externalAcademicPrice: externalAcademic == null ? null : Number(externalAcademic),
+      externalMarketPrice: externalMarket == null ? null : Number(externalMarket),
+      externalNoSalaryPrice: externalNoSalary == null ? null : Number(externalNoSalary),
       pricing: {
         internal: internal == null ? null : Number(internal),
         external: external == null ? null : Number(external),
+        externalAcademic: externalAcademic == null ? null : Number(externalAcademic),
+        externalMarket: externalMarket == null ? null : Number(externalMarket),
+        externalNoSalary: externalNoSalary == null ? null : Number(externalNoSalary),
         legacy: legacy == null ? null : Number(legacy),
       },
       pricingMode: newRow.pricingMode ?? 'SERVICE',
@@ -346,7 +363,9 @@ export const EditServicesTable: React.FC = () => {
     setPricingEditProps(params);
     setPricingForm({
       internal: pricing.internal ?? row.internalPrice ?? '',
-      external: pricing.external ?? row.externalPrice ?? '',
+      externalAcademic: pricing.externalAcademic ?? row.externalAcademicPrice ?? '',
+      externalMarket: pricing.externalMarket ?? row.externalMarketPrice ?? pricing.external ?? row.externalPrice ?? '',
+      externalNoSalary: pricing.externalNoSalary ?? row.externalNoSalaryPrice ?? '',
       legacy: pricing.legacy ?? row.price ?? '',
     });
     setPricingDialogOpen(true);
@@ -362,15 +381,27 @@ export const EditServicesTable: React.FC = () => {
       return Number.isFinite(n) ? n : null;
     };
     const internal = parse(pricingForm.internal);
-    const external = parse(pricingForm.external);
+    const externalAcademic = parse(pricingForm.externalAcademic);
+    const externalMarket = parse(pricingForm.externalMarket);
+    const externalNoSalary = parse(pricingForm.externalNoSalary);
     const legacy = parse(pricingForm.legacy);
 
     const updatedRow: any = {
       ...pricingEditProps.row,
-      pricing: { internal, external, legacy },
+      pricing: {
+        internal,
+        external: externalMarket,
+        externalAcademic,
+        externalMarket,
+        externalNoSalary,
+        legacy
+      },
       // keep legacy scalar fields for now (backward compat)
       internalPrice: internal,
-      externalPrice: external,
+      externalPrice: externalMarket,
+      externalAcademicPrice: externalAcademic,
+      externalMarketPrice: externalMarket,
+      externalNoSalaryPrice: externalNoSalary,
       price: legacy,
     };
     gridRef.current.updateRows([updatedRow]);
@@ -582,9 +613,23 @@ export const EditServicesTable: React.FC = () => {
               inputProps={{ min: 0, step: '0.01' }}
             />
             <TextField
-              label="External price"
-              value={pricingForm.external}
-              onChange={(e) => setPricingForm((p) => ({ ...p, external: e.target.value }))}
+              label="External customer (academic)"
+              value={pricingForm.externalAcademic}
+              onChange={(e) => setPricingForm((p) => ({ ...p, externalAcademic: e.target.value }))}
+              type="number"
+              inputProps={{ min: 0, step: '0.01' }}
+            />
+            <TextField
+              label="External customer (market)"
+              value={pricingForm.externalMarket}
+              onChange={(e) => setPricingForm((p) => ({ ...p, externalMarket: e.target.value }))}
+              type="number"
+              inputProps={{ min: 0, step: '0.01' }}
+            />
+            <TextField
+              label="External customer (no salary)"
+              value={pricingForm.externalNoSalary}
+              onChange={(e) => setPricingForm((p) => ({ ...p, externalNoSalary: e.target.value }))}
               type="number"
               inputProps={{ min: 0, step: '0.01' }}
             />

@@ -13,6 +13,9 @@ export const GET_SERVICES = gql`
             pricing {
                 internal
                 external
+                externalAcademic
+                externalMarket
+                externalNoSalary
                 legacy
             }
             pricingMode
@@ -106,6 +109,9 @@ export const GET_JOB_BY_ID = gql`
                         pricing {
                             internal
                             external
+                            externalAcademic
+                            externalMarket
+                            externalNoSalary
                             legacy
                         }
                         pricingMode
@@ -177,6 +183,9 @@ export const GET_OWN_JOB_BY_ID = gql`
                         pricing {
                             internal
                             external
+                            externalAcademic
+                            externalMarket
+                            externalNoSalary
                             legacy
                         }
                         pricingMode
@@ -459,6 +468,9 @@ export const UPDATE_SERVICE = gql`
       pricing {
         internal
         external
+        externalAcademic
+        externalMarket
+        externalNoSalary
         legacy
       }
       pricingMode
@@ -478,6 +490,9 @@ export const CREATE_SERVICE = gql`
       pricing {
         internal
         external
+        externalAcademic
+        externalMarket
+        externalNoSalary
         legacy
       }
       pricingMode

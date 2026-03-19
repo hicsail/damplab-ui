@@ -25,6 +25,17 @@ export type Parameter = {
     price?: number;
     internalPrice?: number;
     externalPrice?: number;
+    externalAcademicPrice?: number;
+    externalMarketPrice?: number;
+    externalNoSalaryPrice?: number;
+    pricing?: {
+        internal?: number;
+        external?: number;
+        externalAcademic?: number;
+        externalMarket?: number;
+        externalNoSalary?: number;
+        legacy?: number;
+    };
     templateFile? : string;
     tableData?: any;
     paramGroupId?: string;

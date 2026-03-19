@@ -37,7 +37,9 @@ export default function AdminNewService() {
   const [description, setDescription] = useState('');
   const [pricingMode, setPricingMode] = useState<'SERVICE' | 'PARAMETER'>('SERVICE');
   const [internalPrice, setInternalPrice] = useState('');
-  const [externalPrice, setExternalPrice] = useState('');
+  const [externalAcademicPrice, setExternalAcademicPrice] = useState('');
+  const [externalMarketPrice, setExternalMarketPrice] = useState('');
+  const [externalNoSalaryPrice, setExternalNoSalaryPrice] = useState('');
   const [fallbackPrice, setFallbackPrice] = useState('');
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,11 +68,15 @@ export default function AdminNewService() {
     }
 
     const internal = parsePrice(internalPrice);
-    const external = parsePrice(externalPrice);
+    const externalAcademic = parsePrice(externalAcademicPrice);
+    const externalMarket = parsePrice(externalMarketPrice);
+    const externalNoSalary = parsePrice(externalNoSalaryPrice);
     const legacy = parsePrice(fallbackPrice);
     const hasInvalidPrice =
       (internalPrice.trim() && internal === null) ||
-      (externalPrice.trim() && external === null) ||
+      (externalAcademicPrice.trim() && externalAcademic === null) ||
+      (externalMarketPrice.trim() && externalMarket === null) ||
+      (externalNoSalaryPrice.trim() && externalNoSalary === null) ||
       (fallbackPrice.trim() && legacy === null);
 
     if (hasInvalidPrice) {
@@ -83,10 +89,16 @@ export default function AdminNewService() {
       icon: '',
       price: legacy,
       internalPrice: internal,
-      externalPrice: external,
+      externalPrice: externalMarket,
+      externalAcademicPrice: externalAcademic,
+      externalMarketPrice: externalMarket,
+      externalNoSalaryPrice: externalNoSalary,
       pricing: {
         internal,
-        external,
+        external: externalMarket,
+        externalAcademic,
+        externalMarket,
+        externalNoSalary,
         legacy
       },
       pricingMode,
@@ -166,9 +178,23 @@ export default function AdminNewService() {
           inputProps={{ min: 0, step: '0.01' }}
         />
         <TextField
-          label='External price'
-          value={externalPrice}
-          onChange={(event) => setExternalPrice(event.target.value)}
+          label='External customer (academic)'
+          value={externalAcademicPrice}
+          onChange={(event) => setExternalAcademicPrice(event.target.value)}
+          type='number'
+          inputProps={{ min: 0, step: '0.01' }}
+        />
+        <TextField
+          label='External customer (market)'
+          value={externalMarketPrice}
+          onChange={(event) => setExternalMarketPrice(event.target.value)}
+          type='number'
+          inputProps={{ min: 0, step: '0.01' }}
+        />
+        <TextField
+          label='External customer (no salary)'
+          value={externalNoSalaryPrice}
+          onChange={(event) => setExternalNoSalaryPrice(event.target.value)}
           type='number'
           inputProps={{ min: 0, step: '0.01' }}
         />

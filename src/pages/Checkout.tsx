@@ -177,6 +177,10 @@ export default function Checkout() {
         price: node.data.price,
         internalPrice: (node.data as any).internalPrice,
         externalPrice: (node.data as any).externalPrice,
+        externalAcademicPrice: (node.data as any).externalAcademicPrice,
+        externalMarketPrice: (node.data as any).externalMarketPrice,
+        externalNoSalaryPrice: (node.data as any).externalNoSalaryPrice,
+        pricing: (node.data as any).pricing,
         parameters: node.data.parameters
       },
       node.data.formData,
@@ -238,14 +242,21 @@ export default function Checkout() {
     };
 
     const resolveCategoryPrice = (obj: any): number | undefined => {
-      if (customerCategory === 'INTERNAL') {
-        const p = normalizePrice(obj?.internalPrice);
+      const pricing = obj?.pricing;
+      if (customerCategory === 'INTERNAL_CUSTOMERS') {
+        const p = normalizePrice(pricing?.internal ?? obj?.internalPrice);
         if (p !== undefined) return p;
-      } else if (customerCategory === 'EXTERNAL') {
-        const p = normalizePrice(obj?.externalPrice);
+      } else if (customerCategory === 'EXTERNAL_CUSTOMER_ACADEMIC') {
+        const p = normalizePrice(pricing?.externalAcademic ?? pricing?.external ?? obj?.externalAcademicPrice ?? obj?.externalPrice);
+        if (p !== undefined) return p;
+      } else if (customerCategory === 'EXTERNAL_CUSTOMER_MARKET') {
+        const p = normalizePrice(pricing?.externalMarket ?? pricing?.external ?? obj?.externalMarketPrice ?? obj?.externalPrice);
+        if (p !== undefined) return p;
+      } else if (customerCategory === 'EXTERNAL_CUSTOMER_NO_SALARY') {
+        const p = normalizePrice(pricing?.externalNoSalary ?? pricing?.external ?? obj?.externalNoSalaryPrice ?? obj?.externalPrice);
         if (p !== undefined) return p;
       }
-      return normalizePrice(obj?.price);
+      return normalizePrice(pricing?.legacy ?? obj?.price);
     };
 
     const items: {

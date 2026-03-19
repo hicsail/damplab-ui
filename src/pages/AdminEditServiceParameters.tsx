@@ -332,14 +332,46 @@ export default function AdminEditServiceParameters() {
                 </Grid>
                 <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
-                    label='External price'
+                    label='External customer (academic)'
                     type='number'
                     inputProps={{ min: 0, step: '0.01' }}
                     fullWidth
-                    value={selectedParameter.externalPrice ?? ''}
+                    value={selectedParameter.externalAcademicPrice ?? selectedParameter.pricing?.externalAcademic ?? ''}
                     onChange={(event) =>
                       updateParameter(selectedParameterIndex, {
+                        externalAcademicPrice:
+                          event.target.value === '' ? undefined : Number(event.target.value)
+                      })
+                    }
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    label='External customer (market)'
+                    type='number'
+                    inputProps={{ min: 0, step: '0.01' }}
+                    fullWidth
+                    value={selectedParameter.externalMarketPrice ?? selectedParameter.pricing?.externalMarket ?? selectedParameter.externalPrice ?? ''}
+                    onChange={(event) =>
+                      updateParameter(selectedParameterIndex, {
+                        externalMarketPrice:
+                          event.target.value === '' ? undefined : Number(event.target.value),
                         externalPrice:
+                          event.target.value === '' ? undefined : Number(event.target.value)
+                      })
+                    }
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    label='External customer (no salary)'
+                    type='number'
+                    inputProps={{ min: 0, step: '0.01' }}
+                    fullWidth
+                    value={selectedParameter.externalNoSalaryPrice ?? selectedParameter.pricing?.externalNoSalary ?? ''}
+                    onChange={(event) =>
+                      updateParameter(selectedParameterIndex, {
+                        externalNoSalaryPrice:
                           event.target.value === '' ? undefined : Number(event.target.value)
                       })
                     }
@@ -419,7 +451,7 @@ export default function AdminEditServiceParameters() {
                       {(selectedParameter.options ?? []).map((option: any, optionIndex: number) => (
                         <Box
                           key={`${option.id || 'option'}-${optionIndex}`}
-                          sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: 1 }}
+                          sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 1 }}
                         >
                           <TextField
                             label='Choice label'
@@ -443,6 +475,26 @@ export default function AdminEditServiceParameters() {
                               nextOptions[optionIndex] = {
                                 ...nextOptions[optionIndex],
                                 price:
+                                  event.target.value === ''
+                                    ? undefined
+                                    : Number(event.target.value)
+                              };
+                              updateParameter(selectedParameterIndex, { options: nextOptions });
+                            }}
+                          />
+                          <TextField
+                            label='Market price'
+                            type='number'
+                            value={option.externalMarketPrice ?? option.pricing?.externalMarket ?? option.externalPrice ?? ''}
+                            onChange={(event) => {
+                              const nextOptions = [...(selectedParameter.options ?? [])];
+                              nextOptions[optionIndex] = {
+                                ...nextOptions[optionIndex],
+                                externalMarketPrice:
+                                  event.target.value === ''
+                                    ? undefined
+                                    : Number(event.target.value),
+                                externalPrice:
                                   event.target.value === ''
                                     ? undefined
                                     : Number(event.target.value)

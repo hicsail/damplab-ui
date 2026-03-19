@@ -85,7 +85,19 @@ export default function MainFlow() {
         setActiveComponentId(nodeId);
 
         const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
-        const data: NodeData = { id: nodeId, label: name, price: type.price, internalPrice: type.internalPrice, externalPrice: type.externalPrice, pricingMode: type.pricingMode, description: type.description, allowedConnections: type.allowedConnections, 
+        const data: NodeData = {
+            id: nodeId,
+            label: name,
+            price: type.price,
+            internalPrice: type.internalPrice,
+            externalPrice: type.externalPrice,
+            externalAcademicPrice: type.externalAcademicPrice,
+            externalMarketPrice: type.externalMarketPrice,
+            externalNoSalaryPrice: type.externalNoSalaryPrice,
+            pricing: type.pricing,
+            pricingMode: type.pricingMode,
+            description: type.description,
+            allowedConnections: type.allowedConnections,
             icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId, paramGroups: type.paramGroups };
         const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
