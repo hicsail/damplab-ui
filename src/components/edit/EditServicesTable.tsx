@@ -410,8 +410,19 @@ export const EditServicesTable: React.FC = () => {
   };
 
   const columns: GridColDef[] = [
+    getActionsColumn({
+      handleDelete: (id) => handleDeletion(id),
+      handleEdit: (id) => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } }),
+      handleCancel: (id) => setRowModesModel({
+        ...rowModesModel,
+        [id]: { mode: GridRowModes.View, ignoreModifications: true }
+      }),
+      handleSave: (id) => handleSave(id),
+      rowModesModel
+    }),
     {
       field: 'name',
+      headerName: 'Name',
       width: 500,
       editable: true
     },
@@ -435,7 +446,7 @@ export const EditServicesTable: React.FC = () => {
     },
     {
       field: 'pricingMode',
-      headerName: 'How price is calculated',
+      headerName: 'How Price Is Calculated',
       width: 220,
       editable: true,
       type: 'singleSelect',
@@ -451,12 +462,13 @@ export const EditServicesTable: React.FC = () => {
     },
     {
       field: 'description',
+      headerName: 'Description',
       width: 500,
       editable: true
     },
     {
       field: 'allowedConnections',
-      headerName: 'Can be combined with',
+      headerName: 'Can Be Combined With',
       width: 500,
       editable: true,
       renderCell: (params) => <ServiceList services={params.row.allowedConnections} />,
@@ -464,6 +476,7 @@ export const EditServicesTable: React.FC = () => {
     },
     {
       field: 'parameters',
+      headerName: 'Parameters',
       width: 340,
       editable: true,
       renderCell: (params) => <Button variant="contained" onClick={() => handleParamViewButton(params)}>View</Button>,
@@ -508,17 +521,7 @@ export const EditServicesTable: React.FC = () => {
           Edit ({params.row.deliverables?.length || 0})
         </Button>
       )
-    },
-    getActionsColumn({
-      handleDelete: (id) => handleDeletion(id),
-      handleEdit: (id) => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } }),
-      handleCancel: (id) => setRowModesModel({
-        ...rowModesModel,
-        [id]: { mode: GridRowModes.View, ignoreModifications: true }
-      }),
-      handleSave: (id) => handleSave(id),
-      rowModesModel
-    })
+    }
   ];
 
   return (
