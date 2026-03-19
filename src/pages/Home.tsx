@@ -12,6 +12,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import WorkHistoryIcon from '@mui/icons-material/WorkHistory';
 import SchoolIcon from '@mui/icons-material/School';
 import MonitorIcon from '@mui/icons-material/Monitor';
+import PeopleIcon from '@mui/icons-material/People';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
@@ -138,6 +139,10 @@ export default function Home() {
               <MenuButton navigateTo="/dashboard">
                 <ViewStreamIcon />
                 Dashboard<br />(See Submitted Jobs)
+              </MenuButton>
+              <MenuButton navigateTo="/customer-management">
+                <PeopleIcon />
+                Customer categories <br /> (Internal/External)
               </MenuButton>
               <MenuButton navigateTo="/edit">
                 <EditIcon />

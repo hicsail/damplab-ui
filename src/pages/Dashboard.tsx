@@ -110,7 +110,7 @@ export default function Dashboard() {
         <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
           Back to Home
         </Button>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Button
             variant="contained"
             color="primary"
@@ -126,6 +126,14 @@ export default function Dashboard() {
             sx={{ textTransform: 'none' }}
           >
             Lab Monitor South
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate('/customer-management')}
+            sx={{ textTransform: 'none' }}
+          >
+            Customer management
           </Button>
         </Stack>
       </Stack>

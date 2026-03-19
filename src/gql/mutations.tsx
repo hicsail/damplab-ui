@@ -406,3 +406,16 @@ export const ADD_BUG_ATTACHMENTS = gql`
     }
   }
 `;
+
+export const SET_USER_KEYCLOAK_CUSTOMER_CATEGORY = gql`
+  mutation SetUserKeycloakCustomerCategory($userId: ID!, $category: CustomerCategory) {
+    setUserKeycloakCustomerCategory(userId: $userId, category: $category) {
+      id
+      username
+      email
+      firstName
+      lastName
+      customerCategory
+    }
+  }
+`;

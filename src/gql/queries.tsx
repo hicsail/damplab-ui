@@ -748,3 +748,16 @@ export const GET_BUG_REPORT_BY_ID = gql`
     }
   }
 `;
+
+export const SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
+  query SearchKeycloakUsersForCustomerManagement($search: String!, $max: Int) {
+    searchKeycloakUsersForCustomerManagement(search: $search, max: $max) {
+      id
+      username
+      email
+      firstName
+      lastName
+      customerCategory
+    }
+  }
+`;

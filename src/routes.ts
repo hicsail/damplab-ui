@@ -27,6 +27,7 @@ export default [
         route("/lab-monitor/:screen", "./pages/LabMonitor.tsx"),
         route("/technician_view/:id", "./pages/TechnicianView.tsx"),
         route("/dashboard", "./pages/Dashboard.tsx"),
+        route("/customer-management", "./pages/CustomerManagement.tsx"),
         route("/dominos", "./pages/Dominos.tsx"),
         route("/elabs", "./pages/ELabs.tsx"),
         route("/kernel", "./pages/Kernel.tsx"),
