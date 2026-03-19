@@ -145,15 +145,36 @@ export const EditServicesTable: React.FC = () => {
 
   const handleDownloadPricingSheet = () => {
     try {
-      const headers = ['id', 'name', 'pricingInternal', 'pricingExternal', 'pricingLegacy'];
+      const headers = [
+        'id',
+        'name',
+        'pricingInternal',
+        'pricingExternalAcademic',
+        'pricingExternalMarket',
+        'pricingExternalNoSalary',
+        'pricingLegacy'
+      ];
       const dataLines = rows.map((row) => {
         const id = row.id ?? '';
         const name = row.name ?? '';
         const pricing = (row as any).pricing ?? {};
         const internalPrice = pricing.internal ?? (row as any).internalPrice ?? '';
-        const externalPrice = pricing.external ?? (row as any).externalPrice ?? '';
+        const externalAcademicPrice =
+          pricing.externalAcademic ?? (row as any).externalAcademicPrice ?? '';
+        const externalMarketPrice =
+          pricing.externalMarket ?? pricing.external ?? (row as any).externalMarketPrice ?? (row as any).externalPrice ?? '';
+        const externalNoSalaryPrice =
+          pricing.externalNoSalary ?? (row as any).externalNoSalaryPrice ?? '';
         const legacyPrice = pricing.legacy ?? (row as any).price ?? '';
-        return [id, name, internalPrice, externalPrice, legacyPrice]
+        return [
+          id,
+          name,
+          internalPrice,
+          externalAcademicPrice,
+          externalMarketPrice,
+          externalNoSalaryPrice,
+          legacyPrice
+        ]
           .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
           .join(',');
       });
@@ -209,13 +230,53 @@ export const EditServicesTable: React.FC = () => {
       const nameIndex = normalizedHeaders.findIndex((h) => h === 'name' || h === 'service name');
       const internalPriceIndex =
         normalizedHeaders.findIndex((h) => h === 'pricinginternal' || h === 'internalprice' || h === 'internal price');
-      const externalPriceIndex =
-        normalizedHeaders.findIndex((h) => h === 'pricingexternal' || h === 'externalprice' || h === 'external price');
+      const externalAcademicPriceIndex =
+        normalizedHeaders.findIndex(
+          (h) =>
+            h === 'pricingexternalacademic' ||
+            h === 'externalacademicprice' ||
+            h === 'external academic price' ||
+            h === 'external customer academic' ||
+            h === 'external customer (academic)'
+        );
+      const externalMarketPriceIndex =
+        normalizedHeaders.findIndex(
+          (h) =>
+            h === 'pricingexternalmarket' ||
+            h === 'externalmarketprice' ||
+            h === 'external market price' ||
+            h === 'pricingexternal' ||
+            h === 'externalprice' ||
+            h === 'external price' ||
+            h === 'external customer market' ||
+            h === 'external customer (market)'
+        );
+      const externalNoSalaryPriceIndex =
+        normalizedHeaders.findIndex(
+          (h) =>
+            h === 'pricingexternalnosalary' ||
+            h === 'externalnosalaryprice' ||
+            h === 'external no salary price' ||
+            h === 'external customer no salary' ||
+            h === 'external customer (no salary)'
+        );
       const priceIndex =
         normalizedHeaders.findIndex((h) => h === 'pricinglegacy' || h === 'price' || h === 'service price' || h === 'legacy price');
 
-      if (idIndex === -1 || nameIndex === -1 || (internalPriceIndex === -1 && externalPriceIndex === -1 && priceIndex === -1)) {
-        setErrorMessage('Spreadsheet must have columns for id, name, and at least one price column (internalPrice/externalPrice/price).');
+      if (
+        idIndex === -1 ||
+        nameIndex === -1 ||
+        (
+          internalPriceIndex === -1 &&
+          externalAcademicPriceIndex === -1 &&
+          externalMarketPriceIndex === -1 &&
+          externalNoSalaryPriceIndex === -1 &&
+          priceIndex === -1
+        )
+      ) {
+        setErrorMessage(
+          'Spreadsheet must have columns for id, name, and at least one price column (internal, external academic, external market, external no salary, or fallback/legacy).'
+        );
         return;
       }
 
@@ -226,15 +287,21 @@ export const EditServicesTable: React.FC = () => {
         const rawId = row[idIndex];
         const rawName = row[nameIndex];
         const rawInternalPrice = internalPriceIndex !== -1 ? row[internalPriceIndex] : undefined;
-        const rawExternalPrice = externalPriceIndex !== -1 ? row[externalPriceIndex] : undefined;
+        const rawExternalAcademicPrice = externalAcademicPriceIndex !== -1 ? row[externalAcademicPriceIndex] : undefined;
+        const rawExternalMarketPrice = externalMarketPriceIndex !== -1 ? row[externalMarketPriceIndex] : undefined;
+        const rawExternalNoSalaryPrice = externalNoSalaryPriceIndex !== -1 ? row[externalNoSalaryPriceIndex] : undefined;
         const rawPrice = priceIndex !== -1 ? row[priceIndex] : undefined;
 
         const id = rawId !== undefined && rawId !== null ? String(rawId).trim() : '';
         const name = rawName !== undefined && rawName !== null ? String(rawName).trim() : '';
         const internalPriceStr =
           rawInternalPrice !== undefined && rawInternalPrice !== null ? String(rawInternalPrice).trim() : '';
-        const externalPriceStr =
-          rawExternalPrice !== undefined && rawExternalPrice !== null ? String(rawExternalPrice).trim() : '';
+        const externalAcademicPriceStr =
+          rawExternalAcademicPrice !== undefined && rawExternalAcademicPrice !== null ? String(rawExternalAcademicPrice).trim() : '';
+        const externalMarketPriceStr =
+          rawExternalMarketPrice !== undefined && rawExternalMarketPrice !== null ? String(rawExternalMarketPrice).trim() : '';
+        const externalNoSalaryPriceStr =
+          rawExternalNoSalaryPrice !== undefined && rawExternalNoSalaryPrice !== null ? String(rawExternalNoSalaryPrice).trim() : '';
         const priceStr = rawPrice !== undefined && rawPrice !== null ? String(rawPrice).trim() : '';
 
         if (!id && !name && !priceStr) {
@@ -248,12 +315,16 @@ export const EditServicesTable: React.FC = () => {
         };
 
         const internalPrice = parseMoney(internalPriceStr);
-        const externalPrice = parseMoney(externalPriceStr);
+        const externalAcademicPrice = parseMoney(externalAcademicPriceStr);
+        const externalMarketPrice = parseMoney(externalMarketPriceStr);
+        const externalNoSalaryPrice = parseMoney(externalNoSalaryPriceStr);
         const price = parseMoney(priceStr);
 
         const hasInvalid =
           (internalPriceStr !== '' && (internalPrice === null || internalPrice < 0)) ||
-          (externalPriceStr !== '' && (externalPrice === null || externalPrice < 0)) ||
+          (externalAcademicPriceStr !== '' && (externalAcademicPrice === null || externalAcademicPrice < 0)) ||
+          (externalMarketPriceStr !== '' && (externalMarketPrice === null || externalMarketPrice < 0)) ||
+          (externalNoSalaryPriceStr !== '' && (externalNoSalaryPrice === null || externalNoSalaryPrice < 0)) ||
           (priceStr !== '' && (price === null || price < 0));
         if (hasInvalid) {
           console.warn('Skipping row with invalid price:', row);
@@ -271,16 +342,32 @@ export const EditServicesTable: React.FC = () => {
             if (internalPriceStr !== '') {
               changes.internalPrice = internalPrice;
             }
-            if (externalPriceStr !== '') {
-              changes.externalPrice = externalPrice;
+            if (externalAcademicPriceStr !== '') {
+              changes.externalAcademicPrice = externalAcademicPrice;
+            }
+            if (externalMarketPriceStr !== '') {
+              changes.externalMarketPrice = externalMarketPrice;
+              changes.externalPrice = externalMarketPrice;
+            }
+            if (externalNoSalaryPriceStr !== '') {
+              changes.externalNoSalaryPrice = externalNoSalaryPrice;
             }
             if (priceStr !== '') {
               changes.price = price;
             }
-            if (internalPriceStr !== '' || externalPriceStr !== '' || priceStr !== '') {
+            if (
+              internalPriceStr !== '' ||
+              externalAcademicPriceStr !== '' ||
+              externalMarketPriceStr !== '' ||
+              externalNoSalaryPriceStr !== '' ||
+              priceStr !== ''
+            ) {
               changes.pricing = {
                 internal: internalPrice,
-                external: externalPrice,
+                external: externalMarketPrice,
+                externalAcademic: externalAcademicPrice,
+                externalMarket: externalMarketPrice,
+                externalNoSalary: externalNoSalaryPrice,
                 legacy: price,
               };
             }
@@ -311,10 +398,16 @@ export const EditServicesTable: React.FC = () => {
           icon: '',
           price,
           internalPrice,
-          externalPrice,
+          externalPrice: externalMarketPrice,
+          externalAcademicPrice,
+          externalMarketPrice,
+          externalNoSalaryPrice,
           pricing: {
             internal: internalPrice,
-            external: externalPrice,
+            external: externalMarketPrice,
+            externalAcademic: externalAcademicPrice,
+            externalMarket: externalMarketPrice,
+            externalNoSalary: externalNoSalaryPrice,
             legacy: price,
           },
           pricingMode: 'SERVICE',

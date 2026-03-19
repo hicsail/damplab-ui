@@ -201,6 +201,29 @@ export default function Checkout() {
       return "[Price Pending Review]";} // handles all 3 cases of price
   }
 
+  const formatParameterValue = (value: unknown): string => {
+    if (Array.isArray(value)) {
+      return value.map((item) => formatParameterValue(item)).join(', ');
+    }
+    if (value === null || value === undefined || value === '') {
+      return '';
+    }
+    if (typeof value === 'object') {
+      const v = value as any;
+      // Pending file metadata object from file parameters during checkout.
+      if (typeof v.filename === 'string' && v.filename.trim() !== '') {
+        return v.filename;
+      }
+      // Uploaded file metadata may be serialized JSON string elsewhere, but if object sneaks through,
+      // still try a readable fallback.
+      if (typeof v.name === 'string' && v.name.trim() !== '') {
+        return v.name;
+      }
+      return '[File attached]';
+    }
+    return String(value);
+  };
+
 
   const groupServicesByLabel = (workflow: WorkflowNode[]) => {
     return workflow.reduce((acc, node) => {
@@ -582,7 +605,7 @@ export default function Checkout() {
                                       color="text.secondary"
                                       sx={{ fontSize: '0.875rem' }}
                                     >
-                                      {param.name}: {param.value}
+                                      {param.name}: {formatParameterValue(param.value)}
                                     </Typography>
                                   ))}
                                   {node.data.pricingMode === 'PARAMETER' && (
