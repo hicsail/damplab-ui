@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react'
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText } from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, Divider, Typography } from '@mui/material';
 import Snackbar   from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon  from '@mui/icons-material/Close';
@@ -218,21 +218,25 @@ export default function ContextTestComponent(props: SidebarProps) {
                 <div>
                     {
                         hazards.includes(activeNode?.data.label) 
-                        ? (<p><GppMaybe style={{color: "grey", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
-                        sequences provided below or produced by the process will undergo a safety screening.</p>)
+                        ? (
+                            <Alert severity="info" icon={<GppMaybe />} sx={{ mb: 1 }}>
+                                Note: For this service, sequences provided below or produced by the process will undergo a safety screening.
+                            </Alert>
+                        )
                         : ""
                     }
-                    <h2>
+                    <Typography variant="h5" sx={{ mb: 1 }}>
                         {activeNode?.data.label}
-                    </h2>
+                    </Typography>
                 </div>
                 <div>
                     {
                         activeNode?.data.description 
-                        ? <p>{activeNode?.data.description}</p>
+                        ? <Typography variant="body2" color="text.secondary">{activeNode?.data.description}</Typography>
                         : null
                     }
                 </div>
+                <Divider sx={{ my: 1.5 }} />
                 {
                     activeNode
                     ? (
@@ -334,7 +338,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                     {
                         // return header with text Allowed Connections if allowedConnections list is not empty
                         activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 
-                        ? <h3>Allowed Connections</h3>
+                        ? <Typography variant="h6" sx={{ mt: 2 }}>Allowed Connections</Typography>
                         : null
                     }
                     {
@@ -391,7 +395,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                                 </Dialog>
                             </>
                         ) 
-                        : <div><br />Drag a node from the left to the canvas to see its properties here.</div>
+                        : <Typography variant="body2" color="text.secondary"><br />Drag a node from the left to the canvas to see its properties here.</Typography>
                     }
                 </div>
                 <div>

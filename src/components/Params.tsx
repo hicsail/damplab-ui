@@ -1,18 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { useFormik } from "formik";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
+  Chip,
   FormControl,
   FormHelperText,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
+  Stack,
   TextField,
   Box,
   Button,
+  Tooltip,
+  Typography,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ParamTableOnForm from "./ParamTableOnForm";
 
 interface ParamFormProps {
@@ -178,16 +187,26 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
     let paramGroups = returnParamGroups(formData);
 
     return (
-      <div 
-      style={{
-        border: "1px solid black",
-        padding: 2,
-      }}>
+      <Stack spacing={1.5}>
         {paramGroups.map((paramGroup: any) => {
+          const requiredCount = paramGroup.parameters.filter((p: any) => p.required && p.paramType !== "result").length;
+          const missingRequiredCount = paramGroup.parameters.filter(
+            (p: any) => p.required && p.paramType !== "result" && !!paramErrors[p.id]
+          ).length;
+
           return (
-            <div key={paramGroup.id}>
-              <h4>{paramGroup.name}</h4>
-              <div className="input-params" style={{ marginLeft: 20 }}>
+            <Accordion key={paramGroup.id} defaultExpanded={missingRequiredCount > 0}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
+                  <Typography variant="subtitle2">{paramGroup.name}</Typography>
+                  {requiredCount > 0 ? <Chip size="small" label={`${requiredCount} required`} /> : null}
+                  {missingRequiredCount > 0 ? (
+                    <Chip size="small" color="warning" label={`${missingRequiredCount} missing`} />
+                  ) : null}
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails>
+              <div className="input-params" style={{ marginLeft: 8 }}>
                 {paramGroup.parameters.map((param: any) => {
                   if (param.paramType !== "result") {
                     if (param.type === "table") {
@@ -244,16 +263,18 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                                       <DeleteForeverSharp fontSize="small" />
                                     </IconButton>
                                   )}
+                                  {idx === 0 && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => formik.setFieldValue(param.id, [...values, ""])}
+                                      aria-label="Add another value"
+                                      sx={{ p: 0.25, ml: 0.25 }}
+                                    >
+                                      <PlusOne fontSize="small" />
+                                    </IconButton>
+                                  )}
                                 </Box>
                               ))}
-                              <IconButton
-                                size="small"
-                                onClick={() => formik.setFieldValue(param.id, [...values, ""])}
-                                aria-label="Add another value"
-                                sx={{ alignSelf: "flex-start", mt: 0.5 }}
-                              >
-                                <PlusOne />
-                              </IconButton>
                             </Box>
                           </Box>
                         </div>
@@ -443,16 +464,18 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                                       <DeleteForeverSharp fontSize="small" />
                                     </IconButton>
                                   )}
+                                  {idx === 0 && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => formik.setFieldValue(param.id, [...values, ""])}
+                                      aria-label="Add another value"
+                                      sx={{ p: 0.25, ml: 0.25 }}
+                                    >
+                                      <PlusOne fontSize="small" />
+                                    </IconButton>
+                                  )}
                                 </Box>
                               ))}
-                              <IconButton
-                                size="small"
-                                onClick={() => formik.setFieldValue(param.id, [...values, ""])}
-                                aria-label="Add another value"
-                                sx={{ alignSelf: "flex-start", mt: 0.5 }}
-                              >
-                                <PlusOne />
-                              </IconButton>
                             </Box>
                           </Box>
                         </div>
@@ -489,10 +512,11 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                   }
                 })}
               </div>
-            </div>
+              </AccordionDetails>
+            </Accordion>
           );
         })}
-      </div>
+      </Stack>
     );
 
   }
@@ -513,28 +537,50 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
 
   return (
     <div>
-      <h3>Parameters</h3>
-      <div className="formik-errors" style={{ marginLeft: 20 }}>
-        <ul style={{ background: "pink", fontSize: 10 }}>
-          {Object.keys(paramErrors).map((key: any) => {
-            let name = activeNode.data.formData.find(
-              (obj: any) => obj.id === key
-            )?.name;
-            return (
-              <li key={key} style={{ position: "relative", left: -25 }}>
-                {name}: {paramErrors[key]}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      <Stack spacing={1} sx={{ mb: 1 }}>
+        <Typography variant="h6">Parameters</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Fill required fields first. Optional fields can be updated anytime before checkout.
+        </Typography>
+        {Object.keys(paramErrors).length > 0 ? (
+          <Alert severity="warning" sx={{ py: 0.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {Object.keys(paramErrors).length} required field(s) still need values.
+            </Typography>
+            <Box component="ul" sx={{ my: 0.5, pl: 2 }}>
+              {Object.keys(paramErrors).slice(0, 6).map((key: any) => {
+                let name = activeNode.data.formData.find((obj: any) => obj.id === key)?.name;
+                return (
+                  <li key={key}>
+                    <Typography variant="caption">
+                      {name}: {paramErrors[key]}
+                    </Typography>
+                  </li>
+                );
+              })}
+              {Object.keys(paramErrors).length > 6 ? (
+                <Typography variant="caption">...and more</Typography>
+              ) : null}
+            </Box>
+          </Alert>
+        ) : (
+          <Alert severity="success" sx={{ py: 0.5 }}>
+            <Typography variant="body2">All required fields are complete.</Typography>
+          </Alert>
+        )}
+      </Stack>
       <form onSubmit={formik.handleSubmit}>
         {
           // check if there are any param groups and render them
           activeNode.data.paramGroups &&
           renderParamGroups(activeNode.data)
         }
-        <div className="input-params" style={{ marginLeft: 20 }}>
+        <Accordion defaultExpanded sx={{ mt: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2">General Parameters</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+        <div className="input-params" style={{ marginLeft: 8 }}>
           {activeNode.data.formData.map((param: any) => {
             if (param.paramType !== "result" && !param.paramGroupId) {
               if (param.type === "table") {
@@ -612,6 +658,7 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                       }
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
+                      error={Boolean(formik.errors[param.id])}
                     >
                       {param.options.map((option: any) => (
                         <MenuItem key={option.id} value={option.id}>
@@ -620,7 +667,9 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                       ))}
                     </Select>
                     <FormHelperText>
-                      {param.description ? param.description : null}
+                      {formik.errors[param.id]
+                        ? String(formik.errors[param.id])
+                        : (param.description ? param.description : null)}
                     </FormHelperText>
                   </FormControl>
                 );
@@ -668,16 +717,18 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                                 <DeleteForeverSharp fontSize="small" />
                               </IconButton>
                             )}
+                            {idx === 0 && (
+                              <IconButton
+                                size="small"
+                                onClick={() => formik.setFieldValue(param.id, [...values, ""])}
+                                aria-label="Add another value"
+                                sx={{ p: 0.25, ml: 0.25 }}
+                              >
+                                <PlusOne fontSize="small" />
+                              </IconButton>
+                            )}
                           </Box>
                         ))}
-                        <IconButton
-                          size="small"
-                          onClick={() => formik.setFieldValue(param.id, [...values, ""])}
-                          aria-label="Add another value"
-                          sx={{ alignSelf: "flex-start", mt: 0.5 }}
-                        >
-                          <PlusOne />
-                        </IconButton>
                       </Box>
                     </Box>
                   </div>
@@ -786,16 +837,18 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                                 <DeleteForeverSharp fontSize="small" />
                               </IconButton>
                             )}
+                            {idx === 0 && (
+                              <IconButton
+                                size="small"
+                                onClick={() => formik.setFieldValue(param.id, [...values, ""])}
+                                aria-label="Add another value"
+                                sx={{ p: 0.25, ml: 0.25 }}
+                              >
+                                <PlusOne fontSize="small" />
+                              </IconButton>
+                            )}
                           </Box>
                         ))}
-                        <IconButton
-                          size="small"
-                          onClick={() => formik.setFieldValue(param.id, [...values, ""])}
-                          aria-label="Add another value"
-                          sx={{ alignSelf: "flex-start", mt: 0.5 }}
-                        >
-                          <PlusOne />
-                        </IconButton>
                       </Box>
                     </Box>
                   </div>
@@ -823,6 +876,8 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       sx={{ mt: 3, width: "26ch" }}
+                      error={Boolean(formik.errors[param.id])}
+                      helperText={formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
                       InputLabelProps={{ shrink: true }}
                     />
                   </div>
@@ -832,15 +887,23 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
             }
           })}
         </div>
-        <div className="result-parms" style={{ marginLeft: 20 }}>
+          </AccordionDetails>
+        </Accordion>
+        <Accordion sx={{ mt: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2">Result Parameters</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+        <div className="result-parms" style={{ marginLeft: 8 }}>
           {
             // check if there are any result params and display info if there are
             activeNode.data.formData.find(
               (obj: any) => obj.paramType === "result"
             ) && (
-              <div>
-                Result Parameters
-                <IconButton
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <Typography variant="body2">Result Parameters</Typography>
+                <Tooltip title="Result parameters use outputs from previous steps by default. Uncheck to provide your own value.">
+                <IconButton size="small"
                   onClick={() => {
                     alert(
                       "Result parameteres are results of experiments that were previously run in the workflow. By default we will use their outputs, if you would like to specify a different input, you can deselect and enter what we should use."
@@ -849,7 +912,8 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                 >
                   <InfoOutlinedIcon />
                 </IconButton>
-              </div>
+                </Tooltip>
+              </Box>
             )
           }
           {activeNode.data.formData.map((param: any) => {
@@ -889,6 +953,8 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
             }
           })}
         </div>
+          </AccordionDetails>
+        </Accordion>
         {/* Now a dedicated field in each service (should always accompany other params) */}
         {/* <div className="add-instructs" style={{marginLeft: 20, marginBottom: 10}}>
                     <TextField multiline sx={{ mt: 3, width: '26ch' }} label="Additional Instructions" rows={3}
