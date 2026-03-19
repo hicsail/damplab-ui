@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, useMemo } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from "react-router";
 // someday: import from @apollo/client once Apollo Client 4 is out (which will address ESM issues) - see discussion at
 // https://github.com/apollographql/apollo-client/issues/9976#issuecomment-1768446694
@@ -103,24 +103,30 @@ export default function Root() {
   const userContext = useContext(UserContext);
 
   // Create Apollo Client with auth link that uses token from context
-  const httpLink = createHttpLink({
-    uri: import.meta.env.VITE_BACKEND,
-  });
+  const httpLink = useMemo(() => {
+    return createHttpLink({
+      uri: import.meta.env.VITE_BACKEND,
+    });
+  }, []);
 
-  const authLink = setContext(async (_, { headers }) => {
-    const token = await userContext.userProps?.getAccessToken();
-    return {
-      headers: {
-        ...headers,
-        authorization: token ? `Bearer ${token}` : "",
-      },
-    };
-  });
+  const authLink = useMemo(() => {
+    return setContext(async (_, { headers }) => {
+      const token = await userContext.userProps?.getAccessToken();
+      return {
+        headers: {
+          ...headers,
+          authorization: token ? `Bearer ${token}` : "",
+        },
+      };
+    });
+  }, [userContext.userProps]);
 
-  const client = new ApolloClient({
-    link: logLink.concat(authLink.concat(httpLink)),
-    cache: new InMemoryCache(),
-  });
+  const client = useMemo(() => {
+    return new ApolloClient({
+      link: logLink.concat(authLink.concat(httpLink)),
+      cache: new InMemoryCache(),
+    });
+  }, [authLink, httpLink]);
 
   // initial load of services and bundles
   useEffect(() => {
