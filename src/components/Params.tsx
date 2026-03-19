@@ -121,16 +121,15 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
     return errors;
   };
 
-  // copy formik values to activeNode.data
-  const copyFormikValuesToNodeData = (values: any) => {
-    activeNode.data.formData.forEach((obj: any) => {
-      if (obj.paramType === "result") {
-        obj.resultParamValue = values[`resultParamValue${obj.id}`];
+  const buildUpdatedFormData = (values: any) => {
+    return activeNode.data.formData.map((obj: any) => {
+      const updated = { ...obj };
+      if (updated.paramType === "result") {
+        updated.resultParamValue = values[`resultParamValue${updated.id}`];
       }
-      obj.value = values[obj.id];
+      updated.value = values[updated.id];
+      return updated;
     });
-    // Now a dedicated field in each service (should always accompany other params)
-    // activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
   };
 
   const toPendingFiles = (files: FileList | null): PendingParamFile[] => {
@@ -150,9 +149,7 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
     initialValues: initValues(),
     enableReinitialize: true,
     validate: validate,
-    onSubmit: (values: any) => {
-      copyFormikValuesToNodeData(values);
-    },
+    onSubmit: () => {},
   });
 
   const returnParamGroups = (activeNodeData: any) => {
@@ -525,10 +522,20 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
 
   // update values to active node form data and validate
   useEffect(() => {
-    copyFormikValuesToNodeData(formik.values);
-    // Parameter editing mutates nested node data; trigger a nodes array update so
-    // autosave/persistence effects can observe changes and write to localStorage.
-    setNodes((nds: any) => [...nds]);
+    const updatedFormData = buildUpdatedFormData(formik.values);
+    setNodes((nds: any[]) =>
+      nds.map((node: any) =>
+        node.id === activeNode.id
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                formData: updatedFormData,
+              },
+            }
+          : node
+      )
+    );
     const errors = validate(formik.values);
     if (Object.keys(errors).length > 0) {
       formik.setErrors(errors);
