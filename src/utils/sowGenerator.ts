@@ -465,7 +465,9 @@ export const generateSOWData = (
     sowTitle,
     jobId: jobData.id,
     jobName: jobData.name,
-    clientName: technicianInputs.clientProjectManager || jobData.username || 'Client',
+    // clientName should prefer the job's `name` (client name). Historically we used `clientProjectManager`,
+    // so keep it as a fallback only.
+    clientName: jobData.name || technicianInputs.clientProjectManager || jobData.username || 'Client',
     clientEmail: jobData.email,
     clientInstitution: jobData.institute,
     clientAddress: jobData.institute, // Could be enhanced with address lookup

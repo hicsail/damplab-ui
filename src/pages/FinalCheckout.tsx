@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useContext } from 'react';
 import { useMutation } from "@apollo/client";
-import { ADD_JOB_ATTACHMENTS, CREATE_JOB, CREATE_JOB_ATTACHMENT_UPLOAD_URLS } from "../gql/mutations";
+import { ADD_JOB_ATTACHMENTS, CREATE_JOB, CREATE_JOB_ATTACHMENT_UPLOAD_URLS, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS } from "../gql/mutations";
 import { CanvasContext } from "../contexts/Canvas";
 import { useLocation, useNavigate } from 'react-router';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
@@ -35,6 +35,30 @@ interface WorkflowCost {
   cost: number;
   // Add other properties if they exist
 }
+
+type PendingParamFile = {
+  __kind: 'pending-file';
+  localId: string;
+  file: File;
+  filename: string;
+  contentType: string;
+  size: number;
+};
+
+type UploadedParamFile = {
+  filename: string;
+  key: string;
+  contentType: string;
+  size: number;
+  uploadedAt: string;
+};
+
+const isPendingParamFile = (value: unknown): value is PendingParamFile =>
+  !!value &&
+  typeof value === 'object' &&
+  (value as PendingParamFile).__kind === 'pending-file' &&
+  value instanceof Object &&
+  (value as PendingParamFile).file instanceof File;
 
 interface WorkflowNode {
   id: string;
@@ -104,6 +128,7 @@ export default function FinalCheckout() {
   const [createJob, { loading: jobLoading }] = useMutation(CREATE_JOB);
   const [createAttachmentUploadUrls] = useMutation(CREATE_JOB_ATTACHMENT_UPLOAD_URLS);
   const [addJobAttachments] = useMutation(ADD_JOB_ATTACHMENTS);
+  const [createWorkflowParameterUploadUrls] = useMutation(CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS);
 
   useEffect(() => {
     // Guard: redirect if didn't come from previous page/state parsed
@@ -171,11 +196,149 @@ const handleSubmitJob = async () => {
   const workflows = location.state?.orderSummary?.workflows || [];
 
   try {
+    const token = await userContext.userProps?.getAccessToken();
+    const workflowsWithUploadedParamFiles = await (async () => {
+      const clonedWorkflows = workflows.map((workflow: any) => {
+        const nodes = (Array.isArray(workflow) ? workflow : [workflow]).map((node: any) => ({
+          ...node,
+          data: {
+            ...node.data,
+            formData: Array.isArray(node.data?.formData)
+              ? node.data.formData.map((entry: any) => ({ ...entry }))
+              : []
+          }
+        }));
+        return Array.isArray(workflow) ? nodes : nodes[0];
+      });
+
+      const filesToUpload: Array<{
+        clientToken: string;
+        file: File;
+        contentType: string;
+        size: number;
+      }> = [];
+
+      const addFileForUpload = (file: PendingParamFile): string => {
+        const clientToken = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+        filesToUpload.push({
+          clientToken,
+          file: file.file,
+          contentType: file.contentType || 'application/octet-stream',
+          size: file.size
+        });
+        return clientToken;
+      };
+
+      const fileTokenLookup = new Map<string, string | string[]>();
+
+      clonedWorkflows.forEach((workflow: any) => {
+        const nodes = Array.isArray(workflow) ? workflow : [workflow];
+        nodes.forEach((node: any) => {
+          const parameters = Array.isArray(node.data?.parameters) ? node.data.parameters : [];
+          const fileParamIds = new Set(
+            parameters.filter((p: any) => p?.type === 'file' && typeof p.id === 'string').map((p: any) => p.id)
+          );
+          (node.data.formData || []).forEach((entry: any) => {
+            if (!fileParamIds.has(entry.id)) return;
+            if (Array.isArray(entry.value)) {
+              const tokens = entry.value.filter((v: any) => isPendingParamFile(v)).map((f: PendingParamFile) => addFileForUpload(f));
+              if (tokens.length > 0) {
+                fileTokenLookup.set(`${node.id}:${entry.id}`, tokens);
+              }
+              return;
+            }
+            if (isPendingParamFile(entry.value)) {
+              const token = addFileForUpload(entry.value);
+              fileTokenLookup.set(`${node.id}:${entry.id}`, token);
+            }
+          });
+        });
+      });
+
+      if (filesToUpload.length === 0) {
+        return clonedWorkflows;
+      }
+
+      const uploadMetaResult = await createWorkflowParameterUploadUrls({
+        variables: {
+          files: filesToUpload.map((f) => ({
+            clientToken: f.clientToken,
+            filename: f.file.name,
+            contentType: f.contentType,
+            size: f.size
+          }))
+        },
+        context: {
+          headers: {
+            authorization: token ? `Bearer ${token}` : "",
+          },
+        },
+      });
+      const uploads: Array<{
+        clientToken: string;
+        filename: string;
+        uploadUrl: string;
+        key: string;
+        contentType: string;
+        size: number;
+      }> = uploadMetaResult.data?.createWorkflowParameterUploadUrls ?? [];
+      const uploadByToken = new Map(uploads.map((u) => [u.clientToken, u]));
+
+      await Promise.all(
+        filesToUpload.map(async (f) => {
+          const upload = uploadByToken.get(f.clientToken);
+          if (!upload) throw new Error(`Upload URL not found for file token ${f.clientToken}`);
+          const response = await fetch(upload.uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': upload.contentType || 'application/octet-stream',
+            },
+            body: f.file,
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to upload parameter file ${f.file.name}`);
+          }
+        })
+      );
+
+      const uploadedMetaByToken = new Map<string, UploadedParamFile>();
+      uploads.forEach((u) => {
+        uploadedMetaByToken.set(u.clientToken, {
+          filename: u.filename,
+          key: u.key,
+          contentType: u.contentType,
+          size: u.size,
+          uploadedAt: new Date().toISOString()
+        });
+      });
+
+      clonedWorkflows.forEach((workflow: any) => {
+        const nodes = Array.isArray(workflow) ? workflow : [workflow];
+        nodes.forEach((node: any) => {
+          (node.data.formData || []).forEach((entry: any) => {
+            const tokenOrTokens = fileTokenLookup.get(`${node.id}:${entry.id}`);
+            if (!tokenOrTokens) return;
+            if (Array.isArray(tokenOrTokens)) {
+              entry.value = tokenOrTokens
+                .map((t) => uploadedMetaByToken.get(t))
+                .filter(Boolean)
+                .map((meta) => JSON.stringify(meta));
+            } else {
+              const meta = uploadedMetaByToken.get(tokenOrTokens);
+              entry.value = meta ? JSON.stringify(meta) : null;
+            }
+          });
+        });
+      });
+
+      return clonedWorkflows;
+    })();
+
     const data = {
       name: formData.jobName,
       institute: formData.institute,
       notes: formData.notes, // Optional
-      workflows: workflows.map((workflow: any) => ({
+      workflows: workflowsWithUploadedParamFiles.map((workflow: any) => ({
         name: `Workflow-${workflow.id || workflow[0]?.id}`,
         nodes: transformNodesToGQL(Array.isArray(workflow) ? workflow : [workflow]),
         edges: transformEdgesToGQL(
@@ -195,7 +358,6 @@ const handleSubmitJob = async () => {
       showSpinner: true
     });
 
-    const token = await userContext.userProps?.getAccessToken();
     const jobResult = await createJob({ 
       variables: { createJobInput: data },
       context: {

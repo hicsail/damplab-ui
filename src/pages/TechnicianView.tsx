@@ -8,13 +8,14 @@ import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIc
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 
-import { GET_JOB_BY_ID, }         from '../gql/queries';
+import { GET_JOB_BY_ID, GET_SOW_BY_JOB_ID }         from '../gql/queries';
 import { UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 
 import WorkflowStepper            from '../components/WorkflowStepper';
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import JobPDFDocument             from '../components/JobPDFDocument';
+import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SOWGeneratorModal          from '../components/SOWGeneratorModal';
 import { SOWViewer }              from '../components/SOWViewer';
 import { CommentsSection }        from '../components/CommentsSection';
@@ -35,6 +36,7 @@ export default function TechnicianView() {
     const [jobNotes, setJobNotes] = useState('');
     const [workflows, setWorklows]            = useState([]);  // ▶ URLSearchParams {}
     const [sowData, setSowData] = useState<any>(null);
+    const [sowFullData, setSowFullData] = useState<any>(null);
     const [attachments, setAttachments] = useState<any[]>([]);
 
     const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
@@ -59,6 +61,15 @@ export default function TechnicianView() {
         onError: (error: any) => {
             // Error handled by error state
         }
+    });
+
+    const { data: sowByJobIdResult, loading: sowLoading } = useQuery(GET_SOW_BY_JOB_ID, {
+        variables: { jobId: id as string },
+        skip: !id,
+        fetchPolicy: 'network-only',
+        onCompleted: (result) => {
+            setSowFullData(result?.sowByJobId ?? null);
+        },
     });
 
     const [acceptWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
@@ -107,6 +118,39 @@ export default function TechnicianView() {
 
 
     const [submittedWorkflows, setSubmittedWorkflows] = useState<any>([]);
+
+    const getParameterFiles = (): Array<{ label: string; filename: string; url?: string }> => {
+        const files: Array<{ label: string; filename: string; url?: string }> = [];
+        workflows.forEach((workflow: any) => {
+            (workflow?.nodes ?? []).forEach((node: any) => {
+                const serviceParams = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
+                const fileParamMap = new Map(
+                    serviceParams
+                        .filter((p: any) => p && p.type === 'file' && typeof p.id === 'string')
+                        .map((p: any) => [p.id, p.name ?? p.id])
+                );
+                if (!fileParamMap.size) return;
+
+                (node?.formData ?? []).forEach((entry: any) => {
+                    if (!fileParamMap.has(entry?.id)) return;
+                    const paramLabel = fileParamMap.get(entry.id);
+                    const rawValues = Array.isArray(entry.value) ? entry.value : [entry.value];
+                    rawValues.forEach((raw: any) => {
+                        const parsed = typeof raw === 'string' ? (() => {
+                            try { return JSON.parse(raw); } catch { return null; }
+                        })() : raw;
+                        if (!parsed || typeof parsed !== 'object' || !parsed.filename) return;
+                        files.push({
+                            label: `${node.label} - ${paramLabel}`,
+                            filename: parsed.filename,
+                            url: parsed.url
+                        });
+                    });
+                });
+            });
+        });
+        return files;
+    };
 
     // useEffect(() => {
     //     console.log(fetch('https://plasmapper.ca/api/features', {
@@ -238,6 +282,27 @@ export default function TechnicianView() {
                     >
                         {sowData ? 'View / Edit SOW' : 'Generate SOW'}
                     </Button>
+                    <Button
+                        color={sowFullData ? 'primary' : 'secondary'}
+                        variant="contained"
+                        startIcon={<PictureAsPdfIcon />}
+                        sx={{ mr: 1 }}
+                        disabled={!sowFullData || sowLoading}
+                    >
+                        <PDFDownloadLink
+                            document={
+                                <JobInvoiceDocument
+                                    jobId={id as string}
+                                    jobName={jobName}
+                                    customerCategory={jobData?.customerCategory ?? undefined}
+                                    sow={sowFullData}
+                                />
+                            }
+                            fileName={`Invoice-${id}.pdf`}
+                        >
+                            {({ loading }) => (loading ? 'Loading Invoice...' : 'Generate Invoice')}
+                        </PDFDownloadLink>
+                    </Button>
                     <Button 
                         variant="contained"
                         color="error"
@@ -289,6 +354,29 @@ export default function TechnicianView() {
                                                 ? new Date(att.uploadedAt).toLocaleString()
                                                 : undefined
                                         }
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Box>
+                )}
+                {getParameterFiles().length > 0 && (
+                    <Box sx={{ mx: 3, my: 2 }}>
+                        <Typography variant="h6" sx={{ mb: 1 }}>Parameter Files</Typography>
+                        <List dense>
+                            {getParameterFiles().map((f, idx) => (
+                                <ListItem key={`${f.label}-${f.filename}-${idx}`} sx={{ pl: 0 }}>
+                                    <ListItemText
+                                        primary={
+                                            f.url ? (
+                                                <MuiLink href={f.url} target="_blank" rel="noopener noreferrer">
+                                                    {f.filename}
+                                                </MuiLink>
+                                            ) : (
+                                                f.filename
+                                            )
+                                        }
+                                        secondary={f.label}
                                     />
                                 </ListItem>
                             ))}

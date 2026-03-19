@@ -40,6 +40,19 @@ export const ADD_JOB_ATTACHMENTS = gql`
   }
 `;
 
+export const CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS = gql`
+  mutation CreateWorkflowParameterUploadUrls($files: [WorkflowParameterFileUploadRequest!]!) {
+    createWorkflowParameterUploadUrls(files: $files) {
+      clientToken
+      filename
+      uploadUrl
+      key
+      contentType
+      size
+    }
+  }
+`;
+
 // Template mutations
 export const CREATE_TEMPLATE = gql`
     mutation CreateTemplate($input: CreateTemplateInput!) {
