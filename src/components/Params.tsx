@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useFormik } from "formik";
 import {
   Accordion,
@@ -23,6 +23,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ParamTableOnForm from "./ParamTableOnForm";
+import { CanvasContext } from "../contexts/Canvas";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -46,6 +47,7 @@ const isPendingParamFile = (value: unknown): value is PendingParamFile =>
 
 export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
+  const { setNodes } = useContext(CanvasContext);
 
   // Backend may return formData with value as array for multi-value params without allowMultipleValues set
   const isMultiValueParam = (param: any) =>
@@ -524,6 +526,9 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
   // update values to active node form data and validate
   useEffect(() => {
     copyFormikValuesToNodeData(formik.values);
+    // Parameter editing mutates nested node data; trigger a nodes array update so
+    // autosave/persistence effects can observe changes and write to localStorage.
+    setNodes((nds: any) => [...nds]);
     const errors = validate(formik.values);
     if (Object.keys(errors).length > 0) {
       formik.setErrors(errors);

@@ -59,6 +59,8 @@ import { CircularProgress } from "@mui/material";
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './styles/themes';
 
+const CANVAS_AUTOSAVE_KEY = "canvas:autosave";
+
 export function HydrateFallback() {
     return <CircularProgress />;
 }
@@ -101,6 +103,23 @@ export default function Root() {
   const [hazards, setHazards] = useState(Array<string>);
 
   const userContext = useContext(UserContext);
+
+  // Restore autosaved canvas once on app load.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CANVAS_AUTOSAVE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const savedNodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
+      const savedEdges = Array.isArray(parsed?.edges) ? parsed.edges : [];
+      if (savedNodes.length > 0 || savedEdges.length > 0) {
+        setNodes(savedNodes as any);
+        setEdges(savedEdges as any);
+      }
+    } catch (error) {
+      console.warn("Failed to restore autosaved canvas", error);
+    }
+  }, []);
 
   // Create Apollo Client with auth link that uses token from context
   const httpLink = useMemo(() => {
@@ -154,6 +173,26 @@ export default function Root() {
     // Matches to 'activeNode?.data.label in RightSideBar
     setHazards(["Gibson Assembly", "Modular Cloning"]);
   }, []);
+
+  // Persist canvas changes with a small debounce to avoid frequent writes during drag.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(
+          CANVAS_AUTOSAVE_KEY,
+          JSON.stringify({
+            nodes,
+            edges,
+            updatedAt: new Date().toISOString(),
+          })
+        );
+      } catch (error) {
+        console.warn("Failed to autosave canvas", error);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [nodes, edges]);
 
   return (
     <ApolloProvider client={client}>
