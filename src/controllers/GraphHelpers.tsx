@@ -3,7 +3,6 @@ import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents'
 import { NodeParameter } from '../types/CanvasTypes';
 import { services } from '../data/services';
 import { bundles as bundleServiceOrders } from '../data/bundles';
-import { services as serviceNames } from '../data/services';
 
 
 export const getServiceFromId = (services: any, id: string) => {
@@ -32,10 +31,14 @@ export const isValidConnection = (services: any, nodes: any, sourceId: any, targ
 }
 
 export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, service: any, setNodes: any, setEdges: any, sourcePosition: any, setActiveComponentId: any) => {
+    if (!service) {
+        console.warn('Skipping undefined service while adding node to canvas');
+        return sourceId;
+    }
     
     const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
     const nodeId = Math.random().toString(36).substring(2, 9);  // Sufficient variance?
-    const formData: NodeParameter[] = generateFormDataFromParams(service.parameters, nodeId);
+    const formData: NodeParameter[] = generateFormDataFromParams(service.parameters ?? [], nodeId);
     
     const nodeData = {
         id                    : nodeId,
@@ -177,21 +180,42 @@ export const transformEdgesToGQL = (edges: any) => {
 }
 
 
-export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: string[] | undefined, setNodes: any, setEdges: any) => {
+export const addNodesAndEdgesFromServiceIds = (
+    services: any[],
+    serviceIds: string[] | undefined,
+    setNodes: any,
+    setEdges: any,
+    dropPosition?: { x: number; y: number }
+) => {
+    const inputServiceIds = serviceIds ?? [];
+    const validServiceIds = inputServiceIds.filter((serviceId) => {
+        const exists = !!getServiceFromId(services, serviceId);
+        if (!exists) {
+            console.warn(`Skipping unknown service id in bundle drop: ${serviceId}`);
+        }
+        return exists;
+    });
 
-    // loop over serviceIds
+    if (validServiceIds.length === 0) {
+        console.warn('No valid services found for bundle/service insertion');
+        return;
+    }
+
+    // loop over valid serviceIds
     let previousNodeId : any = null;
-    let baseX = 0;
-    let baseY = 0;
+    let baseX = dropPosition?.x ?? 0;
+    let baseY = dropPosition?.y ?? 0;
     
-    serviceIds?.forEach((serviceId: string, index: number) => {
+    validServiceIds.forEach((serviceId: string, index: number) => {
         // get service from serviceId
         const service = getServiceFromId(services, serviceId);
         // if index === 0, add node to canvas with edge
         if (index === 0) {
             // calculate random position on canvas
-            baseX = Math.floor(Math.random() * 1000);
-            baseY = Math.floor(Math.random() * 1);
+            if (!dropPosition) {
+                baseX = Math.floor(Math.random() * 1000);
+                baseY = Math.floor(Math.random() * 1);
+            }
             const sourcePosition = { x: baseX, y: baseY};
             previousNodeId = addNodeToCanvasWithEdge(services, 'source', service, setNodes, setEdges, sourcePosition, null);
         } else {
@@ -203,17 +227,32 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
 }
 
 // TODO: Change bundle data structure to preserve service order!  Needing to check bundles.tsx just to get the correct service order...
-export const addNodesAndEdgesFromBundle = (bundle: any, services: any, setNodes: any, setEdges: any) => {
-    // get serviceIds from bundle
-    const bundleServices = bundleServiceOrders.find(b => b.label == bundle.label)?.services;
-    
-    const bundleServiceNames = bundleServices?.map(service => serviceNames.find(s => s.id === service)?.name);
-    
-    const serviceIds = bundleServiceNames?.map(service => bundle.services.find((s: any) => s.name === service)?.id ?? '');
-    
-    // console.log('test: ', test);
-    // const serviceIds = bundle.services.map((service: any) => service.id);
-    addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges);
+export const addNodesAndEdgesFromBundle = (
+    bundle: any,
+    services: any,
+    setNodes: any,
+    setEdges: any,
+    dropPosition?: { x: number; y: number }
+) => {
+    // Prefer canonical bundle ordering from static bundle config.
+    // Fall back to runtime bundle service references when needed.
+    const canonicalBundle = bundleServiceOrders.find((b) => b.id === bundle.id || b.label === bundle.label);
+    let serviceIds: string[] = [];
+
+    if (canonicalBundle?.services?.length) {
+        serviceIds = canonicalBundle.services;
+    } else if (Array.isArray(bundle.services)) {
+        serviceIds = bundle.services
+            .map((s: any) => (typeof s === 'string' ? s : s?.id))
+            .filter((id: any) => typeof id === 'string' && id.length > 0);
+    }
+
+    if (serviceIds.length === 0) {
+        console.warn(`Unable to resolve service ids for bundle "${bundle?.label ?? bundle?.id ?? 'unknown'}"`);
+        return;
+    }
+
+    addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges, dropPosition);
 }
 
 export const paramsFilledOnNode = (node: any) : Boolean => {

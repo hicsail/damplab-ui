@@ -6,7 +6,7 @@ import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOpt
 import 'reactflow/dist/style.css';
 
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
-import { isValidConnection }                            from '../controllers/GraphHelpers';
+import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
 import { addNodesAndEdgesFromServiceIdsAlt }            from '../controllers/ResubmissionHelpers';
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
@@ -65,12 +65,20 @@ export default function MainFlow() {
 
         event.preventDefault();
 
-        let type = event.dataTransfer.getData('application/reactflow');
-            type = JSON.parse(type);
-        
-        const serviceId = type.id
-        const name      = type.name;
-        
+        const rawType = event.dataTransfer.getData('application/reactflow');
+        if (!rawType) {
+            return;
+        }
+        let parsed: any;
+        try {
+            parsed = JSON.parse(rawType);
+        } catch {
+            return;
+        }
+        const isWrappedPayload = parsed && typeof parsed === 'object' && 'itemType' in parsed && 'payload' in parsed;
+        const itemType = isWrappedPayload ? parsed.itemType : 'service';
+        const type = isWrappedPayload ? parsed.payload : parsed;
+
         // check if the dropped element is valid
         if (typeof type === 'undefined' || !type) {
             return;
@@ -80,6 +88,14 @@ export default function MainFlow() {
             x: event.clientX,
             y: event.clientY,
         });
+
+        if (itemType === 'bundle') {
+            addNodesAndEdgesFromBundle(type, services, setNodes, setEdges, position);
+            return;
+        }
+
+        const serviceId = type.id;
+        const name      = type.name;
 
         const nodeId = Math.random().toString(36).substring(2, 9);
         setActiveComponentId(nodeId);
