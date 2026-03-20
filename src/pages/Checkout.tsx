@@ -19,7 +19,7 @@ import {
   Box,
   Divider,
   Button,
-  Modal,
+  IconButton,
   List,
   ListItem,
   ListItemIcon,
@@ -33,6 +33,7 @@ import {
 
 import CircleIcon from '@mui/icons-material/Circle';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import { CanvasContext } from "../contexts/Canvas";
 import { UserContext, UserContextProps } from "../contexts/UserContext";
@@ -109,8 +110,6 @@ export default function Checkout() {
   const rawWorkflows = getWorkflowsFromGraph(val.nodes, val.edges) || [];
 
   const [workflows, setWorkflows] = useState<WorkflowNode[][]>(rawWorkflows);
-  const [open, setOpen] = useState(false);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<number | null>(null);
 
   useEffect(() => {
     if (workflows && workflows.length > 0) {
@@ -131,16 +130,6 @@ export default function Checkout() {
   }, [workflows]);
   
 
-
-  const handleOpen = (index: number) => {
-    setSelectedWorkflow(index);
-    setOpen(true);
-   };
-
-  const handleClose = () => {
-    setOpen(false);
-    setSelectedWorkflow(null);
-   }
 
   const handleEditJob = () => { navigate('/canvas'); };
 
@@ -474,61 +463,15 @@ export default function Checkout() {
             </Typography>
 
             <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                size="medium"
-                variant="outlined"
-                color="primary"
-                onClick={() => handleOpen(index)}
-              >
-                Review
-              </Button>
-              <Button
-                size="medium"
-                variant="outlined"
+              <IconButton
+                aria-label={`Delete workflow ${index + 1}`}
                 color="error"
                 onClick={() => handleRemoveWorkflow(index)}
+                sx={{ border: 1, borderColor: 'error.main', borderRadius: 1 }}
               >
-                Remove
-              </Button>
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
             </Box>
-
-            {/* Review Modal */}
-            <Modal
-              open={open}
-              onClose={handleClose}
-              aria-labelledby="workflow-review-modal"
-            >
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  width: '80%',
-                  height: '80vh',
-                  bgcolor: 'background.paper',
-                  boxShadow: 24,
-                  p: 4,
-                  borderRadius: 2,
-                  overflow: 'auto'
-                }}
-              >
-                <Button
-                  onClick={handleClose}
-                  sx={{
-                    position: 'absolute',
-                    top: 20,
-                    right: 20
-                  }}
-                >
-                  Close
-                </Button>
-
-                <Typography variant="h6">
-                  Review Workflow {selectedWorkflow !== null ? selectedWorkflow + 1 : ""}
-                </Typography>
-              </Box>
-            </Modal>
           </Box>
 
           <Divider sx={{ my: 2}}/>
