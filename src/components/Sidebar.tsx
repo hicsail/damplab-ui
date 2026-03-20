@@ -300,17 +300,25 @@ export default () => {
               // TODO: Change bundle data structure to preserve service order!  Needing to check bundles.tsx just to get the correct service order...
               filteredBundles.map((bundle: any) => {
                 return (
-                  <Paper key={bundle.id} title={bundle.label}
-                  style={buttonElementStyle} className="dndnode output" 
+                  <Paper
+                  key={bundle.id}
+                  title={bundle.label}
+                  style={buttonElementStyle}
+                  className="dndnode output"
                   variant="outlined"
-                  sx={{ '&:hover': { boxShadow: 2, borderColor: 'primary.main' } }}
-                  onDragStart={(event) => onDragStart(event, { itemType: 'bundle', payload: bundle })} draggable>
+                  sx={{
+                    width: 180,
+                    borderRadius: 1,
+                    '&:hover': { boxShadow: 2, borderColor: 'primary.main' }
+                  }}
+                  onDragStart={(event) => onDragStart(event, { itemType: 'bundle', payload: bundle })}
+                  draggable
+                  >
                     <Button
-                    variant="outlined"
+                    variant="text"
                     title={bundle.label}
                     sx={{
-                      boxShadow: 2,
-                      width: 180,
+                      width: '100%',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -323,6 +331,8 @@ export default () => {
                       lineHeight: 1.2,
                       py: 1,
                       cursor: 'grab',
+                      border: 'none',
+                      boxShadow: 'none',
                     }}
                     onClick={() => addNodesAndEdgesFromBundle(bundle, services, setNodes, setEdges)}>
                       <div>

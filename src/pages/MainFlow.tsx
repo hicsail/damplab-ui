@@ -2,8 +2,9 @@ import { useState, useCallback, useRef, useEffect, useContext } from 'react';
 import { useParams } from 'react-router';
 import { useApolloClient, useMutation } from '@apollo/client';
 import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOptions, 
-                    applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection } from 'reactflow';
+                    applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection, Panel } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { Button } from '@mui/material';
 
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
@@ -120,6 +121,14 @@ export default function MainFlow() {
         setNodes((nds: any) => nds.concat(newNode));
     }, [reactFlowInstance, nodes]);
 
+    const handleClearCanvas = () => {
+        if (window.confirm('Clear all nodes and connections from the canvas?')) {
+            setNodes([]);
+            setEdges([]);
+            setActiveComponentId("");
+        }
+    };
+
     // TODO: Need to finish job status update
     const [updateJobMutation] = useMutation(MUTATE_JOB_STATE, {
         variables: { ID: id, State: 'SUBMITTED' },
@@ -185,6 +194,17 @@ export default function MainFlow() {
                             <Background />
 
                             <Controls />
+                            <Panel position="bottom-left" style={{ marginLeft: 8, marginBottom: 8 }}>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    size="small"
+                                    onClick={handleClearCanvas}
+                                    sx={{ textTransform: 'none', backgroundColor: 'white' }}
+                                >
+                                    Clear canvas
+                                </Button>
+                            </Panel>
 
                         </ReactFlow>
 
