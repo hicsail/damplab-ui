@@ -592,10 +592,10 @@ const handleSubmitJob = async () => {
       </Grid>
 
       <Typography variant="h6" sx={{ mt: 3, mb: 1, textAlign: 'left', fontWeight: 500 }}>
-        Attach Supporting Documents (Demo)
+        Attach Supporting Documents
       </Typography>
       <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', textAlign: 'left' }}>
-        You can select files to attach to this job. For now, these uploads are for demonstration only and are not stored.
+        You can select files to attach to this job. Uploaded files will be included with your submission.
       </Typography>
       <Grid item xs={12} sx={{ mb: 2 }}>
         <Button
