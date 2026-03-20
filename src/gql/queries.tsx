@@ -278,6 +278,16 @@ export const ALL_JOBS = gql`
     }
 `;
 
+export const JOBS_FEED_STATUS = gql`
+  query JobsFeedStatus {
+    jobsFeedStatus {
+      viewedAt
+      latestSubmittedAt
+      hasUnseen
+    }
+  }
+`;
+
 // get workflows from gql
 export const GET_WORKFLOWS_BY_STATE = gql`
     query GetWorkflowsByState($state: WorkflowState!) {

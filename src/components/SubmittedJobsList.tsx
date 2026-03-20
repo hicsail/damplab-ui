@@ -20,6 +20,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DescriptionIcon from '@mui/icons-material/Description';
 import SearchIcon from '@mui/icons-material/Search';
+import FiberNewIcon from '@mui/icons-material/FiberNew';
 
 export interface JobListItem {
   id: string;
@@ -59,6 +60,7 @@ export interface SubmittedJobsListProps {
   emptyMessage?: string;
   onBack?: () => void;
   backLabel?: string;
+  isJobNew?: (job: JobListItem) => boolean;
 }
 
 export default function SubmittedJobsList({
@@ -83,6 +85,7 @@ export default function SubmittedJobsList({
   emptyMessage = 'No jobs found.',
   onBack,
   backLabel = 'Back to Home',
+  isJobNew,
 }: SubmittedJobsListProps) {
   const totalPages = Math.max(1, Math.ceil(totalCount / limit));
   const pageSafe = Math.min(Math.max(1, page), totalPages);
@@ -249,6 +252,15 @@ export default function SubmittedJobsList({
                       )}
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      {isJobNew?.(job) ? (
+                        <Chip
+                          icon={<FiberNewIcon sx={{ fontSize: 16 }} />}
+                          label="New"
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                        />
+                      ) : null}
                       <Chip
                         label={job.state ?? '—'}
                         size="small"

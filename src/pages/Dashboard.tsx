@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { useQuery } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { Box, Button, Alert, Stack } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SubmittedJobsList, {
@@ -8,15 +8,18 @@ import SubmittedJobsList, {
   STATE_OPTIONS,
 } from '../components/SubmittedJobsList';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { ALL_JOBS } from '../gql/queries';
+import { ALL_JOBS, JOBS_FEED_STATUS } from '../gql/queries';
+import { MARK_JOBS_FEED_VIEWED } from '../gql/mutations';
 
 export default function Dashboard() {
+  const [markJobsFeedViewed] = useMutation(MARK_JOBS_FEED_VIEWED);
   const navigate = useNavigate();
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(20);
   const [searchInput, setSearchInput] = React.useState('');
   const [stateFilter, setStateFilter] = React.useState<string>(STATE_OPTIONS[0]);
   const [hasSowFilter, setHasSowFilter] = React.useState<'all' | 'yes' | 'no'>('all');
+  const [lastViewedAt, setLastViewedAt] = React.useState<string | null>(null);
 
   const search = useDebouncedValue(searchInput, 300);
 
@@ -36,6 +39,19 @@ export default function Dashboard() {
   const { data, loading, error } = useQuery(ALL_JOBS, {
     variables: { input },
   });
+  const { data: feedStatusData } = useQuery(JOBS_FEED_STATUS, {
+    fetchPolicy: 'network-only'
+  });
+
+  React.useEffect(() => {
+    if (!feedStatusData) {
+      return;
+    }
+    setLastViewedAt(feedStatusData.jobsFeedStatus?.viewedAt ?? null);
+    markJobsFeedViewed().catch(() => {
+      // Keep dashboard functional even if feed state update fails.
+    });
+  }, [feedStatusData, markJobsFeedViewed]);
 
   const result = data?.allJobs;
   const items: JobListItem[] = useMemo(() => {
@@ -67,6 +83,14 @@ export default function Dashboard() {
     setLimit(l);
     setPage(1);
   }, []);
+  const isJobNew = useCallback(
+    (job: JobListItem) => {
+      if (!job.submitted) return false;
+      if (!lastViewedAt) return true;
+      return new Date(job.submitted).getTime() > new Date(lastViewedAt).getTime();
+    },
+    [lastViewedAt]
+  );
 
   const content = error ? (
     <Alert severity="error">
@@ -95,6 +119,7 @@ export default function Dashboard() {
       emptyMessage="No submitted jobs yet."
       onBack={() => navigate('/')}
       backLabel="Back to Home"
+      isJobNew={isJobNew}
     />
   );
 

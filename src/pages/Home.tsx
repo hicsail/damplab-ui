@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { useNavigate, Navigate } from 'react-router';
-import { useApolloClient } from '@apollo/client';
-import { Box, Button, Chip, Stack, Typography } from '@mui/material';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
+import { Badge, Box, Button, Chip, Stack, Typography } from '@mui/material';
 
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
@@ -16,6 +16,8 @@ import PeopleIcon from '@mui/icons-material/People';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
+import { JOBS_FEED_STATUS } from '../gql/queries';
+import { MARK_JOBS_FEED_VIEWED } from '../gql/mutations';
 
 function MenuButton({ onClick, navigateTo, children }: any) {
   const navigate = useNavigate();
@@ -38,6 +40,13 @@ export default function Home() {
   const navigate = useNavigate();
   const userContext: UserContextProps = useContext(UserContext);
   const userProps: UserProps = userContext.userProps;
+  const isStaff = Boolean(userProps?.isDamplabStaff);
+  const { data: jobsFeedData } = useQuery(JOBS_FEED_STATUS, {
+    skip: !isStaff,
+    pollInterval: 10000,
+    fetchPolicy: 'network-only'
+  });
+  const [markJobsFeedViewed] = useMutation(MARK_JOBS_FEED_VIEWED);
 
   // Redirect to login if not authenticated
   if (!userProps?.isAuthenticated) {
@@ -47,6 +56,17 @@ export default function Home() {
   function logout() {
     apolloClient.resetStore();
     userContext.keycloak.logout();
+  }
+
+  async function openJobsDashboard() {
+    if (isStaff) {
+      try {
+        await markJobsFeedViewed();
+      } catch {
+        // If marking viewed fails, still navigate to keep UX responsive.
+      }
+    }
+    navigate('/dashboard');
   }
 
   const appellation = (userProps?.idTokenParsed as any)?.name || (userProps?.idTokenParsed as any)?.email || "DAMPLab User";
@@ -136,9 +156,16 @@ export default function Home() {
                 <MonitorIcon />
                 Lab Monitor South<br />(Screen display)
               </MenuButton>
-              <MenuButton navigateTo="/dashboard">
-                <ViewStreamIcon />
-                Dashboard<br />(See Submitted Jobs)
+              <MenuButton onClick={openJobsDashboard}>
+                <Badge
+                  color="error"
+                  variant="dot"
+                  overlap="circular"
+                  invisible={!jobsFeedData?.jobsFeedStatus?.hasUnseen}
+                >
+                  <ViewStreamIcon />
+                </Badge>
+                Jobs<br />(See Submitted Jobs)
               </MenuButton>
               <MenuButton navigateTo="/customer-management">
                 <PeopleIcon />

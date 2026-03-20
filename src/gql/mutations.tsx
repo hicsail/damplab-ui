@@ -183,6 +183,16 @@ export const CHANGE_JOB_CUSTOMER_CATEGORY = gql`
     }
 `;
 
+export const MARK_JOBS_FEED_VIEWED = gql`
+  mutation MarkJobsFeedViewed {
+    markJobsFeedViewed {
+      viewedAt
+      latestSubmittedAt
+      hasUnseen
+    }
+  }
+`;
+
 export const CREATE_ANNOUNCEMENT = gql`
   mutation createAnnouncement($input: CreateAnnouncementInput!) {
     createAnnouncement(input: $input) {
