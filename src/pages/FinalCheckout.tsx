@@ -682,7 +682,7 @@ const handleSubmitJob = async () => {
         <Alert
           severity="info" sx={{ mb: 3, borderRadius: 2}}
         >
-          *Please note: The final price and payment details, along with other relevant information, will someday be sent to your email.
+          *Please note: The final price and payment details, along with other relevant information, will be sent to your email.
         </Alert>
 
         <Button
