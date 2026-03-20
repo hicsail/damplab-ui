@@ -1,15 +1,18 @@
 import React, { useState, useContext } from 'react'
 import { useParams } from 'react-router';
 import { useQuery } from '@apollo/client';
-import { Box, Card, CardContent, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Card, CardContent, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, Divider } from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
+import PendingIcon from '@mui/icons-material/Pending';
+import LoopIcon from '@mui/icons-material/Loop';
+import DoneIcon from '@mui/icons-material/Done';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 import { GET_OWN_JOB_BY_ID } from '../gql/queries';
-import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
-import TrackingStepper            from '../components/TrackingStepper';
 import { SOWViewer }              from '../components/SOWViewer';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
+import { calculateServiceCost }   from '../utils/servicePricing';
 
 
 export default function Tracking() {
@@ -95,6 +98,70 @@ export default function Tracking() {
     const jobStatusIcon  = jobStatus()[1];
     const jobStatusText  = jobStatus()[2];
 
+    const formatParameterValue = (parameterDef: any, value: unknown): string => {
+        const base = (() => {
+            if (Array.isArray(value)) return value.map((v) => String(v ?? '')).filter(Boolean).join(', ');
+            if (value === null || value === undefined || value === '') return '';
+            if (typeof value === 'object') {
+                const v = value as any;
+                if (typeof v.filename === 'string' && v.filename.trim() !== '') return v.filename;
+                if (typeof v.name === 'string' && v.name.trim() !== '') return v.name;
+                return '[File attached]';
+            }
+            return String(value);
+        })();
+
+        if (!parameterDef || parameterDef.type !== 'dropdown') return base;
+        const options = Array.isArray(parameterDef.options) ? parameterDef.options : [];
+        const optionNameById = new Map(
+            options
+                .filter((opt: any) => opt && typeof opt.id === 'string')
+                .map((opt: any) => [String(opt.id), String(opt.name ?? opt.id)] as const)
+        );
+        if (Array.isArray(value)) {
+            return value
+                .map((v) => optionNameById.get(String(v ?? '')) ?? String(v ?? ''))
+                .filter(Boolean)
+                .join(', ');
+        }
+        return optionNameById.get(String(value ?? '')) ?? base;
+    };
+
+    const normalizeFormEntries = (rawFormData: any): Array<{ id: string; name?: string; value: unknown; resultParamValue?: unknown }> => {
+        if (Array.isArray(rawFormData)) {
+            return rawFormData
+                .filter((entry: any) => entry && typeof entry.id === 'string')
+                .map((entry: any) => ({
+                    id: entry.id,
+                    name: entry.name,
+                    value: entry.value,
+                    resultParamValue: entry.resultParamValue
+                }));
+        }
+        if (rawFormData && typeof rawFormData === 'object') {
+            return Object.entries(rawFormData).map(([id, value]) => ({
+                id,
+                value
+            }));
+        }
+        return [];
+    };
+
+    const getNodeStatusIcon = (state?: string) => {
+        switch (state) {
+            case 'QUEUED':
+                return <PendingIcon fontSize='small' color='disabled' />;
+            case 'IN_PROGRESS':
+                return <LoopIcon fontSize='small' color='warning' />;
+            case 'COMPLETE':
+                return <DoneIcon fontSize='small' color='success' />;
+            default:
+                return <HelpOutlineIcon fontSize='small' color='disabled' />;
+        }
+    };
+
+    const formatPrice = (value: number) => (Number.isFinite(value) ? `$${value.toFixed(2)}` : '[Price Pending Review]');
+
     const workflowCard = (
         workflows.map((workflow: any, index: number) => {
             return (
@@ -105,8 +172,42 @@ export default function Tracking() {
                             <Typography sx={{ fontSize: 13 }} color="text.secondary" align="right">{workflow.id}</Typography>
                         </Box>
                         <Typography sx={{ fontSize: 13 }} color="text.secondary" align="left">{workflow.state.replace('_', ' ')}</Typography>
-                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', p: 1, m: 1 }}>
-                            <TrackingStepper workflow={transformGQLToWorkflow(workflow).nodes} />
+                        <Box sx={{ p: 1, m: 1 }}>
+                            {(workflow?.nodes ?? []).map((node: any, nodeIndex: number) => {
+                                const paramDefs = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
+                                const servicePrice = calculateServiceCost(
+                                    node.service ?? {},
+                                    node.formData ?? [],
+                                    node?.service?.price ?? null,
+                                    data?.ownJobById?.customerCategory
+                                );
+                                return (
+                                    <Box key={`${node.id || nodeIndex}`} sx={{ mb: 1.5 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {getNodeStatusIcon(node.state)}
+                                                <Typography variant='subtitle2'>{node.label}</Typography>
+                                            </Box>
+                                            <Typography variant='body2' color='text.secondary'>
+                                                {formatPrice(servicePrice)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ pl: 3, pt: 0.5 }}>
+                                            {normalizeFormEntries(node?.formData).map((entry: any) => {
+                                                const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
+                                                const label = entry.name || paramDef?.name || entry.id;
+                                                const rawValue = entry.value ?? entry.resultParamValue;
+                                                return (
+                                                    <Typography key={entry.id} variant='body2' color='text.secondary'>
+                                                        {label}: {formatParameterValue(paramDef, rawValue)}
+                                                    </Typography>
+                                                );
+                                            })}
+                                        </Box>
+                                        {nodeIndex < (workflow?.nodes?.length ?? 0) - 1 ? <Divider sx={{ mt: 1 }} /> : null}
+                                    </Box>
+                                );
+                            })}
                         </Box>
                     </CardContent>
                 </Card>
