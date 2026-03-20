@@ -155,8 +155,15 @@ export const transformNodesToGQL = (nodes: any) => {
         delete gqlNode.description;
         delete gqlNode.paramGroups;
         delete gqlNode.pricingMode;
+        // Backend `AddNodeInput` does not accept pricing breakdown fields on nodes.
+        // It computes final node pricing server-side, with optional `price` as a fallback.
+        delete gqlNode.internalPrice;
+        delete gqlNode.externalPrice;
+        delete gqlNode.externalAcademicPrice;
+        delete gqlNode.externalMarketPrice;
+        delete gqlNode.externalNoSalaryPrice;
+        delete gqlNode.pricing;
 
-        console.log('gqlNode: ', gqlNode);
         gqlNodes.push(gqlNode);
     });
 
