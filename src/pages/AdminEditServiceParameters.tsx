@@ -40,7 +40,7 @@ export default function AdminEditServiceParameters() {
   const { serviceId } = useParams<{ serviceId: string }>();
   const navigate = useNavigate();
   const client = useApolloClient();
-  const { services } = useContext(AppContext);
+  const { services, refreshCatalog } = useContext(AppContext);
 
   const service = useMemo(
     () => services.find((entry: any) => String(entry.id) === String(serviceId)),
@@ -135,7 +135,7 @@ export default function AdminEditServiceParameters() {
           }
         }
       });
-      await client.resetStore();
+      await refreshCatalog();
       navigate('/edit');
     } catch (error) {
       setErrorMessage('Unable to save parameter changes. Please try again.');

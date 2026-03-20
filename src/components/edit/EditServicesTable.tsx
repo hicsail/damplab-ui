@@ -41,7 +41,7 @@ function formatPricingSummary(row: Record<string, unknown>): string {
 export const EditServicesTable: React.FC = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ServiceRow[]>([]);
-  const { services } = useContext(AppContext);
+  const { services, refreshCatalog } = useContext(AppContext);
   const client = useApolloClient();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -59,7 +59,7 @@ export const EditServicesTable: React.FC = () => {
         service: id
       }
     });
-    setRows(rows.filter((row: ServiceRow) => row.id !== id));
+    await refreshCatalog();
   };
 
   const handleDownloadPricingSheet = () => {
@@ -335,7 +335,7 @@ export const EditServicesTable: React.FC = () => {
         createCount += 1;
       }
 
-      await client.resetStore();
+      await refreshCatalog();
 
       setErrorMessage(`Pricing upload complete: updated ${updateCount} service(s), created ${createCount} new service(s).`);
     } catch (error) {

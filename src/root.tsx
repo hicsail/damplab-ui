@@ -1,4 +1,4 @@
-import { useEffect, useState, useContext, useMemo } from "react";
+import { useEffect, useState, useContext, useMemo, useCallback } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from "react-router";
 // someday: import from @apollo/client once Apollo Client 4 is out (which will address ESM issues) - see discussion at
 // https://github.com/apollographql/apollo-client/issues/9976#issuecomment-1768446694
@@ -147,9 +147,9 @@ export default function Root() {
     });
   }, [authLink, httpLink]);
 
-  // initial load of services and bundles
-  useEffect(() => {
-    client
+  const refreshCatalog = useCallback(async () => {
+    await Promise.all([
+      client
       .query({ query: GET_SERVICES })
       .then((result) => {
         console.log("services loaded successfully on app", result);
@@ -157,9 +157,9 @@ export default function Root() {
       })
       .catch((error) => {
         console.log("error when loading services on app", error);
-      });
+      }),
 
-    client
+      client
       .query({ query: GET_BUNDLES })
       .then((result) => {
         console.log("bundles loaded successfully on app", result);
@@ -167,12 +167,18 @@ export default function Root() {
       })
       .catch((error) => {
         console.log("error when loading bundles on app", error);
-      });
+      })
+    ]);
+  }, [client]);
+
+  // initial load of services and bundles
+  useEffect(() => {
+    refreshCatalog();
 
     // TODO: Change hazards to a service attribute...
     // Matches to 'activeNode?.data.label in RightSideBar
     setHazards(["Gibson Assembly", "Modular Cloning"]);
-  }, []);
+  }, [refreshCatalog]);
 
   // Persist canvas changes with a small debounce to avoid frequent writes during drag.
   useEffect(() => {
@@ -198,7 +204,7 @@ export default function Root() {
     <ApolloProvider client={client}>
       <ThemeProvider theme={theme}>
         <AppContext
-          value={{ services: services, bundles: bundles, hazards: hazards }}
+          value={{ services: services, bundles: bundles, hazards: hazards, refreshCatalog }}
         >
           <CanvasContext
             value={{

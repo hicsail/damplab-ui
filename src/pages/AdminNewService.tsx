@@ -31,7 +31,7 @@ const MENU_PROPS = {
 export default function AdminNewService() {
   const navigate = useNavigate();
   const client = useApolloClient();
-  const { services } = useContext(AppContext);
+  const { services, refreshCatalog } = useContext(AppContext);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -117,7 +117,7 @@ export default function AdminNewService() {
           service: newService
         }
       });
-      await client.resetStore();
+      await refreshCatalog();
       navigate('/edit');
     } catch (error) {
       setErrorMessage('Unable to create service. Please try again.');

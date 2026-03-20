@@ -36,7 +36,7 @@ const MENU_PROPS = {
 export default function AdminNewBundle() {
   const navigate = useNavigate();
   const client = useApolloClient();
-  const { services } = useContext(AppContext);
+  const { services, refreshCatalog } = useContext(AppContext);
 
   const [label, setLabel] = useState('');
   const [icon, setIcon] = useState('');
@@ -93,7 +93,7 @@ export default function AdminNewBundle() {
           }
         }
       });
-      await client.resetStore();
+      await refreshCatalog();
       navigate('/edit');
     } catch (_error) {
       setErrorMessage('Unable to create bundle. Please try again.');

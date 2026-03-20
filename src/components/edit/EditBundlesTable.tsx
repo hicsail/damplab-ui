@@ -12,7 +12,7 @@ import { DELETE_BUNDLE } from '../../gql/queries';
 export const EditBundlesTable: React.FC = () => {
   const navigate = useNavigate();
   const client = useApolloClient();
-  const { bundles } = useContext(AppContext);
+  const { bundles, refreshCatalog } = useContext(AppContext);
   const [rows, setRows] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [, setRowModesModel] = useState<GridRowModesModel>({});
@@ -27,7 +27,7 @@ export const EditBundlesTable: React.FC = () => {
         mutation: DELETE_BUNDLE,
         variables: { bundle: id }
       });
-      setRows((prev) => prev.filter((row) => row.id !== id));
+      await refreshCatalog();
     } catch (_error) {
       setErrorMessage('Unable to delete bundle. Please try again.');
     }

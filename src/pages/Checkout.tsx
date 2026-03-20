@@ -224,6 +224,30 @@ export default function Checkout() {
     return String(value);
   };
 
+  const formatParameterDisplayValue = (parameterDef: any, value: unknown): string => {
+    const base = formatParameterValue(value);
+    if (!parameterDef || parameterDef.type !== 'dropdown') {
+      return base;
+    }
+
+    const options = Array.isArray(parameterDef.options) ? parameterDef.options : [];
+    const optionNameById = new Map(
+      options
+        .filter((opt: any) => opt && typeof opt.id === 'string')
+        .map((opt: any) => [String(opt.id), String(opt.name ?? opt.id)] as const)
+    );
+
+    const mapOne = (raw: unknown): string => {
+      const key = String(raw ?? '');
+      return optionNameById.get(key) ?? formatParameterValue(raw);
+    };
+
+    if (Array.isArray(value)) {
+      return value.map((v) => mapOne(v)).join(', ');
+    }
+    return mapOne(value);
+  };
+
 
   const groupServicesByLabel = (workflow: WorkflowNode[]) => {
     return workflow.reduce((acc, node) => {
@@ -598,16 +622,19 @@ export default function Checkout() {
                                       Estimated cost: {formatPriceLabel(getNodeCost(node))}
                                     </Typography>
                                   )}
-                                  {node.data?.formData?.map((param) => (
+                                  {node.data?.formData?.map((param) => {
+                                    const paramDef = (node.data.parameters || []).find((p: any) => p?.id === param.id);
+                                    return (
                                     <Typography
                                       key={param.id}
                                       variant="body2"
                                       color="text.secondary"
                                       sx={{ fontSize: '0.875rem' }}
                                     >
-                                      {param.name}: {formatParameterValue(param.value)}
+                                      {param.name}: {formatParameterDisplayValue(paramDef, param.value)}
                                     </Typography>
-                                  ))}
+                                    );
+                                  })}
                                   {node.data.pricingMode === 'PARAMETER' && (
                                     <Box sx={{ mt: 0.5 }}>
                                       {getParameterLineItems(node).map((item) => (

@@ -37,7 +37,7 @@ export default function AdminEditBundle() {
   const { bundleId } = useParams<{ bundleId: string }>();
   const navigate = useNavigate();
   const client = useApolloClient();
-  const { bundles, services } = useContext(AppContext);
+  const { bundles, services, refreshCatalog } = useContext(AppContext);
 
   const bundle = useMemo(
     () => bundles.find((entry: any) => String(entry.id) === String(bundleId)),
@@ -108,7 +108,7 @@ export default function AdminEditBundle() {
           }
         }
       });
-      await client.resetStore();
+      await refreshCatalog();
       navigate('/edit');
     } catch (_error) {
       setErrorMessage('Unable to update bundle. Please try again.');
