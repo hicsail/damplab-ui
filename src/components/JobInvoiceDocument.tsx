@@ -185,6 +185,21 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
   const invoiceTotal = services.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
 
   const isInternal = customerCategory === 'INTERNAL_CUSTOMERS';
+  const getCustomerCategoryLabel = (category?: JobInvoiceDocumentProps['customerCategory']): string => {
+    switch (category) {
+      case 'INTERNAL_CUSTOMERS':
+        return 'Internal customers';
+      case 'EXTERNAL_CUSTOMER_ACADEMIC':
+        return 'External (Academic)';
+      case 'EXTERNAL_CUSTOMER_MARKET':
+        return 'External (Market)';
+      case 'EXTERNAL_CUSTOMER_NO_SALARY':
+        return 'External (No salary)';
+      default:
+        return 'Customer category';
+    }
+  };
+  const pricingCategoryLabel = getCustomerCategoryLabel(customerCategory);
 
   return (
     <Document>
@@ -285,6 +300,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
         <View style={styles.note}>
           <Text style={styles.strong}>Note to customer</Text>
           <Text style={styles.text}>Service Prices for {fyShort}</Text>
+          <Text style={styles.text}>Pricing category: {pricingCategoryLabel}</Text>
         </View>
       </Page>
     </Document>

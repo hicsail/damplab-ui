@@ -174,6 +174,15 @@ export const MUTATE_JOB_STATE = gql`
     }
 `;
 
+export const CHANGE_JOB_CUSTOMER_CATEGORY = gql`
+    mutation ChangeJobCustomerCategory($jobId: ID!, $customerCategory: CustomerCategory!) {
+        changeJobCustomerCategory(jobId: $jobId, customerCategory: $customerCategory) {
+            id
+            customerCategory
+        }
+    }
+`;
+
 export const CREATE_ANNOUNCEMENT = gql`
   mutation createAnnouncement($input: CreateAnnouncementInput!) {
     createAnnouncement(input: $input) {

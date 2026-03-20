@@ -1,13 +1,29 @@
 import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 
 import { NodeParameter } from '../types/CanvasTypes';
-import { services } from '../data/services';
-import { bundles as bundleServiceOrders } from '../data/bundles';
+import { services as legacyServices } from '../data/services';
 
 
 export const getServiceFromId = (services: any, id: string) => {
     return services.find((service: any) => service.id === id);
 }
+
+const getServiceFromLegacyId = (services: any[], legacyId: string) => {
+    const legacyService = legacyServices.find((service: any) => service.id === legacyId);
+    if (!legacyService) return undefined;
+    return services.find((service: any) => service.name === legacyService.name);
+};
+
+const resolveServiceRef = (services: any[], ref: any) => {
+    if (!ref) return undefined;
+    if (typeof ref === 'object') {
+        if (ref.id && getServiceFromId(services, ref.id)) return getServiceFromId(services, ref.id);
+        if (ref.name) return services.find((service: any) => service.name === ref.name);
+        return undefined;
+    }
+    if (typeof ref !== 'string') return undefined;
+    return getServiceFromId(services, ref) ?? getServiceFromLegacyId(services, ref);
+};
 
 export const isValidConnection = (services: any, nodes: any, sourceId: any, targetId: any) => {
 
@@ -189,33 +205,40 @@ export const transformEdgesToGQL = (edges: any) => {
 
 export const addNodesAndEdgesFromServiceIds = (
     services: any[],
-    serviceIds: string[] | undefined,
+    serviceRefs: any[] | undefined,
     setNodes: any,
     setEdges: any,
     dropPosition?: { x: number; y: number }
 ) => {
-    const inputServiceIds = serviceIds ?? [];
-    const validServiceIds = inputServiceIds.filter((serviceId) => {
-        const exists = !!getServiceFromId(services, serviceId);
-        if (!exists) {
-            console.warn(`Skipping unknown service id in bundle drop: ${serviceId}`);
+    const inputServiceRefs = serviceRefs ?? [];
+    const validServices = inputServiceRefs.map((ref) => {
+        const service = resolveServiceRef(services, ref);
+        if (!service) {
+            const refLabel = typeof ref === 'string' ? ref : ref?.id ?? ref?.name ?? '[unknown]';
+            console.warn(`Skipping unknown service id in bundle drop: ${refLabel}`);
         }
-        return exists;
-    });
+        return service;
+    }).filter((service): service is any => Boolean(service));
 
-    if (validServiceIds.length === 0) {
+    if (validServices.length === 0) {
         console.warn('No valid services found for bundle/service insertion');
         return;
     }
+
+    const dedupedServices: any[] = [];
+    const seen = new Set<string>();
+    validServices.forEach((service) => {
+        if (seen.has(service.id)) return;
+        seen.add(service.id);
+        dedupedServices.push(service);
+    });
 
     // loop over valid serviceIds
     let previousNodeId : any = null;
     let baseX = dropPosition?.x ?? 0;
     let baseY = dropPosition?.y ?? 0;
     
-    validServiceIds.forEach((serviceId: string, index: number) => {
-        // get service from serviceId
-        const service = getServiceFromId(services, serviceId);
+    dedupedServices.forEach((service: any, index: number) => {
         // if index === 0, add node to canvas with edge
         if (index === 0) {
             // calculate random position on canvas
@@ -241,25 +264,13 @@ export const addNodesAndEdgesFromBundle = (
     setEdges: any,
     dropPosition?: { x: number; y: number }
 ) => {
-    // Prefer canonical bundle ordering from static bundle config.
-    // Fall back to runtime bundle service references when needed.
-    const canonicalBundle = bundleServiceOrders.find((b) => b.id === bundle.id || b.label === bundle.label);
-    let serviceIds: string[] = [];
-
-    if (canonicalBundle?.services?.length) {
-        serviceIds = canonicalBundle.services;
-    } else if (Array.isArray(bundle.services)) {
-        serviceIds = bundle.services
-            .map((s: any) => (typeof s === 'string' ? s : s?.id))
-            .filter((id: any) => typeof id === 'string' && id.length > 0);
-    }
-
-    if (serviceIds.length === 0) {
+    if (!Array.isArray(bundle.services) || bundle.services.length === 0) {
         console.warn(`Unable to resolve service ids for bundle "${bundle?.label ?? bundle?.id ?? 'unknown'}"`);
         return;
     }
 
-    addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges, dropPosition);
+    // Use runtime bundle service order from DB; fallback conversion handled per item.
+    addNodesAndEdgesFromServiceIds(services, bundle.services, setNodes, setEdges, dropPosition);
 }
 
 export const paramsFilledOnNode = (node: any) : Boolean => {

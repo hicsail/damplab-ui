@@ -112,6 +112,21 @@ export default function ContextTestComponent(props: SidebarProps) {
         return undefined;
     };
 
+    const getCustomerCategoryLabel = (category?: string | null): string => {
+        switch (category) {
+            case 'INTERNAL_CUSTOMERS':
+                return 'Internal customers';
+            case 'EXTERNAL_CUSTOMER_ACADEMIC':
+                return 'External (Academic)';
+            case 'EXTERNAL_CUSTOMER_MARKET':
+                return 'External (Market)';
+            case 'EXTERNAL_CUSTOMER_NO_SALARY':
+                return 'External (No salary)';
+            default:
+                return 'Customer category';
+        }
+    };
+
     const hasPricingConfigured = (node: any): boolean => {
         if (!node?.data) return false;
         const pricingMode = node.data.pricingMode ?? 'SERVICE';
@@ -119,7 +134,16 @@ export default function ContextTestComponent(props: SidebarProps) {
             return (
               normalizePrice(node.data.internalPrice) !== undefined ||
               normalizePrice(node.data.externalPrice) !== undefined ||
-              normalizePrice(node.data.price) !== undefined
+              normalizePrice(node.data.externalAcademicPrice) !== undefined ||
+              normalizePrice(node.data.externalMarketPrice) !== undefined ||
+              normalizePrice(node.data.externalNoSalaryPrice) !== undefined ||
+              normalizePrice(node.data.price) !== undefined ||
+              normalizePrice(node.data.pricing?.internal) !== undefined ||
+              normalizePrice(node.data.pricing?.external) !== undefined ||
+              normalizePrice(node.data.pricing?.externalAcademic) !== undefined ||
+              normalizePrice(node.data.pricing?.externalMarket) !== undefined ||
+              normalizePrice(node.data.pricing?.externalNoSalary) !== undefined ||
+              normalizePrice(node.data.pricing?.legacy) !== undefined
             );
         }
 
@@ -128,7 +152,16 @@ export default function ContextTestComponent(props: SidebarProps) {
             if (
               normalizePrice(p?.internalPrice) !== undefined ||
               normalizePrice(p?.externalPrice) !== undefined ||
-              normalizePrice(p?.price) !== undefined
+              normalizePrice(p?.externalAcademicPrice) !== undefined ||
+              normalizePrice(p?.externalMarketPrice) !== undefined ||
+              normalizePrice(p?.externalNoSalaryPrice) !== undefined ||
+              normalizePrice(p?.price) !== undefined ||
+              normalizePrice(p?.pricing?.internal) !== undefined ||
+              normalizePrice(p?.pricing?.external) !== undefined ||
+              normalizePrice(p?.pricing?.externalAcademic) !== undefined ||
+              normalizePrice(p?.pricing?.externalMarket) !== undefined ||
+              normalizePrice(p?.pricing?.externalNoSalary) !== undefined ||
+              normalizePrice(p?.pricing?.legacy) !== undefined
             )
               return true;
             const options = Array.isArray(p?.options) ? p.options : [];
@@ -136,7 +169,16 @@ export default function ContextTestComponent(props: SidebarProps) {
               (o: any) =>
                 normalizePrice(o?.internalPrice) !== undefined ||
                 normalizePrice(o?.externalPrice) !== undefined ||
-                normalizePrice(o?.price) !== undefined
+                normalizePrice(o?.externalAcademicPrice) !== undefined ||
+                normalizePrice(o?.externalMarketPrice) !== undefined ||
+                normalizePrice(o?.externalNoSalaryPrice) !== undefined ||
+                normalizePrice(o?.price) !== undefined ||
+                normalizePrice(o?.pricing?.internal) !== undefined ||
+                normalizePrice(o?.pricing?.external) !== undefined ||
+                normalizePrice(o?.pricing?.externalAcademic) !== undefined ||
+                normalizePrice(o?.pricing?.externalMarket) !== undefined ||
+                normalizePrice(o?.pricing?.externalNoSalary) !== undefined ||
+                normalizePrice(o?.pricing?.legacy) !== undefined
             );
         });
     };
@@ -191,6 +233,10 @@ export default function ContextTestComponent(props: SidebarProps) {
                 price: activeNode.data?.price,
                 internalPrice: activeNode.data?.internalPrice,
                 externalPrice: activeNode.data?.externalPrice,
+                externalAcademicPrice: (activeNode.data as any)?.externalAcademicPrice,
+                externalMarketPrice: (activeNode.data as any)?.externalMarketPrice,
+                externalNoSalaryPrice: (activeNode.data as any)?.externalNoSalaryPrice,
+                pricing: activeNode.data?.pricing,
                 parameters: activeNode.data?.parameters,
             },
             activeNode.data?.formData,
@@ -199,6 +245,7 @@ export default function ContextTestComponent(props: SidebarProps) {
         )
         : 0;
     const showPending = activeNode ? !hasPricingConfigured(activeNode) : false;
+    const pricingCategoryLabel = getCustomerCategoryLabel(customerCategory);
     const pricingNotes = activeNode ? getSelectedPricingExplanations(activeNode) : [];
 
     const action = (
@@ -245,6 +292,11 @@ export default function ContextTestComponent(props: SidebarProps) {
                                 <b>Estimated price:</b>{' '}
                                 {showPending ? '[Price Pending Review]' : `$${estimatedCost.toFixed(2)}`}
                             </p>
+                            {!showPending ? (
+                                <p style={{ margin: '4px 0 0 0', fontSize: 12, color: 'rgba(0,0,0,0.6)' }}>
+                                    Pricing for: {pricingCategoryLabel}
+                                </p>
+                            ) : null}
                             {pricingNotes.length > 0 ? (
                                 <div style={{ marginTop: 6 }}>
                                     <b>Pricing notes</b>

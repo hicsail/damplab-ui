@@ -37,6 +37,7 @@ interface SOWViewerProps {
     createdAt: string;
     updatedAt: string;
   };
+  customerCategory?: string | null;
   /** When provided, enables Sign SOW (client) or Sign as BU (technician) and identifies signer */
   currentUser?: { email?: string; name?: string; isStaff?: boolean };
 }
@@ -90,7 +91,7 @@ function logSOWDataSummary(label: string, data: { clientSignature?: unknown; tec
   });
 }
 
-export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFromJob, currentUser }) => {
+export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFromJob, customerCategory, currentUser }) => {
   const [fullSOWData, setFullSOWData] = useState<SOWData | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [clientSignature, setClientSignature] = useState<SOWSignature | null>(null);
@@ -146,9 +147,10 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
   const skipPdfRender = signing || justSubmittedSignature;
 
   // Fetch full SOW data if we only have summary
-  const { data, loading, error } = useQuery(GET_SOW_BY_JOB_ID, {
+  const { data, loading, error, refetch } = useQuery(GET_SOW_BY_JOB_ID, {
     variables: { jobId },
     skip: !sowDataFromJob,
+    fetchPolicy: 'network-only',
     onCompleted: (data) => {
       if (data?.sowByJobId) {
         const sow = data.sowByJobId;
@@ -191,6 +193,18 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
       }
     },
   });
+
+  // When the pricing category changes, the SOW costs need to be re-fetched
+  // even if `jobId` stays the same.
+  useEffect(() => {
+    if (!sowDataFromJob?.id) return;
+    if (!customerCategory) return;
+    if (!refetch) return;
+    refetch().catch(() => {
+      // ignore; error state will be handled by Apollo if it surfaces
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerCategory]);
 
   const getStatusColor = (status: string) => {
     switch (status?.toUpperCase()) {
@@ -265,6 +279,21 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
   };
   const isStaff = currentUser?.isStaff === true;
 
+  const getCustomerCategoryLabel = (category?: string | null): string => {
+    switch (category) {
+      case 'INTERNAL_CUSTOMERS':
+        return 'Internal customers';
+      case 'EXTERNAL_CUSTOMER_ACADEMIC':
+        return 'External (Academic)';
+      case 'EXTERNAL_CUSTOMER_MARKET':
+        return 'External (Market)';
+      case 'EXTERNAL_CUSTOMER_NO_SALARY':
+        return 'External (No salary)';
+      default:
+        return 'Customer category';
+    }
+  };
+
   if (!sowDataFromJob) {
     return null;
   }
@@ -312,6 +341,9 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
             <strong>SOW Number:</strong> {sowDataFromJob.sowNumber} &nbsp;|&nbsp;
             <strong>Created:</strong> {new Date(sowDataFromJob.createdAt).toLocaleDateString()}
           </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: -1, mb: 1 }}>
+            <strong>Pricing category:</strong> {getCustomerCategoryLabel(customerCategory ?? undefined)}
+          </Typography>
           {(clientSignature || technicianSignature) && (
             <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
               <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>
@@ -355,7 +387,7 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
                   return (
                     <PDFDownloadLink
                       key={pdfKey}
-                      document={<SOWDocument sowData={mergedSOWData} />}
+                      document={<SOWDocument sowData={mergedSOWData} customerCategory={customerCategory ?? undefined} />}
                       fileName={`${sowDataFromJob.sowNumber}-${fullSOWData!.jobName}.pdf`}
                     >
                       {({ blob, url, loading: pdfLoading }) => (
@@ -425,7 +457,7 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
               return (
                 <PDFDownloadLink
                   key={pdfKey}
-                  document={<SOWDocument sowData={mergedSOWData} />}
+                  document={<SOWDocument sowData={mergedSOWData} customerCategory={customerCategory ?? undefined} />}
                   fileName={`${sowDataFromJob.sowNumber}-${fullSOWData!.jobName}.pdf`}
                 >
                   {({ blob, url, loading: pdfLoading }) => (
@@ -455,6 +487,7 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
                 <Typography variant="body2"><strong>Project Manager:</strong> {fullSOWData.resources.projectManager}</Typography>
                 <Typography variant="body2"><strong>Timeline:</strong> {fullSOWData.timeline.startDate} - {fullSOWData.timeline.endDate}</Typography>
                 <Typography variant="body2"><strong>Total Cost:</strong> ${fullSOWData.pricing.totalCost.toLocaleString()}</Typography>
+                <Typography variant="body2"><strong>Pricing Category:</strong> {getCustomerCategoryLabel(customerCategory ?? undefined)}</Typography>
               </Box>
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" gutterBottom><strong>Scope of Work:</strong></Typography>

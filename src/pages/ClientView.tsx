@@ -233,6 +233,7 @@ export default function Tracking() {
                     <SOWViewer 
                         jobId={id || ''} 
                         sowData={sowData}
+                        customerCategory={data?.ownJobById?.customerCategory ?? undefined}
                         currentUser={{ email: workflowEmail, name: workflowUsername, isStaff: false }}
                     />
                 )}

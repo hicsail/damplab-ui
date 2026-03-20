@@ -116,11 +116,27 @@ const styles = StyleSheet.create({
 
 interface SOWDocumentProps {
   sowData: SOWData;
+  customerCategory?: string | null;
 }
 
-const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
+const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) => {
   const formatCurrency = (amount: number): string => {
     return `$${amount.toLocaleString()}`;
+  };
+
+  const getCustomerCategoryLabel = (category?: string | null): string => {
+    switch (category) {
+      case 'INTERNAL_CUSTOMERS':
+        return 'Internal customers';
+      case 'EXTERNAL_CUSTOMER_ACADEMIC':
+        return 'External (Academic)';
+      case 'EXTERNAL_CUSTOMER_MARKET':
+        return 'External (Market)';
+      case 'EXTERNAL_CUSTOMER_NO_SALARY':
+        return 'External (No salary)';
+      default:
+        return 'Customer category';
+    }
   };
 
   return (
@@ -248,6 +264,9 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         <Text style={styles.paragraph}>
           This engagement will be conducted on a Project basis. The total value for the Services pursuant 
           to this SOW is presented in the following table:
+        </Text>
+        <Text style={[styles.paragraph, { fontSize: 10 }]}>
+          Pricing category: {getCustomerCategoryLabel(customerCategory ?? undefined)}
         </Text>
 
         <View style={styles.table}>

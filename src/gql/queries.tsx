@@ -451,6 +451,38 @@ export const CREATE_CATEGORY = gql`
   }
 `;
 
+export const DELETE_BUNDLE = gql`
+  mutation deleteBundle($bundle: ID!) {
+    deleteBundle(bundle: $bundle)
+  }
+`;
+
+export const UPDATE_BUNDLE = gql`
+  mutation updateBundle($bundle: ID!, $changes: BundleChange!) {
+    updateBundle(bundle: $bundle, changes: $changes) {
+      id
+      label
+      icon
+      services {
+        id
+      }
+    }
+  }
+`;
+
+export const CREATE_BUNDLE = gql`
+  mutation createBundle($bundle: CreateBundle!) {
+    createBundle(bundle: $bundle) {
+      id
+      label
+      icon
+      services {
+        id
+      }
+    }
+  }
+`;
+
 export const DELETE_SERVICE = gql`
   mutation deleteService($service: ID!) {
     deleteService(service: $service)

@@ -53,6 +53,8 @@ type UploadedParamFile = {
   uploadedAt: string;
 };
 
+const CANVAS_AUTOSAVE_KEY = "canvas:autosave";
+
 const isPendingParamFile = (value: unknown): value is PendingParamFile =>
   !!value &&
   typeof value === 'object' &&
@@ -447,6 +449,13 @@ const handleSubmitJob = async () => {
       severity: 'success',
       showSpinner: true
     });
+
+    // Clear in-progress canvas state after successful submission so
+    // stale work is not restored on refresh/new canvas sessions.
+    val.setNodes([]);
+    val.setEdges([]);
+    localStorage.removeItem(CANVAS_AUTOSAVE_KEY);
+    localStorage.setItem("CurrentCanvas", "");
 
     setTimeout(() => {
       navigate(`/client_view/${jobId}`);

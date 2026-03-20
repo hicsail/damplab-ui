@@ -179,9 +179,11 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
     ))}
   </Document>
   :
-  <div>
-    PDF Unavailable
-  </div>
+  <Document>
+    <Page>
+      <Text>PDF Unavailable</Text>
+    </Page>
+  </Document>
 );
 
 export default JobPDFDocument;

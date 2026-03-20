@@ -3,13 +3,13 @@ import { useParams } from 'react-router';
 import { useQuery, useMutation } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Card, CardContent, Typography, Alert, Chip, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Button, Card, CardContent, Typography, Alert, Chip, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 
 import { GET_JOB_BY_ID, GET_SOW_BY_JOB_ID }         from '../gql/queries';
-import { UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
+import { CHANGE_JOB_CUSTOMER_CATEGORY, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
 import { transformGQLToWorkflow } from '../controllers/GraphHelpers';
 
 import WorkflowStepper            from '../components/WorkflowStepper';
@@ -39,7 +39,7 @@ export default function TechnicianView() {
     const [sowFullData, setSowFullData] = useState<any>(null);
     const [attachments, setAttachments] = useState<any[]>([]);
 
-    const { loading, error, data } = useQuery(GET_JOB_BY_ID, {
+    const { loading, error, data, refetch: refetchJob } = useQuery(GET_JOB_BY_ID, {
         variables: { id: id },
         fetchPolicy: 'network-only',
         onCompleted: (data) => {
@@ -63,7 +63,7 @@ export default function TechnicianView() {
         }
     });
 
-    const { data: sowByJobIdResult, loading: sowLoading } = useQuery(GET_SOW_BY_JOB_ID, {
+    const { data: sowByJobIdResult, loading: sowLoading, refetch: refetchSow } = useQuery(GET_SOW_BY_JOB_ID, {
         variables: { jobId: id as string },
         skip: !id,
         fetchPolicy: 'network-only',
@@ -80,6 +80,8 @@ export default function TechnicianView() {
             // Error handled by error state
         }
     });
+
+    const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
 
 
     const acceptWorkflow = (workflowId: string) => {
@@ -198,6 +200,27 @@ export default function TechnicianView() {
     const jobStatusIcon = jobStatus()[1];
     const jobStatusText = jobStatus()[2];
 
+    const customerCategoryOptions: Array<{ value: string; label: string }> = [
+        { value: 'INTERNAL_CUSTOMERS', label: 'Internal customers' },
+        { value: 'EXTERNAL_CUSTOMER_ACADEMIC', label: 'External (Academic)' },
+        { value: 'EXTERNAL_CUSTOMER_MARKET', label: 'External (Market)' },
+        { value: 'EXTERNAL_CUSTOMER_NO_SALARY', label: 'External (No salary)' },
+    ];
+
+    const currentCustomerCategory = jobData?.customerCategory ?? 'EXTERNAL_CUSTOMER_MARKET';
+
+    const handleCustomerCategoryChange = async (nextCategory: string) => {
+        try {
+            if (!id) return;
+            await changeJobCustomerCategory({
+                variables: { jobId: id as string, customerCategory: nextCategory },
+            });
+            await Promise.all([refetchJob(), refetchSow()]);
+        } catch (e) {
+            console.error('Failed to update job customer category:', e);
+        }
+    };
+
     // const workflowCard = (
     //     <Card>
     //         <CardContent>
@@ -251,26 +274,45 @@ export default function TechnicianView() {
                             <Chip label="SOW generated" color="success" size="small" sx={{ ml: 1.5, fontWeight: 600 }} />
                         )}
                     </Typography>
+                    <FormControl size="small" sx={{ minWidth: 260 }} disabled={categoryUpdating}>
+                        <InputLabel id="pricing-category-label">Pricing category</InputLabel>
+                        <Select
+                            labelId="pricing-category-label"
+                            value={currentCustomerCategory}
+                            label="Pricing category"
+                            onChange={(e) => handleCustomerCategoryChange(String(e.target.value))}
+                        >
+                            {customerCategoryOptions.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
                     <Box sx={{ flexGrow: 1 }} />
                     <Button color='primary' sx={{alignContent: 'right', mr: 1}}>
                         <PictureAsPdfIcon/>&nbsp;
-                        <PDFDownloadLink
-                            document={
-                                <JobPDFDocument
-                                    jobId={id}
-                                    jobName={jobName}
-                                    jobUsername={jobUsername}
-                                    jobEmail={jobEmail}
-                                    jobInstitution={jobInstitution}
-                                    jobNotes={jobNotes}
-                                    jobTime={jobTime}
-                                    workflows={workflows}
-                                />
-                            }
-                            fileName={`DAMP-Order-${id}.pdf`}
-                        >
-                            {({ blob, url, loading, error }) => (loading ? 'Loading document...' : 'Download Summary')}
-                        </PDFDownloadLink>
+                        {id ? (
+                            <PDFDownloadLink
+                                document={
+                                    <JobPDFDocument
+                                        jobId={id}
+                                        jobName={jobName}
+                                        jobUsername={jobUsername}
+                                        jobEmail={jobEmail}
+                                        jobInstitution={jobInstitution}
+                                        jobNotes={jobNotes}
+                                        jobTime={jobTime}
+                                        workflows={workflows}
+                                    />
+                                }
+                                fileName={`DAMP-Order-${id}.pdf`}
+                            >
+                                {({ loading }) => (loading ? 'Loading document...' : 'Download Summary')}
+                            </PDFDownloadLink>
+                        ) : (
+                            'Download Summary'
+                        )}
                     </Button>
                     <Button 
                         color={sowData ? 'primary' : 'secondary'}
@@ -289,19 +331,23 @@ export default function TechnicianView() {
                         sx={{ mr: 1 }}
                         disabled={!sowFullData || sowLoading}
                     >
-                        <PDFDownloadLink
-                            document={
-                                <JobInvoiceDocument
-                                    jobId={id as string}
-                                    jobName={jobName}
-                                    customerCategory={jobData?.customerCategory ?? undefined}
-                                    sow={sowFullData}
-                                />
-                            }
-                            fileName={`Invoice-${id}.pdf`}
-                        >
-                            {({ loading }) => (loading ? 'Loading Invoice...' : 'Generate Invoice')}
-                        </PDFDownloadLink>
+                        {id && sowFullData ? (
+                            <PDFDownloadLink
+                                document={
+                                    <JobInvoiceDocument
+                                        jobId={id}
+                                        jobName={jobName}
+                                        customerCategory={jobData?.customerCategory ?? undefined}
+                                        sow={sowFullData}
+                                    />
+                                }
+                                fileName={`Invoice-${id}.pdf`}
+                            >
+                                {({ loading }) => (loading ? 'Loading Invoice...' : 'Generate Invoice')}
+                            </PDFDownloadLink>
+                        ) : (
+                            'Generate Invoice'
+                        )}
                     </Button>
                     <Button 
                         variant="contained"
@@ -393,6 +439,7 @@ export default function TechnicianView() {
                     <SOWViewer 
                         jobId={id || ''} 
                         sowData={sowData}
+                        customerCategory={jobData?.customerCategory ?? undefined}
                         currentUser={{ email: jobEmail, name: jobUsername, isStaff: true }}
                     />
                 )}
