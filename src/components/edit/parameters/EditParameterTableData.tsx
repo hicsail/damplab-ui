@@ -2,6 +2,7 @@ import * as React from "react";
 import { v4 as uuid } from "uuid";
 import { Box, Button, Stack, TextField } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { EditRowModeHint } from "../EditRowModeHint";
 import {
   DataGrid,
   GridColDef,
@@ -172,6 +173,8 @@ export function EditParameterTableData(props) {
           </Button>
         </Stack>
       </Box>
+
+      {isEditMode ? <EditRowModeHint /> : null}
 
       <DataGrid
         rows={rows}
