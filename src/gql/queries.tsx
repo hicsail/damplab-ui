@@ -7,6 +7,9 @@ export const GET_SERVICES = gql`
         services {
             id
             name
+            serviceCategoryNumber
+            serviceCategoryName
+            unit
             price
             internalPrice
             externalPrice
@@ -504,6 +507,9 @@ export const UPDATE_SERVICE = gql`
     updateService(service: $service, changes: $changes) {
       id
       name
+      serviceCategoryNumber
+      serviceCategoryName
+      unit
       price
       internalPrice
       externalPrice
@@ -526,6 +532,9 @@ export const CREATE_SERVICE = gql`
     createService(service: $service) {
       id
       name
+      serviceCategoryNumber
+      serviceCategoryName
+      unit
       price
       internalPrice
       externalPrice

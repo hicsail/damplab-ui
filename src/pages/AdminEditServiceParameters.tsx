@@ -287,22 +287,6 @@ export default function AdminEditServiceParameters() {
 
                 <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
-                    select
-                    label='Affects price?'
-                    fullWidth
-                    value={selectedParameter.isPriceMultiplier ? 'yes' : 'no'}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        isPriceMultiplier: event.target.value === 'yes'
-                      })
-                    }
-                  >
-                    <MenuItem value='yes'>Yes</MenuItem>
-                    <MenuItem value='no'>No</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
                     label='Fallback price'
                     type='number'
                     inputProps={{ min: 0, step: '0.01' }}
@@ -413,6 +397,23 @@ export default function AdminEditServiceParameters() {
 
                 {selectedParameter.type === 'number' && (
                   <>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                      <TextField
+                        select
+                        label='Use as price multiplier?'
+                        fullWidth
+                        helperText='When enabled, this numeric value multiplies the calculated service price.'
+                        value={selectedParameter.isPriceMultiplier ? 'yes' : 'no'}
+                        onChange={(event) =>
+                          updateParameter(selectedParameterIndex, {
+                            isPriceMultiplier: event.target.value === 'yes'
+                          })
+                        }
+                      >
+                        <MenuItem value='yes'>Yes</MenuItem>
+                        <MenuItem value='no'>No</MenuItem>
+                      </TextField>
+                    </Grid>
                     <Grid size={{ xs: 12, md: 3 }}>
                       <TextField
                         label='Minimum allowed value'

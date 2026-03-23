@@ -5,6 +5,9 @@ export type ServicePricingMode = 'SERVICE' | 'PARAMETER';
 export type Service = {
     id: string;
     name: string;
+    serviceCategoryNumber?: string | null;
+    serviceCategoryName?: string | null;
+    unit?: string | null;
     price?: number | null;
     internalPrice?: number | null;
     externalPrice?: number | null;

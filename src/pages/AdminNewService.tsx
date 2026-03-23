@@ -35,6 +35,9 @@ export default function AdminNewService() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [serviceCategoryNumber, setServiceCategoryNumber] = useState('');
+  const [serviceCategoryName, setServiceCategoryName] = useState('');
+  const [unit, setUnit] = useState('');
   const [pricingMode, setPricingMode] = useState<'SERVICE' | 'PARAMETER'>('SERVICE');
   const [internalPrice, setInternalPrice] = useState('');
   const [externalAcademicPrice, setExternalAcademicPrice] = useState('');
@@ -86,6 +89,9 @@ export default function AdminNewService() {
 
     const newService = {
       name: name.trim(),
+      serviceCategoryNumber: serviceCategoryNumber.trim(),
+      serviceCategoryName: serviceCategoryName.trim(),
+      unit: unit.trim(),
       icon: '',
       price: legacy,
       internalPrice: internal,
@@ -149,6 +155,30 @@ export default function AdminNewService() {
         multiline
         minRows={4}
       />
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+          gap: 2
+        }}
+      >
+        <TextField
+          label='Service Category Number'
+          value={serviceCategoryNumber}
+          onChange={(event) => setServiceCategoryNumber(event.target.value)}
+        />
+        <TextField
+          label='Service Category Name'
+          value={serviceCategoryName}
+          onChange={(event) => setServiceCategoryName(event.target.value)}
+        />
+        <TextField
+          label='Unit'
+          value={unit}
+          onChange={(event) => setUnit(event.target.value)}
+        />
+      </Box>
 
       <FormControl>
         <InputLabel id='new-service-pricing-mode-label'>How price is calculated</InputLabel>

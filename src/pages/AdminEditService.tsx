@@ -42,6 +42,9 @@ export default function AdminEditService() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [serviceCategoryNumber, setServiceCategoryNumber] = useState('');
+  const [serviceCategoryName, setServiceCategoryName] = useState('');
+  const [unit, setUnit] = useState('');
   const [pricingMode, setPricingMode] = useState<'SERVICE' | 'PARAMETER'>('SERVICE');
   const [internalPrice, setInternalPrice] = useState('');
   const [externalAcademicPrice, setExternalAcademicPrice] = useState('');
@@ -67,6 +70,9 @@ export default function AdminEditService() {
     const pricing = row.pricing ?? {};
     setName(row.name ?? '');
     setDescription(row.description ?? '');
+    setServiceCategoryNumber(row.serviceCategoryNumber ?? '');
+    setServiceCategoryName(row.serviceCategoryName ?? '');
+    setUnit(row.unit ?? '');
     setPricingMode(row.pricingMode ?? 'SERVICE');
     setInternalPrice(
       pricing.internal != null ? String(pricing.internal) : row.internalPrice != null ? String(row.internalPrice) : ''
@@ -141,6 +147,9 @@ export default function AdminEditService() {
     const row: any = service;
     const changes = {
       name: name.trim(),
+      serviceCategoryNumber: serviceCategoryNumber.trim(),
+      serviceCategoryName: serviceCategoryName.trim(),
+      unit: unit.trim(),
       icon: row.icon ?? '',
       price: legacy,
       internalPrice: internal,
@@ -210,6 +219,30 @@ export default function AdminEditService() {
         multiline
         minRows={4}
       />
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+          gap: 2
+        }}
+      >
+        <TextField
+          label="Service Category Number"
+          value={serviceCategoryNumber}
+          onChange={(event) => setServiceCategoryNumber(event.target.value)}
+        />
+        <TextField
+          label="Service Category Name"
+          value={serviceCategoryName}
+          onChange={(event) => setServiceCategoryName(event.target.value)}
+        />
+        <TextField
+          label="Unit"
+          value={unit}
+          onChange={(event) => setUnit(event.target.value)}
+        />
+      </Box>
 
       <FormControl>
         <InputLabel id="edit-service-pricing-mode-label">How price is calculated</InputLabel>
