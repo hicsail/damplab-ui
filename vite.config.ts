@@ -16,6 +16,7 @@ export default defineConfig(() => {
       'process.env': {},
     },
     resolve: {
+      dedupe: ['react', 'react-dom'],
       alias: {
         buffer: 'buffer',
       },

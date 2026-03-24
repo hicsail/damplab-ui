@@ -38,8 +38,6 @@ export default function TechnicianView() {
     const [jobEmail, setJobEmail]             = useState('');
     const [jobNotes, setJobNotes] = useState('');
     const [workflows, setWorklows]            = useState([]);  // ▶ URLSearchParams {}
-    const [sowData, setSowData] = useState<any>(null);
-    const [sowFullData, setSowFullData] = useState<any>(null);
     const [attachments, setAttachments] = useState<any[]>([]);
 
     const { loading, error, data, refetch: refetchJob } = useQuery(GET_JOB_BY_ID, {
@@ -57,8 +55,6 @@ export default function TechnicianView() {
             setJobEmail(data.jobById.email);
             setJobNotes(data.jobById.notes);
             setWorklows(data.jobById.workflows);
-            setJobData(data.jobById); // Store complete job data for SOW generation
-            setSowData(data.jobById.sow); // Store SOW data if it exists
             setAttachments(data.jobById.attachments ?? []);
         },
         onError: (error: any) => {
@@ -70,10 +66,12 @@ export default function TechnicianView() {
         variables: { jobId: id as string },
         skip: !id,
         fetchPolicy: 'network-only',
-        onCompleted: (result) => {
-            setSowFullData(result?.sowByJobId ?? null);
-        },
     });
+
+    // Derive from Apollo cache so refetches (e.g. after SOW upsert) update without a full page reload.
+    const jobData = data?.jobById ?? null;
+    const sowData = jobData?.sow ?? null;
+    const sowFullData = sowByJobIdResult?.sowByJobId ?? null;
 
     const [acceptWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
         onCompleted: (data) => {
@@ -102,7 +100,6 @@ export default function TechnicianView() {
 
     const [modalOpen, setModalOpen] = useState(false);
     const [sowModalOpen, setSowModalOpen] = useState(false);
-    const [jobData, setJobData] = useState<any>(null);
 
     const handleOpenModal = () => {
         setModalOpen(true);
