@@ -251,7 +251,7 @@ export const EditServicesTable: React.FC = () => {
               changes.internalPrice = internalPrice;
             }
             if (externalAcademicPriceStr !== '') {
-              changes.externalAcademicPrice = externalAcademic;
+              changes.externalAcademicPrice = externalAcademicPrice;
             }
             if (externalMarketPriceStr !== '') {
               changes.externalMarketPrice = externalMarketPrice;
