@@ -67,6 +67,10 @@ export const EditServicesTable: React.FC = () => {
       const headers = [
         'id',
         'name',
+        'description',
+        'serviceCategoryNumber',
+        'serviceCategoryName',
+        'unit',
         'pricingInternal',
         'pricingExternalAcademic',
         'pricingExternalMarket',
@@ -76,6 +80,10 @@ export const EditServicesTable: React.FC = () => {
       const dataLines = rows.map((row) => {
         const id = row.id ?? '';
         const name = (row as any).name ?? '';
+        const description = (row as any).description ?? '';
+        const serviceCategoryNumber = (row as any).serviceCategoryNumber ?? '';
+        const serviceCategoryName = (row as any).serviceCategoryName ?? '';
+        const unit = (row as any).unit ?? '';
         const pricing = (row as any).pricing ?? {};
         const internalPrice = pricing.internal ?? (row as any).internalPrice ?? '';
         const externalAcademicPrice =
@@ -85,7 +93,19 @@ export const EditServicesTable: React.FC = () => {
         const externalNoSalaryPrice =
           pricing.externalNoSalary ?? (row as any).externalNoSalaryPrice ?? '';
         const legacyPrice = pricing.legacy ?? (row as any).price ?? '';
-        return [id, name, internalPrice, externalAcademicPrice, externalMarketPrice, externalNoSalaryPrice, legacyPrice]
+        return [
+          id,
+          name,
+          description,
+          serviceCategoryNumber,
+          serviceCategoryName,
+          unit,
+          internalPrice,
+          externalAcademicPrice,
+          externalMarketPrice,
+          externalNoSalaryPrice,
+          legacyPrice
+        ]
           .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
           .join(',');
       });
@@ -173,6 +193,25 @@ export const EditServicesTable: React.FC = () => {
       const priceIndex =
         normalizedHeaders.findIndex((h) => h === 'pricinglegacy' || h === 'price' || h === 'service price' || h === 'legacy price');
 
+      const descriptionIndex = normalizedHeaders.findIndex(
+        (h) => h === 'description' || h === 'service description'
+      );
+      const serviceCategoryNumberIndex = normalizedHeaders.findIndex(
+        (h) =>
+          h === 'servicecategorynumber' ||
+          h === 'service category number' ||
+          h === 'category number' ||
+          h === 'category no' ||
+          h === 'category #'
+      );
+      const serviceCategoryNameIndex = normalizedHeaders.findIndex(
+        (h) =>
+          h === 'servicecategoryname' ||
+          h === 'service category name' ||
+          h === 'category name'
+      );
+      const unitIndex = normalizedHeaders.findIndex((h) => h === 'unit' || h === 'service unit');
+
       if (
         idIndex === -1 ||
         nameIndex === -1 ||
@@ -199,9 +238,28 @@ export const EditServicesTable: React.FC = () => {
         const rawExternalMarketPrice = externalMarketPriceIndex !== -1 ? row[externalMarketPriceIndex] : undefined;
         const rawExternalNoSalaryPrice = externalNoSalaryPriceIndex !== -1 ? row[externalNoSalaryPriceIndex] : undefined;
         const rawPrice = priceIndex !== -1 ? row[priceIndex] : undefined;
+        const rawDescription = descriptionIndex !== -1 ? row[descriptionIndex] : undefined;
+        const rawCategoryNumber =
+          serviceCategoryNumberIndex !== -1 ? row[serviceCategoryNumberIndex] : undefined;
+        const rawCategoryName = serviceCategoryNameIndex !== -1 ? row[serviceCategoryNameIndex] : undefined;
+        const rawUnit = unitIndex !== -1 ? row[unitIndex] : undefined;
 
         const id = rawId !== undefined && rawId !== null ? String(rawId).trim() : '';
         const name = rawName !== undefined && rawName !== null ? String(rawName).trim() : '';
+        const descriptionStr =
+          descriptionIndex !== -1 && rawDescription !== undefined && rawDescription !== null
+            ? String(rawDescription).trim()
+            : undefined;
+        const serviceCategoryNumberStr =
+          serviceCategoryNumberIndex !== -1 && rawCategoryNumber !== undefined && rawCategoryNumber !== null
+            ? String(rawCategoryNumber).trim()
+            : undefined;
+        const serviceCategoryNameStr =
+          serviceCategoryNameIndex !== -1 && rawCategoryName !== undefined && rawCategoryName !== null
+            ? String(rawCategoryName).trim()
+            : undefined;
+        const unitStr =
+          unitIndex !== -1 && rawUnit !== undefined && rawUnit !== null ? String(rawUnit).trim() : undefined;
         const internalPriceStr =
           rawInternalPrice !== undefined && rawInternalPrice !== null ? String(rawInternalPrice).trim() : '';
         const externalAcademicPriceStr =
@@ -212,7 +270,12 @@ export const EditServicesTable: React.FC = () => {
           rawExternalNoSalaryPrice !== undefined && rawExternalNoSalaryPrice !== null ? String(rawExternalNoSalaryPrice).trim() : '';
         const priceStr = rawPrice !== undefined && rawPrice !== null ? String(rawPrice).trim() : '';
 
-        if (!id && !name && !priceStr) {
+        const hasMetaInRow =
+          descriptionStr !== undefined ||
+          serviceCategoryNumberStr !== undefined ||
+          serviceCategoryNameStr !== undefined ||
+          unitStr !== undefined;
+        if (!id && !name && !priceStr && !hasMetaInRow) {
           continue;
         }
 
@@ -279,6 +342,18 @@ export const EditServicesTable: React.FC = () => {
                 legacy: price
               };
             }
+            if (descriptionStr !== undefined) {
+              changes.description = descriptionStr;
+            }
+            if (serviceCategoryNumberStr !== undefined) {
+              changes.serviceCategoryNumber = serviceCategoryNumberStr === '' ? null : serviceCategoryNumberStr;
+            }
+            if (serviceCategoryNameStr !== undefined) {
+              changes.serviceCategoryName = serviceCategoryNameStr === '' ? null : serviceCategoryNameStr;
+            }
+            if (unitStr !== undefined) {
+              changes.unit = unitStr === '' ? null : unitStr;
+            }
 
             if (Object.keys(changes).length === 0) {
               continue;
@@ -301,7 +376,7 @@ export const EditServicesTable: React.FC = () => {
           continue;
         }
 
-        const newService = {
+        const newService: Record<string, unknown> = {
           name,
           icon: '',
           price,
@@ -322,9 +397,19 @@ export const EditServicesTable: React.FC = () => {
           parameters: [],
           paramGroups: [],
           allowedConnections: [],
-          description: '',
+          description: descriptionStr !== undefined ? descriptionStr : '',
           deliverables: []
         };
+        if (serviceCategoryNumberStr !== undefined) {
+          newService.serviceCategoryNumber =
+            serviceCategoryNumberStr === '' ? null : serviceCategoryNumberStr;
+        }
+        if (serviceCategoryNameStr !== undefined) {
+          newService.serviceCategoryName = serviceCategoryNameStr === '' ? null : serviceCategoryNameStr;
+        }
+        if (unitStr !== undefined) {
+          newService.unit = unitStr === '' ? null : unitStr;
+        }
 
         await client.mutate({
           mutation: CREATE_SERVICE,

@@ -507,6 +507,7 @@ export const UPDATE_SERVICE = gql`
     updateService(service: $service, changes: $changes) {
       id
       name
+      description
       serviceCategoryNumber
       serviceCategoryName
       unit
