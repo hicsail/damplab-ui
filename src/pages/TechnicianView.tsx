@@ -511,11 +511,7 @@ export default function TechnicianView() {
                         </List>
                     </Box>
                 )}
-                <Box>
-                    <Box sx={{ flexDirection: 'column', pt: 1 }}>
-                        {workflowCard}
-                    </Box>
-                </Box>
+
                 {/* SOW Status Indicator */}
                 {sowData && (
                     <SOWViewer 
@@ -525,6 +521,12 @@ export default function TechnicianView() {
                         currentUser={{ email: jobEmail, name: jobUsername, isStaff: true }}
                     />
                 )}
+
+                <Box>
+                    <Box sx={{ flexDirection: 'column', pt: 1 }}>
+                        {workflowCard}
+                    </Box>
+                </Box>
 
                 {/* Comments Section */}
                 <CommentsSection 

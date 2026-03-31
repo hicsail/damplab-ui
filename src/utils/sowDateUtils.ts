@@ -3,7 +3,11 @@ import { format, parseISO, isValid } from 'date-fns';
 function toDate(value: string | Date): Date {
   if (value instanceof Date) return value;
   try {
-    return value.includes('T') ? parseISO(value) : new Date(value);
+    // IMPORTANT:
+    // - ISO strings with a time ("...T...") should be parsed as ISO.
+    // - Date-only strings ("YYYY-MM-DD") should also be parsed with parseISO, NOT new Date(value).
+    //   JS Date parses "YYYY-MM-DD" as UTC midnight, which can render as the *previous day* in local time.
+    return parseISO(value);
   } catch {
     return new Date(value);
   }

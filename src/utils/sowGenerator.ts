@@ -261,6 +261,7 @@ const calculateTimeline = (
     startDate: format(start, 'yyyy-MM-dd'),
     endDate: format(end, 'yyyy-MM-dd'),
     duration: `${days} day${days !== 1 ? 's' : ''}`,
+    days,
   };
 };
 
@@ -472,9 +473,9 @@ export const generateSOWData = (
     sowTitle,
     jobId: jobData.id,
     jobName: jobData.name,
-    // clientName should prefer the job's `name` (client name). Historically we used `clientProjectManager`,
-    // so keep it as a fallback only.
-    clientName: jobData.name || technicianInputs.clientProjectManager || jobData.username || 'Client',
+    // Prefer clientDisplayName (captured at checkout), then fall back to username.
+    // jobData.name is the PROJECT name.
+    clientName: jobData.clientDisplayName || jobData.username || technicianInputs.clientProjectManager || jobData.name || 'Client',
     clientEmail: jobData.email,
     clientInstitution: jobData.institute,
     clientAddress: jobData.institute, // Could be enhanced with address lookup

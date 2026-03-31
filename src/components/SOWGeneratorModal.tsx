@@ -26,6 +26,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PreviewIcon from '@mui/icons-material/Preview';
 import EditIcon from '@mui/icons-material/Edit';
 import { PDFDownloadLink } from '@react-pdf/renderer';
+import { format } from 'date-fns';
 
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWEditableSections } from '../types/SOWTypes';
 import { generateSOWData } from '../utils/sowGenerator';
@@ -46,7 +47,8 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
     projectManager: '',
     projectLead: '',
     sowTitle: defaultSowTitle,
-    startDate: new Date().toISOString().split('T')[0],
+    // Use local date, not UTC (toISOString), to avoid "one day behind" in most US timezones.
+    startDate: format(new Date(), 'yyyy-MM-dd'),
     duration: 14,
     pricingAdjustments: [],
     specialInstructions: '',
@@ -125,7 +127,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
             });
             setTechnicianInputs(prev => {
               const startDate = existing.timeline?.startDate
-                ? new Date(existing.timeline.startDate).toISOString().split('T')[0]
+                ? format(new Date(existing.timeline.startDate), 'yyyy-MM-dd')
                 : prev.startDate;
               const durStr = existing.timeline?.duration;
               let duration = prev.duration;
@@ -460,7 +462,10 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                     <Box sx={{ flex: '1 1 300px' }}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Client:</strong> {jobData.name}
+                        <strong>Client:</strong> {jobData.username || jobData.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Project:</strong> {jobData.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         <strong>Email:</strong> {jobData.email}
@@ -546,7 +551,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   <DatePicker
                     label="Start Date"
                     value={new Date(technicianInputs.startDate)}
-                    onChange={(date) => handleInputChange('startDate', date?.toISOString().split('T')[0] || '')}
+                    onChange={(date) => handleInputChange('startDate', date ? format(date, 'yyyy-MM-dd') : '')}
                     slotProps={{
                       textField: {
                         fullWidth: true,

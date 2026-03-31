@@ -338,6 +338,7 @@ const handleSubmitJob = async () => {
 
     const data = {
       name: formData.jobName,
+      clientDisplayName: name,
       institute: formData.institute,
       notes: formData.notes, // Optional
       workflows: workflowsWithUploadedParamFiles.map((workflow: any) => ({
