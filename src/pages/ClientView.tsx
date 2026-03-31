@@ -48,7 +48,7 @@ export default function Tracking() {
             setJobName(            job.name);
             setJobState(           job.state);
             setJobTime(            job.submitted);
-            setWorkflowUsername(   job.username);
+            setWorkflowUsername(   job.clientDisplayName || job.username);
             setWorkflowInstitution(job.institute);
             setWorkflowEmail(      job.email);
             setWorklows(           job.workflows);

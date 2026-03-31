@@ -50,7 +50,7 @@ export default function TechnicianView() {
             setJobName(data.jobById.name);
             setJobState(data.jobById.state);
             setJobTime(data.jobById.submitted);
-            setJobUsername(data.jobById.username);
+            setJobUsername(data.jobById.clientDisplayName || data.jobById.username);
             setJobInstitution(data.jobById.institute);
             setJobEmail(data.jobById.email);
             setJobNotes(data.jobById.notes);

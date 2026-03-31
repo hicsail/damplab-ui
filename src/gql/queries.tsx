@@ -150,6 +150,7 @@ export const GET_OWN_JOB_BY_ID = gql`
             id
             name
             username
+            clientDisplayName
             institute
             email
             customerCategory

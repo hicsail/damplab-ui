@@ -26,7 +26,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PreviewIcon from '@mui/icons-material/Preview';
 import EditIcon from '@mui/icons-material/Edit';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWEditableSections } from '../types/SOWTypes';
 import { generateSOWData } from '../utils/sowGenerator';
@@ -180,6 +180,19 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
       }
     }
   }, [jobData, technicianInputs, existingSOW]);
+
+  // Auto-populate the Client Project Manager field from the job's display name.
+  // Only fill when empty so we don't clobber user edits.
+  useEffect(() => {
+    if (!open) return;
+    if (!jobData) return;
+    const displayName = jobData.clientDisplayName || jobData.username || '';
+    if (!displayName) return;
+    setTechnicianInputs((prev) => {
+      if (prev.clientProjectManager && prev.clientProjectManager.trim() !== '') return prev;
+      return { ...prev, clientProjectManager: displayName };
+    });
+  }, [open, jobData]);
 
   const handleInputChange = (field: keyof SOWTechnicianInputs, value: any) => {
     setTechnicianInputs(prev => ({
@@ -462,7 +475,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                     <Box sx={{ flex: '1 1 300px' }}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Client:</strong> {jobData.username || jobData.name}
+                        <strong>Client:</strong> {jobData.clientDisplayName || jobData.username || jobData.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         <strong>Project:</strong> {jobData.name}
@@ -550,7 +563,8 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   </Typography>
                   <DatePicker
                     label="Start Date"
-                    value={new Date(technicianInputs.startDate)}
+                    // Avoid `new Date('YYYY-MM-DD')` (UTC parsing) which can display as the prior day locally.
+                    value={technicianInputs.startDate ? parseISO(technicianInputs.startDate) : null}
                     onChange={(date) => handleInputChange('startDate', date ? format(date, 'yyyy-MM-dd') : '')}
                     slotProps={{
                       textField: {
