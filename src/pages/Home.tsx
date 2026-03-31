@@ -156,6 +156,10 @@ export default function Home() {
                 <MonitorIcon />
                 Lab Monitor South<br />(Screen display)
               </MenuButton>
+              <MenuButton navigateTo="/lab-status-tv">
+                <MonitorIcon />
+                Lab Status TV<br />(Running + Activity)
+              </MenuButton>
               <MenuButton onClick={openJobsDashboard}>
                 <Badge
                   color="error"

@@ -293,6 +293,22 @@ export const JOBS_FEED_STATUS = gql`
   }
 `;
 
+export const ACTIVITY_EVENTS = gql`
+  query ActivityEvents($limit: Int, $since: DateTime) {
+    activityEvents(limit: $limit, since: $since) {
+      id
+      createdAt
+      type
+      message
+      actorDisplayName
+      jobId
+      workflowId
+      workflowNodeId
+      serviceName
+    }
+  }
+`;
+
 // get workflows from gql
 export const GET_WORKFLOWS_BY_STATE = gql`
     query GetWorkflowsByState($state: WorkflowState!) {

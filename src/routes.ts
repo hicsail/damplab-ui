@@ -25,6 +25,7 @@ export default [
     ]),
     layout("./layouts/PrivateRouteDamplabStaff.tsx", [
         route("/lab-monitor/:screen", "./pages/LabMonitor.tsx"),
+        route("/lab-status-tv", "./pages/LabStatusTV.tsx"),
         route("/technician_view/:id", "./pages/TechnicianView.tsx"),
         route("/dashboard", "./pages/Dashboard.tsx"),
         route("/customer-management", "./pages/CustomerManagement.tsx"),

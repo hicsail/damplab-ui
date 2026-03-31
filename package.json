@@ -37,7 +37,8 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
-    "codegen": "graphql-codegen --config codegen.ts"
+    "codegen": "graphql-codegen --config codegen.ts",
+    "test": "node ./node_modules/vitest/vitest.mjs run"
   },
   "eslintConfig": {
     "extends": [
@@ -68,6 +69,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "buffer": "^6.0.3",
     "typescript": "^5.8.3",
-    "vite": "^6.2.6"
+    "vite": "^6.2.6",
+    "vitest": "^3.2.4"
   }
 }
