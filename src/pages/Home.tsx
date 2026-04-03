@@ -13,6 +13,7 @@ import WorkHistoryIcon from '@mui/icons-material/WorkHistory';
 import SchoolIcon from '@mui/icons-material/School';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import PeopleIcon from '@mui/icons-material/People';
+import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
@@ -148,6 +149,11 @@ export default function Home() {
           </MenuButton>
           {userProps.isDamplabStaff && (
             <>
+              <MenuButton navigateTo="/staff_submit">
+                <SupervisorAccountOutlinedIcon />
+                Staff submit job<br />
+                (skip checkout review)
+              </MenuButton>
               <MenuButton navigateTo="/lab-monitor/north">
                 <MonitorIcon />
                 Lab Monitor North<br />(Screen display)

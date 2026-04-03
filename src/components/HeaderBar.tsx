@@ -2,8 +2,10 @@ import { useState, useEffect, useContext, useCallback } from 'react'
 import { Link, useLocation, useMatch, useNavigate } from "react-router";
 import { AppBar, Button, IconButton, Toolbar, Alert } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
+import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
 import Snackbar from '@mui/material/Snackbar';
 import { CanvasContext } from '../contexts/Canvas';
+import { UserContext } from '../contexts/UserContext';
 import LoadCanvasButton from './LoadCanvasButton';
 import SaveCanvasButton from './SaveCanvasButton';
 import "../styles/resubmit.css";
@@ -17,6 +19,8 @@ export default function HeaderBar() {
     const [snackbarMessage, setSnackbarMessage] = useState("");
 
     const { setNodes, setEdges, nodes, edges } = useContext(CanvasContext);
+    const { userProps } = useContext(UserContext);
+    const isStaff = Boolean(userProps?.isDamplabStaff);
     const windowLocation = useLocation();
 
     // This function is responsible for keeping currentCanvas up to date, it is called when user saves or loads a canvas.
@@ -148,9 +152,18 @@ export default function HeaderBar() {
                         />
 
                         { isResubmitting
-                        ? <Link to="/checkout" className="a a--hover a--active">Resubmit...</Link>
-                        : <IconButton onClick={() => navigate("/checkout")} title="Checkout page" aria-controls='menu-appbar' aria-haspopup='true'>
-                            <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
+                        ? <Link to={isStaff ? "/staff_submit" : "/checkout"} className="a a--hover a--active">Resubmit...</Link>
+                        : <IconButton
+                            onClick={() => navigate(isStaff ? "/staff_submit" : "/checkout")}
+                            title={isStaff ? "Staff: submit job for client (skip checkout review)" : "Checkout page"}
+                            aria-controls='menu-appbar'
+                            aria-haspopup='true'
+                          >
+                            {isStaff ? (
+                              <SupervisorAccountOutlinedIcon style={{color: 'white'}}/>
+                            ) : (
+                              <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
+                            )}
                           </IconButton>}
 
                     </div>

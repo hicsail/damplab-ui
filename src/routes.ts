@@ -18,6 +18,7 @@ export default [
         route("/bugs", "./pages/Bugs.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
+        route("/staff_submit", "./pages/StaffJobSubmit.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),
         route("/jobs/:jobId", "./pages/JobSubmitted.tsx"), //config later so only owner of job or admin can access
         route("/client_view/:id", "./pages/ClientView.tsx"), // Client job tracking page with SOW viewer and comments
