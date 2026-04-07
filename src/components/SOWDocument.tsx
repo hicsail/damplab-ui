@@ -117,9 +117,15 @@ const styles = StyleSheet.create({
 interface SOWDocumentProps {
   sowData: SOWData;
   customerCategory?: string | null;
+  jobDisplayId?: string | null;
 }
 
-const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) => {
+const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory, jobDisplayId }) => {
+  const displayJobId =
+    String(jobDisplayId ?? '').trim() ||
+    String(sowData.sowNumber ?? '').trim() ||
+    String(sowData.jobId ?? '').trim();
+
   const formatCurrency = (amount: number): string => {
     return `$${amount.toLocaleString()}`;
   };
@@ -154,7 +160,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
           <Text style={styles.address}>610 Commonwealth Avenue, 4th Floor, Boston, MA 02215</Text>
         </View>
         <Text style={styles.sowNumber}>
-          {sowData.sowNumber} for {sowData.sowTitle || 'Agreement to Perform Research Services'} for {sowData.clientName}
+          Job #{displayJobId} for {sowData.sowTitle || 'Agreement to Perform Research Services'} for {sowData.clientName}
         </Text>
         {sowData.jobName && (
           <Text style={{ marginBottom: 10 }}>
@@ -189,7 +195,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
         </Text>
 
         <Text style={styles.paragraph}>
-          {sowData.sowNumber}, effective as of {formatSOWDate(sowData.date)} is entered into by and between DAMP and {sowData.clientName}
+          Job #{displayJobId}, effective as of {formatSOWDate(sowData.date)} is entered into by and between DAMP and {sowData.clientName}
           {' '}and is subject to the terms and conditions specified below. The Exhibit(s) to this SOW, if any, shall
           be deemed to be a part hereof. In the event of any inconsistency between the terms of the body of this
           SOW and the terms of the Exhibit(s) hereto, the terms of the body of this SOW shall prevail.

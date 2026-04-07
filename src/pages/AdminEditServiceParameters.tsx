@@ -10,17 +10,19 @@ import {
   ListItemText,
   MenuItem,
   Paper,
+  Snackbar,
   Stack,
   TextField,
   Typography
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import { useContext, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { AppContext } from '../contexts/App';
 import { UPDATE_SERVICE } from '../gql/queries';
 import { validateParameter } from '../components/edit/parameters/ParameterValidation';
+import { idFromName, makeUniqueIds } from '../utils/idFromName';
 
 const TYPE_OPTIONS = [
   { value: 'string', label: 'Text' },
@@ -47,11 +49,17 @@ export default function AdminEditServiceParameters() {
     [serviceId, services]
   );
 
-  const [parameters, setParameters] = useState<any[]>(service?.parameters ?? []);
+  const [parameters, setParameters] = useState<any[]>([]);
   const [tableDataText, setTableDataText] = useState<Record<number, string>>({});
   const [selectedParameterIndex, setSelectedParameterIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!service) return;
+    setParameters((prev) => (prev.length ? prev : service.parameters ?? []));
+  }, [service]);
 
   if (!service) {
     return <Alert severity='error'>Service not found.</Alert>;
@@ -99,10 +107,14 @@ export default function AdminEditServiceParameters() {
   const handleSave = async () => {
     try {
       setErrorMessage(null);
+      setSuccessMessage(null);
 
       const tableParseErrors: string[] = [];
       const normalizedParameters = parameters.map((parameter, index) => {
         const normalized = { ...parameter };
+        if (!normalized.id || String(normalized.id).trim() === '') {
+          normalized.id = idFromName(normalized.name ?? '');
+        }
         if (normalized.type === 'table') {
           const raw = tableDataText[index];
           if (raw && raw.trim()) {
@@ -115,8 +127,9 @@ export default function AdminEditServiceParameters() {
         }
         return normalized;
       });
+      const normalizedWithUniqueIds = makeUniqueIds(normalizedParameters);
 
-      const validationErrors = normalizedParameters.flatMap((parameter, index) =>
+      const validationErrors = normalizedWithUniqueIds.flatMap((parameter, index) =>
         validateParameter(parameter).map((error) => `Parameter ${index + 1}: ${error.field} - ${error.errorMsg}`)
       );
 
@@ -131,12 +144,12 @@ export default function AdminEditServiceParameters() {
         variables: {
           service: service.id,
           changes: {
-            parameters: normalizedParameters
+            parameters: normalizedWithUniqueIds
           }
         }
       });
       await refreshCatalog();
-      navigate('/edit');
+      setSuccessMessage('Parameters updated.');
     } catch (error) {
       setErrorMessage('Unable to save parameter changes. Please try again.');
     } finally {
@@ -156,6 +169,17 @@ export default function AdminEditServiceParameters() {
 
       {!!errorMessage && <Alert severity='error'>{errorMessage}</Alert>}
 
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={4000}
+        onClose={() => setSuccessMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSuccessMessage(null)} severity='success' sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '280px 1fr' }, gap: 2 }}>
         <Paper variant='outlined' sx={{ p: 1, maxHeight: { md: '70vh' }, overflow: 'auto' }}>
           <Stack spacing={1}>
@@ -171,7 +195,7 @@ export default function AdminEditServiceParameters() {
                 >
                   <ListItemText
                     primary={parameter.name?.trim() ? parameter.name : 'Untitled parameter'}
-                    secondary={parameter.id ? `ID: ${parameter.id}` : undefined}
+                  secondary={undefined}
                   />
                 </ListItemButton>
               ))}
@@ -206,23 +230,21 @@ export default function AdminEditServiceParameters() {
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
-                    label='Internal ID'
-                    fullWidth
-                    value={selectedParameter.id ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, { id: event.target.value })
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 6 }}>
-                  <TextField
                     label='Name'
                     fullWidth
                     required
                     value={selectedParameter.name ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, { name: event.target.value })
-                    }
+                    onChange={(event) => {
+                      const nextName = event.target.value;
+                      const currentName = selectedParameter.name ?? '';
+                      const currentId = String(selectedParameter.id ?? '');
+                      const currentDerived = idFromName(currentName);
+                      const shouldUpdateId = currentId.trim() === '' || currentId === currentDerived;
+                      updateParameter(selectedParameterIndex, {
+                        name: nextName,
+                        ...(shouldUpdateId ? { id: idFromName(nextName) } : {})
+                      });
+                    }}
                   />
                 </Grid>
                 <Grid size={12}>

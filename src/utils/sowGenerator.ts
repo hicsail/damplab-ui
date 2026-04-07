@@ -8,6 +8,9 @@ import { calculateServiceCost, CustomerCategory } from './servicePricing';
 // Constants
 const SOW_STORAGE_KEY = 'damplab-sows';
 
+/** Shown in UI/PDF preview only until the SOW is saved; the API assigns the real number. */
+export const SOW_NUMBER_PENDING_PLACEHOLDER = 'Pending assignment';
+
 // Local interface for service generators
 interface ServiceContentGenerator {
   serviceId: string;
@@ -62,19 +65,6 @@ const serviceGenerators: ServiceContentGenerator[] = [
     baseCost: (params: any) => 50
   }
 ];
-
-// Get next SOW number from localStorage (legacy; prefer unique per-job number for new SOWs)
-const getNextSOWNumber = (): string => {
-  const stored = localStorage.getItem(SOW_STORAGE_KEY);
-  const existingSOWs = stored ? JSON.parse(stored) : [];
-  const nextNumber = existingSOWs.length + 1;
-  return nextNumber.toString().padStart(3, '0');
-};
-
-/** Unique SOW number for a new SOW. Uses a time-based suffix; jobId is kept internal, not exposed in the SOW number. */
-export const getUniqueSOWNumberForJob = (_jobId: string): string => {
-  return `SOW-${Date.now().toString(36)}`;
-};
 
 // Extract sample/plate counts from formData
 const extractSamplePlateInfo = (formData: any): { samples?: number; plates?: number; description?: string } => {
@@ -425,6 +415,8 @@ const generateServicesList = (workflows: Workflow[], customerCategory?: Customer
           description: description,
           cost: servicePrice,
           category: 'molecular-biology',
+          pricingMode: node.service.pricingMode === 'PARAMETER' ? 'PARAMETER' : 'SERVICE',
+          parameters: Array.isArray(node.service.parameters) ? node.service.parameters : undefined,
           formData: node.formData,
           pricingDetails: pricingDetails && pricingDetails.length > 0 ? pricingDetails : undefined
         });
@@ -442,7 +434,9 @@ export const generateSOWData = (
   technicianInputs: SOWTechnicianInputs,
   existingSOW?: { id?: string; sowNumber?: string }
 ): SOWData => {
-  const sowNumber = existingSOW?.sowNumber ?? getUniqueSOWNumberForJob(jobData.id);
+  // Real sowNumber comes from the server after save; preview only until then.
+  const sowNumber =
+    existingSOW?.sowNumber?.trim() ? existingSOW.sowNumber : SOW_NUMBER_PENDING_PLACEHOLDER;
   const jobCustomerCategory = jobData?.customerCategory as CustomerCategory | undefined;
   const baseCost = jobData.workflows.reduce((sum: number, wf: any) => {
     const nodes = wf?.nodes ?? [];
@@ -468,7 +462,7 @@ export const generateSOWData = (
 
   return {
     id: existingSOW?.id ?? `sow-${Date.now()}`,
-    sowNumber: sowNumber.startsWith('SOW') ? sowNumber : `SOW ${sowNumber}`,
+    sowNumber,
     date: format(new Date(), 'yyyy-MM-dd'),
     sowTitle,
     jobId: jobData.id,

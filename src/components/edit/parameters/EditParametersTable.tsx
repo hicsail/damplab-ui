@@ -31,7 +31,6 @@ import {
   ParameterBooleanSelect,
   ParameterDefaultValueInput,
   ParameterDescriptionInput,
-  ParameterIdInput,
   ParameterNameInput,
   ParameterOptionsButton,
   ParameterParamTypeSelect,
@@ -110,13 +109,6 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const handleCloseSnackbar = () => setSnackbar(null);
 
   const columns: GridColDef[] = [
-    {
-      field: 'id',
-      headerName: 'Internal ID',
-      width: 200,
-      editable: isEdit,
-      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterIdInput {...params} />),
-    },
     {
       field: 'name',
       width: 200,

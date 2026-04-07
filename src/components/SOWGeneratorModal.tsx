@@ -131,7 +131,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
             const existing = data.sowByJobId;
             setExistingSOW({
               id: existing.id,
-              sowNumber: existing.sowNumber ?? `SOW-${jobData.id}-${Date.now().toString(36)}`,
+              sowNumber: existing.sowNumber ?? '',
             });
             setTechnicianInputs(prev => {
               const startDate =
@@ -284,7 +284,6 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
       // Convert SOW data to GraphQL input format
       const sowInput = {
         jobId: jobData.id,
-        sowNumber: finalSOWData.sowNumber,
         sowTitle: finalSOWData.sowTitle || defaultSowTitle,
         date: coerceDateOnlyString(finalSOWData.date)
           ? dateOnlyStringToStableISOString(finalSOWData.date)
@@ -385,7 +384,9 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
       const base = generateSOWData(jobData, technicianInputs, existingSOW ?? undefined);
       // Preserve stable identifiers when possible to reduce churn.
       const stableId = generatedSOW?.id ?? base.id;
-      const stableSowNumber = generatedSOW?.sowNumber ?? base.sowNumber;
+      const stableSowNumber = existingSOW?.sowNumber?.trim()
+        ? existingSOW.sowNumber
+        : generatedSOW?.sowNumber ?? base.sowNumber;
       return {
         ...base,
         id: stableId,

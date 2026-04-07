@@ -13,9 +13,9 @@ export default function AdminEdit () {
 
   const tableSelector = (type: EditTypes) => {
     switch(type) {
-      case 'Services': return <EditServicesTable />;
-      case 'Categories': return <EditCategoriesTable />;
-      case 'Bundles': return <EditBundlesTable />;
+      case 'Services': return <EditServicesTable searchString={searchString} />;
+      case 'Categories': return <EditCategoriesTable searchString={searchString} />;
+      case 'Bundles': return <EditBundlesTable searchString={searchString} />;
     }
   }
 

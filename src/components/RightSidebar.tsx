@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react'
+import React, { useState, useContext } from 'react'
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, Divider, Typography } from '@mui/material';
 import Snackbar   from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
@@ -31,7 +31,7 @@ export default function ContextTestComponent(props: SidebarProps) {
     const customerCategory = userContext.userProps?.customerCategory;
 
     const [ID, setID]                 = useState('');
-    const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
+    const activeNode                  = val.nodes.find((node: any) => node.id === val.activeComponentId);
     const [openToast,  setOpenToast]  = useState(false);
     const [open,       setOpen]       = useState(false);
     const [, setPricingTick]          = useState(0);
@@ -98,10 +98,6 @@ export default function ContextTestComponent(props: SidebarProps) {
         }
         setOpenToast(false);
     };
-
-    useEffect(() => {
-        setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
-    }, [val.activeComponentId]);
 
     const normalizePrice = (value: unknown): number | undefined => {
         if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -248,6 +244,32 @@ export default function ContextTestComponent(props: SidebarProps) {
     const pricingCategoryLabel = getCustomerCategoryLabel(customerCategory);
     const pricingNotes = activeNode ? getSelectedPricingExplanations(activeNode) : [];
 
+    const priceMultiplierParamIds = new Set<string>(
+        Array.isArray(activeNode?.data?.parameters)
+            ? (activeNode!.data.parameters as any[])
+                .filter((p) => p?.isPriceMultiplier === true && typeof p?.id === 'string')
+                .map((p) => p.id as string)
+            : []
+    );
+
+    const activeNodeForParams =
+        activeNode && priceMultiplierParamIds.size > 0 && Array.isArray(activeNode.data?.formData)
+            ? {
+                ...activeNode,
+                data: {
+                    ...activeNode.data,
+                    formData: [
+                        ...(activeNode.data.formData as any[]).filter(
+                            (p: any) => p && typeof p.id === 'string' && priceMultiplierParamIds.has(p.id)
+                        ),
+                        ...(activeNode.data.formData as any[]).filter(
+                            (p: any) => !(p && typeof p.id === 'string' && priceMultiplierParamIds.has(p.id))
+                        ),
+                    ],
+                },
+            }
+            : activeNode;
+
     const action = (
         <React.Fragment>
             <Button onClick={handleCloseToast} color="secondary" size="small">
@@ -318,7 +340,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                     ? (
                         <div>
                             <Params
-                                activeNode={activeNode}
+                                activeNode={activeNodeForParams}
                                 onFormDataChange={() => setPricingTick((t) => t + 1)}
                             />
                         </div>

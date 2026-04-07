@@ -12,14 +12,18 @@ import {
   GridSlots
 } from '@mui/x-data-grid';
 import { ServiceSelection } from './ServiceSelection';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
 
 
-export const EditCategoriesTable: React.FC = () => {
+export interface EditCategoriesTableProps {
+  searchString?: string;
+}
+
+export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ searchString = '' }) => {
   const { data, refetch } = useQuery(GET_CATEGORIES);
   const [rows, setRows] = useState<any[]>([]);
   const { services } = useContext(AppContext);
@@ -33,6 +37,23 @@ export const EditCategoriesTable: React.FC = () => {
     }
     setRows([]);
   }, [data]);
+
+  const filteredRows = useMemo(() => {
+    const q = searchString.trim().toLowerCase();
+    if (!q) return rows;
+
+    return rows.filter((row) => {
+      const label = String(row?.label ?? '').toLowerCase();
+      if (label.includes(q)) return true;
+
+      const svc = row?.services;
+      if (Array.isArray(svc)) {
+        return svc.some((s: any) => String(s?.name ?? '').toLowerCase().includes(q));
+      }
+
+      return false;
+    });
+  }, [rows, searchString]);
 
   const handleDeletion = async (id: GridRowId) => {
     await client.mutate({
@@ -128,7 +149,7 @@ export const EditCategoriesTable: React.FC = () => {
 
   return (
     <DataGrid
-      rows={rows}
+      rows={filteredRows}
       columns={columns}
       rowModesModel={rowModesModel}
       onRowModesModelChange={(newMode) => setRowModesModel(newMode)}

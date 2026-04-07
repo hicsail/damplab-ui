@@ -147,7 +147,7 @@ const handleSubmitJob = async () => {
       severity: 'info',
     });
 
-    const jobId = await submitCanvasJob(apolloClient, {
+    const created = await submitCanvasJob(apolloClient, {
       workflows,
       edges: val.edges,
       nodes: val.nodes,
@@ -171,7 +171,7 @@ const handleSubmitJob = async () => {
     localStorage.setItem("CurrentCanvas", "");
 
     setTimeout(() => {
-      navigate(`/client_view/${jobId}`);
+      navigate(`/client_view/${created.id}`);
     }, 1000);
   } catch (error) {
     console.error('Job submission failed:', error);

@@ -29,6 +29,7 @@ const SOW_SIGNATURES_STORAGE_KEY = 'damplab-sow-signatures';
 
 interface SOWViewerProps {
   jobId: string;
+  jobDisplayId?: string | null;
   sowData?: {
     id: string;
     sowNumber: string;
@@ -91,7 +92,7 @@ function logSOWDataSummary(label: string, data: { clientSignature?: unknown; tec
   });
 }
 
-export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFromJob, customerCategory, currentUser }) => {
+export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, jobDisplayId, sowData: sowDataFromJob, customerCategory, currentUser }) => {
   const [fullSOWData, setFullSOWData] = useState<SOWData | null>(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [clientSignature, setClientSignature] = useState<SOWSignature | null>(null);
@@ -387,7 +388,7 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
                   return (
                     <PDFDownloadLink
                       key={pdfKey}
-                      document={<SOWDocument sowData={mergedSOWData} customerCategory={customerCategory ?? undefined} />}
+                      document={<SOWDocument sowData={mergedSOWData} customerCategory={customerCategory ?? undefined} jobDisplayId={jobDisplayId} />}
                       fileName={`${sowDataFromJob.sowNumber}-${fullSOWData!.jobName}.pdf`}
                     >
                       {({ blob, url, loading: pdfLoading }) => (
@@ -457,7 +458,7 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, sowData: sowDataFro
               return (
                 <PDFDownloadLink
                   key={pdfKey}
-                  document={<SOWDocument sowData={mergedSOWData} customerCategory={customerCategory ?? undefined} />}
+                  document={<SOWDocument sowData={mergedSOWData} customerCategory={customerCategory ?? undefined} jobDisplayId={jobDisplayId} />}
                   fileName={`${sowDataFromJob.sowNumber}-${fullSOWData!.jobName}.pdf`}
                 >
                   {({ blob, url, loading: pdfLoading }) => (

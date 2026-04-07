@@ -223,7 +223,7 @@ export default function Checkout() {
     const optionNameById = new Map(
       options
         .filter((opt: any) => opt && typeof opt.id === 'string')
-        .map((opt: any) => [String(opt.id), String(opt.name ?? opt.id)] as const)
+        .map((opt: any) => [String(opt.id), String(opt.name ?? 'Option')] as const)
     );
 
     const mapOne = (raw: unknown): string => {
