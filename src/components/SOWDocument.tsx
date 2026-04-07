@@ -173,7 +173,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
         </View>
 
         <View style={{ marginTop: 20 }}>
-          <Text style={styles.bold}>{sowData.clientName}</Text>
+          <Text>Services Performed For: {sowData.clientName}</Text>
           <Text>{sowData.clientInstitution}</Text>
           {/* <Text>{sowData.clientAddress || 'Address not provided'}</Text> */}
         </View>

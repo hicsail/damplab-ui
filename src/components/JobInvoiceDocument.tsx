@@ -143,20 +143,6 @@ function splitAddressLines(addr: string | undefined | null): { line1: string; li
   return { line1: parts[0] ?? '', line2: parts.slice(1).join(', ') };
 }
 
-function extractTrailingDigits(s: string | undefined | null): string | null {
-  const str = (s ?? '').toString();
-  const m = str.match(/(\d+)\D*$/); // trailing digits
-  return m?.[1] ?? null;
-}
-
-function getSowShortNumber(sowNumber: string | undefined | null, fallbackInvoice: string): string {
-  const digits = extractTrailingDigits(sowNumber ?? '');
-  if (!digits) return fallbackInvoice;
-  const n = Number(digits);
-  if (!Number.isFinite(n)) return fallbackInvoice;
-  return `0${String(n).padStart(2, '0')}`; // 0## format
-}
-
 export interface JobInvoiceDocumentProps {
   jobId: string;
   jobName: string;
@@ -176,7 +162,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
   const startDate = safeParseISODate(sow?.timeline?.startDate) ?? invoiceDate;
   const fyShort = getFYShort(startDate);
 
-  const sowShort = getSowShortNumber(sow?.sowNumber ?? undefined, invoiceNo);
+  const sowShort = jobId;
   const billedToName = sow?.clientName ?? 'Client';
   const billedToEmail = sow?.clientEmail ?? '';
   const { line1, line2 } = splitAddressLines(sow?.clientAddress ?? '');
@@ -208,10 +194,9 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>{isInternal ? 'INTERNAL INVOICE' : 'EXTERNAL INVOICE'}</Text>
             <Text style={styles.monoBold}>(Internal) Boston University - DAMP Lab</Text>
-            <Text>{'youremail@bu.edu'}</Text>
+            <Text>{'damplab@bu.edu'}</Text>
             <Text>{'610 Commonwealth Ave'}</Text>
             <Text>{'Boston, MA 02215'}</Text>
-            <Text>{'+# (###) ###-####'}</Text>
             <Text>{'damplab.org'}</Text>
           </View>
 
