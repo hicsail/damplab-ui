@@ -210,7 +210,8 @@ export const deleteSequence = async (client: any, sequenceId: string): Promise<b
 export const createSequencesBatch = async (sequences: Sequence[]): Promise<{ message: string; status: string; timestamp: string } | undefined> => {
   try {
     const token = getSessionToken();
-    const response = await fetch(`${process.env.REACT_APP_BACKEND_BASEURL}/mpi/sequences/batch`, {
+    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
+    const response = await fetch(`${backendUrl}/mpi/sequences/batch`, {
       method: "POST",
       headers: {
         "Content-type": "application/json; charset=UTF-8",

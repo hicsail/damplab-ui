@@ -31,7 +31,8 @@ export const handleLoginCallback = async () => {
       return false;
     }
 
-    const backendUrl = process.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
+    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
+    console.log("MPI Auth: Using backend URL:", backendUrl);
     const response = await fetch(`${backendUrl}/mpi/token`, {
       method: 'POST',
       headers: {
@@ -69,12 +70,15 @@ export const checkLoginStatus = async (): Promise<{ loggedIn: boolean; userInfo?
       return { loggedIn: false };
     }
     
-    // Try to decode the JWT to see if it's expired locally
+    // Try to decode the JWT to see if it's expired locally and log details
     try {
       const tokenParts = token.split('.');
       if (tokenParts.length === 3) {
         const payload = JSON.parse(atob(tokenParts[1]));
+        const header = JSON.parse(atob(tokenParts[0]));
         const exp = payload.exp * 1000; // Convert to milliseconds
+        
+        console.log("MPI Auth: Decoded JWT - userId:", payload.userId, "exp:", new Date(exp).toISOString(), "alg:", header.alg);
         
         if (Date.now() > exp) {
           console.log("Token expired according to JWT payload");
@@ -83,30 +87,40 @@ export const checkLoginStatus = async (): Promise<{ loggedIn: boolean; userInfo?
           localStorage.removeItem('user_info');
           return { loggedIn: false };
         }
+      } else {
+        console.error("MPI Auth: Token doesn't have 3 parts, invalid JWT format");
       }
     } catch (e) {
-      console.error("Error decoding JWT:", e);
+      console.error("MPI Auth: Error decoding JWT:", e);
     }
     
     // Verify the token with the backend using REST
-    const backendUrl = process.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
+    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
+    console.log("MPI Auth: Checking status with backend URL:", backendUrl);
     const response = await fetch(`${backendUrl}/mpi/status`, {
       headers: {
         authorization: `Bearer ${token}`
       }
     });
     
+    console.log("MPI Auth: Status response status:", response.status, response.statusText);
+    
     if (!response.ok) {
-      throw new Error('Failed to check login status');
+      const errorText = await response.text();
+      console.error("MPI Auth: Status check failed:", response.status, errorText);
+      throw new Error(`Failed to check login status: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log("MPI Auth: Status response data:", data);
     
     if (data?.loggedIn) {
+      console.log("MPI Auth: Login successful, userInfo:", data.userInfo);
       return { loggedIn: true, userInfo: data.userInfo };
     }
     
     // If we get here, we're not logged in
+    console.log("MPI Auth: Backend returned loggedIn: false");
     localStorage.removeItem('session_token');
     localStorage.removeItem('token_expires_at');
     localStorage.removeItem('user_info');
@@ -122,7 +136,7 @@ export const logout = async (): Promise<void> => {
   try {
     const token = getSessionToken();
     if (token) {
-      const backendUrl = process.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
+      const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
       await fetch(`${backendUrl}/mpi/logout`, {
         method: 'POST',
         headers: {

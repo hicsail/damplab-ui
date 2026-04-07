@@ -28,20 +28,40 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
       // Verify the token and get user info
       const verifyToken = async () => {
         try {
+          console.log("MPI Login: Verifying token from URL");
+          
+          // Decode and log the token for debugging
+          const token = localStorage.getItem('session_token');
+          if (token) {
+            try {
+              const parts = token.split('.');
+              if (parts.length === 3) {
+                const payload = JSON.parse(atob(parts[1]));
+                console.log("MPI Login: Token contains userId:", payload.userId);
+              }
+            } catch (e) {
+              console.error("MPI Login: Could not decode token:", e);
+            }
+          }
+          
           const { loggedIn, userInfo: userData } = await checkLoginStatus();
           
           if (loggedIn && userData) {
+            console.log("MPI Login: Token verified successfully");
             setUserInfo(userData);
             setIsLoggedIn(true);
           } else {
-            setError('Authentication failed. Please try again.');
+            console.error("MPI Login: Token verification failed - loggedIn:", loggedIn, "userData:", userData);
+            console.error("MPI Login: This usually means the user data wasn't found in MongoDB. Check backend logs.");
+            setError('Authentication failed. The token is valid but user data was not found. Please try logging in again.');
             localStorage.removeItem('session_token');
             setIsLoggedIn(false);
             setUserInfo(null);
           }
         } catch (error) {
-          console.error('Token verification failed:', error);
-          setError('Connection error. Please try again.');
+          console.error('MPI Login: Token verification error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Connection error. Please try again.';
+          setError(errorMessage);
           localStorage.removeItem('session_token');
           setIsLoggedIn(false);
           setUserInfo(null);
@@ -88,9 +108,11 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
     const state = Math.random().toString(36).substring(7);
     sessionStorage.setItem('auth_state', state);
     
-    const backendUrl = process.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
+    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
+    console.log("MPI Login: Using backend URL:", backendUrl);
     const currentPath = window.location.pathname;
     const loginUrl = `${backendUrl}/mpi/login?state=${encodeURIComponent(state)}&redirectTo=${encodeURIComponent(currentPath)}`;
+    console.log("MPI Login: Redirecting to:", loginUrl);
     window.location.href = loginUrl;
   };
 
@@ -108,9 +130,9 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
       handleMenuClose();
       
       // Redirect to Auth0 logout
-      const auth0Domain = process.env.REACT_APP_AUTH0_DOMAIN;
-      const clientId = process.env.REACT_APP_AUTH0_CLIENT_ID;
-      const frontendUrl = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3100';
+      const auth0Domain = import.meta.env.REACT_APP_AUTH0_DOMAIN;
+      const clientId = import.meta.env.REACT_APP_AUTH0_CLIENT_ID;
+      const frontendUrl = import.meta.env.REACT_APP_FRONTEND_URL || 'http://localhost:5173';
       const logoutUrl = `https://${auth0Domain}/v2/logout?client_id=${clientId}&returnTo=${frontendUrl}&federated`;
       window.location.href = logoutUrl;
     }
