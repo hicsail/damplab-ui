@@ -475,9 +475,18 @@ export const generateSOWData = (
     jobName: jobData.name,
     // Prefer clientDisplayName (captured at checkout), then fall back to username.
     // jobData.name is the PROJECT name.
-    clientName: jobData.clientDisplayName || jobData.username || technicianInputs.clientProjectManager || jobData.name || 'Client',
+    // Default to the job's captured display name, but allow the modal field to override it.
+    clientName:
+      (technicianInputs.clientProjectManager || '').trim() ||
+      jobData.clientDisplayName ||
+      jobData.username ||
+      jobData.name ||
+      'Client',
     clientEmail: jobData.email,
-    clientInstitution: jobData.institute,
+    // Default to the job's submitted institute, but allow modal override.
+    clientInstitution:
+      (technicianInputs.clientCostCenter || '').trim() ||
+      jobData.institute,
     clientAddress: jobData.institute, // Could be enhanced with address lookup
     scopeOfWork: generateScopeOfWork(jobData.workflows),
     deliverables: generateDeliverables(jobData.workflows),

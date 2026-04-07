@@ -293,17 +293,23 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
               </View>
             </View>
           ))}
+          {sowData.pricing.discount && (
+            <View style={styles.tableRow}>
+              <View style={styles.tableCellLarge}>
+                <Text style={styles.italic}>
+                  Discount{(sowData.pricing.discount.reason || '').trim() ? ` — ${sowData.pricing.discount.reason}` : ''}
+                </Text>
+              </View>
+              <View style={styles.tableCell}>
+                <Text style={styles.italic}>{formatCurrency(-Math.abs(sowData.pricing.discount.amount))}</Text>
+              </View>
+            </View>
+          )}
           <View style={[styles.tableRow, { fontWeight: 'bold', backgroundColor: '#f9f9f9' }]}>
             <Text style={styles.tableCellLarge}>Total</Text>
             <Text style={styles.tableCell}>{formatCurrency(sowData.pricing.totalCost)}</Text>
           </View>
         </View>
-
-        {sowData.pricing.discount && (
-          <Text style={[styles.paragraph, styles.italic]}>
-            *{sowData.pricing.discount.reason}: {formatCurrency(sowData.pricing.discount.amount)} discount applied.
-          </Text>
-        )}
 
         <Text style={styles.paragraph}>
           Upon completion of the initial performance period, University and the Client will have the option 
