@@ -68,6 +68,40 @@ const getCurrentDateTime = () => {
   return now.toLocaleString(); // Formats date and time as per local conventions
 };
 
+const formatParameterValue = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return value.map((item) => formatParameterValue(item)).join(', ');
+  }
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+  if (typeof value === 'object') {
+    const v = value as any;
+    if (typeof v.filename === 'string' && v.filename.trim() !== '') return v.filename;
+    if (typeof v.name === 'string' && v.name.trim() !== '') return v.name;
+    return '[File attached]';
+  }
+  return String(value);
+};
+
+const formatParameterDisplayValue = (parameterDef: any, value: unknown): string => {
+  if (!parameterDef || parameterDef.type !== 'dropdown') {
+    return formatParameterValue(value);
+  }
+  const options = Array.isArray(parameterDef.options) ? parameterDef.options : [];
+  const optionNameById = new Map(
+    options
+      .filter((opt: any) => opt && typeof opt.id === 'string')
+      .map((opt: any) => [String(opt.id), String(opt.name ?? opt.id)] as const)
+  );
+  const mapOne = (raw: unknown): string => {
+    const key = String(raw ?? '');
+    return optionNameById.get(key) ?? formatParameterValue(raw);
+  };
+  if (Array.isArray(value)) return value.map((v) => mapOne(v)).join(', ');
+  return mapOne(value);
+};
+
 interface JobPDFDocumentProps {
   jobId: string | undefined;
   jobName: string;
@@ -156,15 +190,20 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
         {workflow.nodes.map((service, ind) => (
           <View key={ind} style={styles.section}>
             <Text style={styles.service}>{service.label}</Text>
-            {service.formData.map((parameter: any, i: number) => {
+            {(Array.isArray(service.formData) ? service.formData : []).map((parameter: any, i: number) => {
+              const label = parameter.name ?? parameter.id ?? 'Parameter';
+              const parameterDef = (service.parameters || service.service?.parameters || []).find(
+                (p: any) => p?.id === parameter.id
+              );
+              const displayValue = formatParameterDisplayValue(parameterDef, parameter.value);
               if (parameter.type === 'boolean') {
                 if (parameter.value === true) {
-                  return(<Text key={i} style={styles.parameter}>{parameter.name}: true</Text>)
+                  return(<Text key={i} style={styles.parameter}>{label}: true</Text>)
                 } else {
-                  return(<Text key={i} style={styles.parameter}>{parameter.name}: {parameter.resultParamValue}</Text>)
+                  return(<Text key={i} style={styles.parameter}>{label}: {parameter.resultParamValue}</Text>)
                 }
               } else {
-                return(<Text key={i} style={styles.parameter}>{parameter.name}: {parameter.value}</Text>)
+                return(<Text key={i} style={styles.parameter}>{label}: {displayValue}</Text>)
               }
             })}
           </View>
@@ -175,9 +214,11 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
     ))}
   </Document>
   :
-  <div>
-    PDF Unavailable
-  </div>
+  <Document>
+    <Page>
+      <Text>PDF Unavailable</Text>
+    </Page>
+  </Document>
 );
 
 export default JobPDFDocument;

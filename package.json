@@ -5,6 +5,9 @@
   "type": "module",
   "dependencies": {
     "@apollo/client": "^3.14.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@graphql-typed-document-node/core": "^3.2.0",
@@ -13,7 +16,7 @@
     "@mui/system": "^7.0.2",
     "@mui/x-data-grid": "^7.28.3",
     "@mui/x-date-pickers": "^8.12.0",
-    "@react-pdf/renderer": "^4.3.0",
+    "@react-pdf/renderer": "^4.3.2",
     "@react-router/node": "^7.5.3",
     "@types/xlsx": "^0.0.36",
     "date-fns": "^4.1.0",
@@ -33,7 +36,9 @@
   },
   "scripts": {
     "build": "react-router build",
-    "dev": "react-router dev"
+    "dev": "react-router dev",
+    "codegen": "graphql-codegen --config codegen.ts",
+    "test": "node ./node_modules/vitest/vitest.mjs run"
   },
   "eslintConfig": {
     "extends": [
@@ -62,7 +67,9 @@
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "buffer": "^6.0.3",
     "typescript": "^5.8.3",
-    "vite": "^6.2.6"
+    "vite": "^6.2.6",
+    "vitest": "^3.2.4"
   }
 }

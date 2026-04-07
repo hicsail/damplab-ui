@@ -26,9 +26,13 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PreviewIcon from '@mui/icons-material/Preview';
 import EditIcon from '@mui/icons-material/Edit';
 import { PDFDownloadLink } from '@react-pdf/renderer';
+import { format, parseISO } from 'date-fns';
 
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWEditableSections } from '../types/SOWTypes';
-import { generateSOWData, getTeamMembers, storeSOW } from '../utils/sowGenerator';
+import { generateSOWData } from '../utils/sowGenerator';
+import { GET_SOW_BY_JOB_ID, GET_JOB_BY_ID, GET_LAB_MONITOR_STAFF_LIST } from '../gql/queries';
+import { UPSERT_SOW_FOR_JOB } from '../gql/mutations';
+import { useApolloClient, useQuery } from '@apollo/client';
 import SOWDocument from './SOWDocument';
 
 interface SOWGeneratorModalProps {
@@ -38,10 +42,13 @@ interface SOWGeneratorModalProps {
 }
 
 const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jobData }) => {
+  const defaultSowTitle = 'Agreement to Perform Research Services';
   const [technicianInputs, setTechnicianInputs] = useState<SOWTechnicianInputs>({
     projectManager: '',
     projectLead: '',
-    startDate: new Date().toISOString().split('T')[0],
+    sowTitle: defaultSowTitle,
+    // Use local date, not UTC (toISOString), to avoid "one day behind" in most US timezones.
+    startDate: format(new Date(), 'yyyy-MM-dd'),
     duration: 14,
     pricingAdjustments: [],
     specialInstructions: '',
@@ -53,34 +60,139 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
   const [showPreview, setShowPreview] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editableSections, setEditableSections] = useState<SOWEditableSections>({
-    scopeOfWork: '',
+    scopeOfWork: [],
     deliverables: [],
     services: [],
     additionalInformation: '',
   });
   const [isEditingContent, setIsEditingContent] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [existingSOW, setExistingSOW] = useState<{ id: string; sowNumber: string } | null>(null);
 
-  const teamMembers = getTeamMembers();
+  type TeamMemberOption = { id: string; name: string; title?: string };
+  const { data: staffData } = useQuery(GET_LAB_MONITOR_STAFF_LIST, { pollInterval: 60000 });
+  const staffMembers: TeamMemberOption[] = React.useMemo(
+    () =>
+      (staffData?.getLabMonitorStaffList ?? []).map((m: { id: string; displayName: string }) => ({
+        id: m.id,
+        name: m.displayName,
+        title: 'DAMP Staff',
+      })),
+    [staffData],
+  );
 
-  // Generate SOW data whenever inputs change
+  // If an existing SOW references a name that's not in the current staff list, keep it visible.
+  const projectManagerOptions = React.useMemo(() => {
+    const current = technicianInputs.projectManager;
+    if (!current) return staffMembers;
+    if (staffMembers.some((m) => m.name === current)) return staffMembers;
+    return [...staffMembers, { id: '__current_project_manager__', name: current }];
+  }, [staffMembers, technicianInputs.projectManager]);
+
+  const projectLeadOptions = React.useMemo(() => {
+    const current = technicianInputs.projectLead;
+    if (!current) return staffMembers;
+    if (staffMembers.some((m) => m.name === current)) return staffMembers;
+    return [...staffMembers, { id: '__current_project_lead__', name: current }];
+  }, [staffMembers, technicianInputs.projectLead]);
+
+  const client = useApolloClient();
+
+  // Clear existing SOW when modal closes or job changes
+  useEffect(() => {
+    if (!open || !jobData?.id) {
+      setExistingSOW(null);
+    }
+  }, [open, jobData?.id]);
+
+  // Load existing SOW if it exists
+  useEffect(() => {
+    const loadExistingSOW = async () => {
+      if (jobData?.id && open) {
+        setExistingSOW(null);
+        try {
+          const { data } = await client.query({
+            query: GET_SOW_BY_JOB_ID,
+            variables: { jobId: jobData.id },
+            fetchPolicy: 'network-only'
+          });
+
+          if (data?.sowByJobId) {
+            const existing = data.sowByJobId;
+            setExistingSOW({
+              id: existing.id,
+              sowNumber: existing.sowNumber ?? `SOW-${jobData.id}-${Date.now().toString(36)}`,
+            });
+            setTechnicianInputs(prev => {
+              const startDate = existing.timeline?.startDate
+                ? format(new Date(existing.timeline.startDate), 'yyyy-MM-dd')
+                : prev.startDate;
+              const durStr = existing.timeline?.duration;
+              let duration = prev.duration;
+              if (typeof durStr === 'string' && /^\d+/.test(durStr)) {
+                duration = parseInt(durStr, 10) || prev.duration;
+              }
+              return {
+                ...prev,
+                projectManager: existing.resources?.projectManager || '',
+                projectLead: existing.resources?.projectLead || '',
+                sowTitle: (existing as { sowTitle?: string }).sowTitle || defaultSowTitle,
+                startDate,
+                duration,
+                clientProjectManager: existing.clientName || '',
+              };
+            });
+            setEditableSections({
+              scopeOfWork: existing.scopeOfWork || [],
+              deliverables: existing.deliverables || [],
+              services: existing.services || [],
+              additionalInformation: existing.additionalInformation || '',
+            });
+          }
+        } catch (error) {
+          // SOW doesn't exist yet, that's fine
+        }
+      }
+    };
+
+    loadExistingSOW();
+  }, [open, jobData?.id, client]);
+
+  // Generate SOW data whenever inputs change; preserve existing SOW number when updating to avoid conflicts
   useEffect(() => {
     if (jobData && technicianInputs.projectManager && technicianInputs.projectLead) {
       try {
-        const sowData = generateSOWData(jobData, technicianInputs);
+        const sowData = generateSOWData(jobData, technicianInputs, existingSOW ?? undefined);
         setGeneratedSOW(sowData);
-        
-        // Initialize editable sections from generated data
-        setEditableSections({
-          scopeOfWork: sowData.scopeOfWork,
-          deliverables: sowData.deliverables,
-          services: sowData.services,
-          additionalInformation: '',
-        });
+        // Only initialize editable sections from generated data when creating new SOW (no existing)
+        if (!existingSOW) {
+          setEditableSections({
+            scopeOfWork: Array.isArray(sowData.scopeOfWork) ? sowData.scopeOfWork : [sowData.scopeOfWork],
+            deliverables: sowData.deliverables,
+            services: sowData.services,
+            additionalInformation: '',
+          });
+        }
       } catch (error) {
         console.error('Error generating SOW:', error);
       }
     }
-  }, [jobData, technicianInputs]);
+  }, [jobData, technicianInputs, existingSOW]);
+
+  // Auto-populate the Client Project Manager field from the job's display name.
+  // Only fill when empty so we don't clobber user edits.
+  useEffect(() => {
+    if (!open) return;
+    if (!jobData) return;
+    const displayName = jobData.clientDisplayName || jobData.username || '';
+    if (!displayName) return;
+    setTechnicianInputs((prev) => {
+      if (prev.clientProjectManager && prev.clientProjectManager.trim() !== '') return prev;
+      return { ...prev, clientProjectManager: displayName };
+    });
+  }, [open, jobData]);
 
   const handleInputChange = (field: keyof SOWTechnicianInputs, value: any) => {
     setTechnicianInputs(prev => ({
@@ -148,18 +260,90 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleGenerateSOW = () => {
+  const handleGenerateSOW = async () => {
     const finalSOWData = getFinalSOWData();
-    if (!validateInputs() || !finalSOWData) {
+    if (!validateInputs() || !finalSOWData || !jobData?.id) {
       return;
     }
 
-    // Store the SOW in localStorage
-    storeSOW(finalSOWData);
-    
-    // Close modal and show success message
-    onClose();
-    // Could add a success notification here
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    try {
+      // Convert SOW data to GraphQL input format
+      const sowInput = {
+        jobId: jobData.id,
+        sowNumber: finalSOWData.sowNumber,
+        sowTitle: finalSOWData.sowTitle || defaultSowTitle,
+        date: new Date(finalSOWData.date).toISOString(),
+        clientName: finalSOWData.clientName,
+        clientEmail: finalSOWData.clientEmail,
+        clientInstitution: finalSOWData.clientInstitution,
+        clientAddress: finalSOWData.clientAddress || '',
+        scopeOfWork: finalSOWData.scopeOfWork,
+        deliverables: finalSOWData.deliverables,
+        services: finalSOWData.services.map(s => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          cost: s.cost,
+          category: s.category,
+          formData: s.formData
+        })),
+        timeline: {
+          startDate: new Date(finalSOWData.timeline.startDate).toISOString(),
+          endDate: new Date(finalSOWData.timeline.endDate).toISOString(),
+          duration: finalSOWData.timeline.duration
+        },
+        resources: {
+          projectManager: finalSOWData.resources.projectManager,
+          projectLead: finalSOWData.resources.projectLead
+        },
+        pricing: {
+          baseCost: finalSOWData.pricing.baseCost,
+          adjustments: finalSOWData.pricing.adjustments.map(adj => ({
+            type: adj.type.toUpperCase().replace('-', '_') as any,
+            description: adj.description,
+            amount: adj.amount,
+            reason: adj.reason || ''
+          })),
+          totalCost: finalSOWData.pricing.totalCost,
+          discount: finalSOWData.pricing.discount ? {
+            amount: finalSOWData.pricing.discount.amount,
+            reason: finalSOWData.pricing.discount.reason
+          } : null
+        },
+        terms: finalSOWData.terms,
+        additionalInformation: finalSOWData.additionalInformation || '',
+        createdBy: finalSOWData.createdBy || 'technician',
+        status: 'DRAFT'
+      };
+
+      // Use upsert to create or update
+      await client.mutate({
+        mutation: UPSERT_SOW_FOR_JOB,
+        variables: {
+          jobId: jobData.id,
+          input: sowInput
+        },
+        refetchQueries: [
+          { query: GET_SOW_BY_JOB_ID, variables: { jobId: jobData.id } },
+          { query: GET_JOB_BY_ID, variables: { id: jobData.id } }
+        ]
+      });
+
+      setSaveSuccess(true);
+      setTimeout(() => {
+        onClose();
+        setSaveSuccess(false);
+      }, 1500);
+    } catch (error: any) {
+      console.error('Error saving SOW:', error);
+      setSaveError(error.message || 'Failed to save SOW. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReviewSOW = () => {
@@ -193,8 +377,8 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
         <DialogTitle>
-          <Typography variant="h5">Generate Statement of Work</Typography>
-          <Typography variant="subtitle2" color="text.secondary">
+          <Typography variant="h6" component="div">Generate Statement of Work</Typography>
+          <Typography variant="body2" color="text.secondary" component="div">
             Job: {jobData.name} (ID: {jobData.id})
           </Typography>
         </DialogTitle>
@@ -253,7 +437,15 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                 </Box>
                 
                 <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}><strong>Scope of Work:</strong></Typography>
-                <Typography variant="body2" sx={{ mb: 2 }}>{finalSOWData.scopeOfWork}</Typography>
+                <ul>
+                  {Array.isArray(finalSOWData.scopeOfWork) ? (
+                    finalSOWData.scopeOfWork.map((item, index) => (
+                      <li key={index}><Typography variant="body2">{item}</Typography></li>
+                    ))
+                  ) : (
+                    <li><Typography variant="body2">{finalSOWData.scopeOfWork}</Typography></li>
+                  )}
+                </ul>
                 
                 <Typography variant="subtitle1" sx={{ mb: 1 }}><strong>Deliverables:</strong></Typography>
                 <ul>
@@ -283,7 +475,10 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                     <Box sx={{ flex: '1 1 300px' }}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Client:</strong> {jobData.username}
+                        <strong>Client:</strong> {jobData.clientDisplayName || jobData.username || jobData.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        <strong>Project:</strong> {jobData.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         <strong>Email:</strong> {jobData.email}
@@ -304,6 +499,16 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                 </CardContent>
               </Card>
 
+              <TextField
+                fullWidth
+                label="SOW Title"
+                value={technicianInputs.sowTitle}
+                onChange={(e) => handleInputChange('sowTitle', e.target.value)}
+                placeholder={defaultSowTitle}
+                helperText="Document title shown on the SOW (e.g. Agreement to Perform Research Services)"
+                sx={{ mb: 3 }}
+              />
+
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {/* Team Assignment */}
                 <Box sx={{ flex: '1 1 400px' }}>
@@ -317,9 +522,9 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                       onChange={(e) => handleInputChange('projectManager', e.target.value)}
                       label="Project Manager"
                     >
-                      {teamMembers.map((member) => (
+                      {projectManagerOptions.map((member) => (
                         <MenuItem key={member.id} value={member.name}>
-                          {member.name} - {member.title}
+                          {member.name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -337,9 +542,9 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                       onChange={(e) => handleInputChange('projectLead', e.target.value)}
                       label="Project Lead"
                     >
-                      {teamMembers.map((member) => (
+                      {projectLeadOptions.map((member) => (
                         <MenuItem key={member.id} value={member.name}>
-                          {member.name} - {member.title}
+                          {member.name}
                         </MenuItem>
                       ))}
                     </Select>
@@ -358,8 +563,9 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   </Typography>
                   <DatePicker
                     label="Start Date"
-                    value={new Date(technicianInputs.startDate)}
-                    onChange={(date) => handleInputChange('startDate', date?.toISOString().split('T')[0] || '')}
+                    // Avoid `new Date('YYYY-MM-DD')` (UTC parsing) which can display as the prior day locally.
+                    value={technicianInputs.startDate ? parseISO(technicianInputs.startDate) : null}
+                    onChange={(date) => handleInputChange('startDate', date ? format(date, 'yyyy-MM-dd') : '')}
                     slotProps={{
                       textField: {
                         fullWidth: true,
@@ -518,18 +724,38 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   </Typography>
                   
                   {/* Scope of Work Editor */}
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={4}
-                    label="Scope of Work"
-                    value={editableSections.scopeOfWork}
-                    onChange={(e) => setEditableSections({
+                  <Typography variant="subtitle1" sx={{ mb: 1 }}>Scope of Work</Typography>
+                  {editableSections.scopeOfWork.map((item, index) => (
+                    <Box key={index} display="flex" gap={1} mb={1}>
+                      <TextField
+                        fullWidth
+                        value={item}
+                        onChange={(e) => {
+                          const newScope = [...editableSections.scopeOfWork];
+                          newScope[index] = e.target.value;
+                          setEditableSections({...editableSections, scopeOfWork: newScope});
+                        }}
+                      />
+                      <IconButton
+                        onClick={() => {
+                          const newScope = editableSections.scopeOfWork.filter((_, i) => i !== index);
+                          setEditableSections({...editableSections, scopeOfWork: newScope});
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  ))}
+                  <Button
+                    startIcon={<AddIcon />}
+                    onClick={() => setEditableSections({
                       ...editableSections,
-                      scopeOfWork: e.target.value
+                      scopeOfWork: [...editableSections.scopeOfWork, '']
                     })}
                     sx={{ mb: 2 }}
-                  />
+                  >
+                    Add Scope Item
+                  </Button>
                   
                   {/* Deliverables Editor */}
                   <Typography variant="subtitle1" sx={{ mb: 1 }}>Deliverables</Typography>
@@ -606,7 +832,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={onClose}>
+          <Button onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>
           {!showPreview && (
@@ -614,6 +840,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
               variant="outlined"
               startIcon={<EditIcon />}
               onClick={() => setIsEditingContent(!isEditingContent)}
+              disabled={isSaving}
             >
               {isEditingContent ? 'Done Editing' : 'Edit Content'}
             </Button>
@@ -623,7 +850,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
               variant="outlined"
               startIcon={<PreviewIcon />}
               onClick={handleReviewSOW}
-              disabled={!getFinalSOWData()}
+              disabled={!getFinalSOWData() || isSaving}
             >
               Review SOW
             </Button>
@@ -632,12 +859,22 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
             <Button
               variant="contained"
               onClick={handleGenerateSOW}
-              disabled={!getFinalSOWData()}
+              disabled={!getFinalSOWData() || isSaving}
             >
-              Generate & Save SOW
+              {isSaving ? 'Saving...' : 'Generate & Save SOW'}
             </Button>
           )}
         </DialogActions>
+        {saveError && (
+          <Alert severity="error" sx={{ m: 2 }} onClose={() => setSaveError(null)}>
+            {saveError}
+          </Alert>
+        )}
+        {saveSuccess && (
+          <Alert severity="success" sx={{ m: 2 }}>
+            SOW saved successfully!
+          </Alert>
+        )}
       </Dialog>
     </LocalizationProvider>
   );

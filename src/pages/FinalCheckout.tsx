@@ -1,11 +1,11 @@
 //V4
 
 import React, { useState, useEffect, useContext } from 'react';
-import { useMutation } from "@apollo/client";
-import { CREATE_JOB } from "../gql/mutations";
+import { useApolloClient } from "@apollo/client";
 import { CanvasContext } from "../contexts/Canvas";
 import { useLocation, useNavigate } from 'react-router';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
+import { submitCanvasJob } from '../utils/canvasJobSubmission';
 import {
   Snackbar,
   Typography,
@@ -19,12 +19,6 @@ import {
   CircularProgress, 
 } from '@mui/material';
 
-import {
-  transformEdgesToGQL,
-  transformNodesToGQL,
-} from "../controllers/GraphHelpers";
-
-
 interface SnackbarState {
   open: boolean;
   message: string;
@@ -36,29 +30,7 @@ interface WorkflowCost {
   // Add other properties if they exist
 }
 
-interface WorkflowNode {
-  id: string;
-  type: string;
-  data: {
-    id: string;
-    label: string;
-    serviceId: string;
-    parameters?: Array<{
-      id: string;
-      name: string;
-      type: string;
-      paramType: string;
-      required: boolean;
-    }>;
-    formData?: Array<{
-      id: string;
-      nodeId: string;
-      name: string;
-      value: any;
-    }>;
-  };
-}
-
+const CANVAS_AUTOSAVE_KEY = "canvas:autosave";
 
 /**
  * FinalCheckout Component
@@ -74,9 +46,9 @@ export default function FinalCheckout() {
   const val = useContext(CanvasContext);
   const location = useLocation();
   const navigate = useNavigate();
+  const apolloClient = useApolloClient();
   const userContext: UserContextProps = useContext(UserContext);
   const userProps = userContext.userProps;
-  const token = userContext.userProps?.accessToken;
   //formData retrieved from auth
   const email = userProps.idTokenParsed?.email ?? '';
   const name = userProps.idTokenParsed?.name ?? '';
@@ -91,6 +63,7 @@ export default function FinalCheckout() {
     institute: false,
   });
   const [redirecting, setRedirecting] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
   
   // Form data state management
   const [formData, setFormData] = useState({
@@ -99,42 +72,7 @@ export default function FinalCheckout() {
     notes: ''
   });
 
-  // GraphQL mutation for job creation
-  const [createJob, { loading: jobLoading }] = useMutation(CREATE_JOB, {
-    onCompleted: (data) => {
-      // Store job details in localStorage for persistence
-      let fileName = `${data.createJob.id}_${new Date().toLocaleString()}`;
-      let file = {
-        fileName: fileName,
-        nodes: val.nodes,
-        edges: val.edges,
-      };
-      localStorage.setItem(fileName, JSON.stringify(file));
-      
-      setSnackbarState({
-        open: true,
-        message: 'Job submitted successfully!',
-        severity: 'success',
-        showSpinner: true     
-      });
-      
-      // Navigate after showing the success message
-      const jobId = data.createJob.id;
-
-      setTimeout(() => {
-        navigate(`/jobs/${jobId}`);
-      }, 1000);
-    },
-    onError: (error: any) => {
-      console.error("Error creating job:", error);
-      setSnackbarState({
-        open: true,
-        message: 'Failed to submit job. Please try again.',
-        severity: 'error',
-        showSpinner:false
-      });
-    },
-  });
+  const [jobLoading, setJobLoading] = useState(false);
 
   useEffect(() => {
     // Guard: redirect if didn't come from previous page/state parsed
@@ -187,6 +125,12 @@ export default function FinalCheckout() {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
   };
 
+  const handleAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+    setAttachments(Array.from(files));
+  };
+
 /**
   * Handles the job submission process
   * Transforms workflow data and submits to backend
@@ -196,40 +140,48 @@ const handleSubmitJob = async () => {
   const workflows = location.state?.orderSummary?.workflows || [];
 
   try {
-    const data = {
-      name: formData.jobName,
-      institute: formData.institute,
-      notes: formData.notes, // Optional
-      workflows: workflows.map((workflow: any) => ({
-        name: `Workflow-${workflow.id || workflow[0]?.id}`,
-        nodes: transformNodesToGQL(Array.isArray(workflow) ? workflow : [workflow]),
-        edges: transformEdgesToGQL(
-          val.edges.filter((edge: any) => {
-            const workflowNodes = Array.isArray(workflow) ? workflow : [workflow];
-            return workflowNodes.some(node => node.id === edge.source) &&
-                   workflowNodes.some(node => node.id === edge.target);
-          })
-        )
-      }))
-    };
+    setJobLoading(true);
     setSnackbarState({
       open: true,
       message: 'Submitting job...',
-      severity: 'secondary',
-      showSpinner: true
+      severity: 'info',
     });
 
-    const token = await userContext.userProps?.getAccessToken();
-    await createJob({ 
-      variables: { createJobInput: data },
-      context: {
-        headers: {
-          authorization: token ? `Bearer ${token}` : "",
-        },
-      },
+    const jobId = await submitCanvasJob(apolloClient, {
+      workflows,
+      edges: val.edges,
+      nodes: val.nodes,
+      jobName: formData.jobName,
+      institute: formData.institute,
+      notes: formData.notes,
+      clientDisplayName: name,
+      attachments,
+      getAccessToken: () => userContext.userProps?.getAccessToken() ?? Promise.resolve(undefined),
     });
+
+    setSnackbarState({
+      open: true,
+      message: 'Job submitted successfully!',
+      severity: 'success',
+    });
+
+    val.setNodes([]);
+    val.setEdges([]);
+    localStorage.removeItem(CANVAS_AUTOSAVE_KEY);
+    localStorage.setItem("CurrentCanvas", "");
+
+    setTimeout(() => {
+      navigate(`/client_view/${jobId}`);
+    }, 1000);
   } catch (error) {
     console.error('Job submission failed:', error);
+    setSnackbarState({
+      open: true,
+      message: 'Failed to submit job. Please try again.',
+      severity: 'error',
+    });
+  } finally {
+    setJobLoading(false);
   }}
 
   const formatPriceLabel = (price: number | null | undefined): string => {
@@ -352,6 +304,40 @@ const handleSubmitJob = async () => {
           />
         </Grid>
       </Grid>
+
+      <Typography variant="h6" sx={{ mt: 3, mb: 1, textAlign: 'left', fontWeight: 500 }}>
+        Attach Supporting Documents
+      </Typography>
+      <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', textAlign: 'left' }}>
+        You can select files to attach to this job. Uploaded files will be included with your submission.
+      </Typography>
+      <Grid item xs={12} sx={{ mb: 2 }}>
+        <Button
+          variant="outlined"
+          component="label"
+          sx={{ textTransform: 'none' }}
+        >
+          Choose Files
+          <input
+            type="file"
+            multiple
+            hidden
+            onChange={handleAttachmentChange}
+          />
+        </Button>
+      </Grid>
+      {attachments.length > 0 && (
+        <Box sx={{ mb: 3, textAlign: 'left' }}>
+          <Typography variant="body2" sx={{ mb: 0.5 }}>
+            Selected files (not yet uploaded):
+          </Typography>
+          {attachments.map((file) => (
+            <Typography key={file.name} variant="body2" color="text.secondary">
+              • {file.name} ({Math.round(file.size / 1024)} KB)
+            </Typography>
+          ))}
+        </Box>
+      )}
     </Box>
 
 
@@ -410,7 +396,7 @@ const handleSubmitJob = async () => {
         <Alert
           severity="info" sx={{ mb: 3, borderRadius: 2}}
         >
-          *Please note: The final price and payment details, along with other relevant information, will someday be sent to your email.
+          *Please note: The final price and payment details, along with other relevant information, will be sent to your email.
         </Alert>
 
         <Button

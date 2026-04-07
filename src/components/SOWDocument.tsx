@@ -2,6 +2,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { SOWData } from '../types/SOWTypes';
+import { formatSOWDate, formatSOWDateShort } from '../utils/sowDateUtils';
 
 // Using default fonts to avoid font loading issues
 
@@ -79,6 +80,10 @@ const styles = StyleSheet.create({
     flex: 2,
     paddingHorizontal: 5,
   },
+  tableSubLine: {
+    fontSize: 9,
+    marginTop: 2,
+  },
   bold: {
     fontWeight: 'bold',
   },
@@ -111,11 +116,27 @@ const styles = StyleSheet.create({
 
 interface SOWDocumentProps {
   sowData: SOWData;
+  customerCategory?: string | null;
 }
 
-const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
+const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) => {
   const formatCurrency = (amount: number): string => {
     return `$${amount.toLocaleString()}`;
+  };
+
+  const getCustomerCategoryLabel = (category?: string | null): string => {
+    switch (category) {
+      case 'INTERNAL_CUSTOMERS':
+        return 'Internal customers';
+      case 'EXTERNAL_CUSTOMER_ACADEMIC':
+        return 'External (Academic)';
+      case 'EXTERNAL_CUSTOMER_MARKET':
+        return 'External (Market)';
+      case 'EXTERNAL_CUSTOMER_NO_SALARY':
+        return 'External (No salary)';
+      default:
+        return 'Customer category';
+    }
   };
 
   return (
@@ -133,12 +154,17 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           <Text style={styles.address}>610 Commonwealth Avenue, 4th Floor, Boston, MA 02215</Text>
         </View>
         <Text style={styles.sowNumber}>
-          {sowData.sowNumber} for Agreement to Perform Research Services for {sowData.clientName}
+          {sowData.sowNumber} for {sowData.sowTitle || 'Agreement to Perform Research Services'} for {sowData.clientName}
         </Text>
+        {sowData.jobName && (
+          <Text style={{ marginBottom: 10 }}>
+            Project: {sowData.jobName}
+          </Text>
+        )}
 
         {/* Date and Parties */}
         <View>
-          <Text>Date Services Performed By: {sowData.date}</Text>
+          <Text>Date Services Performed By: {formatSOWDate(sowData.date)}</Text>
           <Text>Services Performed For:</Text>
           <Text style={styles.bold}>Trustees of Boston University</Text>
           <Text>DAMP Lab of Boston University</Text>
@@ -163,32 +189,54 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         </Text>
 
         <Text style={styles.paragraph}>
-          {sowData.sowNumber}, effective as of {sowData.date} is entered into by and between DAMP and {sowData.clientName} 
-          and is subject to the terms and conditions specified below. The Exhibit(s) to this SOW, if any, shall 
-          be deemed to be a part hereof. In the event of any inconsistency between the terms of the body of this 
+          {sowData.sowNumber}, effective as of {formatSOWDate(sowData.date)} is entered into by and between DAMP and {sowData.clientName}
+          {' '}and is subject to the terms and conditions specified below. The Exhibit(s) to this SOW, if any, shall
+          be deemed to be a part hereof. In the event of any inconsistency between the terms of the body of this
           SOW and the terms of the Exhibit(s) hereto, the terms of the body of this SOW shall prevail.
         </Text>
 
         {/* Period of Performance */}
         <Text style={styles.sectionTitle}>Period of Performance</Text>
         <Text style={styles.paragraph}>
-          The total turn-around time is estimated to be within {sowData.timeline.duration} from the start date. 
-          Therefore, the services herewith mentioned shall commence on {sowData.timeline.startDate} and continue 
-          until {sowData.timeline.endDate}.
+          The total turn-around time is estimated to be within {sowData.timeline.duration} from the start date.
+          Therefore, the services herewith mentioned shall commence on {formatSOWDate(sowData.timeline.startDate)} and continue
+          until {formatSOWDate(sowData.timeline.endDate)}.
         </Text>
 
         {/* Engagement Resources */}
         <Text style={styles.sectionTitle}>Engagement Resources</Text>
         <Text style={styles.paragraph}>
-          The Services contemplated by this SOW shall be performed by the DAMP team, which shall include the 
+          The Services contemplated by this SOW shall be performed by the DAMP team, which shall include the
           following individuals:
         </Text>
         <Text style={styles.listItem}>{sowData.resources.projectManager} – Project Manager</Text>
-        <Text style={styles.listItem}>{sowData.resources.projectLead} - Project Lead</Text>
+        <Text style={styles.listItem}>{sowData.resources.projectLead} – Project Lead</Text>
 
         {/* Scope of Work */}
         <Text style={styles.sectionTitle}>Scope of Work</Text>
-        <Text style={styles.paragraph}>{sowData.scopeOfWork}</Text>
+        {Array.isArray(sowData.scopeOfWork) ? (
+          sowData.scopeOfWork.map((item, index) => (
+            <Text key={index} style={styles.listItem}>
+              {index + 1}) {item}
+            </Text>
+          ))
+        ) : (
+          // Fallback for old string format - split by newlines if present
+          typeof sowData.scopeOfWork === 'string' ? (
+            (sowData.scopeOfWork as string)
+              .split('\n')
+              .map((line: string, index: number) =>
+                line.trim() ? (
+                  <Text key={index} style={styles.listItem}>
+                    {index + 1}) {line.trim()}
+                  </Text>
+                ) : null
+              )
+              .filter(Boolean)
+          ) : (
+            <Text style={styles.paragraph}>{String(sowData.scopeOfWork)}</Text>
+          )
+        )}
 
         {/* Deliverables */}
         <Text style={styles.sectionTitle}>Deliverables</Text>
@@ -217,6 +265,9 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           This engagement will be conducted on a Project basis. The total value for the Services pursuant 
           to this SOW is presented in the following table:
         </Text>
+        <Text style={[styles.paragraph, { fontSize: 10 }]}>
+          Pricing category: {getCustomerCategoryLabel(customerCategory ?? undefined)}
+        </Text>
 
         <View style={styles.table}>
           <View style={styles.tableHeader}>
@@ -225,8 +276,21 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           </View>
           {sowData.services.map((service, index) => (
             <View key={index} style={styles.tableRow}>
-              <Text style={styles.tableCellLarge}>{service.name}</Text>
-              <Text style={styles.tableCell}>{formatCurrency(service.cost)}</Text>
+              <View style={styles.tableCellLarge}>
+                <Text>{service.name}</Text>
+                {Array.isArray(service.pricingDetails) && service.pricingDetails.length > 0 && (
+                  <View style={{ marginTop: 2 }}>
+                    {service.pricingDetails.map((item, idx) => (
+                      <Text key={idx} style={styles.tableSubLine}>
+                        • {item.label}: {item.quantity} × {formatCurrency(item.unitPrice)} = {formatCurrency(item.total)}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+              </View>
+              <View style={styles.tableCell}>
+                <Text>{formatCurrency(service.cost)}</Text>
+              </View>
             </View>
           ))}
           <View style={[styles.tableRow, { fontWeight: 'bold', backgroundColor: '#f9f9f9' }]}>
@@ -242,7 +306,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         )}
 
         <Text style={styles.paragraph}>
-          Upon completion of the initial performance period, University and the Sponsor will have the option 
+          Upon completion of the initial performance period, University and the Client will have the option 
           to renew this SOW for an additional then-stated project for those resources identified.
         </Text>
 
@@ -253,30 +317,28 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
         {/* Invoice Procedures */}
         <Text style={styles.sectionTitle}>Invoice Procedures</Text>
         <Text style={styles.paragraph}>
-          Sponsor will be invoiced for the Services. It is agreed by the parties that standard invoicing is acceptable. 
+          Client will be invoiced for the Services. It is agreed by the parties that standard invoicing is acceptable. 
           Payments are due upon receipt of such invoices.
         </Text>
         <Text style={styles.paragraph}>
           Invoices shall be submitted in arrears, referencing this SOW Number to the address indicated above. 
-          Terms of payment for the invoice is due upon receipt by Sponsor of a proper invoice. University shall 
-          provide Sponsor with sufficient details to support its invoices, including list of services performed 
-          and justifications for authorized expenses, unless otherwise agreed to by the parties. Payments for 
-          services invoiced that are not received within 30-days from the date of invoice will be subject to a 
-          5% penalty per calendar month.
+          Terms of payment for the invoice are due upon receipt by Client of a proper invoice. DAMP Lab shall 
+          provide Client with sufficient details to support its invoices, including list of services performed 
+          and justifications for authorized expenses, unless otherwise agreed to by the parties.
         </Text>
 
         {/* Completion Criteria */}
         <Text style={styles.sectionTitle}>Completion Criteria</Text>
         <Text style={styles.paragraph}>
-          University shall have fulfilled its obligations when any one of the following first occurs:
+          DAMP Lab shall have fulfilled its obligations when any one of the following first occurs:
         </Text>
         <Text style={styles.listItem}>
-          • University completes the Services described within this SOW, and Sponsor accepts such Services 
-          without unreasonable objections. No response from Sponsor within 2-business days of deliverables 
-          being delivered by University is deemed acceptance.
+          • DAMP Lab completes the Services described within this SOW, and Client accepts such Services 
+          without unreasonable objections. No response from Client within 2-business days of deliverables 
+          being delivered by DAMP Lab is deemed acceptance.
         </Text>
         <Text style={styles.listItem}>
-          • University and/or Sponsor has the right to cancel the Services not yet provided with 20 business 
+          • DAMP Lab and/or Client has the right to cancel the Services not yet provided with 20 business 
           days advance written notice to the other party.
         </Text>
 
@@ -290,7 +352,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
           the change, the rationale for the change, and the effect the change will have on the Project.
         </Text>
         <Text style={styles.listItem}>
-          • The designated Project Manager of the requesting party (University or Sponsor) will review the 
+          • The designated Project Manager of the requesting party (University or Client) will review the 
           proposed change and determine whether to submit a request to the other party.
         </Text>
         <Text style={styles.listItem}>
@@ -301,10 +363,10 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
 
         {/* Additional Information */}
         {sowData.additionalInformation && (
-          <>
+          <View>
             <Text style={styles.sectionTitle}>Additional Information</Text>
             <Text style={styles.paragraph}>{sowData.additionalInformation}</Text>
-          </>
+          </View>
         )}
 
         {/* Signature Section */}
@@ -319,28 +381,54 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData }) => {
             <Text>{sowData.clientName}</Text>
             <Text>({sowData.clientEmail})</Text>
             <Text>{sowData.clientInstitution}</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Date:</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Name:</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Title:</Text>
+            {sowData.clientSignature && typeof sowData.clientSignature.name === 'string' && sowData.clientSignature.name.trim() !== '' ? (
+              <View>
+                {typeof sowData.clientSignature.signatureDataUrl === 'string' && sowData.clientSignature.signatureDataUrl.startsWith('data:') && sowData.clientSignature.signatureDataUrl.length < 500000 && (
+                  <Image src={sowData.clientSignature.signatureDataUrl} style={{ width: 180, height: 50, marginVertical: 4 }} />
+                )}
+                <Text>Date: {formatSOWDateShort(sowData.clientSignature.signedAt)}</Text>
+                <Text>Name: {String(sowData.clientSignature.name)}</Text>
+                {!!sowData.clientSignature.title && <Text>Title: {String(sowData.clientSignature.title)}</Text>}
+              </View>
+            ) : (
+              <View>
+                <View style={styles.signatureLine}></View>
+                <Text>Date:</Text>
+                <View style={styles.signatureLine}></View>
+                <Text>Name:</Text>
+                <View style={styles.signatureLine}></View>
+                <Text>Title:</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.signatureBox}>
             <Text>Trustees of Boston University</Text>
             <Text>By:</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Date:</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Name: Courtney Tretheway</Text>
-            <View style={styles.signatureLine}></View>
-            <Text>Title: Operations Director</Text>
+            {sowData.technicianSignature && typeof sowData.technicianSignature.name === 'string' && sowData.technicianSignature.name.trim() !== '' ? (
+              <View>
+                {typeof sowData.technicianSignature.signatureDataUrl === 'string' && sowData.technicianSignature.signatureDataUrl.startsWith('data:') && sowData.technicianSignature.signatureDataUrl.length < 500000 && (
+                  <Image src={sowData.technicianSignature.signatureDataUrl} style={{ width: 180, height: 50, marginVertical: 4 }} />
+                )}
+                <Text>Date: {formatSOWDateShort(sowData.technicianSignature.signedAt)}</Text>
+                <Text>Name: {String(sowData.technicianSignature.name)}</Text>
+                <Text>Title: {String(sowData.technicianSignature.title || 'Project Manager')}</Text>
+              </View>
+            ) : (
+              <View>
+                <View style={styles.signatureLine}></View>
+                <Text>Date:</Text>
+                <View style={styles.signatureLine}></View>
+                <Text>Name: {sowData.resources?.projectManager ?? ''}</Text>
+                <View style={styles.signatureLine}></View>
+                <Text>Title: Project Manager</Text>
+              </View>
+            )}
           </View>
         </View>
 
         <View style={styles.footer}>
-          <Text>DAMP Lab © | Statement of Work | Generated on {sowData.date}</Text>
+          <Text>DAMP Lab © | Statement of Work | Generated on {formatSOWDate(sowData.createdAt ?? sowData.date)}</Text>
         </View>
       </Page>
     </Document>

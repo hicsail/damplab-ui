@@ -39,6 +39,142 @@ export const EditParameterOptions: React.FC<EditParametersOptionsProps> = (props
       width: 200,
       editable: isEdit
     },
+    {
+      field: 'price',
+      headerName: 'Legacy price',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === '') return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'internalPrice',
+      headerName: 'Internal price',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === '') return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'externalAcademicPrice',
+      headerName: 'External (academic)',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === '') return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'externalMarketPrice',
+      headerName: 'External (market)',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === '') return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'externalNoSalaryPrice',
+      headerName: 'External (no salary)',
+      width: 180,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === '') return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'pricingExplanation',
+      headerName: 'Pricing explanation',
+      width: 380,
+      editable: isEdit,
+    }
   ];
 
   const handleDeletion = async (id: GridRowId) => {
@@ -67,9 +203,25 @@ export const EditParameterOptions: React.FC<EditParametersOptionsProps> = (props
     const filtered = rows.filter((parameter: any) => parameter.id != newRow.id);
 
     // The new value
-    props.gridRef.current.setEditCellValue({ id: props.editParams!.id, field: props.editParams!.field, value: [...filtered, newRow] });
+    const withPricing = {
+      ...newRow,
+      pricing: {
+        internal: newRow.internalPrice ?? newRow.pricing?.internal,
+        external: newRow.externalMarketPrice ?? newRow.externalPrice ?? newRow.pricing?.external,
+        externalAcademic: newRow.externalAcademicPrice ?? newRow.pricing?.externalAcademic,
+        externalMarket: newRow.externalMarketPrice ?? newRow.pricing?.externalMarket ?? newRow.externalPrice,
+        externalNoSalary: newRow.externalNoSalaryPrice ?? newRow.pricing?.externalNoSalary,
+        legacy: newRow.price ?? newRow.pricing?.legacy
+      }
+    };
 
-    return newRow;
+    props.gridRef.current.setEditCellValue({
+      id: props.editParams!.id,
+      field: props.editParams!.field,
+      value: [...filtered, withPricing]
+    });
+
+    return withPricing;
   };
 
   if (isEdit) {

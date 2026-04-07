@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react'
-import { Box, Button, Dialog, DialogActions, DialogContent, DialogContentText } from '@mui/material';
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, Divider, Typography } from '@mui/material';
 import Snackbar   from '@mui/material/Snackbar';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon  from '@mui/icons-material/Close';
@@ -10,7 +10,9 @@ import Params from './Params';
 import NodeButton from './AllowedConnectionButton';
 import { AppContext }    from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas'
+import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { trunc } from '../utils';
+import { calculateServiceCost } from '../utils/servicePricing';
 
 import { RecState } from '../types/Types';
 
@@ -25,11 +27,14 @@ export default function ContextTestComponent(props: SidebarProps) {
     
     const val                   = useContext(CanvasContext);
     const { services, hazards } = useContext(AppContext);
+    const userContext: UserContextProps = useContext(UserContext);
+    const customerCategory = userContext.userProps?.customerCategory;
 
     const [ID, setID]                 = useState('');
     const [activeNode, setActiveNode] = useState(val.nodes.find((node: any) => node.id === val.activeComponentId));
     const [openToast,  setOpenToast]  = useState(false);
     const [open,       setOpen]       = useState(false);
+    const [, setPricingTick]          = useState(0);
     const [record,     setRecord]     = useState<RecState>({ id: "", sequence: { name: "", type: "unknown", seq: "", annotations: [] },  // from Database
                                                              azentaLibs: undefined, azentaOrder: undefined, azentaSample: undefined });
     const [pool,      setPool]      = useState<string>('');
@@ -98,6 +103,151 @@ export default function ContextTestComponent(props: SidebarProps) {
         setActiveNode(val.nodes.find((node: any) => node.id === val.activeComponentId));
     }, [val.activeComponentId]);
 
+    const normalizePrice = (value: unknown): number | undefined => {
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (typeof value === 'string' && value.trim() !== '') {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : undefined;
+        }
+        return undefined;
+    };
+
+    const getCustomerCategoryLabel = (category?: string | null): string => {
+        switch (category) {
+            case 'INTERNAL_CUSTOMERS':
+                return 'Internal customers';
+            case 'EXTERNAL_CUSTOMER_ACADEMIC':
+                return 'External (Academic)';
+            case 'EXTERNAL_CUSTOMER_MARKET':
+                return 'External (Market)';
+            case 'EXTERNAL_CUSTOMER_NO_SALARY':
+                return 'External (No salary)';
+            default:
+                return 'Customer category';
+        }
+    };
+
+    const hasPricingConfigured = (node: any): boolean => {
+        if (!node?.data) return false;
+        const pricingMode = node.data.pricingMode ?? 'SERVICE';
+        if (pricingMode !== 'PARAMETER') {
+            return (
+              normalizePrice(node.data.internalPrice) !== undefined ||
+              normalizePrice(node.data.externalPrice) !== undefined ||
+              normalizePrice(node.data.externalAcademicPrice) !== undefined ||
+              normalizePrice(node.data.externalMarketPrice) !== undefined ||
+              normalizePrice(node.data.externalNoSalaryPrice) !== undefined ||
+              normalizePrice(node.data.price) !== undefined ||
+              normalizePrice(node.data.pricing?.internal) !== undefined ||
+              normalizePrice(node.data.pricing?.external) !== undefined ||
+              normalizePrice(node.data.pricing?.externalAcademic) !== undefined ||
+              normalizePrice(node.data.pricing?.externalMarket) !== undefined ||
+              normalizePrice(node.data.pricing?.externalNoSalary) !== undefined ||
+              normalizePrice(node.data.pricing?.legacy) !== undefined
+            );
+        }
+
+        const params: any[] = Array.isArray(node.data.parameters) ? node.data.parameters : [];
+        return params.some((p) => {
+            if (
+              normalizePrice(p?.internalPrice) !== undefined ||
+              normalizePrice(p?.externalPrice) !== undefined ||
+              normalizePrice(p?.externalAcademicPrice) !== undefined ||
+              normalizePrice(p?.externalMarketPrice) !== undefined ||
+              normalizePrice(p?.externalNoSalaryPrice) !== undefined ||
+              normalizePrice(p?.price) !== undefined ||
+              normalizePrice(p?.pricing?.internal) !== undefined ||
+              normalizePrice(p?.pricing?.external) !== undefined ||
+              normalizePrice(p?.pricing?.externalAcademic) !== undefined ||
+              normalizePrice(p?.pricing?.externalMarket) !== undefined ||
+              normalizePrice(p?.pricing?.externalNoSalary) !== undefined ||
+              normalizePrice(p?.pricing?.legacy) !== undefined
+            )
+              return true;
+            const options = Array.isArray(p?.options) ? p.options : [];
+            return options.some(
+              (o: any) =>
+                normalizePrice(o?.internalPrice) !== undefined ||
+                normalizePrice(o?.externalPrice) !== undefined ||
+                normalizePrice(o?.externalAcademicPrice) !== undefined ||
+                normalizePrice(o?.externalMarketPrice) !== undefined ||
+                normalizePrice(o?.externalNoSalaryPrice) !== undefined ||
+                normalizePrice(o?.price) !== undefined ||
+                normalizePrice(o?.pricing?.internal) !== undefined ||
+                normalizePrice(o?.pricing?.external) !== undefined ||
+                normalizePrice(o?.pricing?.externalAcademic) !== undefined ||
+                normalizePrice(o?.pricing?.externalMarket) !== undefined ||
+                normalizePrice(o?.pricing?.externalNoSalary) !== undefined ||
+                normalizePrice(o?.pricing?.legacy) !== undefined
+            );
+        });
+    };
+
+    const getSelectedPricingExplanations = (node: any): string[] => {
+        const params: any[] = Array.isArray(node?.data?.parameters) ? node.data.parameters : [];
+
+        const notes: string[] = [];
+
+        for (const param of params) {
+            if (!param) continue;
+
+            // Parameter-level note
+            const paramNote =
+                typeof param.pricingExplanation === 'string' ? param.pricingExplanation.trim() : '';
+            if (paramNote) {
+                notes.push(`${param.name ?? param.id}: ${paramNote}`);
+            }
+
+            // Option-level notes for dropdown/enum params
+            if (
+                typeof param.type === 'string' &&
+                (param.type === 'dropdown' || param.type === 'enum') &&
+                Array.isArray(param.options)
+            ) {
+                for (const opt of param.options as any[]) {
+                    if (!opt) continue;
+                    const optNote =
+                        typeof opt.pricingExplanation === 'string'
+                            ? opt.pricingExplanation.trim()
+                            : '';
+                    if (!optNote) continue;
+                    const label = `${param.name ?? param.id} – ${opt.name ?? opt.id}`;
+                    notes.push(`${label}: ${optNote}`);
+                }
+            }
+        }
+
+        // De-dupe while preserving order
+        const seen = new Set<string>();
+        return notes.filter((n) => {
+            if (seen.has(n)) return false;
+            seen.add(n);
+            return true;
+        });
+    };
+
+    const estimatedCost = activeNode
+        ? calculateServiceCost(
+            {
+                pricingMode: activeNode.data?.pricingMode,
+                price: activeNode.data?.price,
+                internalPrice: activeNode.data?.internalPrice,
+                externalPrice: activeNode.data?.externalPrice,
+                externalAcademicPrice: (activeNode.data as any)?.externalAcademicPrice,
+                externalMarketPrice: (activeNode.data as any)?.externalMarketPrice,
+                externalNoSalaryPrice: (activeNode.data as any)?.externalNoSalaryPrice,
+                pricing: activeNode.data?.pricing,
+                parameters: activeNode.data?.parameters,
+            },
+            activeNode.data?.formData,
+            activeNode.data?.price,
+            customerCategory
+        )
+        : 0;
+    const showPending = activeNode ? !hasPricingConfigured(activeNode) : false;
+    const pricingCategoryLabel = getCustomerCategoryLabel(customerCategory);
+    const pricingNotes = activeNode ? getSelectedPricingExplanations(activeNode) : [];
+
     const action = (
         <React.Fragment>
             <Button onClick={handleCloseToast} color="secondary" size="small">
@@ -115,24 +265,64 @@ export default function ContextTestComponent(props: SidebarProps) {
                 <div>
                     {
                         hazards.includes(activeNode?.data.label) 
-                        ? (<p><GppMaybe style={{color: "grey", verticalAlign:"bottom"}}/>&nbsp;Note: For this service, 
-                        sequences provided below or produced by the process will undergo a safety screening.</p>)
+                        ? (
+                            <Alert severity="info" icon={<GppMaybe />} sx={{ mb: 1 }}>
+                                Note: For this service, sequences provided below or produced by the process will undergo a safety screening.
+                            </Alert>
+                        )
                         : ""
                     }
-                    <h2>
+                    <Typography variant="h5" sx={{ mb: 1 }}>
                         {activeNode?.data.label}
-                    </h2>
+                    </Typography>
                 </div>
                 <div>
                     {
                         activeNode?.data.description 
-                        ? <p>{activeNode?.data.description}</p>
+                        ? <Typography variant="body2" color="text.secondary">{activeNode?.data.description}</Typography>
                         : null
                     }
                 </div>
+                <Divider sx={{ my: 1.5 }} />
+                {
+                    activeNode
+                    ? (
+                        <div style={{ marginTop: 8, marginBottom: 12 }}>
+                            <p style={{ margin: 0 }}>
+                                <b>Estimated price:</b>{' '}
+                                {showPending ? '[Price Pending Review]' : `$${estimatedCost.toFixed(2)}`}
+                            </p>
+                            {!showPending ? (
+                                <p style={{ margin: '4px 0 0 0', fontSize: 12, color: 'rgba(0,0,0,0.6)' }}>
+                                    Pricing for: {pricingCategoryLabel}
+                                </p>
+                            ) : null}
+                            {pricingNotes.length > 0 ? (
+                                <div style={{ marginTop: 6 }}>
+                                    <b>Pricing notes</b>
+                                    <ul style={{ marginTop: 6, paddingLeft: 18 }}>
+                                        {pricingNotes.map((note) => (
+                                            <li key={note} style={{ fontSize: 13 }}>
+                                                {note}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : null}
+                        </div>
+                    )
+                    : null
+                }
                 {
                     activeNode?.data.formData 
-                    ? <div><Params activeNode={activeNode}/></div>
+                    ? (
+                        <div>
+                            <Params
+                                activeNode={activeNode}
+                                onFormDataChange={() => setPricingTick((t) => t + 1)}
+                            />
+                        </div>
+                    )
                     : null
                 }
                         <br />
@@ -200,7 +390,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                     {
                         // return header with text Allowed Connections if allowedConnections list is not empty
                         activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 
-                        ? <h3>Allowed Connections</h3>
+                        ? <Typography variant="h6" sx={{ mt: 2 }}>Allowed Connections</Typography>
                         : null
                     }
                     {
@@ -257,7 +447,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                                 </Dialog>
                             </>
                         ) 
-                        : <div><br />Drag a node from the left to the canvas to see its properties here.</div>
+                        : <Typography variant="body2" color="text.secondary"><br />Drag a node from the left to the canvas to see its properties here.</Typography>
                     }
                 </div>
                 <div>

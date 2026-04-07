@@ -1,9 +1,28 @@
 import { Parameter } from "./Parameter";
 
+export type ServicePricingMode = 'SERVICE' | 'PARAMETER';
+
 export type Service = {
     id: string;
     name: string;
-    price: number;
+    serviceCategoryNumber?: string | null;
+    serviceCategoryName?: string | null;
+    unit?: string | null;
+    price?: number | null;
+    internalPrice?: number | null;
+    externalPrice?: number | null;
+    externalAcademicPrice?: number | null;
+    externalMarketPrice?: number | null;
+    externalNoSalaryPrice?: number | null;
+    pricing?: {
+        internal?: number | null;
+        external?: number | null;
+        externalAcademic?: number | null;
+        externalMarket?: number | null;
+        externalNoSalary?: number | null;
+        legacy?: number | null;
+    } | null;
+    pricingMode?: ServicePricingMode;
     icon: string;
     // optional result params
     resultParams?: string[];
@@ -13,6 +32,7 @@ export type Service = {
     categories: string[];
     description: string;
     paramGroups?: any[];
+    deliverables?: string[];  // Array of deliverable descriptions
 };  
 
 

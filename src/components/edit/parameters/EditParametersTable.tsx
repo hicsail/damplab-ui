@@ -35,6 +35,8 @@ import {
   ParameterNameInput,
   ParameterOptionsButton,
   ParameterParamTypeSelect,
+  ParameterPriceInput,
+  ParameterPricingExplanationInput,
   ParameterRangeValueInput,
   ParameterTableDataButton,
   ParameterTypeSelect
@@ -44,6 +46,23 @@ import {
   ParameterTableViewCell,
 } from './ParameterFieldViewCells';
 import {validateParameter} from './ParameterValidation';
+
+const TYPE_LABELS: Record<string, string> = {
+  string: 'Text',
+  number: 'Number',
+  file: 'File upload',
+  boolean: 'Yes/No',
+  dropdown: 'Pick from list',
+  table: 'Table'
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  defaultValue: 'Starting value',
+  rangeValueMin: 'Minimum allowed value',
+  rangeValueMax: 'Maximum allowed value',
+  options: 'Choices',
+  tableData: 'Table setup'
+};
 
 interface EditParametersTableProps {
   viewParams: GridRenderCellParams | null;
@@ -93,6 +112,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const columns: GridColDef[] = [
     {
       field: 'id',
+      headerName: 'Internal ID',
       width: 200,
       editable: isEdit,
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterIdInput {...params} />),
@@ -111,24 +131,191 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'type',
+      headerName: 'Answer format',
       width: 200,
       editable: isEdit,
+      valueFormatter: (value) => TYPE_LABELS[String(value)] ?? String(value ?? ''),
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterTypeSelect {...params} setTypeChangeDialog={setTypeChangeDialog} />)
     },
     {
       field: 'paramType',
+      headerName: 'Where this appears',
       width: 200,
       editable: isEdit,
+      valueFormatter: (value) => {
+        if (value === 'input') return 'User input';
+        return String(value ?? '');
+      },
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterParamTypeSelect {...params} />),
     },
     {
       field: 'required',
+      headerName: 'Required?',
       width: 200,
       editable: isEdit,
       renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
     },
     {
+      field: 'allowMultipleValues',
+      headerName: 'Allow multiple selections?',
+      width: 200,
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
+    },
+    {
+      field: 'isPriceMultiplier',
+      headerName: 'Use as price multiplier?',
+      width: 180,
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterBooleanSelect {...params} />),
+    },
+    {
+      field: 'price',
+      headerName: 'Fallback price',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === "") return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterPriceInput {...params} />),
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'internalPrice',
+      headerName: 'Internal price',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === "") return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterPriceInput {...params} />),
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'externalAcademicPrice',
+      headerName: 'External (academic)',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === "") return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterPriceInput {...params} />),
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'externalMarketPrice',
+      headerName: 'External (market)',
+      width: 160,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === "") return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterPriceInput {...params} />),
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'externalNoSalaryPrice',
+      headerName: 'External (no salary)',
+      width: 180,
+      editable: isEdit,
+      type: 'number',
+      valueParser: (value) => {
+        if (value === undefined || value === "") return undefined;
+        return Number(value);
+      },
+      preProcessEditCellProps: (params) => {
+        const raw = params.props.value;
+        if (raw === undefined || raw === null || raw === '') {
+          return { ...params.props, error: false };
+        }
+        const numeric = Number(raw);
+        const hasError = Number.isNaN(numeric) || numeric < 0;
+        return { ...params.props, error: hasError };
+      },
+      renderEditCell: (params: GridRenderEditCellParams) => (<ParameterPriceInput {...params} />),
+      valueFormatter: (value) => {
+        if (value === undefined || value === null || value === '') return '';
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return '';
+        return `$${numeric.toFixed(2)}`;
+      }
+    },
+    {
+      field: 'pricingExplanation',
+      headerName: 'Price note shown to customer',
+      width: 320,
+      editable: isEdit,
+      renderEditCell: (params: GridRenderEditCellParams) => (
+        <ParameterPricingExplanationInput {...params} />
+      )
+    },
+    {
       field: 'options',
+      headerName: 'Choices',
       width: 200,
       editable: isEdit,
       renderCell: (params: GridRenderCellParams) => (
@@ -141,6 +328,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'defaultValue',
+      headerName: 'Starting value',
       width: 200,
       editable: isEdit,
       valueParser: (value, row, column, apiRef) => {
@@ -174,6 +362,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'rangeValueMin',
+      headerName: 'Minimum allowed value',
       width: 200,
       editable: isEdit,
       // comments on valueParser for 'defaultValue' field apply here
@@ -182,6 +371,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     },
     {
       field: 'rangeValueMax',
+      headerName: 'Maximum allowed value',
       width: 200,
       editable: isEdit,
       // comments on valueParser for 'defaultValue' field apply here
@@ -203,6 +393,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     */
     {
       field: 'tableData',
+      headerName: 'Table setup',
       width: 200,
       editable: isEdit,
       renderCell: (params: GridRenderCellParams) => (
@@ -250,9 +441,25 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     const filtered = rows.filter((parameter: any) => parameter.id != newRow.id);
 
     // The new value
-    props.gridRef.current.setEditCellValue({ id: props.editParams!.id, field: props.editParams!.field, value: [...filtered, newRow] });
+    const withPricing = {
+      ...newRow,
+      pricing: {
+        internal: newRow.internalPrice ?? newRow.pricing?.internal,
+        external: newRow.externalMarketPrice ?? newRow.externalPrice ?? newRow.pricing?.external,
+        externalAcademic: newRow.externalAcademicPrice ?? newRow.pricing?.externalAcademic,
+        externalMarket: newRow.externalMarketPrice ?? newRow.pricing?.externalMarket ?? newRow.externalPrice,
+        externalNoSalary: newRow.externalNoSalaryPrice ?? newRow.pricing?.externalNoSalary,
+        legacy: newRow.price ?? newRow.pricing?.legacy
+      }
+    };
 
-    return newRow;
+    props.gridRef.current.setEditCellValue({
+      id: props.editParams!.id,
+      field: props.editParams!.field,
+      value: [...filtered, withPricing]
+    });
+
+    return withPricing;
   };
 
   if (isEdit) {
@@ -301,9 +508,9 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
       </Dialog>
       <Dialog open={typeChangeDialog.open} onClose={typeChangeDialog.onCancel}>
         <DialogContent>
-            You are changing the parameter type from <strong>{typeChangeDialog.oldType}</strong> to <strong>{typeChangeDialog.newType}</strong>.
-            The following fields are not applicable for the new type and will be reset:
-            <ul>{typeChangeDialog.fieldsToReset?.map((f) => <li key={f}>{f}</li>)}</ul>
+            You are changing the answer format from <strong>{TYPE_LABELS[String(typeChangeDialog.oldType)] ?? String(typeChangeDialog.oldType ?? '')}</strong> to <strong>{TYPE_LABELS[String(typeChangeDialog.newType)] ?? String(typeChangeDialog.newType ?? '')}</strong>.
+            The following fields will be cleared because they do not apply to the new format:
+            <ul>{typeChangeDialog.fieldsToReset?.map((f) => <li key={f}>{FIELD_LABELS[String(f)] ?? String(f)}</li>)}</ul>
         </DialogContent>
         <DialogActions>
           <Button onClick={typeChangeDialog.onCancel}>Cancel</Button>

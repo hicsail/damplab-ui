@@ -1,7 +1,9 @@
 // sowGenerator.ts - SOW content generation utilities
 
+import { addDays, format } from 'date-fns';
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWService } from '../types/SOWTypes';
 import { Workflow } from '../gql/graphql';
+import { calculateServiceCost, CustomerCategory } from './servicePricing';
 
 // Constants
 const SOW_STORAGE_KEY = 'damplab-sows';
@@ -61,7 +63,7 @@ const serviceGenerators: ServiceContentGenerator[] = [
   }
 ];
 
-// Get next SOW number from localStorage
+// Get next SOW number from localStorage (legacy; prefer unique per-job number for new SOWs)
 const getNextSOWNumber = (): string => {
   const stored = localStorage.getItem(SOW_STORAGE_KEY);
   const existingSOWs = stored ? JSON.parse(stored) : [];
@@ -69,36 +71,131 @@ const getNextSOWNumber = (): string => {
   return nextNumber.toString().padStart(3, '0');
 };
 
+/** Unique SOW number for a new SOW. Uses a time-based suffix; jobId is kept internal, not exposed in the SOW number. */
+export const getUniqueSOWNumberForJob = (_jobId: string): string => {
+  return `SOW-${Date.now().toString(36)}`;
+};
+
+// Extract sample/plate counts from formData
+const extractSamplePlateInfo = (formData: any): { samples?: number; plates?: number; description?: string } => {
+  if (!formData || typeof formData !== 'object') return {};
+  
+  let samples: number | undefined;
+  let plates: number | undefined;
+  let description: string | undefined;
+  
+  // Handle array of formData (NodeParameter[])
+  if (Array.isArray(formData)) {
+    formData.forEach((param: any) => {
+      const paramName = (param.name || '').toLowerCase();
+      const paramId = (param.id || '').toLowerCase();
+      const value = param.value;
+      
+      if ((paramName.includes('sample') || paramId.includes('sample-number') || paramId.includes('num-samples')) && typeof value === 'number') {
+        samples = value;
+      }
+      if ((paramName.includes('plate') || paramId.includes('plate')) && typeof value === 'number') {
+        plates = value;
+      }
+    });
+  } else {
+    // Handle object formData
+    Object.keys(formData).forEach(key => {
+      const lowerKey = key.toLowerCase();
+      const value = formData[key];
+      
+      if ((lowerKey.includes('sample') || lowerKey.includes('sample-number') || lowerKey.includes('num-samples')) && typeof value === 'number') {
+        samples = value;
+      }
+      if (lowerKey.includes('plate') && typeof value === 'number') {
+        plates = value;
+      }
+    });
+  }
+  
+  if (samples && plates) {
+    description = `${samples} samples across ${plates} plate${plates > 1 ? 's' : ''}`;
+  } else if (samples) {
+    description = `${samples} sample${samples > 1 ? 's' : ''}`;
+  } else if (plates) {
+    description = `${plates} plate${plates > 1 ? 's' : ''}`;
+  }
+  
+  return { samples, plates, description };
+};
+
 // Generate scope of work based on workflow analysis
-const generateScopeOfWork = (workflows: Workflow[]): string => {
-  const serviceTypes = new Set<string>();
-  const serviceNames = new Set<string>();
+const generateScopeOfWork = (workflows: Workflow[]): string[] => {
+  const scopeItems: string[] = [];
+  const serviceMap = new Map<string, { name: string; formData: any; count: number }>();
   
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        serviceTypes.add(node.service.id);
-        serviceNames.add(node.service.name);
+        const serviceId = node.service.id;
+        const existing = serviceMap.get(serviceId);
+        
+        if (existing) {
+          existing.count++;
+        } else {
+          serviceMap.set(serviceId, {
+            name: node.service.name,
+            formData: node.formData,
+            count: 1
+          });
+        }
       }
     });
   });
 
-  // Check for specific service combinations
-  if (serviceTypes.has('next-gen-seq')) {
-    return "The scope of this service will be to run an already prepared pool of samples on a P1 flow cell at the DAMP Lab.";
+  // Generate bullet points for each service
+  serviceMap.forEach((serviceInfo, serviceId) => {
+    const sampleInfo = extractSamplePlateInfo(serviceInfo.formData);
+    let itemText = '';
+    
+    // Build service description based on service type
+    switch (serviceId) {
+      case 'next-gen-seq':
+        itemText = 'Run an already prepared pool of samples on a P1 flow cell at the DAMP Lab';
+        break;
+      case 'pcr':
+        itemText = 'Perform PCR amplification of the provided DNA samples using the specified primers and conditions';
+        break;
+      case 'gel-electrophoresis':
+        itemText = 'Perform gel electrophoresis analysis of the provided DNA samples to verify size and quality';
+        break;
+      case 'gibson-assembly':
+        itemText = 'Perform Gibson assembly of the provided DNA fragments using the specified vector and insert sequences';
+        break;
+      case 'transformation':
+        itemText = 'Transform competent cells with the provided plasmid DNA and select for successful transformants';
+        break;
+      case 'miniprep':
+        itemText = 'Perform plasmid miniprep extraction from bacterial cultures and generate glycerol stocks';
+        break;
+      default:
+        itemText = `Perform ${serviceInfo.name}`;
+    }
+    
+    // Add sample/plate information if available
+    if (sampleInfo.description) {
+      itemText += ` (${sampleInfo.description})`;
+    }
+    
+    // Add count if service appears multiple times
+    if (serviceInfo.count > 1) {
+      itemText += ` - ${serviceInfo.count} instance${serviceInfo.count > 1 ? 's' : ''}`;
+    }
+    
+    scopeItems.push(itemText);
+  });
+
+  // If no services found, add a generic item
+  if (scopeItems.length === 0) {
+    scopeItems.push('Perform molecular biology services as specified in the workflow');
   }
-  
-  if (serviceTypes.has('pcr') && serviceTypes.has('gel-electrophoresis')) {
-    return "The scope of this service will be to perform PCR amplification and gel electrophoresis analysis of the provided DNA samples.";
-  }
-  
-  if (serviceTypes.has('gibson-assembly')) {
-    return "The scope of this service will be to perform Gibson assembly of the provided DNA fragments and subsequent transformation and verification.";
-  }
-  
-  // Generic scope based on services
-  const serviceList = Array.from(serviceNames).join(', ');
-  return `The scope of this service will be to perform the following molecular biology services: ${serviceList}.`;
+
+  return scopeItems;
 };
 
 // Generate deliverables based on services
@@ -108,11 +205,19 @@ const generateDeliverables = (workflows: Workflow[]): string[] => {
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-        if (generator) {
-          generator.deliverables(node.formData || {}).forEach(deliverable => {
+        // Use deliverables from service if available, otherwise fall back to hardcoded generators
+        if (node.service.deliverables && Array.isArray(node.service.deliverables) && node.service.deliverables.length > 0) {
+          node.service.deliverables.forEach((deliverable: string) => {
             deliverables.add(deliverable);
           });
+        } else {
+          // Fallback to hardcoded generators for backward compatibility
+          const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
+          if (generator) {
+            generator.deliverables(node.formData || {}).forEach(deliverable => {
+              deliverables.add(deliverable);
+            });
+          }
         }
       }
     });
@@ -127,49 +232,171 @@ const generateDeliverables = (workflows: Workflow[]): string[] => {
   return Array.from(deliverables);
 };
 
-// Calculate timeline based on services
-const calculateTimeline = (workflows: Workflow[], startDate: string): { startDate: string; endDate: string; duration: string } => {
+/** Project length in days; used for Period of Performance text. */
+function getProjectLengthDays(workflows: Workflow[], overrideDays?: number): number {
+  if (overrideDays != null && overrideDays > 0) return overrideDays;
   let maxDuration = 0;
-  
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
-        const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-        if (generator) {
-          maxDuration = Math.max(maxDuration, generator.estimatedDuration(node.formData || {}));
-        }
+        const g = serviceGenerators.find(x => x.serviceId === node.service.id);
+        if (g) maxDuration = Math.max(maxDuration, g.estimatedDuration(node.formData || {}));
       }
     });
   });
+  return maxDuration > 0 ? maxDuration : 14;
+}
 
-  // Default to 2 weeks if no specific duration found
-  if (maxDuration === 0) {
-    maxDuration = 14;
-  }
-
+/** Timeline for SOW. Uses technician override duration when provided and > 0. */
+const calculateTimeline = (
+  workflows: Workflow[],
+  startDate: string,
+  overrideDurationDays?: number
+): { startDate: string; endDate: string; duration: string; days: number } => {
+  const days = getProjectLengthDays(workflows, overrideDurationDays);
   const start = new Date(startDate);
-  const end = new Date(start);
-  end.setDate(start.getDate() + maxDuration);
+  const end = addDays(start, days);
 
   return {
-    startDate: start.toLocaleDateString(),
-    endDate: end.toLocaleDateString(),
-    duration: `${maxDuration} days`
+    startDate: format(start, 'yyyy-MM-dd'),
+    endDate: format(end, 'yyyy-MM-dd'),
+    duration: `${days} day${days !== 1 ? 's' : ''}`,
+    days,
   };
+};
+
+const getNodeCost = (node: any, customerCategory?: CustomerCategory): number => {
+  if (!node?.service?.id) return 0;
+
+  const computedCost = calculateServiceCost(
+    node.service,
+    node.formData,
+    node.price,
+    customerCategory
+  );
+
+  const hasPricingData =
+    (node.service?.price !== undefined && node.service?.price !== null) ||
+    (node.price !== undefined && node.price !== null) ||
+    (node.service?.pricingMode === 'PARAMETER' && computedCost > 0);
+  if (hasPricingData) {
+    return computedCost;
+  }
+
+  const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
+  return generator ? generator.baseCost(node.formData || {}) : 0;
+};
+
+const getNodePricingDetails = (node: any, customerCategory?: CustomerCategory): SOWService['pricingDetails'] => {
+  if (!node?.service) return [];
+  const service: any = node.service;
+  const parameters: any[] = Array.isArray(service.parameters) ? service.parameters : [];
+  const formData: any[] = Array.isArray(node.formData) ? node.formData : [];
+  const formDataMap = new Map(formData.map((entry: any) => [entry.id, entry.value]));
+
+  const items: NonNullable<SOWService['pricingDetails']> = [];
+
+  const normalizePrice = (value: unknown): number | undefined => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  };
+  const resolveCategoryPrice = (obj: any): number | undefined => {
+    const pricing = obj?.pricing;
+    if (customerCategory === 'INTERNAL_CUSTOMERS') {
+      const p = normalizePrice(pricing?.internal ?? obj?.internalPrice);
+      if (p !== undefined) return p;
+    } else if (customerCategory === 'EXTERNAL_CUSTOMER_ACADEMIC') {
+      const p = normalizePrice(pricing?.externalAcademic ?? pricing?.external ?? obj?.externalAcademicPrice ?? obj?.externalPrice);
+      if (p !== undefined) return p;
+    } else if (customerCategory === 'EXTERNAL_CUSTOMER_MARKET') {
+      const p = normalizePrice(pricing?.externalMarket ?? pricing?.external ?? obj?.externalMarketPrice ?? obj?.externalPrice);
+      if (p !== undefined) return p;
+    } else if (customerCategory === 'EXTERNAL_CUSTOMER_NO_SALARY') {
+      const p = normalizePrice(pricing?.externalNoSalary ?? pricing?.external ?? obj?.externalNoSalaryPrice ?? obj?.externalPrice);
+      if (p !== undefined) return p;
+    }
+    return normalizePrice(pricing?.legacy ?? obj?.price);
+  };
+
+  parameters.forEach((param: any) => {
+    if (!param || !param.id) return;
+
+    const rawValue = formDataMap.get(param.id);
+    const isMulti = param.allowMultipleValues === true || Array.isArray(rawValue);
+
+    const options = Array.isArray(param.options) ? param.options : undefined;
+    const hasOptionPricing =
+      param.type === 'dropdown' &&
+      options &&
+      options.some(
+        (opt: any) =>
+          opt &&
+          resolveCategoryPrice(opt) !== undefined
+      );
+
+    // When dropdown options have prices, create line items per selected option.
+    if (hasOptionPricing && options) {
+      const valuesArray = Array.isArray(rawValue)
+        ? rawValue
+        : rawValue != null
+        ? [rawValue]
+        : [];
+
+      valuesArray.forEach((v: any) => {
+        if (v === null || v === undefined || v === '') return;
+        const optId = String(v);
+        const opt = options.find((o: any) => o && o.id === optId);
+        if (!opt) return;
+        const unitPrice = resolveCategoryPrice(opt);
+        if (unitPrice === undefined) return;
+
+        items.push({
+          label: `${param.name} – ${opt.name ?? optId}`,
+          quantity: 1,
+          unitPrice,
+          total: unitPrice,
+        });
+      });
+
+      return;
+    }
+
+    // Fallback: parameter-level pricing (per-parameter price and count of values).
+    const unitPrice = resolveCategoryPrice(param);
+    if (unitPrice === undefined) return;
+
+    let quantity = 0;
+    if (isMulti) {
+      if (Array.isArray(rawValue)) quantity = rawValue.length;
+      else if (rawValue !== null && rawValue !== undefined) quantity = 1;
+    } else if (rawValue !== null && rawValue !== undefined) {
+      quantity = 1;
+    }
+    if (quantity === 0) return;
+
+    items.push({
+      label: param.name,
+      quantity,
+      unitPrice,
+      total: unitPrice * quantity,
+    });
+  });
+
+  return items;
 };
 
 // Calculate base pricing
 const calculateBasePricing = (workflows: Workflow[]): number => {
+  // Prefer job/category-aware pricing when present on nodes.
   let totalCost = 0;
   
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
-      if (node.service?.id) {
-        const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-        if (generator) {
-          totalCost += generator.baseCost(node.formData || {});
-        }
-      }
+      totalCost += getNodeCost(node, (workflow as any)?.job?.customerCategory);
     });
   });
 
@@ -177,22 +404,30 @@ const calculateBasePricing = (workflows: Workflow[]): number => {
 };
 
 // Generate services list for SOW
-const generateServicesList = (workflows: Workflow[]): SOWService[] => {
+const generateServicesList = (workflows: Workflow[], customerCategory?: CustomerCategory): SOWService[] => {
   const services: SOWService[] = [];
   
   workflows.forEach(workflow => {
     workflow.nodes.forEach(node => {
       if (node.service?.id) {
+        const servicePrice = getNodeCost(node, customerCategory);
+        const pricingDetails = getNodePricingDetails(node, customerCategory);
+        
+        // Use scope description from generator (could be enhanced to come from service in future)
         const generator = serviceGenerators.find(g => g.serviceId === node.service.id);
-        if (generator) {
-          services.push({
-            id: node.service.id,
-            name: node.service.name,
-            description: generator.scopeOfWork(node.formData || {}),
-            cost: generator.baseCost(node.formData || {}),
-            category: 'molecular-biology'
-          });
-        }
+        const description = generator 
+          ? generator.scopeOfWork(node.formData || {})
+          : `Perform ${node.service.name}`;
+        
+        services.push({
+          id: node.service.id,
+          name: node.service.name,
+          description: description,
+          cost: servicePrice,
+          category: 'molecular-biology',
+          formData: node.formData,
+          pricingDetails: pricingDetails && pricingDetails.length > 0 ? pricingDetails : undefined
+        });
       }
     });
   });
@@ -201,12 +436,18 @@ const generateServicesList = (workflows: Workflow[]): SOWService[] => {
 };
 
 // Generate complete SOW data
+/** existingSOW: when provided (updating existing SOW), re-use its id/sowNumber to avoid conflicts. */
 export const generateSOWData = (
   jobData: any,
-  technicianInputs: SOWTechnicianInputs
+  technicianInputs: SOWTechnicianInputs,
+  existingSOW?: { id?: string; sowNumber?: string }
 ): SOWData => {
-  const sowNumber = getNextSOWNumber();
-  const baseCost = calculateBasePricing(jobData.workflows);
+  const sowNumber = existingSOW?.sowNumber ?? getUniqueSOWNumberForJob(jobData.id);
+  const jobCustomerCategory = jobData?.customerCategory as CustomerCategory | undefined;
+  const baseCost = jobData.workflows.reduce((sum: number, wf: any) => {
+    const nodes = wf?.nodes ?? [];
+    return sum + nodes.reduce((wSum: number, node: any) => wSum + getNodeCost(node, jobCustomerCategory), 0);
+  }, 0);
   const adjustments = technicianInputs.pricingAdjustments || [];
   const discountAmount = adjustments
     .filter(adj => adj.type === 'discount')
@@ -217,15 +458,24 @@ export const generateSOWData = (
       .filter(adj => adj.type === 'additional_cost')
       .reduce((sum, adj) => sum + adj.amount, 0);
 
-  const timeline = calculateTimeline(jobData.workflows, technicianInputs.startDate);
+  const timeline = calculateTimeline(
+    jobData.workflows,
+    technicianInputs.startDate,
+    technicianInputs.duration
+  );
+
+  const sowTitle = (technicianInputs.sowTitle || '').trim() || 'Agreement to Perform Research Services';
 
   return {
-    id: `sow-${Date.now()}`,
-    sowNumber: `SOW ${sowNumber}`,
-    date: new Date().toLocaleDateString(),
+    id: existingSOW?.id ?? `sow-${Date.now()}`,
+    sowNumber: sowNumber.startsWith('SOW') ? sowNumber : `SOW ${sowNumber}`,
+    date: format(new Date(), 'yyyy-MM-dd'),
+    sowTitle,
     jobId: jobData.id,
     jobName: jobData.name,
-    clientName: jobData.username,
+    // Prefer clientDisplayName (captured at checkout), then fall back to username.
+    // jobData.name is the PROJECT name.
+    clientName: jobData.clientDisplayName || jobData.username || technicianInputs.clientProjectManager || jobData.name || 'Client',
     clientEmail: jobData.email,
     clientInstitution: jobData.institute,
     clientAddress: jobData.institute, // Could be enhanced with address lookup
@@ -245,7 +495,7 @@ export const generateSOWData = (
         reason: adjustments.find(adj => adj.type === 'discount')?.reason || 'Special pricing'
       } : undefined
     },
-    services: generateServicesList(jobData.workflows),
+    services: generateServicesList(jobData.workflows, jobCustomerCategory),
     terms: getStandardTerms(),
     createdAt: new Date().toISOString(),
     createdBy: 'technician' // Could be enhanced with actual user info
@@ -268,7 +518,7 @@ Fee Schedule:
 This engagement will be conducted on a Project basis. The total value for the Services pursuant to this SOW is presented in the pricing section below.
 
 Completion Criteria:
-University shall have fulfilled its obligations when University completes the Services described within this SOW, and Sponsor accepts such Services without unreasonable objections. No response from Sponsor within 2-business days of deliverables being delivered by University is deemed acceptance.`;
+DAMP Lab shall have fulfilled its obligations when DAMP Lab completes the Services described within this SOW, and Client accepts such Services without unreasonable objections. No response from Client within 2-business days of deliverables being delivered by DAMP Lab is deemed acceptance.`;
 };
 
 // localStorage utilities

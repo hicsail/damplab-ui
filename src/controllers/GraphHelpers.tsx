@@ -1,14 +1,29 @@
 import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 
 import { NodeParameter } from '../types/CanvasTypes';
-import { services } from '../data/services';
-import { bundles as bundleServiceOrders } from '../data/bundles';
-import { services as serviceNames } from '../data/services';
+import { services as legacyServices } from '../data/services';
 
 
 export const getServiceFromId = (services: any, id: string) => {
     return services.find((service: any) => service.id === id);
 }
+
+const getServiceFromLegacyId = (services: any[], legacyId: string) => {
+    const legacyService = legacyServices.find((service: any) => service.id === legacyId);
+    if (!legacyService) return undefined;
+    return services.find((service: any) => service.name === legacyService.name);
+};
+
+const resolveServiceRef = (services: any[], ref: any) => {
+    if (!ref) return undefined;
+    if (typeof ref === 'object') {
+        if (ref.id && getServiceFromId(services, ref.id)) return getServiceFromId(services, ref.id);
+        if (ref.name) return services.find((service: any) => service.name === ref.name);
+        return undefined;
+    }
+    if (typeof ref !== 'string') return undefined;
+    return getServiceFromId(services, ref) ?? getServiceFromLegacyId(services, ref);
+};
 
 export const isValidConnection = (services: any, nodes: any, sourceId: any, targetId: any) => {
 
@@ -32,15 +47,26 @@ export const isValidConnection = (services: any, nodes: any, sourceId: any, targ
 }
 
 export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, service: any, setNodes: any, setEdges: any, sourcePosition: any, setActiveComponentId: any) => {
+    if (!service) {
+        console.warn('Skipping undefined service while adding node to canvas');
+        return sourceId;
+    }
     
     const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
     const nodeId = Math.random().toString(36).substring(2, 9);  // Sufficient variance?
-    const formData: NodeParameter[] = generateFormDataFromParams(service.parameters, nodeId);
+    const formData: NodeParameter[] = generateFormDataFromParams(service.parameters ?? [], nodeId);
     
     const nodeData = {
         id                    : nodeId,
         label                 : service.name,
         price                 : service.price,
+        internalPrice         : service.internalPrice,
+        externalPrice         : service.externalPrice,
+        externalAcademicPrice : service.externalAcademicPrice,
+        externalMarketPrice   : service.externalMarketPrice,
+        externalNoSalaryPrice : service.externalNoSalaryPrice,
+        pricing               : service.pricing,
+        pricingMode           : service.pricingMode,
         description           : service.description,
         allowedConnections    : service.allowedConnections,
         icon                  : service.icon,
@@ -144,8 +170,16 @@ export const transformNodesToGQL = (nodes: any) => {
         delete gqlNode.parameters;
         delete gqlNode.description;
         delete gqlNode.paramGroups;
+        delete gqlNode.pricingMode;
+        // Backend `AddNodeInput` does not accept pricing breakdown fields on nodes.
+        // It computes final node pricing server-side, with optional `price` as a fallback.
+        delete gqlNode.internalPrice;
+        delete gqlNode.externalPrice;
+        delete gqlNode.externalAcademicPrice;
+        delete gqlNode.externalMarketPrice;
+        delete gqlNode.externalNoSalaryPrice;
+        delete gqlNode.pricing;
 
-        console.log('gqlNode: ', gqlNode);
         gqlNodes.push(gqlNode);
     });
 
@@ -169,21 +203,49 @@ export const transformEdgesToGQL = (edges: any) => {
 }
 
 
-export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: string[] | undefined, setNodes: any, setEdges: any) => {
+export const addNodesAndEdgesFromServiceIds = (
+    services: any[],
+    serviceRefs: any[] | undefined,
+    setNodes: any,
+    setEdges: any,
+    dropPosition?: { x: number; y: number }
+) => {
+    const inputServiceRefs = serviceRefs ?? [];
+    const validServices = inputServiceRefs.map((ref) => {
+        const service = resolveServiceRef(services, ref);
+        if (!service) {
+            const refLabel = typeof ref === 'string' ? ref : ref?.id ?? ref?.name ?? '[unknown]';
+            console.warn(`Skipping unknown service id in bundle drop: ${refLabel}`);
+        }
+        return service;
+    }).filter((service): service is any => Boolean(service));
 
-    // loop over serviceIds
+    if (validServices.length === 0) {
+        console.warn('No valid services found for bundle/service insertion');
+        return;
+    }
+
+    const dedupedServices: any[] = [];
+    const seen = new Set<string>();
+    validServices.forEach((service) => {
+        if (seen.has(service.id)) return;
+        seen.add(service.id);
+        dedupedServices.push(service);
+    });
+
+    // loop over valid serviceIds
     let previousNodeId : any = null;
-    let baseX = 0;
-    let baseY = 0;
+    let baseX = dropPosition?.x ?? 0;
+    let baseY = dropPosition?.y ?? 0;
     
-    serviceIds?.forEach((serviceId: string, index: number) => {
-        // get service from serviceId
-        const service = getServiceFromId(services, serviceId);
+    dedupedServices.forEach((service: any, index: number) => {
         // if index === 0, add node to canvas with edge
         if (index === 0) {
             // calculate random position on canvas
-            baseX = Math.floor(Math.random() * 1000);
-            baseY = Math.floor(Math.random() * 1);
+            if (!dropPosition) {
+                baseX = Math.floor(Math.random() * 1000);
+                baseY = Math.floor(Math.random() * 1);
+            }
             const sourcePosition = { x: baseX, y: baseY};
             previousNodeId = addNodeToCanvasWithEdge(services, 'source', service, setNodes, setEdges, sourcePosition, null);
         } else {
@@ -195,17 +257,20 @@ export const addNodesAndEdgesFromServiceIds = (services: any[], serviceIds: stri
 }
 
 // TODO: Change bundle data structure to preserve service order!  Needing to check bundles.tsx just to get the correct service order...
-export const addNodesAndEdgesFromBundle = (bundle: any, services: any, setNodes: any, setEdges: any) => {
-    // get serviceIds from bundle
-    const bundleServices = bundleServiceOrders.find(b => b.label == bundle.label)?.services;
-    
-    const bundleServiceNames = bundleServices?.map(service => serviceNames.find(s => s.id === service)?.name);
-    
-    const serviceIds = bundleServiceNames?.map(service => bundle.services.find((s: any) => s.name === service)?.id ?? '');
-    
-    // console.log('test: ', test);
-    // const serviceIds = bundle.services.map((service: any) => service.id);
-    addNodesAndEdgesFromServiceIds(services, serviceIds, setNodes, setEdges);
+export const addNodesAndEdgesFromBundle = (
+    bundle: any,
+    services: any,
+    setNodes: any,
+    setEdges: any,
+    dropPosition?: { x: number; y: number }
+) => {
+    if (!Array.isArray(bundle.services) || bundle.services.length === 0) {
+        console.warn(`Unable to resolve service ids for bundle "${bundle?.label ?? bundle?.id ?? 'unknown'}"`);
+        return;
+    }
+
+    // Use runtime bundle service order from DB; fallback conversion handled per item.
+    addNodesAndEdgesFromServiceIds(services, bundle.services, setNodes, setEdges, dropPosition);
 }
 
 export const paramsFilledOnNode = (node: any) : Boolean => {

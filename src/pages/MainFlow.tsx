@@ -2,11 +2,12 @@ import { useState, useCallback, useRef, useEffect, useContext } from 'react';
 import { useParams } from 'react-router';
 import { useApolloClient, useMutation } from '@apollo/client';
 import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOptions, 
-                    applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection } from 'reactflow';
+                    applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection, Panel } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { Button } from '@mui/material';
 
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
-import { isValidConnection }                            from '../controllers/GraphHelpers';
+import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
 import { addNodesAndEdgesFromServiceIdsAlt }            from '../controllers/ResubmissionHelpers';
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
@@ -65,12 +66,20 @@ export default function MainFlow() {
 
         event.preventDefault();
 
-        let type = event.dataTransfer.getData('application/reactflow');
-            type = JSON.parse(type);
-        
-        const serviceId = type.id
-        const name      = type.name;
-        
+        const rawType = event.dataTransfer.getData('application/reactflow');
+        if (!rawType) {
+            return;
+        }
+        let parsed: any;
+        try {
+            parsed = JSON.parse(rawType);
+        } catch {
+            return;
+        }
+        const isWrappedPayload = parsed && typeof parsed === 'object' && 'itemType' in parsed && 'payload' in parsed;
+        const itemType = isWrappedPayload ? parsed.itemType : 'service';
+        const type = isWrappedPayload ? parsed.payload : parsed;
+
         // check if the dropped element is valid
         if (typeof type === 'undefined' || !type) {
             return;
@@ -81,16 +90,44 @@ export default function MainFlow() {
             y: event.clientY,
         });
 
+        if (itemType === 'bundle') {
+            addNodesAndEdgesFromBundle(type, services, setNodes, setEdges, position);
+            return;
+        }
+
+        const serviceId = type.id;
+        const name      = type.name;
+
         const nodeId = Math.random().toString(36).substring(2, 9);
         setActiveComponentId(nodeId);
 
         const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
-        const data: NodeData = { id: nodeId, label: name, price: type.price, description: type.description, allowedConnections: type.allowedConnections, 
+        const data: NodeData = {
+            id: nodeId,
+            label: name,
+            price: type.price,
+            internalPrice: type.internalPrice,
+            externalPrice: type.externalPrice,
+            externalAcademicPrice: type.externalAcademicPrice,
+            externalMarketPrice: type.externalMarketPrice,
+            externalNoSalaryPrice: type.externalNoSalaryPrice,
+            pricing: type.pricing,
+            pricingMode: type.pricingMode,
+            description: type.description,
+            allowedConnections: type.allowedConnections,
             icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId, paramGroups: type.paramGroups };
         const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
         setNodes((nds: any) => nds.concat(newNode));
     }, [reactFlowInstance, nodes]);
+
+    const handleClearCanvas = () => {
+        if (window.confirm('Clear all nodes and connections from the canvas?')) {
+            setNodes([]);
+            setEdges([]);
+            setActiveComponentId("");
+        }
+    };
 
     // TODO: Need to finish job status update
     const [updateJobMutation] = useMutation(MUTATE_JOB_STATE, {
@@ -157,6 +194,17 @@ export default function MainFlow() {
                             <Background />
 
                             <Controls />
+                            <Panel position="bottom-left" style={{ marginLeft: 8, marginBottom: 8 }}>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    size="small"
+                                    onClick={handleClearCanvas}
+                                    sx={{ textTransform: 'none', backgroundColor: 'white' }}
+                                >
+                                    Clear canvas
+                                </Button>
+                            </Panel>
 
                         </ReactFlow>
 

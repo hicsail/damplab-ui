@@ -1,82 +1,168 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate, Link } from "react-router";
-import { useApolloClient, useQuery } from "@apollo/client";
-import { Box, Button, Typography} from '@mui/material';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import { PDFDownloadLink } from '@react-pdf/renderer';
+import React, { useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router';
+import { useMutation, useQuery } from '@apollo/client';
+import { Box, Button, Alert, Stack } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import SubmittedJobsList, {
+  type JobListItem,
+  STATE_OPTIONS,
+} from '../components/SubmittedJobsList';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { ALL_JOBS, JOBS_FEED_STATUS } from '../gql/queries';
+import { MARK_JOBS_FEED_VIEWED } from '../gql/mutations';
 
-import { bodyText, StyledContainer } from "../styles/themes";
-import { GET_WORKFLOWS_BY_STATE, GET_JOB_BY_WORKFLOW_ID } from "../gql/queries";
-import JobPDFDocument from '../components/JobPDFDocument';
+export default function Dashboard() {
+  const [markJobsFeedViewed] = useMutation(MARK_JOBS_FEED_VIEWED);
+  const navigate = useNavigate();
+  const [page, setPage] = React.useState(1);
+  const [limit, setLimit] = React.useState(20);
+  const [searchInput, setSearchInput] = React.useState('');
+  const [stateFilter, setStateFilter] = React.useState<string>(STATE_OPTIONS[0]);
+  const [hasSowFilter, setHasSowFilter] = React.useState<'all' | 'yes' | 'no'>('all');
+  const [lastViewedAt, setLastViewedAt] = React.useState<string | null>(null);
 
+  const search = useDebouncedValue(searchInput, 300);
 
-export default function Dashboard( {...props} ) {
-    const apolloClient = useApolloClient();
-    const [queuedWorkflows,     setQueuedWorkflows]     = useState([]);
-    const [inProgressWorkflows, setInProgressWorkflows] = useState([]);
-    const [completedWorkflows,  setCompletedWorkflows]  = useState([]);
-    const [jobs,                setJobs]                = useState<any[]>([]);
+  const input = useMemo(() => {
+    const inp: Record<string, unknown> = {
+      page,
+      limit,
+      sortBy: 'SUBMITTED',
+      sortOrder: 'DESC',
+    };
+    if (search.trim()) inp.search = search.trim();
+    if (stateFilter) inp.state = stateFilter;
+    if (hasSowFilter !== 'all') inp.hasSow = hasSowFilter === 'yes';
+    return inp;
+  }, [page, limit, search, stateFilter, hasSowFilter]);
 
-    const useWorkflowQueries = ($state: string, $setterFunc: Function) => {
-        useQuery(GET_WORKFLOWS_BY_STATE, {
-            variables: { state: $state },
-            onCompleted: (data) => {
-                console.log($state, " workflows loaded successfully", data);
-                $setterFunc(data.getWorkflowByState);
-            },
-            onError: (error: any) => {
-                console.log(error.networkError?.result?.errors);
-                console.log("error when loading ", $state, " workflows", error);
-            },
-        });
+  const { data, loading, error } = useQuery(ALL_JOBS, {
+    variables: { input },
+  });
+  const { data: feedStatusData } = useQuery(JOBS_FEED_STATUS, {
+    fetchPolicy: 'network-only'
+  });
+
+  React.useEffect(() => {
+    if (!feedStatusData) {
+      return;
     }
-    
-    useWorkflowQueries("QUEUED",      setQueuedWorkflows);
-    useWorkflowQueries("IN_PROGRESS", setInProgressWorkflows);
-    useWorkflowQueries("COMPLETE",    setCompletedWorkflows);
+    setLastViewedAt(feedStatusData.jobsFeedStatus?.viewedAt ?? null);
+    markJobsFeedViewed().catch(() => {
+      // Keep dashboard functional even if feed state update fails.
+    });
+  }, [feedStatusData, markJobsFeedViewed]);
 
-    useEffect(() => {
-        const fetchJobIDs = async () => {
-            const allWorkflows = [...queuedWorkflows, ...inProgressWorkflows, ...completedWorkflows];
-            const jobIDPromises = allWorkflows.map(async (workflow: any) => {
-                try {
-                    const result = await apolloClient.query({
-                        query: GET_JOB_BY_WORKFLOW_ID,
-                        variables: { id: workflow.id },
-                    });
-                    return result.data.jobByWorkflowId;
-                } catch (error) {
-                    console.log('error when loading job', error);
-                    return null;
-                }
-            });
-            const returnedJobs = await Promise.all(jobIDPromises);
-            setJobs(returnedJobs.filter((id) => id !== null));
-        };
+  const result = data?.allJobs;
+  const items: JobListItem[] = useMemo(() => {
+    const raw = result?.items ?? [];
+    return raw.map((j: Record<string, unknown>) => ({
+      id: String(j.id ?? ''),
+      name: String(j.name ?? ''),
+      state: String(j.state ?? ''),
+      submitted: String(j.submitted ?? ''),
+      username: j.username != null ? String(j.username) : undefined,
+      institute: j.institute != null ? String(j.institute) : undefined,
+      email: j.email != null ? String(j.email) : undefined,
+      sow: j.sow
+        ? {
+            id: String((j.sow as Record<string, unknown>).id ?? ''),
+            sowNumber: String((j.sow as Record<string, unknown>).sowNumber ?? ''),
+            sowTitle: (j.sow as Record<string, unknown>).sowTitle != null
+              ? String((j.sow as Record<string, unknown>).sowTitle)
+              : undefined,
+            status: String((j.sow as Record<string, unknown>).status ?? ''),
+          }
+        : null,
+    }));
+  }, [result?.items]);
+  const totalCount = result?.totalCount ?? 0;
 
-        fetchJobIDs();
-    }, [queuedWorkflows, inProgressWorkflows, completedWorkflows, apolloClient]);
+  const handlePageChange = useCallback((p: number) => setPage(p), []);
+  const handleLimitChange = useCallback((l: number) => {
+    setLimit(l);
+    setPage(1);
+  }, []);
+  const isJobNew = useCallback(
+    (job: JobListItem) => {
+      if (!job.submitted) return false;
+      if (!lastViewedAt) return true;
+      return new Date(job.submitted).getTime() > new Date(lastViewedAt).getTime();
+    },
+    [lastViewedAt]
+  );
 
-    return (
-        <div>
-            <Typography variant="h4" sx={{ mt: 2, mb: 2 }}>Submitted Jobs</Typography>
-                {jobs.map((job, index) => (
-                    <Button key={index} variant="outlined" title={job.name}  sx={{boxShadow: 2}} 
-                    style={{ textAlign: 'left', borderRadius: 5, margin: 20, padding: 5, display: 'flow', justifyContent: 'space-around' }}
-                    component={Link} to={`/technician_view/${job.id}`}>
-                        <p style={{fontWeight: 'bold', margin: 10}}>{job.name} ({job.id})</p>
-                        <div style={{ color: 'black', margin: 10 }}>
-                            State    : {job.state}     <br/>
-                            Username : {job.username}  <br/>
-                            Institute: {job.institute} <br/>
-                            Email    : {job.email}     <br/>
-                            {/* TODO: Fix these fields... */}
-                            {/* Submitted: {new Date(job.submitted).toLocaleString('en-US', { timeZone: 'US/Eastern' })} <br/> */}
-                            {/* Notes    : {job.notes}     <br/> */}
-                            {/* Services : {job.workflow} */}
-                        </div>
-                    </Button>
-                ))}
-        </div>
-    )
+  const content = error ? (
+    <Alert severity="error">
+      Failed to load submitted jobs. Please try again later.
+    </Alert>
+  ) : (
+    <SubmittedJobsList
+      items={items}
+      totalCount={totalCount}
+      loading={loading}
+      page={page}
+      limit={limit}
+      onPageChange={handlePageChange}
+      onLimitChange={handleLimitChange}
+      search={searchInput}
+      onSearchChange={setSearchInput}
+      stateFilter={stateFilter}
+      onStateFilterChange={setStateFilter}
+      hasSowFilter={hasSowFilter}
+      onHasSowFilterChange={setHasSowFilter}
+      showHasSowFilter
+      getJobLink={(j) => `/technician_view/${j.id}`}
+      isStaff
+      title="Submitted Jobs"
+      subtitle="All submitted jobs. Click a job to open the technician view."
+      emptyMessage="No submitted jobs yet."
+      onBack={() => navigate('/')}
+      backLabel="Back to Home"
+      isJobNew={isJobNew}
+    />
+  );
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        justifyContent="space-between"
+        alignItems={{ xs: 'stretch', sm: 'center' }}
+        spacing={2}
+        sx={{ mb: 2 }}
+      >
+        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
+          Back to Home
+        </Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate('/lab-monitor/north')}
+            sx={{ textTransform: 'none' }}
+          >
+            Lab Monitor North
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate('/lab-monitor/south')}
+            sx={{ textTransform: 'none' }}
+          >
+            Lab Monitor South
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate('/customer-management')}
+            sx={{ textTransform: 'none' }}
+          >
+            Customer management
+          </Button>
+        </Stack>
+      </Stack>
+      {content}
+    </Box>
+  );
 }

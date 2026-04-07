@@ -55,8 +55,9 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
     for (let i = 0; i < paramsData.length; i++) {
         const parameter = paramsData[i];
         const formId = Math.random().toString(36).substring(2, 9);
+        const allowMultipleValues = !!parameter.allowMultipleValues;
         formData.push({
-            id: formId,
+            id: parameter.id ?? formId,
             nodeId: nodeId,
             name: parameter.name,
             type: parameter.type,
@@ -64,8 +65,9 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
             description: parameter.description,
             paramType: parameter.paramType ? parameter.paramType : null,
             resultParamValue: "",
-            value: formValues[i].value,
-            required: true // parameter.required,
+            value: formValues[i].value != null ? formValues[i].value : (allowMultipleValues ? [''] : null),
+            required: parameter.required,
+            allowMultipleValues: allowMultipleValues || undefined,
         });
     };
 
@@ -74,6 +76,14 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
     const nodeData = {
         id: nodeId,
         label: service.service.name,
+        price: service.price ?? service.service.price ?? 0,
+        internalPrice: service.service.internalPrice,
+        externalPrice: service.service.externalPrice,
+        externalAcademicPrice: service.service.externalAcademicPrice,
+        externalMarketPrice: service.service.externalMarketPrice,
+        externalNoSalaryPrice: service.service.externalNoSalaryPrice,
+        pricing: service.service.pricing,
+        pricingMode: service.service.pricingMode,
         description: service.description,
         allowedConnections: service.service.allowedConnections,
         icon: service.service.icon,
@@ -133,8 +143,9 @@ export const generateFormDataFromParamsAlt = (paramsData: any, nodeId: string): 
     for (let i = 0; i < paramsData.length; i++) {
         const parameter = paramsData[i];
         const formId    = Math.random().toString(36).substring(2, 9);
+        const allowMultipleValues = !!parameter.allowMultipleValues;
         formData.push({
-            id              : formId,
+            id              : parameter.id ?? formId,
             nodeId          : nodeId,
             name            : parameter.name,
             type            : parameter.type,
@@ -142,8 +153,9 @@ export const generateFormDataFromParamsAlt = (paramsData: any, nodeId: string): 
             description     : parameter.description,
             paramType       : parameter.paramType ? parameter.paramType: null,
             resultParamValue: "",
-            value           : null,
-            required        : true  // parameter.required,
+            value           : allowMultipleValues ? [''] : null,
+            required        : parameter.required,
+            allowMultipleValues: allowMultipleValues || undefined,
         });
     }
 

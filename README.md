@@ -36,6 +36,23 @@ You can then install the dependencies and launch the program in development mode
 
 ```console
 npm install
+```
+
+Before running the application, you'll need to set up your environment variables. Copy the example environment file and fill in the required values:
+
+```console
+cp .env.example .env
+```
+
+Then edit `.env` and provide values for:
+- `VITE_KEYCLOAK_URL` - Your Keycloak server URL
+- `VITE_KEYCLOAK_REALM` - Your Keycloak realm (default: damplab)
+- `VITE_KEYCLOAK_CLIENT_ID` - Your Keycloak client ID (default: damplabclient)
+- `VITE_BACKEND` - Your backend API URL
+
+Once your environment variables are configured, launch the program:
+
+```console
 npm start
 ```
 
@@ -85,10 +102,15 @@ The damplab-ui app expects to see certain roles attached to its users.
 These are: `damplab-staff`, `internal-customer`, and `external-customer`.
 It often makes sense to assign roles to groups and then add users to groups, rather than configuring roles directly on the users.
 
-The damplab-ui app will then need the following environment variables to be set in order to talk to Keycloak:
-- `VITE_KEYCLOAK_URL`
-- `VITE_KEYCLOAK_REALM`
-- `VITE_KEYCLOAK_CLIENT_ID`
+The damplab-ui app will then need the following environment variables to be set. You can use the `.env.example` file as a template:
+
+**Keycloak Configuration:**
+- `VITE_KEYCLOAK_URL` - Your Keycloak server URL
+- `VITE_KEYCLOAK_REALM` - Your Keycloak realm (default: damplab)
+- `VITE_KEYCLOAK_CLIENT_ID` - Your Keycloak client ID (default: damplabclient)
+
+**Backend Configuration:**
+- `VITE_BACKEND` - Your backend API URL (GraphQL endpoint)
 
 
 ### Learn More

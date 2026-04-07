@@ -1,4 +1,5 @@
-FROM node:22 AS build
+# Official images via AWS Public ECR mirror — avoids Docker Hub pull flakiness/rate limits in GitHub Actions.
+FROM public.ecr.aws/docker/library/node:22 AS build
 
 ARG VITE_BACKEND
 ARG VITE_KEYCLOAK_URL
@@ -16,7 +17,7 @@ RUN npm install
 RUN npm run build
 
 
-FROM nginx:1.28
+FROM public.ecr.aws/docker/library/nginx:1.28
 
 COPY nginx-http-server.conf /etc/nginx/conf.d/default.conf
 

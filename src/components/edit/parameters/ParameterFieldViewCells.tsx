@@ -8,12 +8,12 @@ import { Box, Button, Tooltip } from "@mui/material";
 
 export function ParameterOptionsViewCell(props: GridRenderCellParams) {
   const [isHover, setIsHover] = React.useState(false);
-  const isDisabled = props.row.type !== "enum";
+  const isDisabled = props.row.type !== "dropdown";
 
   return (
     <Tooltip
       open={isDisabled && isHover}
-      title={"Options is only applicable for parameters of type enum."}
+      title={"Choices are only used when the answer format is Pick from list."}
       arrow
     >
       <Box
@@ -26,7 +26,7 @@ export function ParameterOptionsViewCell(props: GridRenderCellParams) {
           disabled={isDisabled}
           onClick={() => props.handleOptionsViewButton(props)}
         >
-          View
+          View choices
         </Button>
       </Box>
     </Tooltip>
@@ -40,7 +40,7 @@ export function ParameterTableViewCell(props: GridRenderCellParams) {
   return (
     <Tooltip
       open={isDisabled && isHover}
-      title={"TableData is only applicable for parameters of type table."}
+      title={"Table setup is only used when the answer format is Table."}
       arrow
     >
       <Box
@@ -53,7 +53,7 @@ export function ParameterTableViewCell(props: GridRenderCellParams) {
           disabled={isDisabled}
           onClick={() => props.handleTableDataButton(props)}
         >
-          View
+          View table
         </Button>
       </Box>
     </Tooltip>

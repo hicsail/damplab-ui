@@ -1,24 +1,57 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useFormik } from "formik";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
+  Chip,
   FormControl,
   FormHelperText,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
+  Stack,
   TextField,
+  Box,
+  Button,
+  Tooltip,
+  Typography,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ParamTableOnForm from "./ParamTableOnForm";
+import { CanvasContext } from "../contexts/Canvas";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
+  onFormDataChange?: () => void;
 }
 
-export default function ({ activeNode }: ParamFormProps) {
+type PendingParamFile = {
+  __kind: "pending-file";
+  localId: string;
+  file: File;
+  filename: string;
+  contentType: string;
+  size: number;
+};
+
+const isPendingParamFile = (value: unknown): value is PendingParamFile =>
+  !!value &&
+  typeof value === "object" &&
+  (value as PendingParamFile).__kind === "pending-file" &&
+  typeof (value as PendingParamFile).filename === "string";
+
+export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
+  const { setNodes } = useContext(CanvasContext);
+
+  // Backend may return formData with value as array for multi-value params without allowMultipleValues set
+  const isMultiValueParam = (param: any) =>
+    param.allowMultipleValues === true || Array.isArray(param.value);
 
   // init formik with values from activeNode
   const initValues = () => {
@@ -32,7 +65,23 @@ export default function ({ activeNode }: ParamFormProps) {
         initValues[`resultParamValue${obj.id}`] = obj.resultParamValue
           ? obj.resultParamValue
           : "";
-      } else initValues[obj.id] = obj.value ? obj.value : "";
+      } else if (isMultiValueParam(obj)) {
+        if (obj.type === "file") {
+          const arr = Array.isArray(obj.value) ? obj.value : obj.value ? [obj.value] : [];
+          initValues[obj.id] = arr;
+          return;
+        }
+        const arr = Array.isArray(obj.value)
+          ? (obj.value.length ? obj.value : [""])
+          : [obj.value ?? ""];
+        initValues[obj.id] = arr;
+      } else {
+        if (obj.type === "file") {
+          initValues[obj.id] = obj.value ?? null;
+          return;
+        }
+        initValues[obj.id] = obj.value != null ? obj.value : "";
+      }
     });
     // Now a dedicated field in each service (should always accompany other params)
     // initValues[`addinst${activeNode?.data.id}`] = activeNode?.data.additionalInstructions ? activeNode?.data.additionalInstructions : '';
@@ -43,36 +92,56 @@ export default function ({ activeNode }: ParamFormProps) {
   // validation function for formik to check for empty fields
   const validate = (values: any) => {
     let errors: any = {};
-    // loop over values and check if they are empty
-    for (let key in values) {
-      if (
-        values[key] === "" ||
-        values[key] === undefined ||
-        values[key] === null
-      ) {
-        // if key is an id of a param in formdata, then it is a required field
+    activeNode.data.formData.forEach((obj: any) => {
+      if (obj.paramType === "result") return;
+      const key = obj.id;
+      if (isMultiValueParam(obj)) {
+        if (obj.required) {
+          const arr = values[key];
+          const hasValue = obj.type === "file"
+            ? Array.isArray(arr) && arr.length > 0
+            : Array.isArray(arr) && arr.some((v: any) => v != null && String(v).trim() !== "");
+          if (!hasValue) errors[key] = "Required (at least one value)";
+        }
+      } else {
+        if (obj.type === "file") {
+          if (obj.required && !values[key]) errors[key] = "Required";
+          return;
+        }
         if (
-          activeNode.data.formData.find((obj: any) => obj.id === key)
-            ?.required === true
-        )
-          errors[key] = "Required";
-        // if (activeNode.data.formData.find((obj: any) => obj.id === key)) errors[key] = 'Required';
+          values[key] === "" ||
+          values[key] === undefined ||
+          values[key] === null
+        ) {
+          if (obj.required) errors[key] = "Required";
+        }
       }
-    }
+    });
     setParamErrors(errors);
     return errors;
   };
 
-  // copy formik values to activeNode.data
-  const copyFormikValuesToNodeData = (values: any) => {
-    activeNode.data.formData.forEach((obj: any) => {
-      obj.value = values[obj.id];
-      if (obj.paramType === "result") {
-        obj.resultParamValue = values[`resultParamValue${obj.id}`];
+  const buildUpdatedFormData = (values: any) => {
+    return activeNode.data.formData.map((obj: any) => {
+      const updated = { ...obj };
+      if (updated.paramType === "result") {
+        updated.resultParamValue = values[`resultParamValue${updated.id}`];
       }
+      updated.value = values[updated.id];
+      return updated;
     });
-    // Now a dedicated field in each service (should always accompany other params)
-    // activeNode.data.additionalInstructions = values[`addinst${activeNode?.data.id}`];
+  };
+
+  const toPendingFiles = (files: FileList | null): PendingParamFile[] => {
+    if (!files) return [];
+    return Array.from(files).map((file) => ({
+      __kind: "pending-file",
+      localId: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      file,
+      filename: file.name,
+      contentType: file.type || "application/octet-stream",
+      size: file.size,
+    }));
   };
 
   // formik hook init
@@ -80,9 +149,7 @@ export default function ({ activeNode }: ParamFormProps) {
     initialValues: initValues(),
     enableReinitialize: true,
     validate: validate,
-    onSubmit: (values: any) => {
-      copyFormikValuesToNodeData(values);
-    },
+    onSubmit: () => {},
   });
 
   const returnParamGroups = (activeNodeData: any) => {
@@ -119,16 +186,26 @@ export default function ({ activeNode }: ParamFormProps) {
     let paramGroups = returnParamGroups(formData);
 
     return (
-      <div 
-      style={{
-        border: "1px solid black",
-        padding: 2,
-      }}>
+      <Stack spacing={1.5}>
         {paramGroups.map((paramGroup: any) => {
+          const requiredCount = paramGroup.parameters.filter((p: any) => p.required && p.paramType !== "result").length;
+          const missingRequiredCount = paramGroup.parameters.filter(
+            (p: any) => p.required && p.paramType !== "result" && !!paramErrors[p.id]
+          ).length;
+
           return (
-            <div key={paramGroup.id}>
-              <h4>{paramGroup.name}</h4>
-              <div className="input-params" style={{ marginLeft: 20 }}>
+            <Accordion key={paramGroup.id} defaultExpanded={missingRequiredCount > 0}>
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
+                  <Typography variant="subtitle2">{paramGroup.name}</Typography>
+                  {requiredCount > 0 ? <Chip size="small" label={`${requiredCount} required`} /> : null}
+                  {missingRequiredCount > 0 ? (
+                    <Chip size="small" color="warning" label={`${missingRequiredCount} missing`} />
+                  ) : null}
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails>
+              <div className="input-params" style={{ marginLeft: 8 }}>
                 {paramGroup.parameters.map((param: any) => {
                   if (param.paramType !== "result") {
                     if (param.type === "table") {
@@ -139,6 +216,66 @@ export default function ({ activeNode }: ParamFormProps) {
                             columns={param.tableData.columns}
                             rows={param.tableData.rows}
                           />
+                        </div>
+                      );
+                    }
+                    if (param.type === "dropdown" && isMultiValueParam(param)) {
+                      const values = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [""];
+                      return (
+                        <div key={param.id} style={{ marginTop: 12 }}>
+                          <Box display="flex" alignItems="flex-start" gap={0.5} flexWrap="wrap">
+                            <Box>
+                              {values.map((val: string, idx: number) => (
+                                <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
+                                  <FormControl size="small" sx={{ width: "26ch" }}>
+                                    <InputLabel sx={{ backgroundColor: "white" }}>
+                                      {idx === 0 ? param.name : `${param.name} (${idx + 1})`}
+                                    </InputLabel>
+                                    <Select
+                                      value={val ?? ""}
+                                      onChange={(e) => {
+                                        const next = [...values];
+                                        next[idx] = e.target.value;
+                                        formik.setFieldValue(param.id, next);
+                                      }}
+                                      onBlur={formik.handleBlur}
+                                    >
+                                      {param.options?.map((option: any) => (
+                                        <MenuItem key={option.id} value={option.id}>
+                                          {option.name}
+                                        </MenuItem>
+                                      )) ?? []}
+                                    </Select>
+                                    {idx === 0 && param.description && (
+                                      <FormHelperText>{param.description}</FormHelperText>
+                                    )}
+                                  </FormControl>
+                                  {idx > 0 && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        const next = values.filter((_: any, i: number) => i !== idx);
+                                        formik.setFieldValue(param.id, next.length ? next : [""]);
+                                      }}
+                                      aria-label="Remove value"
+                                    >
+                                      <DeleteForeverSharp fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                  {idx === 0 && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => formik.setFieldValue(param.id, [...values, ""])}
+                                      aria-label="Add another value"
+                                      sx={{ p: 0.25, ml: 0.25 }}
+                                    >
+                                      <PlusOne fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                </Box>
+                              ))}
+                            </Box>
+                          </Box>
                         </div>
                       );
                     }
@@ -219,6 +356,130 @@ export default function ({ activeNode }: ParamFormProps) {
                         </FormControl>
                       );
                     }
+                    if (param.type === "file") {
+                      if (isMultiValueParam(param)) {
+                        const files = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [];
+                        return (
+                          <div key={param.id} style={{ marginTop: 12 }}>
+                            <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                              {param.name}
+                              <input
+                                hidden
+                                type="file"
+                                multiple
+                                onChange={(e) => {
+                                  const selected = toPendingFiles(e.target.files);
+                                  formik.setFieldValue(param.id, [...files, ...selected]);
+                                  e.currentTarget.value = "";
+                                }}
+                              />
+                            </Button>
+                            {param.description ? (
+                              <FormHelperText>{param.description}</FormHelperText>
+                            ) : null}
+                            <Box sx={{ mt: 1 }}>
+                              {files.map((f: any, idx: number) => (
+                                <Box key={f?.localId ?? idx} display="flex" alignItems="center" gap={0.5}>
+                                  <FormHelperText sx={{ m: 0 }}>
+                                    {isPendingParamFile(f) ? f.filename : "Uploaded file"}
+                                  </FormHelperText>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx))}
+                                    aria-label="Remove file"
+                                  >
+                                    <DeleteForeverSharp fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              ))}
+                            </Box>
+                          </div>
+                        );
+                      }
+                      const fileValue = formik.values[param.id];
+                      return (
+                        <div key={param.id} style={{ marginTop: 12 }}>
+                          <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                            {param.name}
+                            <input
+                              hidden
+                              type="file"
+                              onChange={(e) => {
+                                const selected = toPendingFiles(e.target.files);
+                                formik.setFieldValue(param.id, selected[0] ?? null);
+                                e.currentTarget.value = "";
+                              }}
+                            />
+                          </Button>
+                          {param.description ? (
+                            <FormHelperText>{param.description}</FormHelperText>
+                          ) : null}
+                          {fileValue ? (
+                            <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5 }}>
+                              <FormHelperText sx={{ m: 0 }}>
+                                {isPendingParamFile(fileValue) ? fileValue.filename : "Uploaded file"}
+                              </FormHelperText>
+                              <IconButton size="small" onClick={() => formik.setFieldValue(param.id, null)} aria-label="Remove file">
+                                <DeleteForeverSharp fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          ) : null}
+                        </div>
+                      );
+                    }
+                    if (param.type !== "dropdown" && isMultiValueParam(param)) {
+                      const values = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [""];
+                      return (
+                        <div key={param.id} style={{ marginTop: 12 }}>
+                          <Box display="flex" alignItems="flex-start" gap={0.5} flexWrap="wrap">
+                            <Box>
+                              {values.map((val: string, idx: number) => (
+                                <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
+                                  <TextField
+                                    multiline={param.name === "Additional Notes"}
+                                    helperText={idx === 0 && param.description ? param.description : null}
+                                    size="small"
+                                    label={idx === 0 ? param.name : undefined}
+                                    type={param.type}
+                                    value={val ?? ""}
+                                    onChange={(e) => {
+                                      const next = [...values];
+                                      next[idx] = e.target.value;
+                                      formik.setFieldValue(param.id, next);
+                                    }}
+                                    onBlur={formik.handleBlur}
+                                    sx={{ width: "26ch" }}
+                                    InputLabelProps={{ shrink: true }}
+                                  />
+                                  {idx > 0 && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => {
+                                        const next = values.filter((_: any, i: number) => i !== idx);
+                                        formik.setFieldValue(param.id, next.length ? next : [""]);
+                                      }}
+                                      aria-label="Remove value"
+                                    >
+                                      <DeleteForeverSharp fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                  {idx === 0 && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => formik.setFieldValue(param.id, [...values, ""])}
+                                      aria-label="Add another value"
+                                      sx={{ p: 0.25, ml: 0.25 }}
+                                    >
+                                      <PlusOne fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                </Box>
+                              ))}
+                            </Box>
+                          </Box>
+                        </div>
+                      );
+                    }
                     else {
                       return (
                         <div key={param.id}>
@@ -250,17 +511,31 @@ export default function ({ activeNode }: ParamFormProps) {
                   }
                 })}
               </div>
-            </div>
+              </AccordionDetails>
+            </Accordion>
           );
         })}
-      </div>
+      </Stack>
     );
 
   }
 
   // update values to active node form data and validate
   useEffect(() => {
-    copyFormikValuesToNodeData(formik.values);
+    const updatedFormData = buildUpdatedFormData(formik.values);
+    setNodes((nds: any[]) =>
+      nds.map((node: any) =>
+        node.id === activeNode.id
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                formData: updatedFormData,
+              },
+            }
+          : node
+      )
+    );
     const errors = validate(formik.values);
     if (Object.keys(errors).length > 0) {
       formik.setErrors(errors);
@@ -268,33 +543,56 @@ export default function ({ activeNode }: ParamFormProps) {
     if (Object(errors).length !== paramErrors.length) {
       setParamErrors(errors);
     }
+    onFormDataChange?.();
   }, [formik.values]);
 
 
   return (
     <div>
-      <h3>Parameters</h3>
-      <div className="formik-errors" style={{ marginLeft: 20 }}>
-        <ul style={{ background: "pink", fontSize: 10 }}>
-          {Object.keys(paramErrors).map((key: any) => {
-            let name = activeNode.data.formData.find(
-              (obj: any) => obj.id === key
-            )?.name;
-            return (
-              <li key={key} style={{ position: "relative", left: -25 }}>
-                {name}: {paramErrors[key]}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+      <Stack spacing={1} sx={{ mb: 1 }}>
+        <Typography variant="h6">Parameters</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Fill required fields first. Optional fields can be updated anytime before checkout.
+        </Typography>
+        {Object.keys(paramErrors).length > 0 ? (
+          <Alert severity="warning" sx={{ py: 0.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {Object.keys(paramErrors).length} required field(s) still need values.
+            </Typography>
+            <Box component="ul" sx={{ my: 0.5, pl: 2 }}>
+              {Object.keys(paramErrors).slice(0, 6).map((key: any) => {
+                let name = activeNode.data.formData.find((obj: any) => obj.id === key)?.name;
+                return (
+                  <li key={key}>
+                    <Typography variant="caption">
+                      {name}: {paramErrors[key]}
+                    </Typography>
+                  </li>
+                );
+              })}
+              {Object.keys(paramErrors).length > 6 ? (
+                <Typography variant="caption">...and more</Typography>
+              ) : null}
+            </Box>
+          </Alert>
+        ) : (
+          <Alert severity="success" sx={{ py: 0.5 }}>
+            <Typography variant="body2">All required fields are complete.</Typography>
+          </Alert>
+        )}
+      </Stack>
       <form onSubmit={formik.handleSubmit}>
         {
           // check if there are any param groups and render them
           activeNode.data.paramGroups &&
           renderParamGroups(activeNode.data)
         }
-        <div className="input-params" style={{ marginLeft: 20 }}>
+        <Accordion defaultExpanded sx={{ mt: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2">General Parameters</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+        <div className="input-params" style={{ marginLeft: 8 }}>
           {activeNode.data.formData.map((param: any) => {
             if (param.paramType !== "result" && !param.paramGroupId) {
               if (param.type === "table") {
@@ -308,7 +606,7 @@ export default function ({ activeNode }: ParamFormProps) {
                   </div>
                 );
               }
-              if (param.type === "dropdown") {
+              if (param.type === "dropdown" && !isMultiValueParam(param)) {
                 return (
                   <FormControl
                     size="small"
@@ -372,6 +670,7 @@ export default function ({ activeNode }: ParamFormProps) {
                       }
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
+                      error={Boolean(formik.errors[param.id])}
                     >
                       {param.options.map((option: any) => (
                         <MenuItem key={option.id} value={option.id}>
@@ -380,12 +679,194 @@ export default function ({ activeNode }: ParamFormProps) {
                       ))}
                     </Select>
                     <FormHelperText>
-                      {param.description ? param.description : null}
+                      {formik.errors[param.id]
+                        ? String(formik.errors[param.id])
+                        : (param.description ? param.description : null)}
                     </FormHelperText>
                   </FormControl>
                 );
-              } else {
+              }
+              if (param.type === "dropdown" && isMultiValueParam(param)) {
+                const values = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [""];
                 return (
+                  <div key={param.id} style={{ marginTop: 12 }}>
+                    <Box display="flex" alignItems="flex-start" gap={0.5} flexWrap="wrap">
+                      <Box>
+                        {values.map((val: string, idx: number) => (
+                          <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
+                            <FormControl size="small" sx={{ width: "26ch" }}>
+                              <InputLabel sx={{ backgroundColor: "white" }}>
+                                {idx === 0 ? param.name : `${param.name} (${idx + 1})`}
+                              </InputLabel>
+                              <Select
+                                value={val ?? ""}
+                                onChange={(e) => {
+                                  const next = [...values];
+                                  next[idx] = e.target.value;
+                                  formik.setFieldValue(param.id, next);
+                                }}
+                                onBlur={formik.handleBlur}
+                              >
+                                {param.options?.map((option: any) => (
+                                  <MenuItem key={option.id} value={option.id}>
+                                    {option.name}
+                                  </MenuItem>
+                                )) ?? []}
+                              </Select>
+                              {idx === 0 && param.description && (
+                                <FormHelperText>{param.description}</FormHelperText>
+                              )}
+                            </FormControl>
+                            {idx > 0 && (
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  const next = values.filter((_: any, i: number) => i !== idx);
+                                  formik.setFieldValue(param.id, next.length ? next : [""]);
+                                }}
+                                aria-label="Remove value"
+                              >
+                                <DeleteForeverSharp fontSize="small" />
+                              </IconButton>
+                            )}
+                            {idx === 0 && (
+                              <IconButton
+                                size="small"
+                                onClick={() => formik.setFieldValue(param.id, [...values, ""])}
+                                aria-label="Add another value"
+                                sx={{ p: 0.25, ml: 0.25 }}
+                              >
+                                <PlusOne fontSize="small" />
+                              </IconButton>
+                            )}
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  </div>
+                );
+              }
+              if (param.type === "file") {
+                if (isMultiValueParam(param)) {
+                  const files = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [];
+                  return (
+                    <div key={param.id} style={{ marginTop: 12 }}>
+                      <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                        {param.name}
+                        <input
+                          hidden
+                          type="file"
+                          multiple
+                          onChange={(e) => {
+                            const selected = toPendingFiles(e.target.files);
+                            formik.setFieldValue(param.id, [...files, ...selected]);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                      </Button>
+                      {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
+                      <Box sx={{ mt: 1 }}>
+                        {files.map((f: any, idx: number) => (
+                          <Box key={f?.localId ?? idx} display="flex" alignItems="center" gap={0.5}>
+                            <FormHelperText sx={{ m: 0 }}>
+                              {isPendingParamFile(f) ? f.filename : "Uploaded file"}
+                            </FormHelperText>
+                            <IconButton
+                              size="small"
+                              onClick={() => formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx))}
+                              aria-label="Remove file"
+                            >
+                              <DeleteForeverSharp fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        ))}
+                      </Box>
+                    </div>
+                  );
+                }
+                const fileValue = formik.values[param.id];
+                return (
+                  <div key={param.id} style={{ marginTop: 12 }}>
+                    <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                      {param.name}
+                      <input
+                        hidden
+                        type="file"
+                        onChange={(e) => {
+                          const selected = toPendingFiles(e.target.files);
+                          formik.setFieldValue(param.id, selected[0] ?? null);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                    </Button>
+                    {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
+                    {fileValue ? (
+                      <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5 }}>
+                        <FormHelperText sx={{ m: 0 }}>
+                          {isPendingParamFile(fileValue) ? fileValue.filename : "Uploaded file"}
+                        </FormHelperText>
+                        <IconButton size="small" onClick={() => formik.setFieldValue(param.id, null)} aria-label="Remove file">
+                          <DeleteForeverSharp fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    ) : null}
+                  </div>
+                );
+              }
+              if (param.type !== "dropdown" && isMultiValueParam(param)) {
+                const values = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [""];
+                return (
+                  <div key={param.id} style={{ marginTop: 12 }}>
+                    <Box display="flex" alignItems="flex-start" gap={0.5} flexWrap="wrap">
+                      <Box>
+                        {values.map((val: string, idx: number) => (
+                          <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
+                            <TextField
+                              multiline={param.name === "Additional Notes"}
+                              helperText={idx === 0 && param.description ? param.description : null}
+                              size="small"
+                              label={idx === 0 ? param.name : undefined}
+                              type={param.type}
+                              value={val ?? ""}
+                              onChange={(e) => {
+                                const next = [...values];
+                                next[idx] = e.target.value;
+                                formik.setFieldValue(param.id, next);
+                              }}
+                              onBlur={formik.handleBlur}
+                              sx={{ width: "26ch" }}
+                              InputLabelProps={{ shrink: true }}
+                            />
+                            {idx > 0 && (
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  const next = values.filter((_: any, i: number) => i !== idx);
+                                  formik.setFieldValue(param.id, next.length ? next : [""]);
+                                }}
+                                aria-label="Remove value"
+                              >
+                                <DeleteForeverSharp fontSize="small" />
+                              </IconButton>
+                            )}
+                            {idx === 0 && (
+                              <IconButton
+                                size="small"
+                                onClick={() => formik.setFieldValue(param.id, [...values, ""])}
+                                aria-label="Add another value"
+                                sx={{ p: 0.25, ml: 0.25 }}
+                              >
+                                <PlusOne fontSize="small" />
+                              </IconButton>
+                            )}
+                          </Box>
+                        ))}
+                      </Box>
+                    </Box>
+                  </div>
+                );
+              }
+              return (
                   <div key={param.id}>
                     {param.dynamicAdd && (
                       <IconButton onClick={() => alert("Dynamic Add")}>
@@ -407,25 +888,34 @@ export default function ({ activeNode }: ParamFormProps) {
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       sx={{ mt: 3, width: "26ch" }}
+                      error={Boolean(formik.errors[param.id])}
+                      helperText={formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
                       InputLabelProps={{ shrink: true }}
                     />
                   </div>
                 );
-              }
             } else {
               return null;
             }
           })}
         </div>
-        <div className="result-parms" style={{ marginLeft: 20 }}>
+          </AccordionDetails>
+        </Accordion>
+        <Accordion sx={{ mt: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2">Result Parameters</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+        <div className="result-parms" style={{ marginLeft: 8 }}>
           {
             // check if there are any result params and display info if there are
             activeNode.data.formData.find(
               (obj: any) => obj.paramType === "result"
             ) && (
-              <div>
-                Result Parameters
-                <IconButton
+              <Box display="flex" alignItems="center" gap={0.5}>
+                <Typography variant="body2">Result Parameters</Typography>
+                <Tooltip title="Result parameters use outputs from previous steps by default. Uncheck to provide your own value.">
+                <IconButton size="small"
                   onClick={() => {
                     alert(
                       "Result parameteres are results of experiments that were previously run in the workflow. By default we will use their outputs, if you would like to specify a different input, you can deselect and enter what we should use."
@@ -434,7 +924,8 @@ export default function ({ activeNode }: ParamFormProps) {
                 >
                   <InfoOutlinedIcon />
                 </IconButton>
-              </div>
+                </Tooltip>
+              </Box>
             )
           }
           {activeNode.data.formData.map((param: any) => {
@@ -474,6 +965,8 @@ export default function ({ activeNode }: ParamFormProps) {
             }
           })}
         </div>
+          </AccordionDetails>
+        </Accordion>
         {/* Now a dedicated field in each service (should always accompany other params) */}
         {/* <div className="add-instructs" style={{marginLeft: 20, marginBottom: 10}}>
                     <TextField multiline sx={{ mt: 3, width: '26ch' }} label="Additional Instructions" rows={3}

@@ -11,5 +11,22 @@ export default defineConfig(() => {
       target: 'esnext',
     },
     plugins: [reactRouter()],
+    define: {
+      'global': 'globalThis',
+      'process.env': {},
+    },
+    resolve: {
+      dedupe: ['react', 'react-dom'],
+      alias: {
+        buffer: 'buffer',
+      },
+    },
+    optimizeDeps: {
+      esbuildOptions: {
+        define: {
+          global: 'globalThis',
+        },
+      },
+    },
   };
 });

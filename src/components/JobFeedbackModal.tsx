@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useMutation } from '@apollo/client';
-import { Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField } from "@mui/material";
+import { Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography, Checkbox } from "@mui/material";
 import { styled } from "@mui/system";
 
-import { MUTATE_JOB_STATE } from '../gql/mutations';
+import { MUTATE_JOB_STATE, CREATE_COMMENT } from '../gql/mutations';
+import { UserContext } from '../contexts/UserContext';
 
 
 const CenteredModal = styled(Modal)`
@@ -23,22 +24,21 @@ const ModalBox = styled(Box)`
 `;
 
 const FeedbackField = styled(TextField)`
-  id: feedback-message;
-  variant: outlined;
-  margin: normal;
   margin-bottom: 10px;
 `;
 
 
 export default function JobFeedbackModal(props: any) {
-  const { onClose, id } = props;
+  const { onClose, id, jobName, jobUsername, jobEmail, jobInstitution, jobTime, jobState } = props;
   
   const [feedbackType,      setFeedbackType]      = useState("");
   const [feedbackMessage,   setFeedbackMessage]   = useState("");
-  // const [newState,          setNewState]          = useState("");
+  const [sendAsComment,     setSendAsComment]     = useState(true);
   const [mutationCompleted, setMutationCompleted] = useState(false);
 
   const [mutateJobState] = useMutation(MUTATE_JOB_STATE);
+  const [createComment]  = useMutation(CREATE_COMMENT);
+  const userContext      = useContext(UserContext);
 
   useEffect(() => {
     if (mutationCompleted) {
@@ -56,9 +56,21 @@ export default function JobFeedbackModal(props: any) {
   };
   
   const handleSubmit = async () => {
-    // feedbackType === "looks-good" ? setNewState("ACCEPTED") : setNewState("REJECTED");
-    
-    const updatedState = feedbackType === "looks-good" ? "ACCEPTED" : "REJECTED";
+    if (!feedbackType) return;
+
+    let updatedState: string;
+    switch (feedbackType) {
+      case "looks-good":
+        updatedState = "ACCEPTED";
+        break;
+      case "minor-changes":
+      case "major-changes":
+        updatedState = "CHANGES_REQUESTED";
+        break;
+      default:
+        updatedState = jobState || "SUBMITTED";
+    }
+
     try {
       await mutateJobState({
         variables: { ID: id, State: updatedState },
@@ -66,11 +78,26 @@ export default function JobFeedbackModal(props: any) {
           console.log(error.networkError?.result?.errors);
         },
         onCompleted: () => {
-          window.location.reload();
+          setMutationCompleted(true);
         }
       });
   
-      onClose();  // Close the modal after the mutation is completed
+      if (sendAsComment && feedbackMessage.trim()) {
+        const email = userContext.userProps?.idTokenParsed?.email ?? 'technician@bu.edu';
+        await createComment({
+          variables: {
+            input: {
+              jobId: id,
+              content: feedbackMessage.trim(),
+              author: email,
+              authorType: 'STAFF',
+              isInternal: false,
+            },
+          },
+        });
+      }
+
+      window.location.reload();
     } catch (error) {
       console.log(error);
     }
@@ -80,32 +107,93 @@ export default function JobFeedbackModal(props: any) {
   return (
     <CenteredModal open={props.open} onClose={props.onClose}>
       <ModalBox>
-        <h2 text-align="center">Job Feedback</h2>
-        <FormControl component="fieldset" sx={{width: '500px'}}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Review Job</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Record a decision on this job and optionally send structured feedback to the client.
+        </Typography>
+
+        {jobName && (
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle2">{jobName}</Typography>
+            {jobUsername && (
+              <Typography variant="body2" color="text.secondary">
+                {jobUsername} {jobEmail ? `(${jobEmail})` : ''}
+              </Typography>
+            )}
+            {jobInstitution && (
+              <Typography variant="body2" color="text.secondary">
+                {jobInstitution}
+              </Typography>
+            )}
+            {jobTime && (
+              <Typography variant="body2" color="text.secondary">
+                Submitted: {jobTime.slice(0, 16).replace('T', ' ')}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        <FormControl component="fieldset" sx={{width: '100%'}}>
 
           <RadioGroup onChange = {handleFeedbackTypeChange} value = {feedbackType} name = "feedback-type" aria-label = "feedback-type">
 
-            <FormControlLabel control={<Radio />} value="looks-good"    label="Job Accepted" />
+            <FormControlLabel control={<Radio />} value="looks-good"    label="Accept job (ready to proceed)" />
 
-            <FormControlLabel control={<Radio />} value="minor-changes" label="Needs Minor Changes" />
+            <FormControlLabel control={<Radio />} value="minor-changes" label="Request minor changes" />
               {feedbackType === "minor-changes" && (
-                <FeedbackField onChange={handleFeedbackMessageChange} value={feedbackMessage} label="Feedback message" required/>
+                <FeedbackField
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  onChange={handleFeedbackMessageChange}
+                  value={feedbackMessage}
+                  label="Describe the minor changes needed"
+                  required
+                />
               )}
 
-            <FormControlLabel control={<Radio />} value="major-changes" label="Needs Major Changes"/>
+            <FormControlLabel control={<Radio />} value="major-changes" label="Request major changes / redesign"/>
               {feedbackType === "major-changes" && (
-                <FeedbackField onChange={handleFeedbackMessageChange} value={feedbackMessage} label="Reason for major changes" required/>
+                <FeedbackField
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  onChange={handleFeedbackMessageChange}
+                  value={feedbackMessage}
+                  label="Explain what needs to change"
+                  required
+                />
               )}
 
           </RadioGroup>
 
-          {feedbackType && (
-            <Button variant="contained" color="inherit" onClick={handleSubmit}>
+          <Box sx={{ mt: 1, mb: 2 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={sendAsComment}
+                  onChange={(e) => setSendAsComment(e.target.checked)}
+                />
+              }
+              label="Post this feedback as a visible comment to the client"
+            />
+          </Box>
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <Button onClick={onClose} color="inherit">
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleSubmit}
+              disabled={!feedbackType || (feedbackType !== 'looks-good' && !feedbackMessage.trim())}
+            >
               {feedbackType === "looks-good"
                 ? "Accept Job"
-                : "Send Feedback"}
+                : "Submit Decision"}
             </Button>
-          )}
+          </Box>
           
         </FormControl>
       </ModalBox>

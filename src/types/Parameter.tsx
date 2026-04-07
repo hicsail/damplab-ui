@@ -7,11 +7,35 @@ export type Parameter = {
     required: boolean;
     workflowId?: string;
     description?: string;
+    /**
+     * Optional text shown to clients describing how pricing is determined for this parameter.
+     * Used for transparency when pricing is not purely programmatic.
+     */
+    pricingExplanation?: string;
+    /** When true, this parameter's numeric value acts as a price multiplier. */
+    isPriceMultiplier?: boolean;
     options?: any[];
     defaultValue?: any;
     rangeValueMin?: number;
     rangeValueMax?: number;
     dynamicAdd?: boolean;
+    /** When true, customers can add multiple values for this parameter (plus button in sidebar). */
+    allowMultipleValues?: boolean;
+    /** Optional per-parameter price used when service pricingMode is PARAMETER. */
+    price?: number;
+    internalPrice?: number;
+    externalPrice?: number;
+    externalAcademicPrice?: number;
+    externalMarketPrice?: number;
+    externalNoSalaryPrice?: number;
+    pricing?: {
+        internal?: number;
+        external?: number;
+        externalAcademic?: number;
+        externalMarket?: number;
+        externalNoSalary?: number;
+        legacy?: number;
+    };
     templateFile? : string;
     tableData?: any;
     paramGroupId?: string;

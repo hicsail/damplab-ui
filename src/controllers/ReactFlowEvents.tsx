@@ -9,8 +9,9 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string): Nod
     for (let i = 0; i < paramsData.length; i++) {
         const parameter = paramsData[i];
         const formId    = Math.random().toString(36).substring(2, 9);
+        const allowMultipleValues = !!parameter.allowMultipleValues;
         formData.push({
-            id              : formId,
+            id              : parameter.id ?? formId,
             nodeId          : nodeId,
             name            : parameter.name,
             type            : parameter.type,
@@ -18,9 +19,10 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string): Nod
             description     : parameter.description,
             paramType       : parameter.paramType ? parameter.paramType: null,
             resultParamValue: "",
-            value           : null,
+            value           : allowMultipleValues ? [''] : null,
             required        : parameter.required,
             dynamicAdd : parameter.dynamicAdd ? parameter.dynamicAdd : null,
+            allowMultipleValues: allowMultipleValues || undefined,
             tableData : parameter.tableData ? parameter.tableData : null,
             paramGroups: parameter.paramGroups ? parameter.paramGroups : null,
             paramGroupId: parameter.paramGroupId ? parameter.paramGroupId : null,

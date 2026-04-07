@@ -9,17 +9,27 @@ import {
 export default [
     route("/canvas", "./pages/MainFlow.tsx"),
     route("/login", "./pages/LoginForm.tsx"),
-
     layout("./layouts/PrivateRouteAuthed.tsx", [
         index("./pages/Home.tsx"),
+        route("/training", "./pages/Training.tsx"),
+        route("/training/admin-edit", "./pages/TrainingAdminEdit.tsx"),
+        route("/training/canvas", "./pages/TrainingCanvas.tsx"),
+        route("/admin/services-catalog", "./pages/AdminServicesCatalog.tsx"),
+        route("/bugs", "./pages/Bugs.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
+        route("/staff_submit", "./pages/StaffJobSubmit.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),
-        route("/jobs/:jobId", "./pages/JobSubmitted.tsx") //config later so only owner of job or admin can access
+        route("/jobs/:jobId", "./pages/JobSubmitted.tsx"), //config later so only owner of job or admin can access
+        route("/client_view/:id", "./pages/ClientView.tsx"), // Client job tracking page with SOW viewer and comments
+        route("/my_jobs", "./pages/MyJobs.tsx") // List of current user's submitted jobs
     ]),
     layout("./layouts/PrivateRouteDamplabStaff.tsx", [
+        route("/lab-monitor/:screen", "./pages/LabMonitor.tsx"),
+        route("/lab-status-tv", "./pages/LabStatusTV.tsx"),
         route("/technician_view/:id", "./pages/TechnicianView.tsx"),
         route("/dashboard", "./pages/Dashboard.tsx"),
+        route("/customer-management", "./pages/CustomerManagement.tsx"),
         route("/dominos", "./pages/Dominos.tsx"),
         route("/elabs", "./pages/ELabs.tsx"),
         route("/kernel", "./pages/Kernel.tsx"),
@@ -27,6 +37,11 @@ export default [
         route("/release_notes", "./pages/ReleaseNotes.tsx"),
         route("/edit_announcements", "./pages/Announcements.tsx"),
         route("/data_translation", "./pages/DataTranslation.tsx"),
+        route("/edit/services/new", "./pages/AdminNewService.tsx"),
+        route("/edit/services/:serviceId/parameters", "./pages/AdminEditServiceParameters.tsx"),
+        route("/edit/services/:serviceId", "./pages/AdminEditService.tsx"),
+        route("/edit/bundles/new", "./pages/AdminNewBundle.tsx"),
+        route("/edit/bundles/:bundleId", "./pages/AdminEditBundle.tsx"),
         route("/screener", "./pages/Screener.tsx"),
 
         /* Old comments from pre-React-Router-migration App.tsx: */
