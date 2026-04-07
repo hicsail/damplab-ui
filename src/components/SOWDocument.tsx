@@ -164,8 +164,8 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
 
         {/* Date and Parties */}
         <View>
-          <Text>Date Services Performed By: {formatSOWDate(sowData.date)}</Text>
-          <Text>Services Performed For:</Text>
+          <Text>Date of Agreement: {formatSOWDate(sowData.date)}</Text>
+          <Text>Services Performed By:</Text>
           <Text style={styles.bold}>Trustees of Boston University</Text>
           <Text>DAMP Lab of Boston University</Text>
           <Text>610 Commonwealth Avenue</Text>
@@ -175,7 +175,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
         <View style={{ marginTop: 20 }}>
           <Text style={styles.bold}>{sowData.clientName}</Text>
           <Text>{sowData.clientInstitution}</Text>
-          <Text>{sowData.clientAddress || 'Address not provided'}</Text>
+          {/* <Text>{sowData.clientAddress || 'Address not provided'}</Text> */}
         </View>
 
         {/* Statement of Work Introduction */}
