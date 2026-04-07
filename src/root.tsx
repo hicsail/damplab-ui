@@ -150,7 +150,7 @@ export default function Root() {
   const refreshCatalog = useCallback(async () => {
     await Promise.all([
       client
-      .query({ query: GET_SERVICES })
+      .query({ query: GET_SERVICES, fetchPolicy: "network-only" })
       .then((result) => {
         console.log("services loaded successfully on app", result);
         setServices(result.data.services);
@@ -160,7 +160,7 @@ export default function Root() {
       }),
 
       client
-      .query({ query: GET_BUNDLES })
+      .query({ query: GET_BUNDLES, fetchPolicy: "network-only" })
       .then((result) => {
         console.log("bundles loaded successfully on app", result);
         setBundles(result.data.bundles);

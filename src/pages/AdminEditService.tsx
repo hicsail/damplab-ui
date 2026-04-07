@@ -15,6 +15,7 @@ import {
   TextField,
   Typography
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { UPDATE_SERVICE } from '../gql/queries';
@@ -197,11 +198,33 @@ export default function AdminEditService() {
   };
 
   if (!service) {
-    return <Alert severity="error">Service not found.</Alert>;
+    return (
+      <Stack spacing={2} sx={{ maxWidth: 900 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/edit')}
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          Back to catalog
+        </Button>
+        <Alert severity="error">Service not found.</Alert>
+      </Stack>
+    );
   }
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 900 }}>
+      <Button
+        variant="outlined"
+        size="small"
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate('/edit')}
+        sx={{ alignSelf: 'flex-start' }}
+      >
+        Back to catalog
+      </Button>
       <Typography variant="h2">Edit service</Typography>
       <Typography variant="body1" color="text.secondary">
         Update service details, pricing, connections, and deliverables on this page. Use{' '}

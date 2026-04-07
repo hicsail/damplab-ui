@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { AppContext } from '../contexts/App';
@@ -62,7 +63,20 @@ export default function AdminEditServiceParameters() {
   }, [service]);
 
   if (!service) {
-    return <Alert severity='error'>Service not found.</Alert>;
+    return (
+      <Stack spacing={2}>
+        <Button
+          variant='outlined'
+          size='small'
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/edit')}
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          Back to catalog
+        </Button>
+        <Alert severity='error'>Service not found.</Alert>
+      </Stack>
+    );
   }
 
   const updateParameter = (index: number, patch: Record<string, any>) => {
@@ -161,6 +175,15 @@ export default function AdminEditServiceParameters() {
 
   return (
     <Stack spacing={3}>
+      <Button
+        variant='outlined'
+        size='small'
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate('/edit')}
+        sx={{ alignSelf: 'flex-start' }}
+      >
+        Back to catalog
+      </Button>
       <Typography variant='h2'>Full parameter editor</Typography>
       <Typography variant='h5'>{service.name}</Typography>
       <Typography variant='body1' color='text.secondary'>
