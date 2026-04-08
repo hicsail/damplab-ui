@@ -18,51 +18,27 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    if (token) {
+    const mpiAuth = params.get('mpi_auth');
+
+    // After OAuth redirect, the cookie is already set — just verify status
+    if (mpiAuth === 'success') {
       setIsLoading(true);
-      localStorage.setItem('session_token', token);
-      // Remove the token from URL without triggering a page reload
       window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Verify the token and get user info
-      const verifyToken = async () => {
+
+      const verifyLogin = async () => {
         try {
-          console.log("MPI Login: Verifying token from URL");
-          
-          // Decode and log the token for debugging
-          const token = localStorage.getItem('session_token');
-          if (token) {
-            try {
-              const parts = token.split('.');
-              if (parts.length === 3) {
-                const payload = JSON.parse(atob(parts[1]));
-                console.log("MPI Login: Token contains userId:", payload.userId);
-              }
-            } catch (e) {
-              console.error("MPI Login: Could not decode token:", e);
-            }
-          }
-          
           const { loggedIn, userInfo: userData } = await checkLoginStatus();
-          
           if (loggedIn && userData) {
-            console.log("MPI Login: Token verified successfully");
             setUserInfo(userData);
             setIsLoggedIn(true);
           } else {
-            console.error("MPI Login: Token verification failed - loggedIn:", loggedIn, "userData:", userData);
-            console.error("MPI Login: This usually means the user data wasn't found in MongoDB. Check backend logs.");
-            setError('Authentication failed. The token is valid but user data was not found. Please try logging in again.');
-            localStorage.removeItem('session_token');
+            setError('Authentication failed. Please try logging in again.');
             setIsLoggedIn(false);
             setUserInfo(null);
           }
         } catch (error) {
-          console.error('MPI Login: Token verification error:', error);
-          const errorMessage = error instanceof Error ? error.message : 'Connection error. Please try again.';
-          setError(errorMessage);
-          localStorage.removeItem('session_token');
+          console.error('MPI Login: verification error:', error);
+          setError(error instanceof Error ? error.message : 'Connection error. Please try again.');
           setIsLoggedIn(false);
           setUserInfo(null);
         } finally {
@@ -70,33 +46,23 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
         }
       };
 
-      verifyToken();
+      verifyLogin();
+      return;
     }
 
+    // On mount, check if an existing session cookie is valid
     const checkExistingSession = async () => {
-      const sessionToken = localStorage.getItem('session_token');
-      if (sessionToken) {
-        setIsLoading(true);
-        try {
-          const { loggedIn, userInfo: userData } = await checkLoginStatus();
-          
-          if (loggedIn && userData) {
-            setUserInfo(userData);
-            setIsLoggedIn(true);
-          } else {
-            localStorage.removeItem('session_token');
-            setIsLoggedIn(false);
-            setUserInfo(null);
-          }
-        } catch (error) {
-          console.error('Session check failed:', error);
-          setError('Session check failed. Please log in again.');
-          localStorage.removeItem('session_token');
-          setIsLoggedIn(false);
-          setUserInfo(null);
-        } finally {
-          setIsLoading(false);
+      setIsLoading(true);
+      try {
+        const { loggedIn, userInfo: userData } = await checkLoginStatus();
+        if (loggedIn && userData) {
+          setUserInfo(userData);
+          setIsLoggedIn(true);
         }
+      } catch (error) {
+        console.error('Session check failed:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -107,12 +73,10 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
     setIsLoading(true);
     const state = Math.random().toString(36).substring(7);
     sessionStorage.setItem('auth_state', state);
-    
+
     const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
-    console.log("MPI Login: Using backend URL:", backendUrl);
     const currentPath = window.location.pathname;
     const loginUrl = `${backendUrl}/mpi/login?state=${encodeURIComponent(state)}&redirectTo=${encodeURIComponent(currentPath)}`;
-    console.log("MPI Login: Redirecting to:", loginUrl);
     window.location.href = loginUrl;
   };
 
@@ -123,12 +87,10 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      localStorage.removeItem('session_token');
-      sessionStorage.removeItem('auth_state');
       setIsLoggedIn(false);
       setUserInfo(null);
       handleMenuClose();
-      
+
       // Redirect to Auth0 logout
       const auth0Domain = import.meta.env.REACT_APP_AUTH0_DOMAIN;
       const clientId = import.meta.env.REACT_APP_AUTH0_CLIENT_ID;
@@ -154,19 +116,19 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
     <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '36px' }}>
       {isLoggedIn ? (
         <>
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
               cursor: 'pointer',
               '&:hover': { opacity: 0.8 }
             }}
             onClick={handleMenuClick}
           >
             {userInfo && userInfo.picture ? (
-              <Avatar 
-                src={userInfo.picture} 
-                alt={userInfo.name || 'User'} 
+              <Avatar
+                src={userInfo.picture}
+                alt={userInfo.name || 'User'}
                 sx={{ width: 32, height: 32, marginRight: 1 }}
               />
             ) : (
@@ -206,8 +168,8 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
           </Menu>
         </>
       ) : (
-        <Button 
-          variant="contained" 
+        <Button
+          variant="contained"
           onClick={handleLogin}
           disabled={isLoading}
           sx={{ textTransform: 'none' }}
@@ -219,9 +181,9 @@ const MPILoginButton: React.FC<MPILoginButtonProps> = ({ isLoggedIn, setIsLogged
           )}
         </Button>
       )}
-      <Snackbar 
-        open={!!error} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
         onClose={handleErrorClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >

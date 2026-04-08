@@ -1,15 +1,14 @@
-import { getSessionToken } from "./MPIAuthQueries";
 import { ScreeningInput, ScreeningResult, Region } from "./types";
+
+const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
 
 export const screenSequence = async (sequenceId: string, region: string): Promise<ScreeningResult | undefined> => {
   try {
-    const token = getSessionToken();
-    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
     const response = await fetch(`${backendUrl}/secure-dna/screen`, {
       method: "POST",
+      credentials: 'include',
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify({
         sequenceId,
@@ -30,13 +29,11 @@ export const screenSequence = async (sequenceId: string, region: string): Promis
 
 export const getScreeningResults = async (sequenceId: string): Promise<ScreeningResult[] | undefined> => {
   try {
-    const token = getSessionToken();
-    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
     const response = await fetch(`${backendUrl}/secure-dna/screen/${sequenceId}`, {
       method: "GET",
+      credentials: 'include',
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
       },
     });
     const data = await response.json();
@@ -53,13 +50,11 @@ export const getScreeningResults = async (sequenceId: string): Promise<Screening
 
 export const getUserScreenings = async (): Promise<ScreeningResult[] | undefined> => {
   try {
-    const token = getSessionToken();
-    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
     const response = await fetch(`${backendUrl}/secure-dna/screenings`, {
       method: "GET",
+      credentials: 'include',
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
       },
     });
     const data = await response.json();
@@ -76,13 +71,11 @@ export const getUserScreenings = async (): Promise<ScreeningResult[] | undefined
 
 export const screenSequencesBatch = async (sequenceIds: string[], region: Region): Promise<{ message: string; status: string; timestamp: string } | undefined> => {
   try {
-    const token = getSessionToken();
-    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
     const response = await fetch(`${backendUrl}/secure-dna/screen/batch`, {
       method: "POST",
+      credentials: 'include',
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
       },
       body: JSON.stringify({
         sequenceIds,
@@ -100,4 +93,3 @@ export const screenSequencesBatch = async (sequenceIds: string[], region: Region
     console.error(e);
   }
 };
-  

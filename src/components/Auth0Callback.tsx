@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { handleLoginCallback, debugCheckToken } from '../mpi/MPIAuthQueries';
+import { handleLoginCallback } from '../mpi/MPIAuthQueries';
 import { Box, CircularProgress, Typography } from '@mui/material';
 
 const Auth0Callback = () => {
@@ -38,23 +38,21 @@ const Auth0Callback = () => {
         }
         
         // Verify state parameter
-        const storedState = localStorage.getItem('auth_state');
+        const storedState = sessionStorage.getItem('auth_state');
         if (state !== storedState) {
           setError("State mismatch, possible security issue");
           setIsProcessing(false);
           return;
         }
-        
+
         // Process the code
         const success = await handleLoginCallback();
-        
+
         // Clear state regardless of success
-        localStorage.removeItem('auth_state');
+        sessionStorage.removeItem('auth_state');
         
         if (success) {
           console.log("Login successful, redirecting...");
-          // Check token for debugging
-          debugCheckToken();
           setIsSuccess(true);
         } else {
           setError("Failed to complete authentication");
