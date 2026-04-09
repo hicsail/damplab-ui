@@ -66,6 +66,12 @@ export interface ScreeningResult {
     name: string;
     seq: string;
     type: 'dna' | 'rna' | 'aa' | 'unknown';
+    annotations?: Array<{
+      start: number;
+      end: number;
+      type: string;
+      description?: string;
+    }>;
   };
   /** Batch-level synthesis_permission from MPI (same for all rows from one screen call) */
   status: 'granted' | 'denied';

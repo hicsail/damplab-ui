@@ -7,18 +7,14 @@ import { useQuery } from '@apollo/client';
 
 import SecureDNAScreeningTable from '../components/SecureDNAScreeningTable';
 import UploadAndScreenSequences from '../components/UploadAndScreenSequences';
-import { GET_USER_SCREENINGS } from '../mpi/SequencesQueries';
+import { GET_ORG_SCREENINGS } from '../mpi/SequencesQueries';
 
 function Screener() {
   const [openUploadAndScreen, setOpenUploadAndScreen] = useState(false);
 
-  const { data, loading, error, refetch } = useQuery(GET_USER_SCREENINGS, {
-    pollInterval: 30000,
-  });
+  const { data, loading, error, refetch } = useQuery(GET_ORG_SCREENINGS);
 
-  const handleRefresh = () => {
-    refetch();
-  };
+  const handleRefresh = () => refetch();
 
   return (
     <>
@@ -53,7 +49,7 @@ function Screener() {
                 </Button>
               </Box>
               <SecureDNAScreeningTable
-                screenings={data && data.getUserScreenings ? data.getUserScreenings : []}
+                screenings={data?.orgScreenings ?? []}
                 loading={loading}
                 error={error}
               />
@@ -62,7 +58,6 @@ function Screener() {
           <UploadAndScreenSequences
             open={openUploadAndScreen}
             onClose={() => setOpenUploadAndScreen(false)}
-            onScreeningComplete={handleRefresh}
           />
         </Box>
       </Box>
