@@ -1,6 +1,5 @@
 import { gql } from '@apollo/client';
 import { Sequence } from './types';
-import { ApolloClient, NormalizedCacheObject } from '@apollo/client';
 
 export const GET_SEQUENCES = gql`
   query GetSequences {
@@ -34,6 +33,7 @@ export const GET_USER_SCREENINGS = gql`
         type
       }
       status
+      providerReference
       threats {
         name
         hit_regions {
@@ -73,12 +73,6 @@ export const CREATE_SEQUENCE = gql`
   }
 `;
 
-export const DELETE_SEQUENCE = gql`
-  mutation DeleteSequence($id: String!) {
-    deleteSequence(id: $id)
-  }
-`;
-
 export const SCREEN_SEQUENCE = gql`
   mutation ScreenSequence($input: ScreeningInput!) {
     screenSequence(input: $input) {
@@ -115,6 +109,7 @@ export const SCREEN_SEQUENCES_BATCH = gql`
         name
       }
       status
+      providerReference
       threats {
         name
         hit_regions {
@@ -129,18 +124,6 @@ export const SCREEN_SEQUENCES_BATCH = gql`
       created_at
       updated_at
       userId
-    }
-  }
-`;
-
-export const UPDATE_SEQUENCE = gql`
-  mutation UpdateSequence($id: String!, $input: CreateSequenceInput!) {
-    updateSequence(id: $id, input: $input) {
-      id
-      name
-      sequence
-      createdAt
-      updatedAt
     }
   }
 `;
@@ -177,58 +160,6 @@ export const createSequence = async (client: any, sequence: Sequence): Promise<S
   }
 };
 
-export const updateSequence = async (client: ApolloClient<NormalizedCacheObject>, id: string, sequence: Partial<Sequence>): Promise<Sequence> => {
-  try {
-    const { data } = await client.mutate<{ updateSequence: Sequence }>({
-      mutation: UPDATE_SEQUENCE,
-      variables: {
-        id,
-        input: sequence
-      }
-    });
-    return data!.updateSequence;
-  } catch (error) {
-    console.error('Error updating sequence:', error);
-    throw error;
-  }
-};
-
-export const deleteSequence = async (client: any, sequenceId: string): Promise<boolean> => {
-  try {
-    const result = await client.mutate({
-      mutation: DELETE_SEQUENCE,
-      variables: { id: sequenceId }
-    });
-    return result.data.deleteSequence;
-  } catch (error) {
-    console.error('Error deleting sequence:', error);
-    throw error;
-  }
-};
-
-export const createSequencesBatch = async (sequences: Sequence[]): Promise<{ message: string; status: string; timestamp: string } | undefined> => {
-  try {
-    const backendUrl = import.meta.env.VITE_BACKEND_BASEURL || import.meta.env.REACT_APP_BACKEND_BASEURL || 'http://127.0.0.1:5100';
-    const response = await fetch(`${backendUrl}/mpi/sequences/batch`, {
-      method: "POST",
-      credentials: 'include',
-      headers: {
-        "Content-type": "application/json; charset=UTF-8",
-      },
-      body: JSON.stringify(sequences),
-    });
-    const data = await response.json();
-    if (response.ok) {
-      return data;
-    } else {
-      const message = await data["message"];
-      console.log(message);
-    }
-  } catch (e) {
-    console.log(e);
-  }
-};
-
 export const screenSequence = async (client: any, sequenceId: string, region: string): Promise<any> => {
   try {
     const result = await client.mutate({
@@ -247,14 +178,20 @@ export const screenSequence = async (client: any, sequenceId: string, region: st
   }
 };
 
-export const screenSequencesBatch = async (client: any, sequenceIds: string[], region: string): Promise<any> => {
+export const screenSequencesBatch = async (
+  client: any,
+  sequenceIds: string[],
+  region: string,
+  providerReference?: string
+): Promise<any> => {
   try {
     const result = await client.mutate({
       mutation: SCREEN_SEQUENCES_BATCH,
       variables: {
         input: {
           sequenceIds,
-          region
+          region,
+          ...(providerReference?.trim() ? { providerReference: providerReference.trim() } : {})
         }
       }
     });

@@ -67,9 +67,12 @@ export interface ScreeningResult {
     seq: string;
     type: 'dna' | 'rna' | 'aa' | 'unknown';
   };
+  /** Batch-level synthesis_permission from MPI (same for all rows from one screen call) */
   status: 'granted' | 'denied';
   threats: HazardHits[];
   region: Region;
+  /** Batch id / provider_reference from MPI */
+  providerReference?: string | null;
   created_at: Date;
   updated_at: Date;
   userId: string;

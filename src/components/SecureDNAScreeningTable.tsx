@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { useQuery } from '@apollo/client';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
-import { Button, Typography, Box, Modal, Stack, Chip } from '@mui/material';
-import { GET_USER_SCREENINGS } from '../mpi/SequencesQueries';
+import { Button, Typography, Box, Modal, Stack, Chip, Tooltip } from '@mui/material';
 import { ScreeningResult, HitRegion } from '../mpi/types';
 import { ApolloError } from '@apollo/client';
 
@@ -26,10 +24,28 @@ const columns: GridColDef<ScreeningRow>[] = [
       return params.row.sequence && params.row.sequence.name ? params.row.sequence.name : '';
     }
   },
+  {
+    field: 'providerReference',
+    headerName: 'Batch',
+    flex: 1.1,
+    sortable: false,
+    renderCell: (params: GridRenderCellParams<ScreeningRow>) => {
+      const ref = params.row.providerReference;
+      if (!ref) return <Typography variant="body2">—</Typography>;
+      const short = ref.length > 40 ? `${ref.slice(0, 38)}…` : ref;
+      return (
+        <Tooltip title={ref}>
+          <Typography variant="body2" noWrap sx={{ maxWidth: '100%' }}>
+            {short}
+          </Typography>
+        </Tooltip>
+      );
+    }
+  },
   { 
     field: 'status', 
-    headerName: 'Status', 
-    flex: 1,
+    headerName: 'Batch status', 
+    flex: 0.9,
     renderCell: (params: GridRenderCellParams<ScreeningRow>) => {
       const status = params.row.status.toUpperCase();
       const color = status === 'GRANTED' ? 'success.main' : 'error.main';
@@ -37,6 +53,23 @@ const columns: GridColDef<ScreeningRow>[] = [
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
           <Typography color={color}>{status}</Typography>
         </Box>
+      );
+    }
+  },
+  {
+    field: 'hazardous',
+    headerName: 'Hazardous',
+    flex: 0.75,
+    sortable: false,
+    renderCell: (params: GridRenderCellParams<ScreeningRow>) => {
+      const hazardous = params.row.threats.length > 0;
+      return (
+        <Chip
+          label={hazardous ? 'Yes' : 'No'}
+          color={hazardous ? 'warning' : 'default'}
+          size="small"
+          variant={hazardous ? 'filled' : 'outlined'}
+        />
       );
     }
   },
@@ -80,11 +113,12 @@ export default function SecureDNAScreeningTable({
 
   if (loading) return <div>Loading...</div>;
   if (error) {
-    if (error.message.includes('unauthorized') || error.message.includes('No authorization header')) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes('unauthorized') || msg.includes('no authorization header')) {
       return (
         <Box sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary">
-            Please login to the MPI to view screening results
+            Please sign in to DAMPLab to view SecureDNA screening results
           </Typography>
         </Box>
       );
@@ -164,7 +198,7 @@ export default function SecureDNAScreeningTable({
 
                   <Box>
                     <Typography variant="subtitle1" fontWeight="bold">
-                      Status:
+                      Batch status:
                     </Typography>
                     <Typography 
                       sx={{ 
@@ -174,6 +208,24 @@ export default function SecureDNAScreeningTable({
                       }}
                     >
                       {selectedScreening.status.toUpperCase()}
+                    </Typography>
+                  </Box>
+
+                  {selectedScreening.providerReference && (
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight="bold">
+                        Batch:
+                      </Typography>
+                      <Typography sx={{ pl: 2, wordBreak: 'break-word' }}>{selectedScreening.providerReference}</Typography>
+                    </Box>
+                  )}
+
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      Hazardous (this sequence):
+                    </Typography>
+                    <Typography sx={{ pl: 2, fontWeight: 'bold' }}>
+                      {selectedScreening.threats.length > 0 ? 'Yes' : 'No'}
                     </Typography>
                   </Box>
 

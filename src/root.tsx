@@ -125,7 +125,6 @@ export default function Root() {
   const httpLink = useMemo(() => {
     return createHttpLink({
       uri: import.meta.env.VITE_BACKEND,
-      credentials: 'include',
     });
   }, []);
 

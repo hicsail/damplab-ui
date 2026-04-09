@@ -154,8 +154,12 @@ function UploadAndScreenSequences({ open, onClose, onScreeningComplete }: Upload
         sequenceIds.push(createdSeq.id);
       }
 
-      // Then start the screening process with all sequence IDs
-      const screeningResult = await screenSequencesBatch(client, sequenceIds, Region.ALL);
+      const firstName = sequences[0]?.name || 'batch';
+      const safeLabel = firstName.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'batch';
+      const providerReference = `${safeLabel}...-${new Date().toISOString()}`;
+
+      // Single MPI /secure-dna/screen call via damplab-backend (batch)
+      const screeningResult = await screenSequencesBatch(client, sequenceIds, Region.ALL, providerReference);
       
       if (screeningResult) {
         setMessage('Biosecurity check is running in the background. Results usually appear in the screenings table after a minute or so.');
