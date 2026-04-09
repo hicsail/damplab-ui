@@ -10,10 +10,12 @@ import {
   MenuItem,
   OutlinedInput,
   Select,
+  Snackbar,
   Stack,
   TextField,
   Typography
 } from '@mui/material';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { UPDATE_SERVICE } from '../gql/queries';
@@ -42,6 +44,7 @@ export default function AdminEditService() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [icon, setIcon] = useState('');
   const [serviceCategoryNumber, setServiceCategoryNumber] = useState('');
   const [serviceCategoryName, setServiceCategoryName] = useState('');
   const [unit, setUnit] = useState('');
@@ -54,6 +57,7 @@ export default function AdminEditService() {
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([]);
   const [deliverables, setDeliverables] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const availableServices = useMemo(
@@ -70,6 +74,7 @@ export default function AdminEditService() {
     const pricing = row.pricing ?? {};
     setName(row.name ?? '');
     setDescription(row.description ?? '');
+    setIcon(row.icon ?? '');
     setServiceCategoryNumber(row.serviceCategoryNumber ?? '');
     setServiceCategoryName(row.serviceCategoryName ?? '');
     setUnit(row.unit ?? '');
@@ -121,6 +126,7 @@ export default function AdminEditService() {
   const handleSave = async () => {
     if (!service) return;
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     if (!name.trim()) {
       setErrorMessage('Service name is required.');
@@ -150,7 +156,7 @@ export default function AdminEditService() {
       serviceCategoryNumber: serviceCategoryNumber.trim(),
       serviceCategoryName: serviceCategoryName.trim(),
       unit: unit.trim(),
-      icon: row.icon ?? '',
+      icon: icon.trim(),
       price: legacy,
       internalPrice: internal,
       externalPrice: externalMarket,
@@ -183,7 +189,7 @@ export default function AdminEditService() {
         }
       });
       await refreshCatalog();
-      navigate('/edit');
+      setSuccessMessage('Service updated.');
     } catch (_error) {
       setErrorMessage('Unable to save service. Please try again.');
     } finally {
@@ -192,11 +198,33 @@ export default function AdminEditService() {
   };
 
   if (!service) {
-    return <Alert severity="error">Service not found.</Alert>;
+    return (
+      <Stack spacing={2} sx={{ maxWidth: 900 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate('/edit')}
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          Back to catalog
+        </Button>
+        <Alert severity="error">Service not found.</Alert>
+      </Stack>
+    );
   }
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 900 }}>
+      <Button
+        variant="outlined"
+        size="small"
+        startIcon={<ArrowBackIcon />}
+        onClick={() => navigate('/edit')}
+        sx={{ alignSelf: 'flex-start' }}
+      >
+        Back to catalog
+      </Button>
       <Typography variant="h2">Edit service</Typography>
       <Typography variant="body1" color="text.secondary">
         Update service details, pricing, connections, and deliverables on this page. Use{' '}
@@ -204,6 +232,17 @@ export default function AdminEditService() {
       </Typography>
 
       {!!errorMessage && <Alert severity="error">{errorMessage}</Alert>}
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={4000}
+        onClose={() => setSuccessMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
 
       <TextField
         label="Service name"
@@ -218,6 +257,14 @@ export default function AdminEditService() {
         onChange={(event) => setDescription(event.target.value)}
         multiline
         minRows={4}
+      />
+
+      <TextField
+        label="Icon URL"
+        value={icon}
+        onChange={(event) => setIcon(event.target.value)}
+        placeholder="https://…"
+        helperText="Optional. Used in the catalog and workflow views."
       />
 
       <Box

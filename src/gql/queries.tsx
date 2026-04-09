@@ -73,6 +73,7 @@ export const GET_JOB_BY_ID = gql`
     query JobById($id: ID!) {
         jobById(id: $id) {
             id
+            jobId
             name
             username
             clientDisplayName
@@ -148,6 +149,7 @@ export const GET_OWN_JOB_BY_ID = gql`
     query ownJobById($id: ID!) {
         ownJobById(id: $id) {
             id
+            jobId
             name
             username
             clientDisplayName
@@ -541,6 +543,7 @@ export const UPDATE_SERVICE = gql`
         legacy
       }
       pricingMode
+      icon
       deliverables
     }
   }
@@ -765,6 +768,34 @@ export const GET_SOW_BY_JOB_ID = gql`
         signedAt
         signatureDataUrl
       }
+    }
+  }
+`;
+
+export const GET_INVOICES_BY_JOB_ID = gql`
+  query GetInvoicesByJobId($jobId: ID!) {
+    invoicesByJobId(jobId: $jobId) {
+      id
+      jobId
+      jobDisplayId
+      jobName
+      invoiceNumber
+      invoiceDate
+      createdBy
+      billedToName
+      billedToEmail
+      billedToAddress
+      customerCategory
+      services {
+        id
+        serviceId
+        name
+        description
+        cost
+        category
+      }
+      totalCost
+      createdAt
     }
   }
 `;

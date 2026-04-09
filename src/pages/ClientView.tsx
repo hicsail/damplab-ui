@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react'
+import React, { useState, useContext, useEffect } from 'react'
 import { useParams } from 'react-router';
 import { useQuery } from '@apollo/client';
 import { Box, Card, CardContent, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, Divider } from '@mui/material';
@@ -8,12 +8,13 @@ import LoopIcon from '@mui/icons-material/Loop';
 import DoneIcon from '@mui/icons-material/Done';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
-import { GET_OWN_JOB_BY_ID } from '../gql/queries';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import JobInvoiceDocument from '../components/JobInvoiceDocument';
+import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '../gql/queries';
 import { SOWViewer }              from '../components/SOWViewer';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { calculateServiceCost }   from '../utils/servicePricing';
-
 
 export default function Tracking() {
 
@@ -39,23 +40,40 @@ export default function Tracking() {
         skip: skipQuery,
         fetchPolicy: 'network-only',
         errorPolicy: 'all',
-        onCompleted: (data) => {
-            const job = data?.ownJobById;
-            console.log('ownJobById onCompleted attachments:', job?.attachments);
-            if (!job?.workflows?.length) return;
-            setWorkflowName(       job.workflows[0].name);
-            setWorkflowState(      job.workflows[0].state);
-            setJobName(            job.name);
-            setJobState(           job.state);
-            setJobTime(            job.submitted);
-            setWorkflowUsername(   job.clientDisplayName || job.username);
-            setWorkflowInstitution(job.institute);
-            setWorkflowEmail(      job.email);
-            setWorklows(           job.workflows);
-            setSowData(job.sow ?? null);
-            setAttachments(job.attachments ?? []);
-        },
     });
+
+    useEffect(() => {
+        const job = data?.ownJobById;
+        if (!job) return;
+        setJobName(job.name ?? '');
+        setJobState(job.state ?? '');
+        setJobTime(job.submitted ?? '');
+        setWorkflowUsername(job.clientDisplayName || job.username || '');
+        setWorkflowInstitution(job.institute ?? '');
+        setWorkflowEmail(job.email ?? '');
+        setWorklows(job.workflows ?? []);
+        setSowData(job.sow ?? null);
+        setAttachments(job.attachments ?? []);
+        const wfs = job.workflows ?? [];
+        if (wfs.length > 0) {
+            setWorkflowName(wfs[0].name ?? '');
+            setWorkflowState(wfs[0].state ?? '');
+        }
+    }, [data?.ownJobById]);
+
+    const { data: sowByJobIdResult } = useQuery(GET_SOW_BY_JOB_ID, {
+        variables: { jobId: id as string },
+        skip: !id,
+        fetchPolicy: 'network-only',
+    });
+    const sowFullData = sowByJobIdResult?.sowByJobId ?? null;
+
+    const { data: invoicesResult } = useQuery(GET_INVOICES_BY_JOB_ID, {
+        variables: { jobId: id as string },
+        skip: !id,
+        fetchPolicy: 'network-only',
+    });
+    const invoices = invoicesResult?.invoicesByJobId ?? [];
 
     if (skipQuery) return <p>Loading...</p>;
     if (loading) return <p>Loading...</p>;
@@ -116,7 +134,7 @@ export default function Tracking() {
         const optionNameById = new Map(
             options
                 .filter((opt: any) => opt && typeof opt.id === 'string')
-                .map((opt: any) => [String(opt.id), String(opt.name ?? opt.id)] as const)
+                .map((opt: any) => [String(opt.id), String(opt.name ?? 'Option')] as const)
         );
         if (Array.isArray(value)) {
             return value
@@ -169,7 +187,7 @@ export default function Tracking() {
                     <CardContent>
                         <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
                             <Typography sx={{ fontSize: 15 }} color="text.secondary" align="left">{workflow.name}</Typography>
-                            <Typography sx={{ fontSize: 13 }} color="text.secondary" align="right">{workflow.id}</Typography>
+                            <Box />
                         </Box>
                         <Typography sx={{ fontSize: 13 }} color="text.secondary" align="left">{workflow.state.replace('_', ' ')}</Typography>
                         <Box sx={{ p: 1, m: 1 }}>
@@ -195,7 +213,7 @@ export default function Tracking() {
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
                                             {normalizeFormEntries(node?.formData).map((entry: any) => {
                                                 const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
-                                                const label = entry.name || paramDef?.name || entry.id;
+                                                const label = entry.name || paramDef?.name || 'Parameter';
                                                 const rawValue = entry.value ?? entry.resultParamValue;
                                                 return (
                                                     <Typography key={entry.id} variant='body2' color='text.secondary'>
@@ -223,7 +241,7 @@ export default function Tracking() {
                 const fileParamMap = new Map(
                     serviceParams
                         .filter((p: any) => p && p.type === 'file' && typeof p.id === 'string')
-                        .map((p: any) => [p.id, p.name ?? p.id])
+                        .map((p: any) => [p.id, p.name ?? 'File upload'])
                 );
                 if (!fileParamMap.size) return;
 
@@ -333,11 +351,57 @@ export default function Tracking() {
                 {sowData && (
                     <SOWViewer 
                         jobId={id || ''} 
+                        jobDisplayId={data?.ownJobById?.jobId ?? null}
                         sowData={sowData}
                         customerCategory={data?.ownJobById?.customerCategory ?? undefined}
                         currentUser={{ email: workflowEmail, name: workflowUsername, isStaff: false }}
                     />
                 )}
+
+                {/* Invoices */}
+                <Box sx={{ mx: 3, my: 2 }}>
+                    <Typography variant="h6" sx={{ mb: 1 }}>Invoices</Typography>
+                    {!invoices?.length ? (
+                        <Typography variant="body2" color="text.secondary">
+                            No invoices have been generated for this job yet.
+                        </Typography>
+                    ) : (
+                        <List dense>
+                            {invoices.map((inv: any, idx: number) => (
+                                <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
+                                    <ListItemText
+                                        primary={
+                                            id && sowFullData ? (
+                                                <PDFDownloadLink
+                                                    document={
+                                                        <JobInvoiceDocument
+                                                            jobId={id}
+                                                            jobDisplayId={data?.ownJobById?.jobId ?? null}
+                                                            jobName={jobName}
+                                                            customerCategory={data?.ownJobById?.customerCategory ?? undefined}
+                                                            sow={sowFullData}
+                                                            invoice={inv}
+                                                        />
+                                                    }
+                                                    fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
+                                                >
+                                                    {({ loading }) =>
+                                                        loading ? 'Loading...' : `Invoice ${inv.invoiceNumber || ''}`.trim()
+                                                    }
+                                                </PDFDownloadLink>
+                                            ) : (
+                                                `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
+                                            )
+                                        }
+                                        secondary={
+                                            `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
+                                        }
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    )}
+                </Box>
 
                 {/* Comments Section */}
                 <CommentsSection 

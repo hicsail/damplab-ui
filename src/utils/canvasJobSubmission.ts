@@ -50,7 +50,7 @@ export type SubmitCanvasJobInput = {
 export async function submitCanvasJob(
   client: ApolloClient<object>,
   input: SubmitCanvasJobInput
-): Promise<string> {
+): Promise<{ id: string; jobId?: string }> {
   const {
     workflows,
     edges,
@@ -238,72 +238,41 @@ export async function submitCanvasJob(
     },
   });
 
-  const jobId = jobResult.data?.createJob?.id;
-  if (!jobId) {
+  const createdId = jobResult.data?.createJob?.id;
+  const createdJobId = jobResult.data?.createJob?.jobId;
+  if (!createdId) {
     throw new Error('Job was created but no ID was returned.');
   }
 
-  const localFileName = `${jobId}_${new Date().toLocaleString()}`;
-  localStorage.setItem(
-    localFileName,
-    JSON.stringify({
-      fileName: localFileName,
-      nodes,
-      edges,
-    })
-  );
-
-  if (attachments.length > 0) {
-    const filesForRequest = attachments.map((file) => ({
-      filename: file.name,
-      contentType: file.type || 'application/octet-stream',
-      size: file.size,
-    }));
-
-    const uploadUrlResult = await client.mutate({
-      mutation: CREATE_JOB_ATTACHMENT_UPLOAD_URLS,
-      variables: {
-        jobId,
-        files: filesForRequest,
-      },
-      context: {
-        headers: {
-          authorization: token ? `Bearer ${token}` : '',
-        },
-      },
-    });
-
-    const attachmentUploads = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
-
-    await Promise.all(
-      attachmentUploads.map(async (u: any) => {
-        const file = attachments.find((f) => f.name === u.filename && f.size === u.size);
-        if (!file) {
-          return;
-        }
-        await fetch(u.uploadUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': u.contentType || 'application/octet-stream',
-          },
-          body: file,
-        });
+  // Post-create side effects below should not fail the submission.
+  // If the job was created successfully, callers should proceed with success UX even if these steps fail.
+  try {
+    const localFileName = `${createdId}_${new Date().toLocaleString()}`;
+    localStorage.setItem(
+      localFileName,
+      JSON.stringify({
+        fileName: localFileName,
+        nodes,
+        edges,
       })
     );
+  } catch (e) {
+    console.warn('Failed to save local graph snapshot:', e);
+  }
 
-    const attachmentInputs = attachmentUploads.map((u: any) => ({
-      filename: u.filename,
-      key: u.key,
-      contentType: u.contentType,
-      size: u.size,
-    }));
+  if (attachments.length > 0) {
+    try {
+      const filesForRequest = attachments.map((file) => ({
+        filename: file.name,
+        contentType: file.type || 'application/octet-stream',
+        size: file.size,
+      }));
 
-    if (attachmentInputs.length > 0) {
-      await client.mutate({
-        mutation: ADD_JOB_ATTACHMENTS,
+      const uploadUrlResult = await client.mutate({
+        mutation: CREATE_JOB_ATTACHMENT_UPLOAD_URLS,
         variables: {
-          jobId,
-          attachments: attachmentInputs,
+          jobId: createdId,
+          files: filesForRequest,
         },
         context: {
           headers: {
@@ -311,8 +280,53 @@ export async function submitCanvasJob(
           },
         },
       });
+
+      const attachmentUploads = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
+
+      await Promise.all(
+        attachmentUploads.map(async (u: any) => {
+          const file = attachments.find((f) => f.name === u.filename && f.size === u.size);
+          if (!file) {
+            return;
+          }
+          const resp = await fetch(u.uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': u.contentType || 'application/octet-stream',
+            },
+            body: file,
+          });
+          if (!resp.ok) {
+            throw new Error(`Failed to upload attachment ${u.filename}`);
+          }
+        })
+      );
+
+      const attachmentInputs = attachmentUploads.map((u: any) => ({
+        filename: u.filename,
+        key: u.key,
+        contentType: u.contentType,
+        size: u.size,
+      }));
+
+      if (attachmentInputs.length > 0) {
+        await client.mutate({
+          mutation: ADD_JOB_ATTACHMENTS,
+          variables: {
+            jobId: createdId,
+            attachments: attachmentInputs,
+          },
+          context: {
+            headers: {
+              authorization: token ? `Bearer ${token}` : '',
+            },
+          },
+        });
+      }
+    } catch (e) {
+      console.warn('Job created, but attachments failed to upload/register:', e);
     }
   }
 
-  return jobId;
+  return { id: createdId, jobId: createdJobId ?? undefined };
 }

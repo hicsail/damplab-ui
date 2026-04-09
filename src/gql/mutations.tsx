@@ -15,6 +15,7 @@ export const CREATE_JOB = gql`
     mutation createJob($createJobInput: CreateJobInput!) {
         createJob(createJobInput: $createJobInput) {
             id
+            jobId
             name
         }
     }
@@ -181,6 +182,15 @@ export const CHANGE_JOB_CUSTOMER_CATEGORY = gql`
             customerCategory
         }
     }
+`;
+
+export const ADD_WORKFLOW_TO_JOB = gql`
+  mutation AddWorkflowToJob($jobId: ID!, $workflow: AddWorkflowInput!) {
+    addWorkflowToJob(jobId: $jobId, workflow: $workflow) {
+      id
+      name
+    }
+  }
 `;
 
 export const MARK_JOBS_FEED_VIEWED = gql`
@@ -358,6 +368,34 @@ export const SUBMIT_SOW_SIGNATURE = gql`
         signedAt
         signatureDataUrl
       }
+    }
+  }
+`;
+
+export const CREATE_INVOICE = gql`
+  mutation CreateInvoice($input: CreateInvoiceInput!) {
+    createInvoice(input: $input) {
+      id
+      jobId
+      jobDisplayId
+      jobName
+      invoiceNumber
+      invoiceDate
+      createdBy
+      billedToName
+      billedToEmail
+      billedToAddress
+      customerCategory
+      services {
+        id
+        serviceId
+        name
+        description
+        cost
+        category
+      }
+      totalCost
+      createdAt
     }
   }
 `;

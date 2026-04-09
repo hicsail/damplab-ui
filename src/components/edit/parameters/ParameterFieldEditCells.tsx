@@ -19,6 +19,7 @@ import {
   Select,
   Tooltip,
 } from "@mui/material";
+import { idFromName } from "../../../utils/idFromName";
 
 const PARAMETER_TYPE_LABELS: Record<string, string> = {
   string: "Text",
@@ -145,16 +146,30 @@ export function ParameterPricingExplanationInput(props: GridRenderEditCellParams
   );
 }
 
-export function ParameterIdInput(props: GridRenderEditCellParams) {
-  return <GridEditInputCell {...props} placeholder={"Internal ID"} />;
-}
-
 export function ParameterNameInput(props: GridRenderEditCellParams) {
+  const { id, field } = props;
+  const apiRef = useGridApiContext();
+
+  const handleValueChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextName = event.target.value;
+    const row = apiRef.current.getRowWithUpdatedValues(id) as any;
+    const currentName = String(row?.name ?? '');
+    const currentId = String(row?.id ?? '');
+    const currentDerived = idFromName(currentName);
+    const shouldUpdateId = currentId.trim() === '' || currentId === currentDerived;
+
+    apiRef.current.setEditCellValue({ id, field, value: nextName });
+    if (shouldUpdateId) {
+      apiRef.current.setEditCellValue({ id, field: 'id', value: idFromName(nextName) });
+    }
+  };
+
   return (
     <GridEditInputCell
       {...props}
       placeholder={"Name (required)"}
       endAdornment={<InputAdornment position={"end"}>*</InputAdornment>}
+      onChange={handleValueChange}
     />
   );
 }

@@ -57,23 +57,111 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   strong: { fontWeight: 800 },
+  table: {
+    width: '100%',
+  },
   tableHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    paddingBottom: 4,
+    paddingBottom: 6,
+    paddingTop: 2,
     marginTop: 6,
+    width: '100%',
   },
   row: {
     flexDirection: 'row',
-    paddingTop: 6,
+    alignItems: 'center',
+    paddingVertical: 8,
+    width: '100%',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#ccc',
   },
-  colDate: { width: 75 },
-  colProd: { width: 140 },
-  colDesc: { width: 190 },
-  colQty: { width: 40, textAlign: 'right' },
-  colRate: { width: 70, textAlign: 'right' },
-  colAmount: { width: 90, textAlign: 'right' },
+  /** Fixed-width cells + gutter; row alignItems:center vertically centers shorter cells vs tall pricing blocks. */
+  cellDate: {
+    width: 52,
+    marginRight: 6,
+    flexShrink: 0,
+    flexGrow: 0,
+    justifyContent: 'center',
+  },
+  /** Service name + description stacked (reads top-to-bottom). */
+  cellService: {
+    width: 168,
+    marginRight: 6,
+    flexShrink: 0,
+    flexGrow: 0,
+    justifyContent: 'center',
+  },
+  serviceName: {
+    fontSize: 8,
+    fontWeight: 800,
+    lineHeight: 1.25,
+    marginBottom: 2,
+    width: '100%',
+  },
+  serviceMeta: {
+    fontSize: 7,
+    lineHeight: 1.25,
+    color: '#333333',
+    width: '100%',
+  },
+  cellPricing: {
+    width: 168,
+    marginRight: 6,
+    flexShrink: 0,
+    flexGrow: 0,
+    justifyContent: 'center',
+  },
+  cellRate: {
+    width: 54,
+    marginRight: 6,
+    flexShrink: 0,
+    flexGrow: 0,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  cellAmount: {
+    width: 60,
+    flexShrink: 0,
+    flexGrow: 0,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  cellText: {
+    fontSize: 8,
+    lineHeight: 1.2,
+  },
+  cellTextHeader: {
+    fontSize: 8,
+    fontWeight: 800,
+    lineHeight: 1.2,
+  },
+  cellTextHeaderRight: {
+    fontSize: 8,
+    fontWeight: 800,
+    lineHeight: 1.2,
+    textAlign: 'right',
+    width: '100%',
+  },
+  cellTextRight: {
+    fontSize: 8,
+    lineHeight: 1.2,
+    textAlign: 'right',
+    width: '100%',
+  },
+  pricingLine: {
+    fontSize: 7,
+    marginBottom: 2,
+    lineHeight: 1.25,
+    width: '100%',
+  },
+  pricingLineLast: {
+    fontSize: 7,
+    lineHeight: 1.25,
+    width: '100%',
+  },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -91,6 +179,13 @@ function safeParseISODate(iso: string | undefined | null): Date | null {
   if (!iso) return null;
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function toIsoStringSafe(d: unknown): string | null {
+  if (!d) return null;
+  if (typeof d === 'string') return d;
+  if (d instanceof Date) return d.toISOString();
+  return null;
 }
 
 function pad2(n: number) {
@@ -143,22 +238,103 @@ function splitAddressLines(addr: string | undefined | null): { line1: string; li
   return { line1: parts[0] ?? '', line2: parts.slice(1).join(', ') };
 }
 
-function extractTrailingDigits(s: string | undefined | null): string | null {
-  const str = (s ?? '').toString();
-  const m = str.match(/(\d+)\D*$/); // trailing digits
-  return m?.[1] ?? null;
+function normalizePricingMode(v: unknown): 'SERVICE' | 'PARAMETER' {
+  if (typeof v === 'string' && v.toUpperCase() === 'PARAMETER') return 'PARAMETER';
+  return 'SERVICE';
 }
 
-function getSowShortNumber(sowNumber: string | undefined | null, fallbackInvoice: string): string {
-  const digits = extractTrailingDigits(sowNumber ?? '');
-  if (!digits) return fallbackInvoice;
-  const n = Number(digits);
-  if (!Number.isFinite(n)) return fallbackInvoice;
-  return `0${String(n).padStart(2, '0')}`; // 0## format
+function formDataToMap(formData: unknown): Map<string, unknown> {
+  const m = new Map<string, unknown>();
+  if (Array.isArray(formData)) {
+    for (const e of formData as Array<{ id?: string; value?: unknown }>) {
+      if (e && typeof e.id === 'string') m.set(e.id, e.value);
+    }
+  } else if (formData && typeof formData === 'object') {
+    for (const [k, v] of Object.entries(formData as Record<string, unknown>)) {
+      m.set(k, v);
+    }
+  }
+  return m;
+}
+
+/** Price multiplier params: show entered value(s); if all numeric, note combined × factor like pricing engine. */
+function formatMultiplierNotes(parameters: any[] | undefined, formData: unknown): string[] {
+  const lines: string[] = [];
+  const map = formDataToMap(formData);
+  if (!Array.isArray(parameters)) return lines;
+  for (const p of parameters) {
+    if (!p || p.isPriceMultiplier !== true || typeof p.id !== 'string') continue;
+    const raw = map.get(p.id);
+    if (raw === undefined || raw === null || raw === '') continue;
+    const label = typeof p.name === 'string' && p.name.trim() ? p.name.trim() : p.id;
+    const allowMulti = p.allowMultipleValues === true;
+    if (Array.isArray(raw)) {
+      const strs = raw.map((v) => (v === null || v === undefined ? '' : String(v))).filter((s) => s !== '');
+      if (!strs.length) continue;
+      const nums = raw.map((v) =>
+        typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN
+      );
+      const allNum = nums.every((n) => Number.isFinite(n));
+      if (allowMulti && allNum && nums.length > 1) {
+        const sum = nums.reduce((a, b) => a + b, 0);
+        lines.push(`${label}: ${strs.join(', ')} (×${sum} applied)`);
+      } else {
+        const multiNote = allowMulti && strs.length > 1 ? ' (multiple values)' : '';
+        lines.push(`${label}: ${strs.join(', ')}${multiNote}`);
+      }
+    } else {
+      lines.push(`${label}: ${String(raw)}`);
+    }
+  }
+  return lines;
+}
+
+function formatParameterPricingLines(
+  details: Array<{ label: string; quantity: number; unitPrice: number; total: number }> | undefined
+): string[] {
+  if (!Array.isArray(details) || !details.length) return [];
+  return details.map((d) => {
+    if (d.quantity > 1) {
+      return `${d.label}: ${d.quantity} × ${formatCurrency(d.unitPrice)} = ${formatCurrency(d.total)}`;
+    }
+    return `${d.label}: ${formatCurrency(d.total)}`;
+  });
+}
+
+/** PARAMETER mode: priced parameter lines + any multiplier params. SERVICE mode: multiplier lines only, or empty. */
+function buildInvoicePricingNote(row: any): string {
+  const mode = normalizePricingMode(row?.pricingMode);
+  const multLines = formatMultiplierNotes(row?.parameters, row?.formData);
+  if (mode === 'PARAMETER') {
+    const paramLines = formatParameterPricingLines(row?.pricingDetails);
+    return [...paramLines, ...multLines].join('\n').trim();
+  }
+  return multLines.join('\n').trim();
+}
+
+function matchSowService(invoiceLine: any, index: number, sowServices: any[] | undefined): any | null {
+  if (!Array.isArray(sowServices) || !sowServices.length) return null;
+  const sid = invoiceLine?.serviceId ?? invoiceLine?.id;
+  const byId = sowServices.find((s) => s && (String(s.id) === String(sid)));
+  if (byId) return byId;
+  return sowServices[index] ?? null;
+}
+
+function mergeLineForPricing(invoiceLine: any, index: number, sow: SOWData | null): any {
+  const sowSvc = sow?.services ? matchSowService(invoiceLine, index, sow.services as any[]) : null;
+  if (!sowSvc) return invoiceLine;
+  return {
+    ...invoiceLine,
+    pricingMode: sowSvc.pricingMode ?? invoiceLine.pricingMode,
+    parameters: sowSvc.parameters ?? invoiceLine.parameters,
+    formData: sowSvc.formData ?? invoiceLine.formData,
+    pricingDetails: sowSvc.pricingDetails ?? invoiceLine.pricingDetails,
+  };
 }
 
 export interface JobInvoiceDocumentProps {
   jobId: string;
+  jobDisplayId?: string | null;
   jobName: string;
   customerCategory?:
     | 'INTERNAL_CUSTOMERS'
@@ -167,22 +343,44 @@ export interface JobInvoiceDocumentProps {
     | 'EXTERNAL_CUSTOMER_NO_SALARY'
     | null;
   sow: SOWData | null;
+  invoice?: {
+    id: string;
+    invoiceNumber: string;
+    invoiceDate?: string | Date | null;
+    jobDisplayId?: string | null;
+    services: Array<{
+      serviceId?: string | null;
+      name: string;
+      description?: string | null;
+      cost: number;
+      category?: string | null;
+      pricingMode?: 'SERVICE' | 'PARAMETER' | null;
+      parameters?: any;
+      formData?: any;
+      pricingDetails?: Array<{ label: string; quantity: number; unitPrice: number; total: number }>;
+    }>;
+    totalCost?: number | null;
+    billedToName?: string | null;
+    billedToEmail?: string | null;
+    billedToAddress?: string | null;
+  } | null;
 }
 
-const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName, customerCategory, sow }) => {
-  const invoiceDate = new Date();
-  const invoiceNo = getInvoiceNumber(jobId);
+const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDisplayId: jobDisplayIdProp, jobName, customerCategory, sow, invoice }) => {
+  const invoiceDate = safeParseISODate(toIsoStringSafe(invoice?.invoiceDate)) ?? new Date();
+  const invoiceNo = invoice?.invoiceNumber ?? getInvoiceNumber(jobId);
+  const invoiceId = invoice?.id ?? '';
 
   const startDate = safeParseISODate(sow?.timeline?.startDate) ?? invoiceDate;
   const fyShort = getFYShort(startDate);
 
-  const sowShort = getSowShortNumber(sow?.sowNumber ?? undefined, invoiceNo);
-  const billedToName = sow?.clientName ?? 'Client';
-  const billedToEmail = sow?.clientEmail ?? '';
-  const { line1, line2 } = splitAddressLines(sow?.clientAddress ?? '');
+  const jobDisplayId = invoice?.jobDisplayId ?? jobDisplayIdProp ?? jobId;
+  const billedToName = invoice?.billedToName ?? sow?.clientName ?? 'Client';
+  const billedToEmail = invoice?.billedToEmail ?? sow?.clientEmail ?? '';
+  const { line1, line2 } = splitAddressLines(invoice?.billedToAddress ?? sow?.clientAddress ?? '');
 
-  const services = sow?.services ?? [];
-  const invoiceTotal = services.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
+  const services = (invoice?.services?.length ? invoice.services : (sow?.services ?? [])) as any[];
+  const invoiceTotal = Number(invoice?.totalCost) || services.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
 
   const isInternal = customerCategory === 'INTERNAL_CUSTOMERS';
   const getCustomerCategoryLabel = (category?: JobInvoiceDocumentProps['customerCategory']): string => {
@@ -208,10 +406,9 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>{isInternal ? 'INTERNAL INVOICE' : 'EXTERNAL INVOICE'}</Text>
             <Text style={styles.monoBold}>(Internal) Boston University - DAMP Lab</Text>
-            <Text>{'youremail@bu.edu'}</Text>
+            <Text>{'damplab@bu.edu'}</Text>
             <Text>{'610 Commonwealth Ave'}</Text>
             <Text>{'Boston, MA 02215'}</Text>
-            <Text>{'+# (###) ###-####'}</Text>
             <Text>{'damplab.org'}</Text>
           </View>
 
@@ -223,7 +420,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
 
         <View style={styles.block}>
           <Text style={styles.sowLine}>
-            {'SOW '}{sowShort} {' | '}{jobName}
+            {'Job #'}{jobDisplayId} {' | '}{jobName}
           </Text>
 
           <View style={styles.twoCol}>
@@ -237,6 +434,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
 
             <View style={{ width: 200 }}>
               <Text style={styles.strong}>Invoice no.: {invoiceNo}</Text>
+              <Text style={styles.text}>Job ID: {jobDisplayId}</Text>
               <Text style={styles.text}>Terms: Net 30</Text>
               <Text style={styles.text}>Invoice date: {formatMMDDYYYY(invoiceDate)}</Text>
             </View>
@@ -263,31 +461,85 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobName,
 
         <View style={styles.divider} />
 
-        <View>
+        <View style={styles.table}>
           <View style={styles.tableHeader}>
-            <Text style={styles.colDate}>Date</Text>
-            <Text style={styles.colProd}>Product or Service</Text>
-            <Text style={styles.colDesc}>Description</Text>
-            <Text style={styles.colQty}>Qty</Text>
-            <Text style={styles.colRate}>Rate</Text>
-            <Text style={styles.colAmount}>Amount</Text>
+            <View style={styles.cellDate}>
+              <Text style={styles.cellTextHeader} wrap>
+                Date
+              </Text>
+            </View>
+            <View style={styles.cellService}>
+              <Text style={styles.cellTextHeader} wrap>
+                Service
+              </Text>
+              <Text style={[styles.cellText, { marginTop: 3 }]} wrap>
+                Description
+              </Text>
+            </View>
+            <View style={styles.cellPricing}>
+              <Text style={styles.cellTextHeader} wrap>
+                Pricing details
+              </Text>
+            </View>
+            <View style={styles.cellRate}>
+              <Text style={styles.cellTextHeaderRight} wrap>
+                Rate
+              </Text>
+            </View>
+            <View style={styles.cellAmount}>
+              <Text style={styles.cellTextHeaderRight} wrap>
+                Amount
+              </Text>
+            </View>
           </View>
 
           {services.map((s, idx) => {
-            const rate = Number(s.cost) || 0;
-            const qty = 1;
-            const amount = rate * qty;
+            const row = mergeLineForPricing(s, idx, sow);
+            const rate = Number(row.cost) || 0;
+            const amount = rate;
+            const pricingNote = buildInvoicePricingNote(row);
             return (
-              <View key={s.id || idx} style={styles.row}>
-                <Text style={styles.colDate}>{formatMMDDYYYY(invoiceDate)}</Text>
-                <Text style={styles.colProd}>{s.name}</Text>
-                <Text style={styles.colDesc}>
-                  {s.category}
-                  {s.description ? ` - ${s.description}` : ''}
-                </Text>
-                <Text style={styles.colQty}>{qty}</Text>
-                <Text style={styles.colRate}>{formatCurrency(rate)}</Text>
-                <Text style={styles.colAmount}>{formatCurrency(amount)}</Text>
+              <View key={row.serviceId || row.id || idx} style={styles.row}>
+                <View style={styles.cellDate}>
+                  <Text style={styles.cellText} wrap>
+                    {formatMMDDYYYY(invoiceDate)}
+                  </Text>
+                </View>
+                <View style={styles.cellService}>
+                  <Text style={styles.serviceName} wrap>
+                    {row.name}
+                  </Text>
+                  <Text style={styles.serviceMeta} wrap>
+                    {row.category ?? ''}
+                    {row.description ? `${row.category ? ' · ' : ''}${row.description}` : ''}
+                  </Text>
+                </View>
+                <View style={styles.cellPricing}>
+                  {pricingNote
+                    ? (() => {
+                        const lines = pricingNote.split('\n');
+                        return lines.map((line, i) => (
+                          <Text
+                            key={i}
+                            style={i === lines.length - 1 ? styles.pricingLineLast : styles.pricingLine}
+                            wrap
+                          >
+                            {line}
+                          </Text>
+                        ));
+                      })()
+                    : null}
+                </View>
+                <View style={styles.cellRate}>
+                  <Text style={styles.cellTextRight} wrap>
+                    {formatCurrency(rate)}
+                  </Text>
+                </View>
+                <View style={styles.cellAmount}>
+                  <Text style={styles.cellTextRight} wrap>
+                    {formatCurrency(amount)}
+                  </Text>
+                </View>
               </View>
             );
           })}

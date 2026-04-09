@@ -2,14 +2,18 @@ import { useApolloClient } from '@apollo/client';
 import { DataGrid, GridActionsCellItem, GridColDef, GridRowId, GridRowModesModel, GridSlots } from '@mui/x-data-grid';
 import { Alert, Button, Snackbar } from '@mui/material';
 import { Delete, Edit } from '@mui/icons-material';
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AppContext } from '../../contexts/App';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
 import { DELETE_BUNDLE } from '../../gql/queries';
 
-export const EditBundlesTable: React.FC = () => {
+export interface EditBundlesTableProps {
+  searchString?: string;
+}
+
+export const EditBundlesTable: React.FC<EditBundlesTableProps> = ({ searchString = '' }) => {
   const navigate = useNavigate();
   const client = useApolloClient();
   const { bundles, refreshCatalog } = useContext(AppContext);
@@ -20,6 +24,23 @@ export const EditBundlesTable: React.FC = () => {
   useEffect(() => {
     setRows(bundles);
   }, [bundles]);
+
+  const filteredRows = useMemo(() => {
+    const q = searchString.trim().toLowerCase();
+    if (!q) return rows;
+
+    return rows.filter((row) => {
+      const label = String(row?.label ?? '').toLowerCase();
+      if (label.includes(q)) return true;
+
+      const svc = row?.services;
+      if (Array.isArray(svc)) {
+        return svc.some((s: any) => String(s?.name ?? '').toLowerCase().includes(q));
+      }
+
+      return false;
+    });
+  }, [rows, searchString]);
 
   const handleDelete = async (id: GridRowId) => {
     try {
@@ -78,7 +99,7 @@ export const EditBundlesTable: React.FC = () => {
   return (
     <>
       <DataGrid
-        rows={rows}
+        rows={filteredRows}
         columns={columns}
         slots={{ toolbar: GridToolBar as GridSlots['toolbar'] }}
         slotProps={{

@@ -1,21 +1,27 @@
 import { Stack, Typography } from '@mui/material';
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { ToolBar } from '../components/edit/ToolBar';
 import { EditBundlesTable } from '../components/edit/EditBundlesTable';
 import { EditCategoriesTable } from '../components/edit/EditCategoriesTable';
 import { EditServicesTable } from '../components/edit/EditServicesTable';
+import { AppContext } from '../contexts/App';
 
 type EditTypes = 'Services' | 'Categories' | 'Bundles';
 
 export default function AdminEdit () {
+  const { refreshCatalog } = useContext(AppContext);
   const [editType, setEditType] = useState<EditTypes>('Services');
   const [searchString, setSearchString] = useState<string>('');
 
+  useEffect(() => {
+    void refreshCatalog();
+  }, [refreshCatalog]);
+
   const tableSelector = (type: EditTypes) => {
     switch(type) {
-      case 'Services': return <EditServicesTable />;
-      case 'Categories': return <EditCategoriesTable />;
-      case 'Bundles': return <EditBundlesTable />;
+      case 'Services': return <EditServicesTable searchString={searchString} />;
+      case 'Categories': return <EditCategoriesTable searchString={searchString} />;
+      case 'Bundles': return <EditBundlesTable searchString={searchString} />;
     }
   }
 

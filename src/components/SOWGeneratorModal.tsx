@@ -26,10 +26,16 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import PreviewIcon from '@mui/icons-material/Preview';
 import EditIcon from '@mui/icons-material/Edit';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWEditableSections } from '../types/SOWTypes';
 import { generateSOWData } from '../utils/sowGenerator';
+import {
+  coerceDateOnlyString,
+  dateOnlyStringToLocalDate,
+  dateOnlyStringToStableISOString,
+  isoToDateOnlyString,
+} from '../utils/localDate';
 import { GET_SOW_BY_JOB_ID, GET_JOB_BY_ID, GET_LAB_MONITOR_STAFF_LIST } from '../gql/queries';
 import { UPSERT_SOW_FOR_JOB } from '../gql/mutations';
 import { useApolloClient, useQuery } from '@apollo/client';
@@ -57,6 +63,8 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
   });
 
   const [generatedSOW, setGeneratedSOW] = useState<SOWData | null>(null);
+  const [previewSOW, setPreviewSOW] = useState<SOWData | null>(null);
+  const [previewKey, setPreviewKey] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editableSections, setEditableSections] = useState<SOWEditableSections>({
@@ -123,12 +131,12 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
             const existing = data.sowByJobId;
             setExistingSOW({
               id: existing.id,
-              sowNumber: existing.sowNumber ?? `SOW-${jobData.id}-${Date.now().toString(36)}`,
+              sowNumber: existing.sowNumber ?? '',
             });
             setTechnicianInputs(prev => {
-              const startDate = existing.timeline?.startDate
-                ? format(new Date(existing.timeline.startDate), 'yyyy-MM-dd')
-                : prev.startDate;
+              const startDate =
+                isoToDateOnlyString(existing.timeline?.startDate) ??
+                prev.startDate;
               const durStr = existing.timeline?.duration;
               let duration = prev.duration;
               if (typeof durStr === 'string' && /^\d+/.test(durStr)) {
@@ -142,6 +150,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                 startDate,
                 duration,
                 clientProjectManager: existing.clientName || '',
+                clientCostCenter: existing.clientInstitution || '',
               };
             });
             setEditableSections({
@@ -261,7 +270,8 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
   };
 
   const handleGenerateSOW = async () => {
-    const finalSOWData = getFinalSOWData();
+    // Build a fresh snapshot to avoid stale values in the downloaded PDF / saved payload.
+    const finalSOWData = buildFinalSOWData();
     if (!validateInputs() || !finalSOWData || !jobData?.id) {
       return;
     }
@@ -274,9 +284,10 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
       // Convert SOW data to GraphQL input format
       const sowInput = {
         jobId: jobData.id,
-        sowNumber: finalSOWData.sowNumber,
         sowTitle: finalSOWData.sowTitle || defaultSowTitle,
-        date: new Date(finalSOWData.date).toISOString(),
+        date: coerceDateOnlyString(finalSOWData.date)
+          ? dateOnlyStringToStableISOString(finalSOWData.date)
+          : new Date(finalSOWData.date).toISOString(),
         clientName: finalSOWData.clientName,
         clientEmail: finalSOWData.clientEmail,
         clientInstitution: finalSOWData.clientInstitution,
@@ -292,8 +303,12 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
           formData: s.formData
         })),
         timeline: {
-          startDate: new Date(finalSOWData.timeline.startDate).toISOString(),
-          endDate: new Date(finalSOWData.timeline.endDate).toISOString(),
+          startDate: coerceDateOnlyString(finalSOWData.timeline.startDate)
+            ? dateOnlyStringToStableISOString(finalSOWData.timeline.startDate)
+            : new Date(finalSOWData.timeline.startDate).toISOString(),
+          endDate: coerceDateOnlyString(finalSOWData.timeline.endDate)
+            ? dateOnlyStringToStableISOString(finalSOWData.timeline.endDate)
+            : new Date(finalSOWData.timeline.endDate).toISOString(),
           duration: finalSOWData.timeline.duration
         },
         resources: {
@@ -350,23 +365,40 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
     if (!validateInputs()) {
       return;
     }
+    const final = buildFinalSOWData();
+    if (!final) return;
+    setPreviewSOW(final);
+    setPreviewKey((k) => k + 1);
     setShowPreview(true);
   };
 
   const handleClosePreview = () => {
     setShowPreview(false);
+    setPreviewSOW(null);
   };
 
-  const getFinalSOWData = (): SOWData | null => {
-    if (!generatedSOW) return null;
-    
-    return {
-      ...generatedSOW,
-      scopeOfWork: editableSections.scopeOfWork,
-      deliverables: editableSections.deliverables,
-      services: editableSections.services,
-      additionalInformation: editableSections.additionalInformation,
-    };
+  const buildFinalSOWData = (): SOWData | null => {
+    if (!jobData) return null;
+    if (!technicianInputs.projectManager || !technicianInputs.projectLead) return null;
+    try {
+      const base = generateSOWData(jobData, technicianInputs, existingSOW ?? undefined);
+      // Preserve stable identifiers when possible to reduce churn.
+      const stableId = generatedSOW?.id ?? base.id;
+      const stableSowNumber = existingSOW?.sowNumber?.trim()
+        ? existingSOW.sowNumber
+        : generatedSOW?.sowNumber ?? base.sowNumber;
+      return {
+        ...base,
+        id: stableId,
+        sowNumber: stableSowNumber,
+        scopeOfWork: editableSections.scopeOfWork,
+        deliverables: editableSections.deliverables,
+        services: editableSections.services,
+        additionalInformation: editableSections.additionalInformation,
+      };
+    } catch {
+      return null;
+    }
   };
 
   if (!jobData) {
@@ -384,9 +416,9 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
         </DialogTitle>
 
         <DialogContent>
-          {showPreview && getFinalSOWData() ? (
+          {showPreview && previewSOW ? (
             (() => {
-              const finalSOWData = getFinalSOWData();
+              const finalSOWData = previewSOW;
               if (!finalSOWData) return null;
               return (
               <Box>
@@ -402,6 +434,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                       Back to Edit
                     </Button>
                     <PDFDownloadLink
+                      key={previewKey}
                       document={<SOWDocument sowData={finalSOWData} />}
                       fileName={`SOW-${finalSOWData.sowNumber.replace(' ', '-')}-${jobData.name}.pdf`}
                     >
@@ -563,8 +596,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                   </Typography>
                   <DatePicker
                     label="Start Date"
-                    // Avoid `new Date('YYYY-MM-DD')` (UTC parsing) which can display as the prior day locally.
-                    value={technicianInputs.startDate ? parseISO(technicianInputs.startDate) : null}
+                    value={technicianInputs.startDate ? dateOnlyStringToLocalDate(technicianInputs.startDate) : null}
                     onChange={(date) => handleInputChange('startDate', date ? format(date, 'yyyy-MM-dd') : '')}
                     slotProps={{
                       textField: {
@@ -850,7 +882,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
               variant="outlined"
               startIcon={<PreviewIcon />}
               onClick={handleReviewSOW}
-              disabled={!getFinalSOWData() || isSaving}
+              disabled={!buildFinalSOWData() || isSaving}
             >
               Review SOW
             </Button>
@@ -859,7 +891,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
             <Button
               variant="contained"
               onClick={handleGenerateSOW}
-              disabled={!getFinalSOWData() || isSaving}
+              disabled={!buildFinalSOWData() || isSaving}
             >
               {isSaving ? 'Saving...' : 'Generate & Save SOW'}
             </Button>

@@ -66,7 +66,7 @@ export default function StaffJobSubmit() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
-  const [lastSubmittedJobId, setLastSubmittedJobId] = useState<string | null>(null);
+  const [lastSubmittedJob, setLastSubmittedJob] = useState<{ id: string; jobId?: string } | null>(null);
 
   if (!userProps?.isDamplabStaff) {
     return <Navigate to="/checkout" replace />;
@@ -99,7 +99,7 @@ export default function StaffJobSubmit() {
       setJobLoading(true);
       const notes = buildStaffNotes(formData.clientName, formData.clientEmail, formData.notes);
 
-      const jobId = await submitCanvasJob(apolloClient, {
+      const created = await submitCanvasJob(apolloClient, {
         workflows,
         edges: val.edges,
         nodes: val.nodes,
@@ -111,12 +111,7 @@ export default function StaffJobSubmit() {
         getAccessToken: () => userContext.userProps?.getAccessToken() ?? Promise.resolve(undefined),
       });
 
-      val.setNodes([]);
-      val.setEdges([]);
-      localStorage.removeItem(CANVAS_AUTOSAVE_KEY);
-      localStorage.setItem('CurrentCanvas', '');
-
-      setLastSubmittedJobId(jobId);
+      setLastSubmittedJob(created);
       setSuccessDialogOpen(true);
       setAttachments([]);
       setFormData({
@@ -138,11 +133,18 @@ export default function StaffJobSubmit() {
 
   const handleSuccessDismiss = () => {
     setSuccessDialogOpen(false);
-    setLastSubmittedJobId(null);
+    setLastSubmittedJob(null);
+    // Clear the canvas only after the success dialog is dismissed.
+    // Otherwise the component re-renders with workflows.length === 0 and shows the empty-workflow screen,
+    // which looks like an error after a successful submission.
+    val.setNodes([]);
+    val.setEdges([]);
+    localStorage.removeItem(CANVAS_AUTOSAVE_KEY);
+    localStorage.setItem('CurrentCanvas', '');
     navigate('/canvas');
   };
 
-  if (workflows.length === 0) {
+  if (workflows.length === 0 && !successDialogOpen) {
     return (
       <Box sx={{ p: 3, maxWidth: 640 }}>
         <Typography variant="h5" sx={{ mb: 2 }}>
@@ -296,12 +298,12 @@ export default function StaffJobSubmit() {
       <Dialog open={successDialogOpen} onClose={handleSuccessDismiss} maxWidth="sm" fullWidth>
         <DialogTitle>Job submitted successfully</DialogTitle>
         <DialogContent>
-          <Typography variant="body1" sx={{ mb: lastSubmittedJobId ? 1 : 0 }}>
+          <Typography variant="body1" sx={{ mb: lastSubmittedJob ? 1 : 0 }}>
             The job was submitted and will follow the normal lab pipeline.
           </Typography>
-          {lastSubmittedJobId && (
+          {lastSubmittedJob && (
             <Typography variant="body2" color="text.secondary">
-              Job ID: {lastSubmittedJobId}
+              Job ID: {lastSubmittedJob.jobId ?? lastSubmittedJob.id}
             </Typography>
           )}
         </DialogContent>

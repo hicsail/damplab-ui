@@ -3,6 +3,17 @@ import { format, parseISO, isValid } from 'date-fns';
 function toDate(value: string | Date): Date {
   if (value instanceof Date) return value;
   try {
+    // If the modal/API provides a date-only string (YYYY-MM-DD), interpret it as a
+    // *local* calendar date (midnight local time). This avoids timezone shifts
+    // where UTC midnight renders as the previous day locally.
+    const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) {
+      const y = Number(dateOnly[1]);
+      const m = Number(dateOnly[2]);
+      const d = Number(dateOnly[3]);
+      return new Date(y, m - 1, d);
+    }
+
     // IMPORTANT:
     // - ISO strings with a time ("...T...") should be parsed as ISO.
     // - Date-only strings ("YYYY-MM-DD") should also be parsed with parseISO, NOT new Date(value).

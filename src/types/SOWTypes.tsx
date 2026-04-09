@@ -66,6 +66,10 @@ export interface SOWService {
   description: string;
   cost: number;
   category: string;
+  /** How the service base price is computed (mirrors catalog service). */
+  pricingMode?: 'SERVICE' | 'PARAMETER';
+  /** Service parameter definitions (for invoice / multiplier display). */
+  parameters?: any[];
   /** Parameter values for pricing calculations when needed. */
   formData?: any;
   /** Optional line-item breakdown for parameter/option-level pricing. */

@@ -18,6 +18,7 @@ import { useContext, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_SERVICE } from '../gql/queries';
 import { AppContext } from '../contexts/App';
+import { idFromName } from '../utils/idFromName';
 
 const MENU_PROPS = {
   PaperProps: {
@@ -35,6 +36,7 @@ export default function AdminNewService() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [icon, setIcon] = useState('');
   const [serviceCategoryNumber, setServiceCategoryNumber] = useState('');
   const [serviceCategoryName, setServiceCategoryName] = useState('');
   const [unit, setUnit] = useState('');
@@ -88,11 +90,12 @@ export default function AdminNewService() {
     }
 
     const newService = {
+      id: idFromName(name),
       name: name.trim(),
       serviceCategoryNumber: serviceCategoryNumber.trim(),
       serviceCategoryName: serviceCategoryName.trim(),
       unit: unit.trim(),
-      icon: '',
+      icon: icon.trim(),
       price: legacy,
       internalPrice: internal,
       externalPrice: externalMarket,
@@ -154,6 +157,14 @@ export default function AdminNewService() {
         onChange={(event) => setDescription(event.target.value)}
         multiline
         minRows={4}
+      />
+
+      <TextField
+        label='Icon URL'
+        value={icon}
+        onChange={(event) => setIcon(event.target.value)}
+        placeholder='https://…'
+        helperText='Optional. Used in the catalog and workflow views.'
       />
 
       <Box

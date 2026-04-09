@@ -13,11 +13,12 @@ import UploadIcon from '@mui/icons-material/Upload';
 import DownloadIcon from '@mui/icons-material/Download';
 import { Edit, Delete } from '@mui/icons-material';
 import { ServiceList } from './ServiceList';
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppContext } from '../../contexts/App';
 import { GridToolBar } from './GridToolBar';
 import { processCSVFile, processExcelFile, validateFileType } from '../data-translation/utils';
 import { useNavigate } from 'react-router';
+import { idFromName } from '../../utils/idFromName';
 
 type ServiceRow = Record<string, unknown> & { id: GridRowId };
 
@@ -38,7 +39,11 @@ function formatPricingSummary(row: Record<string, unknown>): string {
   return parts.length ? parts.join(' · ') : '—';
 }
 
-export const EditServicesTable: React.FC = () => {
+export interface EditServicesTableProps {
+  searchString?: string;
+}
+
+export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchString = '' }) => {
   const navigate = useNavigate();
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const { services, refreshCatalog } = useContext(AppContext);
@@ -51,6 +56,27 @@ export const EditServicesTable: React.FC = () => {
   useEffect(() => {
     setRows(services as ServiceRow[]);
   }, [services]);
+
+  const filteredRows = useMemo(() => {
+    const q = searchString.trim().toLowerCase();
+    if (!q) return rows;
+
+    return rows.filter((row) => {
+      const name = String((row as any).name ?? '').toLowerCase();
+      if (name.includes(q)) return true;
+
+      const params = (row as any).parameters;
+      if (Array.isArray(params)) {
+        return params.some((p: any) => {
+          const pid = String(p?.id ?? '').toLowerCase();
+          const pname = String(p?.name ?? '').toLowerCase();
+          return pid.includes(q) || pname.includes(q);
+        });
+      }
+
+      return false;
+    });
+  }, [rows, searchString]);
 
   const handleDeletion = async (id: GridRowId) => {
     await client.mutate({
@@ -377,6 +403,7 @@ export const EditServicesTable: React.FC = () => {
         }
 
         const newService: Record<string, unknown> = {
+          id: idFromName(name),
           name,
           icon: '',
           price,
@@ -552,7 +579,7 @@ export const EditServicesTable: React.FC = () => {
           />
         </Box>
         <DataGrid
-          rows={rows}
+          rows={filteredRows}
           columns={columns}
           slots={{
             toolbar: GridToolBar as GridSlots['toolbar']

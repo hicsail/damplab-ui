@@ -117,9 +117,15 @@ const styles = StyleSheet.create({
 interface SOWDocumentProps {
   sowData: SOWData;
   customerCategory?: string | null;
+  jobDisplayId?: string | null;
 }
 
-const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) => {
+const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory, jobDisplayId }) => {
+  const displayJobId =
+    String(jobDisplayId ?? '').trim() ||
+    String(sowData.sowNumber ?? '').trim() ||
+    String(sowData.jobId ?? '').trim();
+
   const formatCurrency = (amount: number): string => {
     return `$${amount.toLocaleString()}`;
   };
@@ -154,7 +160,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
           <Text style={styles.address}>610 Commonwealth Avenue, 4th Floor, Boston, MA 02215</Text>
         </View>
         <Text style={styles.sowNumber}>
-          {sowData.sowNumber} for {sowData.sowTitle || 'Agreement to Perform Research Services'} for {sowData.clientName}
+          Job #{displayJobId} for {sowData.sowTitle || 'Agreement to Perform Research Services'} for {sowData.clientName}
         </Text>
         {sowData.jobName && (
           <Text style={{ marginBottom: 10 }}>
@@ -164,8 +170,8 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
 
         {/* Date and Parties */}
         <View>
-          <Text>Date Services Performed By: {formatSOWDate(sowData.date)}</Text>
-          <Text>Services Performed For:</Text>
+          <Text>Date of Agreement: {formatSOWDate(sowData.date)}</Text>
+          <Text>Services Performed By:</Text>
           <Text style={styles.bold}>Trustees of Boston University</Text>
           <Text>DAMP Lab of Boston University</Text>
           <Text>610 Commonwealth Avenue</Text>
@@ -173,9 +179,9 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
         </View>
 
         <View style={{ marginTop: 20 }}>
-          <Text style={styles.bold}>{sowData.clientName}</Text>
+          <Text>Services Performed For: {sowData.clientName}</Text>
           <Text>{sowData.clientInstitution}</Text>
-          <Text>{sowData.clientAddress || 'Address not provided'}</Text>
+          {/* <Text>{sowData.clientAddress || 'Address not provided'}</Text> */}
         </View>
 
         {/* Statement of Work Introduction */}
@@ -189,7 +195,7 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
         </Text>
 
         <Text style={styles.paragraph}>
-          {sowData.sowNumber}, effective as of {formatSOWDate(sowData.date)} is entered into by and between DAMP and {sowData.clientName}
+          Job #{displayJobId}, effective as of {formatSOWDate(sowData.date)} is entered into by and between DAMP and {sowData.clientName}
           {' '}and is subject to the terms and conditions specified below. The Exhibit(s) to this SOW, if any, shall
           be deemed to be a part hereof. In the event of any inconsistency between the terms of the body of this
           SOW and the terms of the Exhibit(s) hereto, the terms of the body of this SOW shall prevail.
@@ -293,17 +299,23 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory }) 
               </View>
             </View>
           ))}
+          {sowData.pricing.discount && (
+            <View style={styles.tableRow}>
+              <View style={styles.tableCellLarge}>
+                <Text style={styles.italic}>
+                  Discount{(sowData.pricing.discount.reason || '').trim() ? ` — ${sowData.pricing.discount.reason}` : ''}
+                </Text>
+              </View>
+              <View style={styles.tableCell}>
+                <Text style={styles.italic}>{formatCurrency(-Math.abs(sowData.pricing.discount.amount))}</Text>
+              </View>
+            </View>
+          )}
           <View style={[styles.tableRow, { fontWeight: 'bold', backgroundColor: '#f9f9f9' }]}>
             <Text style={styles.tableCellLarge}>Total</Text>
             <Text style={styles.tableCell}>{formatCurrency(sowData.pricing.totalCost)}</Text>
           </View>
         </View>
-
-        {sowData.pricing.discount && (
-          <Text style={[styles.paragraph, styles.italic]}>
-            *{sowData.pricing.discount.reason}: {formatCurrency(sowData.pricing.discount.amount)} discount applied.
-          </Text>
-        )}
 
         <Text style={styles.paragraph}>
           Upon completion of the initial performance period, University and the Client will have the option 
