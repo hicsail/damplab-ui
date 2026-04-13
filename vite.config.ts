@@ -11,6 +11,11 @@ export default defineConfig(() => {
       target: 'esnext',
     },
     plugins: [reactRouter()],
+    server: {
+      proxy: {
+        '/graphql': 'http://localhost:5100',
+      },
+    },
     define: {
       'global': 'globalThis',
       'process.env': {},
