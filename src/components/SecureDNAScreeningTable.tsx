@@ -94,6 +94,29 @@ function clusterScreenings(screenings: ScreeningResult[]): ScreeningBatchRow[] {
   return batches;
 }
 
+function escapeCsvCell(value: string | number): string {
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+function downloadIbbisSummaryCsv(items: ScreeningResult[]) {
+  const header = ['UUID', 'Flag'].map(escapeCsvCell).join(',');
+  const lines = items.map((row) => {
+    const uuid = row.sequence?.name ?? '';
+    const flag = row.threats.length > 0 ? 1 : 0;
+    return [uuid, flag].map((c) => escapeCsvCell(c)).join(',');
+  });
+  const csvContent = [header, ...lines].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'ibbis-summary.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function ThreatPanels({ threats }: { threats: ScreeningResult['threats'] }) {
   if (threats.length === 0) {
     return (
@@ -534,9 +557,23 @@ export default function SecureDNAScreeningTable({
               </Table>
             </TableContainer>
 
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 1,
+                flexWrap: 'wrap',
+                mt: 1,
+              }}
+            >
               <Button variant="outlined" onClick={() => setSelectedBatch(null)}>
                 Close
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => downloadIbbisSummaryCsv(selectedBatch.items)}
+              >
+                Download IBBIS Summary
               </Button>
             </Box>
           </Box>
