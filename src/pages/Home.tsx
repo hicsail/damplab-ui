@@ -14,6 +14,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import PeopleIcon from '@mui/icons-material/People';
 import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
+import BiotechIcon from '@mui/icons-material/Biotech';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
@@ -192,6 +193,10 @@ export default function Home() {
               <MenuButton navigateTo="/data_translation">
                 <EditIcon />
                 Data Translation<br />(Abbott to eLabs)
+              </MenuButton>
+              <MenuButton navigateTo="/screener">
+                <BiotechIcon />
+                Screener<br />(SecureDNA)
               </MenuButton>
               <MenuButton navigateTo="/edit_announcements">
                 <CampaignIcon />

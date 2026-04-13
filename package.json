@@ -30,6 +30,7 @@
     "react-router": "^7.5.3",
     "reactflow": "^11.11.4",
     "seqparse": "^0.2.1",
+    "seqviz": "^3.10.19",
     "uuid": "^11.1.0",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
