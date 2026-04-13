@@ -1,42 +1,118 @@
 import { gql } from '@apollo/client';
 import type { ApolloClient } from '@apollo/client';
-import type { ScreeningResult, Sequence } from './types';
+import type { ScreeningBatch, Sequence } from './types';
 
 /** Must match backend `MAX_MPI_SEQUENCE_BATCH` and MPI SecureDNA batch limit. */
 export const MAX_MPI_SEQUENCE_BATCH = 100;
 
+const SEQUENCE_FIELDS = `
+  id
+  name
+  seq
+  type
+  annotations {
+    start
+    end
+    type
+    description
+  }
+  userId
+  mpiId
+  created_at
+  updated_at
+`;
+
+const SCREENING_BATCH_FIELDS = `
+  id
+  mpiBatchId
+  mpiCreatedAt
+  synthesisPermission
+  region
+  providerReference
+  hitsByRecord {
+    fasta_header
+    line_number_range
+    sequence_length
+    hits_by_hazard {
+      type
+      is_wild_type
+      hit_regions {
+        seq
+        seq_range_start
+        seq_range_end
+      }
+      most_likely_organism {
+        name
+        organism_type
+        ans
+        tags
+      }
+      organisms {
+        name
+        organism_type
+        ans
+        tags
+      }
+    }
+  }
+  warnings {
+    diagnostic
+    additional_info
+    line_number_range
+  }
+  errors {
+    diagnostic
+    additional_info
+    line_number_range
+  }
+  verifiable {
+    synthclient_version
+    response_json
+    signature
+    public_key
+    history
+    sha3_256
+  }
+  sequences {
+    sequence {
+      ${SEQUENCE_FIELDS}
+    }
+    mpiSequenceId
+    name
+    order
+    originalSeq
+    threats {
+      type
+      is_wild_type
+      hit_regions {
+        seq
+        seq_range_start
+        seq_range_end
+      }
+      most_likely_organism {
+        name
+        organism_type
+        ans
+        tags
+      }
+      organisms {
+        name
+        organism_type
+        ans
+        tags
+      }
+    }
+    warning
+  }
+  userId
+  created_at
+  updated_at
+`;
+
 export const GET_ORG_SCREENINGS = gql`
   query OrgScreenings {
     orgScreenings {
-      id
-      sequence {
-        id
-        name
-        seq
-        type
-        annotations {
-          start
-          end
-          type
-          description
-        }
-      }
-      status
-      providerReference
-      threats {
-        name
-        hit_regions {
-          seq
-          seq_range_start
-          seq_range_end
-        }
-        is_wild_type
-        references
-      }
-      region
-      created_at
-      updated_at
-      userId
+      ${SCREENING_BATCH_FIELDS}
     }
   }
 `;
@@ -65,27 +141,7 @@ export const CREATE_SEQUENCES_BATCH = gql`
 export const SCREEN_SEQUENCES_BATCH = gql`
   mutation ScreenSequencesBatch($input: BatchScreeningInput!) {
     screenSequencesBatch(input: $input) {
-      id
-      sequence {
-        id
-        name
-      }
-      status
-      providerReference
-      threats {
-        name
-        hit_regions {
-          seq
-          seq_range_start
-          seq_range_end
-        }
-        is_wild_type
-        references
-      }
-      region
-      created_at
-      updated_at
-      userId
+      ${SCREENING_BATCH_FIELDS}
     }
   }
 `;
@@ -120,7 +176,7 @@ export const screenSequencesBatch = async (
   sequenceIds: string[],
   region: string,
   providerReference?: string
-): Promise<ScreeningResult[]> => {
+): Promise<ScreeningBatch> => {
   const result = await client.mutate({
     mutation: SCREEN_SEQUENCES_BATCH,
     variables: {
@@ -132,9 +188,9 @@ export const screenSequencesBatch = async (
     },
     refetchQueries: [...ORG_SCREENINGS_REFETCH]
   });
-  const rows = result.data?.screenSequencesBatch;
-  if (!Array.isArray(rows)) {
+  const batch = result.data?.screenSequencesBatch;
+  if (!batch || typeof batch !== 'object') {
     throw new Error('Failed to complete screening');
   }
-  return rows as ScreeningResult[];
+  return batch as ScreeningBatch;
 };

@@ -20,18 +20,24 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { ScreeningResult, HitRegion } from '../mpi/types';
+import {
+  ScreeningBatch,
+  ScreeningBatchSequenceSlice,
+  SecureDnaHazardHit,
+  HitRegion,
+} from '../mpi/types';
 import { ApolloError } from '@apollo/client';
 import SequenceSeqVizModal from './SequenceSeqVizModal';
 
 interface ScreeningBatchRow {
   id: string;
   providerReference: string | null;
+  mpiBatchId: string;
   created_at: Date;
-  region: ScreeningResult['region'];
+  region: ScreeningBatch['region'];
   sequenceCount: number;
-  batchStatus: 'granted' | 'denied' | 'mixed';
-  items: ScreeningResult[];
+  batchStatus: 'granted' | 'denied';
+  batch: ScreeningBatch;
 }
 
 interface BatchGridRow extends ScreeningBatchRow {
@@ -39,70 +45,37 @@ interface BatchGridRow extends ScreeningBatchRow {
 }
 
 interface SecureDNAScreeningTableProps {
-  screenings?: ScreeningResult[];
+  screenings?: ScreeningBatch[];
   loading?: boolean;
   error?: ApolloError;
 }
 
-function batchKey(s: ScreeningResult): string {
-  const ref = s.providerReference?.trim();
-  if (ref) return `ref:${ref}`;
-  return `single:${s.id}`;
+function batchToRow(batch: ScreeningBatch): ScreeningBatchRow {
+  return {
+    id: batch.id,
+    providerReference: batch.providerReference?.trim() || null,
+    mpiBatchId: batch.mpiBatchId,
+    created_at: new Date(batch.created_at),
+    region: batch.region,
+    sequenceCount: batch.sequences.length,
+    batchStatus: batch.synthesisPermission,
+    batch,
+  };
 }
 
-function clusterScreenings(screenings: ScreeningResult[]): ScreeningBatchRow[] {
-  const map = new Map<string, ScreeningResult[]>();
-  for (const s of screenings) {
-    const k = batchKey(s);
-    if (!map.has(k)) map.set(k, []);
-    map.get(k)!.push(s);
-  }
-
-  const batches: ScreeningBatchRow[] = [];
-  for (const [, items] of map) {
-    items.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-    const first = items[0];
-    const ref = first.providerReference?.trim() || null;
-    const denied = items.some((x) => x.status === 'denied');
-    const granted = items.some((x) => x.status === 'granted');
-    let batchStatus: 'granted' | 'denied' | 'mixed' = 'granted';
-    if (denied && granted) batchStatus = 'mixed';
-    else if (denied) batchStatus = 'denied';
-    else batchStatus = 'granted';
-
-    const maxCreated = new Date(
-      Math.max(...items.map((x) => new Date(x.created_at).getTime()))
-    );
-
-    batches.push({
-      id: ref ? `ref:${ref}` : `single:${first.id}`,
-      providerReference: ref,
-      created_at: maxCreated,
-      region: first.region,
-      sequenceCount: items.length,
-      batchStatus,
-      items,
-    });
-  }
-
-  batches.sort(
-    (a, b) => b.created_at.getTime() - a.created_at.getTime()
-  );
-  return batches;
+function sortBatches(rows: ScreeningBatchRow[]): ScreeningBatchRow[] {
+  return [...rows].sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
 }
 
 function escapeCsvCell(value: string | number): string {
   return `"${String(value).replace(/"/g, '""')}"`;
 }
 
-function downloadIbbisSummaryCsv(items: ScreeningResult[]) {
+function downloadIbbisSummaryCsv(batch: ScreeningBatch) {
   const header = ['UUID', 'Flag'].map(escapeCsvCell).join(',');
-  const lines = items.map((row) => {
-    const uuid = row.sequence?.name ?? '';
-    const flag = row.threats.length > 0 ? 1 : 0;
+  const lines = batch.sequences.map((slice) => {
+    const uuid = slice.sequence?.name ?? slice.name ?? '';
+    const flag = slice.threats.length > 0 ? 1 : 0;
     return [uuid, flag].map((c) => escapeCsvCell(c)).join(',');
   });
   const csvContent = [header, ...lines].join('\n');
@@ -117,7 +90,7 @@ function downloadIbbisSummaryCsv(items: ScreeningResult[]) {
   URL.revokeObjectURL(url);
 }
 
-function ThreatPanels({ threats }: { threats: ScreeningResult['threats'] }) {
+function ThreatPanels({ threats }: { threats: SecureDnaHazardHit[] }) {
   if (threats.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
@@ -135,6 +108,12 @@ function ThreatPanels({ threats }: { threats: ScreeningResult['threats'] }) {
           <Stack spacing={2}>
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
               <Chip label="THREAT" color="error" size="small" />
+              <Chip
+                label={String(threat.type ?? '').toUpperCase()}
+                color="info"
+                size="small"
+                variant="outlined"
+              />
               {threat.is_wild_type !== null && (
                 <Chip
                   label={threat.is_wild_type ? 'Wild Type' : 'Non-Wild Type'}
@@ -146,10 +125,10 @@ function ThreatPanels({ threats }: { threats: ScreeningResult['threats'] }) {
 
             <Box>
               <Typography variant="subtitle1" fontWeight="bold">
-                Name:
+                Most likely organism:
               </Typography>
               <Typography sx={{ pl: 2, wordBreak: 'break-word' }}>
-                {threat.name}
+                {threat.most_likely_organism?.name ?? '—'}
               </Typography>
             </Box>
 
@@ -179,15 +158,15 @@ function ThreatPanels({ threats }: { threats: ScreeningResult['threats'] }) {
               </Stack>
             </Box>
 
-            {threat.references.length > 0 && (
+            {threat.organisms && threat.organisms.length > 0 && (
               <Box>
                 <Typography variant="subtitle1" fontWeight="bold">
-                  Related Organisms:
+                  Related organisms:
                 </Typography>
                 <Stack spacing={1} sx={{ pl: 2 }}>
-                  {threat.references.map((org, idx) => (
+                  {threat.organisms.map((org, idx) => (
                     <Typography key={idx} variant="body2" sx={{ wordBreak: 'break-word' }}>
-                      {org}
+                      {org.name}
                     </Typography>
                   ))}
                 </Stack>
@@ -208,16 +187,18 @@ const columns: GridColDef<BatchGridRow>[] = [
     sortable: false,
     renderCell: (params: GridRenderCellParams<BatchGridRow>) => {
       const ref = params.row.providerReference;
-      if (!ref) {
+      const mpiId = params.row.mpiBatchId;
+      const display = ref || mpiId;
+      if (!display) {
         return (
           <Typography variant="body2" color="text.secondary">
-            Single sequence
+            —
           </Typography>
         );
       }
-      const short = ref.length > 40 ? `${ref.slice(0, 38)}…` : ref;
+      const short = display.length > 40 ? `${display.slice(0, 38)}…` : display;
       return (
-        <Tooltip title={ref}>
+        <Tooltip title={display}>
           <Typography variant="body2" noWrap sx={{ maxWidth: '100%' }}>
             {short}
           </Typography>
@@ -240,11 +221,7 @@ const columns: GridColDef<BatchGridRow>[] = [
     renderCell: (params: GridRenderCellParams<BatchGridRow>) => {
       const status = params.row.batchStatus.toUpperCase();
       const color =
-        status === 'GRANTED'
-          ? 'success.main'
-          : status === 'DENIED'
-            ? 'error.main'
-            : 'warning.main';
+        status === 'GRANTED' ? 'success.main' : 'error.main';
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}>
           <Typography color={color}>{status}</Typography>
@@ -282,6 +259,10 @@ const columns: GridColDef<BatchGridRow>[] = [
   },
 ];
 
+function sliceRowKey(batch: ScreeningBatch, slice: ScreeningBatchSequenceSlice): string {
+  return `${batch.id}-${slice.mpiSequenceId}-${slice.order}`;
+}
+
 export default function SecureDNAScreeningTable({
   screenings = [],
   loading = false,
@@ -290,17 +271,17 @@ export default function SecureDNAScreeningTable({
   const [selectedBatch, setSelectedBatch] = useState<ScreeningBatchRow | null>(
     null
   );
-  const [expandedSeqId, setExpandedSeqId] = useState<string | null>(null);
+  const [expandedSeqKey, setExpandedSeqKey] = useState<string | null>(null);
   const [seqVizTarget, setSeqVizTarget] = useState<{
     name: string;
     sequence: Pick<
-      ScreeningResult['sequence'],
+      ScreeningBatchSequenceSlice['sequence'],
       'seq' | 'type' | 'annotations'
     >;
   } | null>(null);
 
   const batches = useMemo(
-    () => clusterScreenings(screenings),
+    () => sortBatches(screenings.map(batchToRow)),
     [screenings]
   );
 
@@ -365,7 +346,7 @@ export default function SecureDNAScreeningTable({
           open
           onClose={() => {
             setSelectedBatch(null);
-            setExpandedSeqId(null);
+            setExpandedSeqKey(null);
             setSeqVizTarget(null);
           }}
         >
@@ -392,20 +373,24 @@ export default function SecureDNAScreeningTable({
 
             <Box sx={{ p: 2, border: '1px solid #e0e0e0', borderRadius: 2, mb: 2 }}>
               <Stack spacing={1.5}>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    MPI batch id
+                  </Typography>
+                  <Typography sx={{ pl: 1, wordBreak: 'break-word' }}>
+                    {selectedBatch.batch.mpiBatchId}
+                  </Typography>
+                </Box>
                 {selectedBatch.providerReference ? (
                   <Box>
                     <Typography variant="subtitle2" fontWeight="bold">
-                      Batch id
+                      Provider reference
                     </Typography>
                     <Typography sx={{ pl: 1, wordBreak: 'break-word' }}>
                       {selectedBatch.providerReference}
                     </Typography>
                   </Box>
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    No batch id (legacy single-sequence row)
-                  </Typography>
-                )}
+                ) : null}
                 <Box>
                   <Typography variant="subtitle2" fontWeight="bold">
                     Region
@@ -416,7 +401,15 @@ export default function SecureDNAScreeningTable({
                 </Box>
                 <Box>
                   <Typography variant="subtitle2" fontWeight="bold">
-                    Created
+                    Screened (MPI)
+                  </Typography>
+                  <Typography sx={{ pl: 1 }}>
+                    {new Date(selectedBatch.batch.mpiCreatedAt).toLocaleString()}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="bold">
+                    Stored
                   </Typography>
                   <Typography sx={{ pl: 1 }}>
                     {new Date(selectedBatch.created_at).toLocaleString()}
@@ -424,7 +417,7 @@ export default function SecureDNAScreeningTable({
                 </Box>
                 <Box>
                   <Typography variant="subtitle2" fontWeight="bold">
-                    Batch status
+                    Batch synthesis permission
                   </Typography>
                   <Typography
                     sx={{
@@ -433,9 +426,7 @@ export default function SecureDNAScreeningTable({
                       color:
                         selectedBatch.batchStatus === 'granted'
                           ? 'success.main'
-                          : selectedBatch.batchStatus === 'denied'
-                            ? 'error.main'
-                            : 'warning.main',
+                          : 'error.main',
                     }}
                   >
                     {selectedBatch.batchStatus.toUpperCase()}
@@ -445,7 +436,7 @@ export default function SecureDNAScreeningTable({
             </Box>
 
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1 }}>
-              Sequences in this batch ({selectedBatch.items.length})
+              Sequences in this batch ({selectedBatch.batch.sequences.length})
             </Typography>
 
             <TableContainer component={Paper} variant="outlined" sx={{ mb: 1 }}>
@@ -457,15 +448,16 @@ export default function SecureDNAScreeningTable({
                     <TableCell align="center" width={56} padding="checkbox">
                       View
                     </TableCell>
-                    <TableCell>Status</TableCell>
+                    <TableCell align="center">Batch permission</TableCell>
                     <TableCell>Hazardous</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {selectedBatch.items.map((row) => {
-                    const open = expandedSeqId === row.id;
+                  {selectedBatch.batch.sequences.map((slice) => {
+                    const rowKey = sliceRowKey(selectedBatch.batch, slice);
+                    const open = expandedSeqKey === rowKey;
                     return (
-                      <Fragment key={row.id}>
+                      <Fragment key={rowKey}>
                         <TableRow hover>
                           <TableCell padding="checkbox">
                             <IconButton
@@ -473,7 +465,7 @@ export default function SecureDNAScreeningTable({
                               aria-expanded={open}
                               aria-label="show threat details"
                               onClick={() =>
-                                setExpandedSeqId(open ? null : row.id)
+                                setExpandedSeqKey(open ? null : rowKey)
                               }
                               sx={{
                                 transform: open ? 'rotate(180deg)' : 'none',
@@ -488,8 +480,13 @@ export default function SecureDNAScreeningTable({
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
-                              {row.sequence?.name ?? '—'}
+                              {slice.sequence?.name ?? slice.name ?? '—'}
                             </Typography>
+                            {slice.warning ? (
+                              <Typography variant="caption" color="warning.main" display="block">
+                                {slice.warning}
+                              </Typography>
+                            ) : null}
                           </TableCell>
                           <TableCell align="center" padding="checkbox">
                             <Tooltip title="View sequence map">
@@ -499,43 +496,43 @@ export default function SecureDNAScreeningTable({
                                   aria-label="View sequence map"
                                   onClick={() =>
                                     setSeqVizTarget({
-                                      name: row.sequence.name,
+                                      name: slice.sequence.name,
                                       sequence: {
-                                        seq: row.sequence.seq,
-                                        type: row.sequence.type,
-                                        annotations: row.sequence.annotations,
+                                        seq: slice.sequence.seq,
+                                        type: slice.sequence.type,
+                                        annotations: slice.sequence.annotations,
                                       },
                                     })
                                   }
-                                  disabled={!row.sequence?.seq}
+                                  disabled={!slice.sequence?.seq}
                                 >
                                   <VisibilityIcon fontSize="small" />
                                 </IconButton>
                               </span>
                             </Tooltip>
                           </TableCell>
-                          <TableCell>
+                          <TableCell align="center">
                             <Typography
                               color={
-                                row.status === 'granted'
+                                selectedBatch.batch.synthesisPermission === 'granted'
                                   ? 'success.main'
                                   : 'error.main'
                               }
                               fontWeight="medium"
                             >
-                              {row.status.toUpperCase()}
+                              {selectedBatch.batch.synthesisPermission.toUpperCase()}
                             </Typography>
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={row.threats.length > 0 ? 'Yes' : 'No'}
-                              color={row.threats.length > 0 ? 'warning' : 'default'}
+                              label={slice.threats.length > 0 ? 'Yes' : 'No'}
+                              color={slice.threats.length > 0 ? 'warning' : 'default'}
                               size="small"
-                              variant={row.threats.length > 0 ? 'filled' : 'outlined'}
+                              variant={slice.threats.length > 0 ? 'filled' : 'outlined'}
                             />
                           </TableCell>
                         </TableRow>
-                        <TableRow key={`${row.id}-detail`}>
+                        <TableRow key={`${rowKey}-detail`}>
                           <TableCell
                             style={{ paddingBottom: 0, paddingTop: 0 }}
                             colSpan={5}
@@ -545,7 +542,7 @@ export default function SecureDNAScreeningTable({
                                 <Typography variant="subtitle2" gutterBottom>
                                   Threat details
                                 </Typography>
-                                <ThreatPanels threats={row.threats} />
+                                <ThreatPanels threats={slice.threats} />
                               </Box>
                             </Collapse>
                           </TableCell>
@@ -571,7 +568,7 @@ export default function SecureDNAScreeningTable({
               </Button>
               <Button
                 variant="contained"
-                onClick={() => downloadIbbisSummaryCsv(selectedBatch.items)}
+                onClick={() => downloadIbbisSummaryCsv(selectedBatch.batch)}
               >
                 Download IBBIS Summary
               </Button>

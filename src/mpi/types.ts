@@ -18,6 +18,8 @@ export interface Sequence {
   }>;
   userId: string;
   mpiId?: string;
+  created_at?: string | Date;
+  updated_at?: string | Date;
 }
 
 export interface ScreeningInput {
@@ -39,18 +41,37 @@ export interface Organism {
   tags: string[];
 }
 
-export interface HazardHits {
-  name: string;
+export type SecureDnaHitKind = 'nuc' | 'aa';
+
+/** Full SecureDNA hazard hit (MPI `hits_by_record` / per-sequence `threats`). */
+export interface SecureDnaHazardHit {
+  type: SecureDnaHitKind;
+  is_wild_type: boolean | null;
   hit_regions: HitRegion[];
-  is_wild_type: boolean;
-  references: string[];
+  most_likely_organism: Organism;
+  organisms: Organism[];
+}
+
+export interface ScreeningDiagnostic {
+  diagnostic: string;
+  additional_info: string;
+  line_number_range?: number[] | null;
+}
+
+export interface VerifiableScreening {
+  synthclient_version?: string;
+  response_json?: string;
+  signature?: string;
+  public_key?: string;
+  history?: string;
+  sha3_256?: string;
 }
 
 export interface RecordHit {
   fasta_header: string;
   line_number_range: number[];
   sequence_length: number;
-  hits_by_hazard: HazardHits[];
+  hits_by_hazard: SecureDnaHazardHit[];
 }
 
 export interface ScreeningResponse {
@@ -59,27 +80,30 @@ export interface ScreeningResponse {
   hits_by_record?: RecordHit[];
 }
 
-export interface ScreeningResult {
+export interface ScreeningBatchSequenceSlice {
+  sequence: Sequence;
+  mpiSequenceId: string;
+  name: string;
+  order: number;
+  originalSeq: string;
+  threats: SecureDnaHazardHit[];
+  warning?: string;
+}
+
+/** One persisted screening run (matches backend `ScreeningBatch`). */
+export interface ScreeningBatch {
   id: string;
-  sequence: {
-    id: string;
-    name: string;
-    seq: string;
-    type: 'dna' | 'rna' | 'aa' | 'unknown';
-    annotations?: Array<{
-      start: number;
-      end: number;
-      type: string;
-      description?: string;
-    }>;
-  };
-  /** Batch-level synthesis_permission from MPI (same for all rows from one screen call) */
-  status: 'granted' | 'denied';
-  threats: HazardHits[];
+  mpiBatchId: string;
+  mpiCreatedAt: string;
+  synthesisPermission: 'granted' | 'denied';
   region: Region;
-  /** Batch id / provider_reference from MPI */
   providerReference?: string | null;
-  created_at: Date;
-  updated_at: Date;
+  hitsByRecord: RecordHit[];
+  warnings: ScreeningDiagnostic[];
+  errors: ScreeningDiagnostic[];
+  verifiable?: VerifiableScreening | null;
+  sequences: ScreeningBatchSequenceSlice[];
   userId: string;
-} 
+  created_at: string;
+  updated_at: string;
+}
