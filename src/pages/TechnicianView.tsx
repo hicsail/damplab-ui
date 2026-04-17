@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router';
 import { useApolloClient, useQuery, useMutation } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Autocomplete, Box, Button, Card, CardContent, Typography, Alert, Chip, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Divider, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, FormHelperText, Checkbox, FormControlLabel, Snackbar } from '@mui/material';
+import { Autocomplete, Box, Button, Card, CardContent, Typography, Alert, Chip, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Divider, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, FormHelperText, Checkbox, FormControlLabel, Snackbar, Tooltip } from '@mui/material';
 import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
+import BiotechIcon from '@mui/icons-material/Biotech';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import PendingIcon from '@mui/icons-material/Pending';
@@ -14,7 +15,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { DeleteForeverSharp, PlusOne } from '@mui/icons-material';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SERVICES, GET_SOW_BY_JOB_ID }         from '../gql/queries';
-import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
+import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, SCREEN_JOB_SEQUENCES, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
 import { calculateServiceCost } from '../utils/servicePricing';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
@@ -24,6 +25,22 @@ import SOWGeneratorModal          from '../components/SOWGeneratorModal';
 import { SOWViewer }              from '../components/SOWViewer';
 import { CommentsSection }        from '../components/CommentsSection';
 import { generateFormDataFromParams } from '../controllers/ReactFlowEvents';
+import { SecureDnaThreatPanels } from '../components/SecureDnaThreatPanels';
+import type { SecureDnaHazardHit } from '../mpi/types';
+
+/** Matches catalog names in Mongo (see job-screening.constants on backend). */
+const GIBSON_ASSEMBLY_SERVICE_NAME = 'Gibson Assembly';
+const M_CLONING_SERVICE_NAME = 'Modular Cloning';
+
+type ScreeningSlice = {
+    sliceName: string;
+    workflowId: string;
+    nodeId: string;
+    fieldId: string;
+    order: number;
+    threats?: unknown;
+    warning?: string | null;
+};
 
 type PendingParamFile = {
     __kind: 'pending-file';
@@ -120,6 +137,25 @@ export default function TechnicianView() {
     const jobData = data?.jobById ?? null;
     const sowData = jobData?.sow ?? null;
     const sowFullData = sowByJobIdResult?.sowByJobId ?? null;
+    const screeningStatus = jobData?.jobScreeningStatus;
+    const screeningBlocksStaff = Boolean(screeningStatus && !screeningStatus.allowStaffActions);
+    const screeningBatchDisplay = jobData?.jobScreeningBatchDisplay ?? null;
+
+    const screeningSlicesByWorkflowNode = useMemo(() => {
+        const m = new Map<string, ScreeningSlice[]>();
+        const slices = screeningBatchDisplay?.slices as ScreeningSlice[] | undefined;
+        if (!slices?.length) return m;
+        for (const sl of slices) {
+            const k = `${sl.workflowId}::${sl.nodeId}`;
+            const arr = m.get(k) ?? [];
+            arr.push(sl);
+            m.set(k, arr);
+        }
+        for (const arr of m.values()) {
+            arr.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        }
+        return m;
+    }, [screeningBatchDisplay]);
 
     const [acceptWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
         onCompleted: (data) => {
@@ -136,6 +172,15 @@ export default function TechnicianView() {
 
     const [createInvoice, { loading: creatingInvoice }] = useMutation(CREATE_INVOICE);
 
+    const [screenJobSequences, { loading: screeningJob }] = useMutation(SCREEN_JOB_SEQUENCES, {
+        refetchQueries: id ? [{ query: GET_JOB_BY_ID, variables: { id } }] : [],
+    });
+
+    const handleScreenJobSequences = () => {
+        if (!id) return;
+        void screenJobSequences({ variables: { jobId: id } });
+    };
+
     const acceptWorkflow = (workflowId: string) => {
 
         let updateWorkflowState = {
@@ -151,6 +196,7 @@ export default function TechnicianView() {
 
     const [modalOpen, setModalOpen] = useState(false);
     const [sowModalOpen, setSowModalOpen] = useState(false);
+    const [hazardDetailSlice, setHazardDetailSlice] = useState<ScreeningSlice | null>(null);
 
     const handleOpenModal = () => {
         setModalOpen(true);
@@ -584,8 +630,11 @@ export default function TechnicianView() {
 
     const formatPrice = (value: number) => (Number.isFinite(value) ? `$${value.toFixed(2)}` : '[Price Pending Review]');
 
+    const screeningFieldLabel = (fid: string) => (fid === 'vector' ? 'Vector' : fid === 'insert' ? 'Insert' : fid);
+
     const workflowCard = (
         workflows.map((workflow: any, index: number) => {
+            const wfId = workflow?.id != null ? String(workflow.id) : '';
             return (
                 <Card key={workflow.id || `workflow-${index}`} sx={{m:1, boxShadow: 2}}>
                     <CardContent>
@@ -603,6 +652,11 @@ export default function TechnicianView() {
                                     node?.service?.price ?? null,
                                     jobData?.customerCategory
                                 );
+                                const svcName = node?.service?.name as string | undefined;
+                                const isScreenableService =
+                                    svcName === GIBSON_ASSEMBLY_SERVICE_NAME || svcName === M_CLONING_SERVICE_NAME;
+                                const nodeKey = wfId && node?.id != null ? `${wfId}::${node.id}` : '';
+                                const nodeSlices = nodeKey ? (screeningSlicesByWorkflowNode.get(nodeKey) ?? []) : [];
                                 return (
                                     <Box key={`${node.id || nodeIndex}`} sx={{ mb: 1.5 }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -626,6 +680,62 @@ export default function TechnicianView() {
                                                 );
                                             })}
                                         </Box>
+                                        {isScreenableService ? (
+                                            <Box sx={{ pl: 3, pt: 1, pb: 0.5 }}>
+                                                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 0.3 }}>
+                                                    SecureDNA (this service)
+                                                </Typography>
+                                                {!screeningBatchDisplay ? (
+                                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                                        No screening batch yet — use &quot;Screen sequences&quot; above.
+                                                    </Typography>
+                                                ) : nodeSlices.length === 0 ? (
+                                                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                                        No matching slices in the latest batch for this node.
+                                                    </Typography>
+                                                ) : (
+                                                    nodeSlices.map((sl) => {
+                                                        const threatCount = Array.isArray(sl.threats) ? sl.threats.length : 0;
+                                                        return (
+                                                            <Box key={sl.sliceName} sx={{ mt: 0.75 }}>
+                                                                <Typography variant="body2" component="span">
+                                                                    <strong>{screeningFieldLabel(sl.fieldId)}:</strong>{' '}
+                                                                    {threatCount > 0 ? (
+                                                                        <Tooltip title="Click for hazard details">
+                                                                            <Chip
+                                                                                size="small"
+                                                                                label={`${threatCount} hazard hit${threatCount === 1 ? '' : 's'}`}
+                                                                                color="warning"
+                                                                                onClick={() => setHazardDetailSlice(sl)}
+                                                                                sx={{
+                                                                                    ml: 0.5,
+                                                                                    verticalAlign: 'middle',
+                                                                                    height: 22,
+                                                                                    cursor: 'pointer',
+                                                                                }}
+                                                                            />
+                                                                        </Tooltip>
+                                                                    ) : (
+                                                                        <Chip
+                                                                            size="small"
+                                                                            label="No hazard hits"
+                                                                            color="success"
+                                                                            variant="outlined"
+                                                                            sx={{ ml: 0.5, verticalAlign: 'middle', height: 22 }}
+                                                                        />
+                                                                    )}
+                                                                </Typography>
+                                                                {sl.warning ? (
+                                                                    <Typography variant="body2" color="warning.main" sx={{ mt: 0.25 }}>
+                                                                        {sl.warning}
+                                                                    </Typography>
+                                                                ) : null}
+                                                            </Box>
+                                                        );
+                                                    })
+                                                )}
+                                            </Box>
+                                        ) : null}
                                         {nodeIndex < (workflow?.nodes?.length ?? 0) - 1 ? <Divider sx={{ mt: 1 }} /> : null}
                                     </Box>
                                 );
@@ -693,16 +803,37 @@ export default function TechnicianView() {
                             'Download Summary'
                         )}
                     </Button>
-                    <Button 
-                        color={sowData ? 'primary' : 'secondary'}
-                        variant='contained'
-                        startIcon={<DescriptionIcon />}
-                        onClick={handleOpenSOWModal}
-                        disabled={!jobData}
-                        sx={{ mr: 1 }}
+                    {screeningStatus?.requiresScreening ? (
+                        <Button
+                            variant="outlined"
+                            startIcon={<BiotechIcon />}
+                            onClick={handleScreenJobSequences}
+                            disabled={!jobData || screeningJob}
+                            sx={{ mr: 1 }}
+                        >
+                            {screeningJob ? 'Screening…' : 'Screen sequences'}
+                        </Button>
+                    ) : null}
+                    <Tooltip
+                        title={
+                            screeningBlocksStaff && !sowData && screeningStatus?.blockingMessage
+                                ? screeningStatus.blockingMessage
+                                : ''
+                        }
                     >
-                        {sowData ? 'View / Edit SOW' : 'Generate SOW'}
-                    </Button>
+                        <span>
+                            <Button 
+                                color={sowData ? 'primary' : 'secondary'}
+                                variant='contained'
+                                startIcon={<DescriptionIcon />}
+                                onClick={handleOpenSOWModal}
+                                disabled={!jobData || (!sowData && screeningBlocksStaff)}
+                                sx={{ mr: 1 }}
+                            >
+                                {sowData ? 'View / Edit SOW' : 'Generate SOW'}
+                            </Button>
+                        </span>
+                    </Tooltip>
                     <Button
                         color={sowFullData ? 'primary' : 'secondary'}
                         variant="contained"
@@ -778,6 +909,70 @@ export default function TechnicianView() {
                     <p><b>User:</b> {jobUsername} ({jobEmail})</p>
                     <p><b>Organization:</b> {jobInstitution}</p>
                 </Box>
+                {jobData ? (
+                <Box
+                    sx={{
+                        mx: 3,
+                        mt: 2,
+                        mb: 1,
+                        p: 2,
+                        bgcolor: 'action.hover',
+                        borderRadius: 1,
+                        border: 1,
+                        borderColor: 'divider',
+                    }}
+                >
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        SecureDNA — screening status
+                    </Typography>
+                    {!screeningStatus?.requiresScreening ? (
+                        <Typography variant="body2" color="text.secondary">
+                            No screening required — this job has no Gibson Assembly or Modular Cloning sequences that need screening.
+                        </Typography>
+                    ) : screeningBatchDisplay ? (
+                        <>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body2" component="span">
+                                    <b>Synthesis permission:</b>
+                                </Typography>
+                                <Chip
+                                    size="small"
+                                    label={screeningBatchDisplay.synthesisPermission === 'granted' ? 'Granted' : 'Denied'}
+                                    color={screeningBatchDisplay.synthesisPermission === 'granted' ? 'success' : 'error'}
+                                />
+                                {screeningBatchDisplay.batchErrorCount > 0 ? (
+                                    <Chip
+                                        size="small"
+                                        label={`${screeningBatchDisplay.batchErrorCount} batch error(s)`}
+                                        color="error"
+                                        variant="outlined"
+                                    />
+                                ) : null}
+                                {screeningBatchDisplay.batchWarningCount > 0 ? (
+                                    <Chip
+                                        size="small"
+                                        label={`${screeningBatchDisplay.batchWarningCount} batch warning(s)`}
+                                        color="warning"
+                                        variant="outlined"
+                                    />
+                                ) : null}
+                            </Box>
+                            {!screeningBatchDisplay.sequencesCurrent ? (
+                                <Alert severity="warning" sx={{ mt: 1.5 }}>
+                                    These results may be outdated — sequences changed since this batch. Run &quot;Screen sequences&quot; again.
+                                </Alert>
+                            ) : null}
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                Screened {screeningBatchDisplay.screenedAt ? new Date(screeningBatchDisplay.screenedAt).toLocaleString() : '—'}
+                            </Typography>
+                        </>
+                    ) : (
+                        <Alert severity="info" sx={{ mt: 0 }}>
+                            <strong>No screening has been run yet.</strong> Use &quot;Screen sequences&quot; above to run SecureDNA screening before generating a SOW or accepting this job.
+                        </Alert>
+                    )}
+                </Box>
+                ) : null}
                 {attachments.length > 0 && (
                     <Box sx={{ mx: 3, my: 2 }}>
                         <Typography variant="h6" sx={{ mb: 1 }}>Attachments</Typography>
@@ -902,12 +1097,55 @@ export default function TechnicianView() {
                     }}
                 />
 
-                <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id}/>
+                <JobFeedbackModal
+                    open={modalOpen}
+                    onClose={handleCloseModal}
+                    id={id}
+                    screeningBlocksAccept={screeningBlocksStaff}
+                    screeningMessage={screeningStatus?.blockingMessage ?? null}
+                />
                 <SOWGeneratorModal 
                     open={sowModalOpen} 
                     onClose={handleCloseSOWModal} 
                     jobData={jobData}
+                    screeningGateBlocked={screeningBlocksStaff}
+                    screeningGateMessage={screeningStatus?.blockingMessage ?? null}
                 />
+
+                <Dialog
+                    open={hazardDetailSlice !== null}
+                    onClose={() => setHazardDetailSlice(null)}
+                    maxWidth="md"
+                    fullWidth
+                    scroll="paper"
+                >
+                    <DialogTitle>
+                        Hazard details —{' '}
+                        {hazardDetailSlice ? screeningFieldLabel(hazardDetailSlice.fieldId) : ''}
+                    </DialogTitle>
+                    <DialogContent dividers>
+                        {hazardDetailSlice?.sliceName ? (
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                {hazardDetailSlice.sliceName}
+                            </Typography>
+                        ) : null}
+                        {hazardDetailSlice?.warning ? (
+                            <Alert severity="warning" sx={{ mb: 2 }}>
+                                {hazardDetailSlice.warning}
+                            </Alert>
+                        ) : null}
+                        <SecureDnaThreatPanels
+                            threats={
+                                (Array.isArray(hazardDetailSlice?.threats)
+                                    ? hazardDetailSlice.threats
+                                    : []) as SecureDnaHazardHit[]
+                            }
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setHazardDetailSlice(null)}>Close</Button>
+                    </DialogActions>
+                </Dialog>
 
                 <Dialog open={invoiceDialogOpen} onClose={closeInvoiceDialog} maxWidth="sm" fullWidth>
                     <DialogTitle>Create invoice (select services)</DialogTitle>

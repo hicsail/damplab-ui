@@ -45,9 +45,18 @@ interface SOWGeneratorModalProps {
   open: boolean;
   onClose: () => void;
   jobData: any; // Job data from GraphQL query
+  /** When true, primary SOW actions are disabled (sequence screening gate). */
+  screeningGateBlocked?: boolean;
+  screeningGateMessage?: string | null;
 }
 
-const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jobData }) => {
+const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({
+  open,
+  onClose,
+  jobData,
+  screeningGateBlocked = false,
+  screeningGateMessage = null,
+}) => {
   const defaultSowTitle = 'Agreement to Perform Research Services';
   const [technicianInputs, setTechnicianInputs] = useState<SOWTechnicianInputs>({
     projectManager: '',
@@ -416,6 +425,11 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
         </DialogTitle>
 
         <DialogContent>
+          {screeningGateBlocked && screeningGateMessage ? (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {screeningGateMessage}
+            </Alert>
+          ) : null}
           {showPreview && previewSOW ? (
             (() => {
               const finalSOWData = previewSOW;
@@ -882,7 +896,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
               variant="outlined"
               startIcon={<PreviewIcon />}
               onClick={handleReviewSOW}
-              disabled={!buildFinalSOWData() || isSaving}
+              disabled={!buildFinalSOWData() || isSaving || screeningGateBlocked}
             >
               Review SOW
             </Button>
@@ -891,7 +905,7 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
             <Button
               variant="contained"
               onClick={handleGenerateSOW}
-              disabled={!buildFinalSOWData() || isSaving}
+              disabled={!buildFinalSOWData() || isSaving || screeningGateBlocked}
             >
               {isSaving ? 'Saving...' : 'Generate & Save SOW'}
             </Button>

@@ -3,7 +3,7 @@ import type { ApolloClient } from '@apollo/client';
 import type { ScreeningBatch, Sequence } from './types';
 
 /** Must match backend `MAX_MPI_SEQUENCE_BATCH` and MPI SecureDNA batch limit. */
-export const MAX_MPI_SEQUENCE_BATCH = 100;
+export const MAX_MPI_SEQUENCE_BATCH = 1000;
 
 const SEQUENCE_FIELDS = `
   id

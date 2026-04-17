@@ -175,6 +175,17 @@ export const MUTATE_JOB_STATE = gql`
     }
 `;
 
+export const SCREEN_JOB_SEQUENCES = gql`
+  mutation ScreenJobSequences($jobId: ID!) {
+    screenJobSequences(jobId: $jobId) {
+      id
+      mpiBatchId
+      synthesisPermission
+      providerReference
+    }
+  }
+`;
+
 export const CHANGE_JOB_CUSTOMER_CATEGORY = gql`
     mutation ChangeJobCustomerCategory($jobId: ID!, $customerCategory: CustomerCategory!) {
         changeJobCustomerCategory(jobId: $jobId, customerCategory: $customerCategory) {

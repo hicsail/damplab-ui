@@ -96,6 +96,33 @@ export const GET_JOB_BY_ID = gql`
                 createdAt
                 updatedAt
             }
+            jobScreeningStatus {
+                requiresScreening
+                targetSequenceCount
+                hasScreeningBatch
+                sequencesCurrent
+                screeningPassed
+                allowStaffActions
+                blockingMessage
+            }
+            jobScreeningBatchDisplay {
+                batchId
+                synthesisPermission
+                mpiCreatedAt
+                screenedAt
+                sequencesCurrent
+                batchErrorCount
+                batchWarningCount
+                slices {
+                    sliceName
+                    workflowId
+                    nodeId
+                    fieldId
+                    order
+                    threats
+                    warning
+                }
+            }
             workflows {
                 id
                 state
