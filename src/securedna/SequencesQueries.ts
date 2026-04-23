@@ -2,8 +2,8 @@ import { gql } from '@apollo/client';
 import type { ApolloClient } from '@apollo/client';
 import type { ScreeningBatch, Sequence } from './types';
 
-/** Must match backend `MAX_MPI_SEQUENCE_BATCH` and MPI SecureDNA batch limit. */
-export const MAX_MPI_SEQUENCE_BATCH = 1000;
+/** Must match backend `MAX_SECUREDNA_SEQUENCE_BATCH`. */
+export const MAX_SECUREDNA_SEQUENCE_BATCH = 1000;
 
 const SEQUENCE_FIELDS = `
   id
@@ -17,15 +17,14 @@ const SEQUENCE_FIELDS = `
     description
   }
   userId
-  mpiId
   created_at
   updated_at
 `;
 
 const SCREENING_BATCH_FIELDS = `
   id
-  mpiBatchId
-  mpiCreatedAt
+  batchRunId
+  screeningCompletedAt
   synthesisPermission
   region
   providerReference
@@ -77,7 +76,7 @@ const SCREENING_BATCH_FIELDS = `
     sequence {
       ${SEQUENCE_FIELDS}
     }
-    mpiSequenceId
+    recordId
     name
     order
     originalSeq
@@ -109,9 +108,9 @@ const SCREENING_BATCH_FIELDS = `
   updated_at
 `;
 
-export const GET_ORG_SCREENINGS = gql`
-  query OrgScreenings {
-    orgScreenings {
+export const GET_SCREENING_BATCHES = gql`
+  query ScreeningBatches {
+    screeningBatches {
       ${SCREENING_BATCH_FIELDS}
     }
   }
@@ -131,7 +130,6 @@ export const CREATE_SEQUENCES_BATCH = gql`
         description
       }
       userId
-      mpiId
       created_at
       updated_at
     }
@@ -146,7 +144,7 @@ export const SCREEN_SEQUENCES_BATCH = gql`
   }
 `;
 
-const ORG_SCREENINGS_REFETCH = [{ query: GET_ORG_SCREENINGS }] as const;
+const SCREENING_BATCHES_REFETCH = [{ query: GET_SCREENING_BATCHES }] as const;
 
 export const createSequencesBatch = async (
   client: ApolloClient<object>,
@@ -186,7 +184,7 @@ export const screenSequencesBatch = async (
         ...(providerReference?.trim() ? { providerReference: providerReference.trim() } : {})
       }
     },
-    refetchQueries: [...ORG_SCREENINGS_REFETCH]
+    refetchQueries: [...SCREENING_BATCHES_REFETCH]
   });
   const batch = result.data?.screenSequencesBatch;
   if (!batch || typeof batch !== 'object') {

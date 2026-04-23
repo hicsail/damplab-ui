@@ -108,7 +108,7 @@ export const GET_JOB_BY_ID = gql`
             jobScreeningBatchDisplay {
                 batchId
                 synthesisPermission
-                mpiCreatedAt
+                screeningCompletedAt
                 screenedAt
                 sequencesCurrent
                 batchErrorCount

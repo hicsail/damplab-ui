@@ -26,7 +26,7 @@ import { SOWViewer }              from '../components/SOWViewer';
 import { CommentsSection }        from '../components/CommentsSection';
 import { generateFormDataFromParams } from '../controllers/ReactFlowEvents';
 import { SecureDnaThreatPanels } from '../components/SecureDnaThreatPanels';
-import type { SecureDnaHazardHit } from '../mpi/types';
+import type { SecureDnaHazardHit } from '../securedna/types';
 
 /** Matches catalog names in Mongo (see job-screening.constants on backend). */
 const GIBSON_ASSEMBLY_SERVICE_NAME = 'Gibson Assembly';

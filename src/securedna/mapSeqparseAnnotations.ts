@@ -11,6 +11,6 @@ export function mapSeqparseAnnotationsToSaved(
     start: a.start,
     end: a.end,
     type: (a.type && a.type.trim()) || a.name || 'misc_feature',
-    description: a.name?.trim() || undefined,
+    description: a.name?.trim() || undefined
   }));
 }

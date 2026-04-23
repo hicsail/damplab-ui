@@ -23,7 +23,8 @@ interface SidebarProps {
 export default function ContextTestComponent(props: SidebarProps) {
     const {noMouseEvents} = props;
 
-    const api_url = import.meta.env.VITE_MPI_API || '';
+    /** Optional external records API (e.g. lab integration). Set `VITE_EXTERNAL_RECORDS_API` in `.env`. */
+    const api_url = import.meta.env.VITE_EXTERNAL_RECORDS_API || '';
     
     const val                   = useContext(CanvasContext);
     const { services, hazards } = useContext(AppContext);
@@ -406,7 +407,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                     </div>
                     <Button onClick = {() => { }} sx = {{ ml: 2 }}>+ Add Library</ Button>
                     <br />
-                    <Button variant='contained' onClick = {() => { put() }} sx = {{ ml: 2 }}>Send to MPI Record {ID}</ Button>
+                    <Button variant='contained' onClick = {() => { put() }} sx = {{ ml: 2 }}>Update external record {ID}</Button>
                 </Box>
                 <div>
                     {

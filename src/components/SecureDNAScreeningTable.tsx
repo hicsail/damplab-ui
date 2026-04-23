@@ -24,14 +24,14 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import {
   ScreeningBatch,
   ScreeningBatchSequenceSlice,
-} from '../mpi/types';
+} from '../securedna/types';
 import { ApolloError } from '@apollo/client';
 import SequenceSeqVizModal from './SequenceSeqVizModal';
 
 interface ScreeningBatchRow {
   id: string;
   providerReference: string | null;
-  mpiBatchId: string;
+  batchRunId: string;
   created_at: Date;
   region: ScreeningBatch['region'];
   sequenceCount: number;
@@ -53,7 +53,7 @@ function batchToRow(batch: ScreeningBatch): ScreeningBatchRow {
   return {
     id: batch.id,
     providerReference: batch.providerReference?.trim() || null,
-    mpiBatchId: batch.mpiBatchId,
+    batchRunId: batch.batchRunId,
     created_at: new Date(batch.created_at),
     region: batch.region,
     sequenceCount: batch.sequences.length,
@@ -97,8 +97,8 @@ const columns: GridColDef<BatchGridRow>[] = [
     sortable: false,
     renderCell: (params: GridRenderCellParams<BatchGridRow>) => {
       const ref = params.row.providerReference;
-      const mpiId = params.row.mpiBatchId;
-      const display = ref || mpiId;
+      const runId = params.row.batchRunId;
+      const display = ref || runId;
       if (!display) {
         return (
           <Typography variant="body2" color="text.secondary">
@@ -170,7 +170,7 @@ const columns: GridColDef<BatchGridRow>[] = [
 ];
 
 function sliceRowKey(batch: ScreeningBatch, slice: ScreeningBatchSequenceSlice): string {
-  return `${batch.id}-${slice.mpiSequenceId}-${slice.order}`;
+  return `${batch.id}-${slice.recordId}-${slice.order}`;
 }
 
 export default function SecureDNAScreeningTable({
@@ -285,10 +285,10 @@ export default function SecureDNAScreeningTable({
               <Stack spacing={1.5}>
                 <Box>
                   <Typography variant="subtitle2" fontWeight="bold">
-                    MPI batch id
+                    Batch run id
                   </Typography>
                   <Typography sx={{ pl: 1, wordBreak: 'break-word' }}>
-                    {selectedBatch.batch.mpiBatchId}
+                    {selectedBatch.batch.batchRunId}
                   </Typography>
                 </Box>
                 {selectedBatch.providerReference ? (
@@ -311,10 +311,10 @@ export default function SecureDNAScreeningTable({
                 </Box>
                 <Box>
                   <Typography variant="subtitle2" fontWeight="bold">
-                    Screened (MPI)
+                    Screening completed
                   </Typography>
                   <Typography sx={{ pl: 1 }}>
-                    {new Date(selectedBatch.batch.mpiCreatedAt).toLocaleString()}
+                    {new Date(selectedBatch.batch.screeningCompletedAt).toLocaleString()}
                   </Typography>
                 </Box>
                 <Box>

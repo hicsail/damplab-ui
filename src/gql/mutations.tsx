@@ -179,7 +179,7 @@ export const SCREEN_JOB_SEQUENCES = gql`
   mutation ScreenJobSequences($jobId: ID!) {
     screenJobSequences(jobId: $jobId) {
       id
-      mpiBatchId
+      batchRunId
       synthesisPermission
       providerReference
     }

@@ -1,6 +1,6 @@
 import { Box, Button, Modal, Typography } from '@mui/material';
 import SequenceSeqVizViewer from './SequenceSeqVizViewer';
-import type { Sequence } from '../mpi/types';
+import type { Sequence } from '../securedna/types';
 
 export interface SequenceSeqVizModalProps {
   open: boolean;

@@ -1,5 +1,5 @@
 import { Box, Stack, Typography, Chip } from '@mui/material';
-import { SecureDnaHazardHit, HitRegion } from '../mpi/types';
+import { SecureDnaHazardHit, HitRegion } from '../securedna/types';
 
 /**
  * Renders SecureDNA hazard hit details (same content as the Screener batch modal).

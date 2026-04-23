@@ -1,6 +1,6 @@
 import { Box, Typography } from '@mui/material';
 import SeqViz from 'seqviz';
-import type { Sequence } from '../mpi/types';
+import type { Sequence } from '../securedna/types';
 
 /** Matches seqviz `AnnotationProp` (name + range). */
 interface SeqVizAnnotationInput {

@@ -14,15 +14,15 @@ import {
 } from '@mui/material';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApolloClient } from '@apollo/client';
-import { Sequence } from '../mpi/types';
-import { Region } from '../mpi/types';
+import { Sequence } from '../securedna/types';
+import { Region } from '../securedna/types';
 import {
   createSequencesBatch,
   screenSequencesBatch,
-  MAX_MPI_SEQUENCE_BATCH
-} from '../mpi/SequencesQueries';
-import { formatApolloError } from '../mpi/apolloError';
-import { mapSeqparseAnnotationsToSaved } from '../mpi/mapSeqparseAnnotations';
+  MAX_SECUREDNA_SEQUENCE_BATCH
+} from '../securedna/SequencesQueries';
+import { formatApolloError } from '../securedna/apolloError';
+import { mapSeqparseAnnotationsToSaved } from '../securedna/mapSeqparseAnnotations';
 import { parseFile } from 'seqparse';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -59,7 +59,6 @@ async function parseSequenceFiles(files: File[]): Promise<Sequence[]> {
           seq: seq.seq,
           annotations: mapSeqparseAnnotationsToSaved(seq.annotations),
           userId: '',
-          mpiId: '',
           created_at: new Date(),
           updated_at: new Date()
         }))
@@ -239,7 +238,6 @@ function UploadAndScreenSequences({ open, onClose }: UploadAndScreenSequencesPro
         seq: seq.seq,
         annotations: mapSeqparseAnnotationsToSaved(seq.annotations),
         userId: '',
-        mpiId: '',
         created_at: new Date(),
         updated_at: new Date()
       }));
@@ -344,7 +342,7 @@ function UploadAndScreenSequences({ open, onClose }: UploadAndScreenSequencesPro
   };
 
   const hasInvalidSequences = sequences.some((seq) => seq.seq.length < 50);
-  const hasTooManySequences = sequences.length > MAX_MPI_SEQUENCE_BATCH;
+  const hasTooManySequences = sequences.length > MAX_SECUREDNA_SEQUENCE_BATCH;
 
   return (
     <>
@@ -354,13 +352,13 @@ function UploadAndScreenSequences({ open, onClose }: UploadAndScreenSequencesPro
           <Typography variant="h4">Upload and Screen Sequences</Typography>
 
           <Typography variant="body1" sx={{ textAlign: 'center' }}>
-            Sequences must be at least 50 base pairs in length. At most {MAX_MPI_SEQUENCE_BATCH} sequences per
+            Sequences must be at least 50 base pairs in length. At most {MAX_SECUREDNA_SEQUENCE_BATCH} sequences per
             batch.
           </Typography>
 
           {hasTooManySequences && (
             <Typography color="error" sx={{ textAlign: 'center' }}>
-              Too many sequences ({sequences.length}). Remove some or split into batches of {MAX_MPI_SEQUENCE_BATCH}{' '}
+              Too many sequences ({sequences.length}). Remove some or split into batches of {MAX_SECUREDNA_SEQUENCE_BATCH}{' '}
               or fewer.
             </Typography>
           )}

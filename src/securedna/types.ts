@@ -1,8 +1,12 @@
+/**
+ * Must match GraphQL `Region` enum **names** from the API (ALL, US, …), not the wire values
+ * the backend uses for SecureDNA (`all`, `us`, …). Sending lowercase breaks validation (HTTP 400).
+ */
 export enum Region {
-  ALL = 'all',
-  US = 'us',
-  EU = 'eu',
-  PRC = 'prc'
+  ALL = 'ALL',
+  US = 'US',
+  EU = 'EU',
+  PRC = 'PRC'
 }
 
 export interface Sequence {
@@ -17,7 +21,6 @@ export interface Sequence {
     description?: string;
   }>;
   userId: string;
-  mpiId?: string;
   created_at?: string | Date;
   updated_at?: string | Date;
 }
@@ -43,7 +46,7 @@ export interface Organism {
 
 export type SecureDnaHitKind = 'nuc' | 'aa';
 
-/** Full SecureDNA hazard hit (MPI `hits_by_record` / per-sequence `threats`). */
+/** Full SecureDNA hazard hit (`hits_by_record` / per-sequence `threats`). */
 export interface SecureDnaHazardHit {
   type: SecureDnaHitKind;
   is_wild_type: boolean | null;
@@ -82,7 +85,8 @@ export interface ScreeningResponse {
 
 export interface ScreeningBatchSequenceSlice {
   sequence: Sequence;
-  mpiSequenceId: string;
+  /** Mongo sequence id used in the FASTA header. */
+  recordId: string;
   name: string;
   order: number;
   originalSeq: string;
@@ -90,11 +94,11 @@ export interface ScreeningBatchSequenceSlice {
   warning?: string;
 }
 
-/** One persisted screening run (matches backend `ScreeningBatch`). */
+/** One persisted screening run (backend `ScreeningBatch`). */
 export interface ScreeningBatch {
   id: string;
-  mpiBatchId: string;
-  mpiCreatedAt: string;
+  batchRunId: string;
+  screeningCompletedAt: string;
   synthesisPermission: 'granted' | 'denied';
   region: Region;
   providerReference?: string | null;
