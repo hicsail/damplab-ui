@@ -862,3 +862,19 @@ export const SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
     }
   }
 `;
+
+export const LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
+  query ListKeycloakUsersForCustomerManagement($category: CustomerManagementUserListCategory!, $offset: Int, $limit: Int) {
+    listKeycloakUsersForCustomerManagement(category: $category, offset: $offset, limit: $limit) {
+      items {
+        id
+        username
+        email
+        firstName
+        lastName
+        customerCategory
+      }
+      hasNextPage
+    }
+  }
+`;

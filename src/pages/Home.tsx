@@ -149,6 +149,10 @@ export default function Home() {
               <AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />
               Canvas
             </MenuButton>
+            <MenuButton navigateTo="/services-catalog">
+              <FormatListBulletedIcon />
+              Services Catalog
+            </MenuButton>
             <MenuButton navigateTo="/training">
               <SchoolIcon />
               Learning Hub
@@ -202,10 +206,6 @@ export default function Home() {
                 <MenuButton navigateTo="/edit">
                   <EditIcon />
                   Catalog Editor
-                </MenuButton>
-                <MenuButton navigateTo="/admin/services-catalog">
-                  <EditIcon />
-                  Admin Services
                 </MenuButton>
                 <MenuButton navigateTo="/customer-management">
                   <PeopleIcon />

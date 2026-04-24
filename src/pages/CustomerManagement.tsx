@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useLazyQuery, useMutation } from '@apollo/client';
+import { useLazyQuery, useMutation, useQuery } from '@apollo/client';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import {
   Alert,
@@ -15,16 +15,19 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   TextField,
   Typography,
 } from '@mui/material';
 
-import { SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT } from '../gql/queries';
+import { LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT, SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT } from '../gql/queries';
 import { SET_USER_KEYCLOAK_CUSTOMER_CATEGORY } from '../gql/mutations';
 
 const MAX_RESULTS = 25;
+
+const DEFAULT_LIST_CATEGORY = 'STAFF';
 
 const CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'None (clear category groups)' },
@@ -56,9 +59,25 @@ export default function CustomerManagement() {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
   const [lastQuery, setLastQuery] = useState('');
+  const [listCategory, setListCategory] = useState<string>(DEFAULT_LIST_CATEGORY);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [pendingByUser, setPendingByUser] = useState<Record<string, string>>({});
 
   const [runSearch, { data, loading, error }] = useLazyQuery(SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT, {
+    fetchPolicy: 'network-only',
+  });
+
+  const {
+    data: listData,
+    loading: listLoading,
+    error: listError,
+  } = useQuery(LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT, {
+    variables: {
+      category: listCategory,
+      offset: page * rowsPerPage,
+      limit: rowsPerPage,
+    },
     fetchPolicy: 'network-only',
   });
 
@@ -71,21 +90,35 @@ export default function CustomerManagement() {
     [data?.searchKeycloakUsersForCustomerManagement]
   );
 
+  const listRows: SearchRow[] = useMemo(
+    () => (listData?.listKeycloakUsersForCustomerManagement?.items ?? []) as SearchRow[],
+    [listData?.listKeycloakUsersForCustomerManagement?.items]
+  );
+
+  const hasNextPage: boolean = Boolean(listData?.listKeycloakUsersForCustomerManagement?.hasNextPage);
+
   const onSearch = useCallback(() => {
     const q = searchInput.trim();
     if (q.length < 2) return;
     setLastQuery(q);
-    void runSearch({ variables: { search: q, max: MAX_RESULTS } });
+    setPage(0);
+    void runSearch({ variables: { search: q, max: Math.max(MAX_RESULTS, 200) } });
   }, [runSearch, searchInput]);
 
   const refetchLast = useCallback(() => {
     if (lastQuery.length >= 2) {
-      void runSearch({ variables: { search: lastQuery, max: MAX_RESULTS } });
+      void runSearch({ variables: { search: lastQuery, max: Math.max(MAX_RESULTS, 200) } });
     }
   }, [lastQuery, runSearch]);
 
   const onSelectChange = useCallback((userId: string, event: SelectChangeEvent<string>) => {
     setPendingByUser((prev) => ({ ...prev, [userId]: event.target.value }));
+  }, []);
+
+  const onListCategoryChange = useCallback((event: SelectChangeEvent<string>) => {
+    setListCategory(event.target.value);
+    setPage(0);
+    setLastQuery('');
   }, []);
 
   const onApply = useCallback(
@@ -117,6 +150,30 @@ export default function CustomerManagement() {
     return chosen !== normCategory(row.customerCategory);
   };
 
+  const isSearching = lastQuery.length >= 2;
+
+  const filteredRows: SearchRow[] = useMemo(() => {
+    const base = isSearching ? rows : listRows;
+    if (isSearching && listCategory !== DEFAULT_LIST_CATEGORY) {
+      return base.filter((r) => normCategory(r.customerCategory) === listCategory);
+    }
+    return base;
+  }, [isSearching, listCategory, listRows, rows]);
+
+  const pagedRows: SearchRow[] = useMemo(() => {
+    if (!isSearching) return filteredRows;
+    const start = page * rowsPerPage;
+    return filteredRows.slice(start, start + rowsPerPage);
+  }, [filteredRows, isSearching, page, rowsPerPage]);
+
+  const isBusy = loading || listLoading;
+  const combinedError = error ?? listError;
+
+  const canGoPrev = page > 0;
+  const canGoNext = isSearching
+    ? (page + 1) * rowsPerPage < filteredRows.length
+    : hasNextPage;
+
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -135,6 +192,22 @@ export default function CustomerManagement() {
       </Typography>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }} alignItems={{ sm: 'center' }}>
+        <FormControl size="small" sx={{ minWidth: 260 }}>
+          <InputLabel id="list-category-label">Show users</InputLabel>
+          <Select
+            labelId="list-category-label"
+            label="Show users"
+            value={listCategory}
+            onChange={onListCategoryChange}
+          >
+            <MenuItem value={DEFAULT_LIST_CATEGORY}>Staff</MenuItem>
+            {CATEGORY_OPTIONS.filter((o) => o.value !== '').map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <TextField
           label="Search users"
           value={searchInput}
@@ -144,14 +217,14 @@ export default function CustomerManagement() {
           size="small"
           sx={{ minWidth: 280 }}
         />
-        <Button variant="contained" onClick={onSearch} disabled={searchInput.trim().length < 2 || loading}>
+        <Button variant="contained" onClick={onSearch} disabled={searchInput.trim().length < 2 || isBusy}>
           Search
         </Button>
       </Stack>
 
-      {error && (
+      {combinedError && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error.message}
+          {combinedError.message}
         </Alert>
       )}
       {saveError && (
@@ -160,61 +233,95 @@ export default function CustomerManagement() {
         </Alert>
       )}
 
-      {!loading && lastQuery && rows.length === 0 && !error && (
+      {!isBusy && isSearching && filteredRows.length === 0 && !combinedError && (
         <Typography color="text.secondary">No users found.</Typography>
       )}
 
-      {rows.length > 0 && (
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Username</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Category</TableCell>
-              <TableCell align="right">Update</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row) => {
-              const selectValue = pendingByUser[row.id] ?? normCategory(row.customerCategory);
-              return (
-                <TableRow key={row.id}>
-                  <TableCell>{displayName(row)}</TableCell>
-                  <TableCell>{row.username ?? '—'}</TableCell>
-                  <TableCell>{row.email ?? '—'}</TableCell>
-                  <TableCell sx={{ minWidth: 220 }}>
-                    <FormControl size="small" fullWidth>
-                      <InputLabel id={`cat-label-${row.id}`}>Pricing category</InputLabel>
-                      <Select
-                        labelId={`cat-label-${row.id}`}
-                        label="Pricing category"
-                        value={selectValue}
-                        onChange={(e) => onSelectChange(row.id, e)}
+      {filteredRows.length > 0 && (
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Username</TableCell>
+                <TableCell>Email</TableCell>
+                <TableCell>Category</TableCell>
+                <TableCell align="right">Update</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {pagedRows.map((row) => {
+                const selectValue = pendingByUser[row.id] ?? normCategory(row.customerCategory);
+                return (
+                  <TableRow key={row.id}>
+                    <TableCell>{displayName(row)}</TableCell>
+                    <TableCell>{row.username ?? '—'}</TableCell>
+                    <TableCell>{row.email ?? '—'}</TableCell>
+                    <TableCell sx={{ minWidth: 220 }}>
+                      <FormControl size="small" fullWidth>
+                        <InputLabel id={`cat-label-${row.id}`}>Pricing category</InputLabel>
+                        <Select
+                          labelId={`cat-label-${row.id}`}
+                          label="Pricing category"
+                          value={selectValue}
+                          onChange={(e) => onSelectChange(row.id, e)}
+                        >
+                          {CATEGORY_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value || 'none'} value={opt.value}>
+                              {opt.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        disabled={!isDirty(row) || saving}
+                        onClick={() => void onApply(row.id, row)}
                       >
-                        {CATEGORY_OPTIONS.map((opt) => (
-                          <MenuItem key={opt.value || 'none'} value={opt.value}>
-                            {opt.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled={!isDirty(row) || saving}
-                      onClick={() => void onApply(row.id, row)}
-                    >
-                      Apply
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                        Apply
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {filteredRows.length > 0 && (
+        <Stack direction="row" spacing={2} sx={{ mt: 2 }} alignItems="center" justifyContent="flex-end">
+          <Typography variant="body2" color="text.secondary">
+            Page {page + 1}
+          </Typography>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel id="rows-per-page-label">Rows</InputLabel>
+            <Select
+              labelId="rows-per-page-label"
+              label="Rows"
+              value={String(rowsPerPage)}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setPage(0);
+              }}
+            >
+              {[10, 25, 50].map((n) => (
+                <MenuItem key={n} value={String(n)}>
+                  {n} / page
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Button variant="outlined" disabled={!canGoPrev || isBusy} onClick={() => setPage((p) => Math.max(p - 1, 0))}>
+            Previous
+          </Button>
+          <Button variant="outlined" disabled={!canGoNext || isBusy} onClick={() => setPage((p) => p + 1)}>
+            Next
+          </Button>
+        </Stack>
       )}
     </Box>
   );
