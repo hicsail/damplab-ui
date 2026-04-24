@@ -52,6 +52,31 @@ const toPendingFiles = (files: FileList | null): PendingParamFile[] => {
     }));
 };
 
+const stripTypename = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(stripTypename);
+    if (!value || typeof value !== 'object') return value;
+    const out: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([k, v]) => {
+        if (k === '__typename') return;
+        out[k] = stripTypename(v);
+    });
+    return out;
+};
+
+const downloadJson = (filename: string, payload: unknown) => {
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Let the browser start the download before revoking.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+};
+
 export default function TechnicianView() {
 
     const { id }                              = useParams();
@@ -66,7 +91,7 @@ export default function TechnicianView() {
     const [jobInstitution, setJobInstitution] = useState('');
     const [jobEmail, setJobEmail]             = useState('');
     const [jobNotes, setJobNotes] = useState('');
-    const [workflows, setWorklows]            = useState([]);  // ▶ URLSearchParams {}
+    const [workflows, setWorklows]            = useState<any[]>([]);  // ▶ URLSearchParams {}
     const [attachments, setAttachments] = useState<any[]>([]);
 
     const { loading, error, data, refetch: refetchJob } = useQuery(GET_JOB_BY_ID, {
@@ -351,7 +376,7 @@ export default function TechnicianView() {
                 const metas = tokenOrTokens.map((t) => uploadedMetaByToken.get(t)).filter(Boolean).map((m) => JSON.stringify(m));
                 return { ...p, value: metas };
             }
-            const meta = uploadedMetaByToken.get(tokenOrTokens);
+            const meta = typeof tokenOrTokens === 'string' ? uploadedMetaByToken.get(tokenOrTokens) : undefined;
             return { ...p, value: meta ? JSON.stringify(meta) : null };
         });
     };
@@ -501,6 +526,18 @@ export default function TechnicianView() {
         } catch (e) {
             console.error('Failed to update job customer category:', e);
         }
+    };
+
+    const handleExportJobJson = () => {
+        if (!id || !jobData) return;
+        const exportPayload = stripTypename({
+            exportedAt: new Date().toISOString(),
+            job: jobData,
+            sow: sowFullData,
+            invoices,
+        });
+        const displayId = (jobData as any)?.jobId ?? id;
+        downloadJson(`DAMP-Job-${displayId}.json`, exportPayload);
     };
 
     // const workflowCard = (
@@ -755,6 +792,14 @@ export default function TechnicianView() {
                         sx={{ textTransform: 'none' }}
                     >
                         Add service
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        onClick={handleExportJobJson}
+                        disabled={!jobData}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        Export job JSON
                     </Button>
                 </Box>
                 <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
