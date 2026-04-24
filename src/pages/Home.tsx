@@ -26,13 +26,30 @@ function MenuButton({ onClick, navigateTo, children }: any) {
     <Button
       variant="contained"
       onClick={onClick ? onClick : () => navigate(navigateTo)}
-      sx={{ width: '210px', minWidth: '210px', textTransform: 'none' }}
+      sx={{
+        width: '210px',
+        minWidth: '210px',
+        height: '72px',
+        textTransform: 'none',
+        alignItems: 'center',
+      }}
     >
       <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {children[0]}
-        <Box sx={{ width: '100%' }}>{children.slice(1)}</Box>
+        <Box sx={{ width: '100%', lineHeight: 1.2 }}>{children.slice(1)}</Box>
       </Box>
     </Button>
+  );
+}
+
+function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Typography variant="h6" sx={{ mb: 1 }}>
+        {title}
+      </Typography>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-start' }}>{children}</Box>
+    </Box>
   );
 }
 
@@ -111,7 +128,7 @@ export default function Home() {
         {userProps.isExternalCustomer && <Chip label="External Customer" />}
       </Stack>
 
-      {/* Navigation: horizontal wrapping row */}
+      {/* Navigation: sectioned menu + announcements */}
       <Box
         sx={{
           display: 'flex',
@@ -122,81 +139,91 @@ export default function Home() {
           width: '100%',
         }}
       >
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-start' }}>
-          <MenuButton onClick={() => (window.location.href = 'https://www.damplab.org/services')}>
-            <img src="/damp-white.svg" height="30px" alt="DAMP Logo" />
-            DAMPLab Site<br />(See Service Prices)
-          </MenuButton>
-          <MenuButton navigateTo="/canvas">
-            <AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />
-            Canvas<br />(Design Workflows)
-          </MenuButton>
-          <MenuButton navigateTo="/my_jobs">
-            <WorkHistoryIcon />
-            My Jobs<br />(View Submitted Jobs)
-          </MenuButton>
-          <MenuButton navigateTo="/bugs">
-            <BugReportIcon />
-            Bugs<br />(Report & View Issues)
-          </MenuButton>
-          <MenuButton navigateTo="/training">
-            <SchoolIcon />
-            Training<br />(How to use the app)
-          </MenuButton>
-          <MenuButton navigateTo="/admin/services-catalog">
-            <EditIcon />
-            Admin Services<br />(Read-only Catalog)
-          </MenuButton>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: '1 1 700px', minWidth: 320 }}>
+          <MenuSection title="Basics">
+            <MenuButton navigateTo="/my_jobs">
+              <WorkHistoryIcon />
+              My Jobs
+            </MenuButton>
+            <MenuButton navigateTo="/canvas">
+              <AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />
+              Canvas
+            </MenuButton>
+            <MenuButton navigateTo="/training">
+              <SchoolIcon />
+              Learning Hub
+            </MenuButton>
+            <MenuButton navigateTo="/bugs">
+              <BugReportIcon />
+              Bugs
+            </MenuButton>
+            <MenuButton onClick={() => (window.location.href = 'https://www.damplab.org/services')}>
+              <img src="/damp-white.svg" height="30px" alt="DAMP Logo" />
+              DAMPLab Site
+            </MenuButton>
+          </MenuSection>
+
           {userProps.isDamplabStaff && (
             <>
-              <MenuButton navigateTo="/staff_submit">
-                <SupervisorAccountOutlinedIcon />
-                Staff submit job<br />
-                (skip checkout review)
-              </MenuButton>
-              <MenuButton navigateTo="/lab-monitor/north">
-                <MonitorIcon />
-                Lab Monitor North<br />(Screen display)
-              </MenuButton>
-              <MenuButton navigateTo="/lab-monitor/south">
-                <MonitorIcon />
-                Lab Monitor South<br />(Screen display)
-              </MenuButton>
-              <MenuButton navigateTo="/lab-status-tv">
-                <MonitorIcon />
-                Lab Status TV<br />(Running + Activity)
-              </MenuButton>
-              <MenuButton onClick={openJobsDashboard}>
-                <Badge
-                  color="error"
-                  variant="dot"
-                  overlap="circular"
-                  invisible={!jobsFeedData?.jobsFeedStatus?.hasUnseen}
-                >
-                  <ViewStreamIcon />
-                </Badge>
-                Jobs<br />(See Submitted Jobs)
-              </MenuButton>
-              <MenuButton navigateTo="/customer-management">
-                <PeopleIcon />
-                Customer categories <br /> (Internal/External)
-              </MenuButton>
-              <MenuButton navigateTo="/edit">
-                <EditIcon />
-                Admin Edit<br />(Edit Services)
-              </MenuButton>
-              <MenuButton navigateTo="/release_notes">
-                <FormatListBulletedIcon />
-                Release Notes<br />(+ Other Admin Info)
-              </MenuButton>
-              <MenuButton navigateTo="/data_translation">
-                <EditIcon />
-                Data Translation<br />(Abbott to eLabs)
-              </MenuButton>
-              <MenuButton navigateTo="/edit_announcements">
-                <CampaignIcon />
-                Add Announcement<br />(+ Edit)
-              </MenuButton>
+              <MenuSection title="Staff: operations">
+                <MenuButton onClick={openJobsDashboard}>
+                  <Badge
+                    color="error"
+                    variant="dot"
+                    overlap="circular"
+                    invisible={!jobsFeedData?.jobsFeedStatus?.hasUnseen}
+                  >
+                    <ViewStreamIcon />
+                  </Badge>
+                  Jobs
+                </MenuButton>
+                <MenuButton navigateTo="/staff_submit">
+                  <SupervisorAccountOutlinedIcon />
+                  Staff submit job
+                </MenuButton>
+              </MenuSection>
+
+              <MenuSection title="Staff: displays">
+                <MenuButton navigateTo="/lab-monitor/north">
+                  <MonitorIcon />
+                  Lab Monitor North
+                </MenuButton>
+                <MenuButton navigateTo="/lab-monitor/south">
+                  <MonitorIcon />
+                  Lab Monitor South
+                </MenuButton>
+                <MenuButton navigateTo="/lab-status-tv">
+                  <MonitorIcon />
+                  Lab Status TV
+                </MenuButton>
+              </MenuSection>
+
+              <MenuSection title="Admin tools">
+                <MenuButton navigateTo="/edit">
+                  <EditIcon />
+                  Catalog Editor
+                </MenuButton>
+                <MenuButton navigateTo="/admin/services-catalog">
+                  <EditIcon />
+                  Admin Services
+                </MenuButton>
+                <MenuButton navigateTo="/customer-management">
+                  <PeopleIcon />
+                  Customer Management
+                </MenuButton>
+                <MenuButton navigateTo="/edit_announcements">
+                  <CampaignIcon />
+                  Announcements
+                </MenuButton>
+                <MenuButton navigateTo="/release_notes">
+                  <FormatListBulletedIcon />
+                  Release Notes
+                </MenuButton>
+                <MenuButton navigateTo="/data_translation">
+                  <EditIcon />
+                  Data Translation
+                </MenuButton>
+              </MenuSection>
             </>
           )}
         </Box>
