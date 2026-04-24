@@ -36,17 +36,24 @@ function applyUiTerminologyReplacements(root: Node) {
       .replace(/\bServices\b/g, 'Operations')
       .replace(/\bService\b/g, 'Operation');
 
+  const processTextNode = (tn: Text) => {
+    if (isExcluded(tn)) return;
+    const original = tn.nodeValue ?? '';
+    if (!original || !/\bService(s)?\b/.test(original)) return;
+    const updated = replaceText(original);
+    if (updated !== original) tn.nodeValue = updated;
+  };
+
+  // TreeWalker doesn't include the root node, so handle TEXT_NODE roots explicitly.
+  if (root.nodeType === Node.TEXT_NODE) {
+    processTextNode(root as Text);
+    return;
+  }
+
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node: Node | null = walker.nextNode();
   while (node) {
-    if (!isExcluded(node)) {
-      const tn = node as Text;
-      const original = tn.nodeValue ?? '';
-      if (original && /\bService(s)?\b/.test(original)) {
-        const updated = replaceText(original);
-        if (updated !== original) tn.nodeValue = updated;
-      }
-    }
+    processTextNode(node as Text);
     node = walker.nextNode();
   }
 }
@@ -75,7 +82,8 @@ function installUiTerminologyObserver() {
       m.addedNodes.forEach((n) => {
         // Only rescan the subtree that actually changed.
         if (n.nodeType === Node.TEXT_NODE) {
-          pendingRoots.push(n);
+          // A TEXT_NODE root won't be visited by TreeWalker; rescan its parent.
+          if (n.parentNode) pendingRoots.push(n.parentNode);
         } else if (n.nodeType === Node.ELEMENT_NODE) {
           pendingRoots.push(n);
         }
