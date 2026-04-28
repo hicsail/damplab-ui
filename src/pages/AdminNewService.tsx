@@ -1,4 +1,4 @@
-import { useApolloClient } from '@apollo/client';
+import { ApolloError, useApolloClient } from '@apollo/client';
 import {
   Alert,
   Box,
@@ -18,7 +18,26 @@ import { useContext, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_SERVICE } from '../gql/queries';
 import { AppContext } from '../contexts/App';
-import { idFromName } from '../utils/idFromName';
+
+function formatCreateServiceError(error: unknown): string {
+  const fallback = 'Unable to create service. Please try again.';
+  if (error instanceof ApolloError) {
+    const gqlMessage = error.graphQLErrors?.[0]?.message;
+    if (gqlMessage) return `Unable to create service: ${gqlMessage}`;
+    if (error.networkError) {
+      const networkAny = error.networkError as { result?: { errors?: { message?: string }[] }; statusCode?: number; message?: string };
+      const networkGqlMessage = networkAny.result?.errors?.[0]?.message;
+      if (networkGqlMessage) return `Unable to create service: ${networkGqlMessage}`;
+      const status = networkAny.statusCode ? ` (HTTP ${networkAny.statusCode})` : '';
+      return `Unable to create service — network error${status}: ${networkAny.message ?? 'request failed'}`;
+    }
+    return error.message ? `Unable to create service: ${error.message}` : fallback;
+  }
+  if (error instanceof Error && error.message) {
+    return `Unable to create service: ${error.message}`;
+  }
+  return fallback;
+}
 
 const MENU_PROPS = {
   PaperProps: {
@@ -90,7 +109,6 @@ export default function AdminNewService() {
     }
 
     const newService = {
-      id: idFromName(name),
       name: name.trim(),
       serviceCategoryNumber: serviceCategoryNumber.trim(),
       serviceCategoryName: serviceCategoryName.trim(),
@@ -129,7 +147,8 @@ export default function AdminNewService() {
       await refreshCatalog();
       navigate('/edit');
     } catch (error) {
-      setErrorMessage('Unable to create service. Please try again.');
+      console.error('Create service failed:', error);
+      setErrorMessage(formatCreateServiceError(error));
     } finally {
       setIsSaving(false);
     }
