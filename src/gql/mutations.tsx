@@ -473,6 +473,7 @@ export const SET_USER_KEYCLOAK_CUSTOMER_CATEGORY = gql`
       firstName
       lastName
       customerCategory
+      isDefaultExternalCustomer
     }
   }
 `;

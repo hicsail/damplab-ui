@@ -6,6 +6,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   FormControl,
   InputLabel,
   MenuItem,
@@ -29,6 +30,16 @@ const MAX_RESULTS = 25;
 
 const DEFAULT_LIST_CATEGORY = 'STAFF';
 
+const LIST_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: 'ALL', label: 'All users' },
+  { value: 'STAFF', label: 'Staff' },
+  { value: 'INTERNAL_CUSTOMERS', label: 'Internal customers' },
+  { value: 'EXTERNAL_CUSTOMER_DEFAULT', label: 'Default external (signup)' },
+  { value: 'EXTERNAL_CUSTOMER_ACADEMIC', label: 'External — academic' },
+  { value: 'EXTERNAL_CUSTOMER_MARKET', label: 'External — market' },
+  { value: 'EXTERNAL_CUSTOMER_NO_SALARY', label: 'External — no salary' },
+];
+
 const CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: '', label: 'None (clear category groups)' },
   { value: 'INTERNAL_CUSTOMERS', label: 'Internal customers' },
@@ -44,6 +55,7 @@ type SearchRow = {
   firstName?: string | null;
   lastName?: string | null;
   customerCategory?: string | null;
+  isDefaultExternalCustomer?: boolean | null;
 };
 
 function displayName(row: SearchRow): string {
@@ -145,19 +157,28 @@ export default function CustomerManagement() {
     [pendingByUser, refetchLast, resetSaveError, setCategory]
   );
 
+  const initialSelectValue = (row: SearchRow): string => {
+    if (row.isDefaultExternalCustomer) return '';
+    return normCategory(row.customerCategory);
+  };
+
   const isDirty = (row: SearchRow) => {
-    const chosen = pendingByUser[row.id] ?? normCategory(row.customerCategory);
-    return chosen !== normCategory(row.customerCategory);
+    const chosen = pendingByUser[row.id] ?? initialSelectValue(row);
+    return chosen !== initialSelectValue(row);
   };
 
   const isSearching = lastQuery.length >= 2;
 
   const filteredRows: SearchRow[] = useMemo(() => {
     const base = isSearching ? rows : listRows;
-    if (isSearching && listCategory !== DEFAULT_LIST_CATEGORY) {
-      return base.filter((r) => normCategory(r.customerCategory) === listCategory);
+    if (!isSearching) return base;
+    if (listCategory === 'ALL' || listCategory === DEFAULT_LIST_CATEGORY) return base;
+    if (listCategory === 'EXTERNAL_CUSTOMER_DEFAULT') {
+      return base.filter((r) => r.isDefaultExternalCustomer === true);
     }
-    return base;
+    return base.filter(
+      (r) => normCategory(r.customerCategory) === listCategory && !r.isDefaultExternalCustomer
+    );
   }, [isSearching, listCategory, listRows, rows]);
 
   const pagedRows: SearchRow[] = useMemo(() => {
@@ -200,8 +221,7 @@ export default function CustomerManagement() {
             value={listCategory}
             onChange={onListCategoryChange}
           >
-            <MenuItem value={DEFAULT_LIST_CATEGORY}>Staff</MenuItem>
-            {CATEGORY_OPTIONS.filter((o) => o.value !== '').map((opt) => (
+            {LIST_FILTER_OPTIONS.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>
                 {opt.label}
               </MenuItem>
@@ -251,28 +271,33 @@ export default function CustomerManagement() {
             </TableHead>
             <TableBody>
               {pagedRows.map((row) => {
-                const selectValue = pendingByUser[row.id] ?? normCategory(row.customerCategory);
+                const selectValue = pendingByUser[row.id] ?? initialSelectValue(row);
                 return (
                   <TableRow key={row.id}>
                     <TableCell>{displayName(row)}</TableCell>
                     <TableCell>{row.username ?? '—'}</TableCell>
                     <TableCell>{row.email ?? '—'}</TableCell>
-                    <TableCell sx={{ minWidth: 220 }}>
-                      <FormControl size="small" fullWidth>
-                        <InputLabel id={`cat-label-${row.id}`}>Pricing category</InputLabel>
-                        <Select
-                          labelId={`cat-label-${row.id}`}
-                          label="Pricing category"
-                          value={selectValue}
-                          onChange={(e) => onSelectChange(row.id, e)}
-                        >
-                          {CATEGORY_OPTIONS.map((opt) => (
-                            <MenuItem key={opt.value || 'none'} value={opt.value}>
-                              {opt.label}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
+                    <TableCell sx={{ minWidth: 240 }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <FormControl size="small" sx={{ flex: 1 }}>
+                          <InputLabel id={`cat-label-${row.id}`}>Pricing category</InputLabel>
+                          <Select
+                            labelId={`cat-label-${row.id}`}
+                            label="Pricing category"
+                            value={selectValue}
+                            onChange={(e) => onSelectChange(row.id, e)}
+                          >
+                            {CATEGORY_OPTIONS.map((opt) => (
+                              <MenuItem key={opt.value || 'none'} value={opt.value}>
+                                {opt.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        {row.isDefaultExternalCustomer && (
+                          <Chip size="small" label="Default external" color="warning" variant="outlined" />
+                        )}
+                      </Stack>
                     </TableCell>
                     <TableCell align="right">
                       <Button

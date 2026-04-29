@@ -859,6 +859,7 @@ export const SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
       firstName
       lastName
       customerCategory
+      isDefaultExternalCustomer
     }
   }
 `;
@@ -873,6 +874,7 @@ export const LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
         firstName
         lastName
         customerCategory
+        isDefaultExternalCustomer
       }
       hasNextPage
     }
