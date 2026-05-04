@@ -19,11 +19,12 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DrawIcon from '@mui/icons-material/Draw';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { GET_SOW_BY_JOB_ID } from '../gql/queries';
+import { GET_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '../gql/queries';
 import { SUBMIT_SOW_SIGNATURE } from '../gql/mutations';
 import SOWDocument from './SOWDocument';
 import SignatureCapture from './SignatureCapture';
 import { SOWData, SOWSignature } from '../types/SOWTypes';
+import { computeWorkflowPricingOverlays } from '../utils/sowGenerator';
 
 const SOW_SIGNATURES_STORAGE_KEY = 'damplab-sow-signatures';
 
@@ -224,12 +225,45 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, jobDisplayId, sowDa
     }
   };
 
+  // Saved SOW services lack pricingDetails (the upsert input only persists
+  // id/name/description/cost/category/formData). Re-derive pricingDetails from
+  // the live job's workflow nodes so the fee schedule renders multiplier and
+  // option-priced sub-rows. Order matches generateServicesList.
+  const { data: jobQueryData } = useQuery(GET_JOB_BY_ID, {
+    variables: { id: jobId },
+    skip: !jobId || !sowDataFromJob,
+    fetchPolicy: 'cache-first',
+  });
+
   const mergedSOWData: SOWData | null = fullSOWData
-    ? {
-        ...fullSOWData,
-        clientSignature: (clientSignature ?? (fullSOWData.clientSignature ? normalizeSignature(fullSOWData.clientSignature) : null)) ?? undefined,
-        technicianSignature: (technicianSignature ?? (fullSOWData.technicianSignature ? normalizeSignature(fullSOWData.technicianSignature) : null)) ?? undefined,
-      }
+    ? (() => {
+        const overlays = computeWorkflowPricingOverlays(
+          jobQueryData?.jobById?.workflows ?? [],
+          customerCategory as any
+        );
+        const overlaidServices = (fullSOWData.services || []).map((s: any, i: number) => {
+          // Prefer position-matched overlay; fall back to first id-match.
+          const candidate = overlays[i];
+          const overlay =
+            candidate && String(candidate.serviceId) === String(s.id)
+              ? candidate
+              : overlays.find((o) => String(o.serviceId) === String(s.id));
+          if (!overlay) return s;
+          return {
+            ...s,
+            pricingDetails: s.pricingDetails ?? overlay.pricingDetails,
+            parameters: s.parameters ?? overlay.parameters,
+            formData: s.formData ?? overlay.formData,
+            pricingMode: s.pricingMode ?? overlay.pricingMode,
+          };
+        });
+        return {
+          ...fullSOWData,
+          services: overlaidServices,
+          clientSignature: (clientSignature ?? (fullSOWData.clientSignature ? normalizeSignature(fullSOWData.clientSignature) : null)) ?? undefined,
+          technicianSignature: (technicianSignature ?? (fullSOWData.technicianSignature ? normalizeSignature(fullSOWData.technicianSignature) : null)) ?? undefined,
+        };
+      })()
     : null;
 
   const pdfKey = `sow-pdf-${jobId}-${clientSignature?.signedAt ?? 'noclient'}-${technicianSignature?.signedAt ?? 'notech'}`;

@@ -284,18 +284,6 @@ const getNodePricingDetails = (node: any, customerCategory?: CustomerCategory): 
   const formData: any[] = Array.isArray(node.formData) ? node.formData : [];
   const formDataMap = new Map(formData.map((entry: any) => [entry.id, entry.value]));
 
-  // [TEMP DEBUG] remove once price-multiplier display is confirmed working
-  // eslint-disable-next-line no-console
-  console.debug('[SOW pricingDetails]', service?.name, {
-    paramCount: parameters.length,
-    multiplierParams: parameters
-      .filter((p: any) => p?.isPriceMultiplier === true)
-      .map((p: any) => ({ id: p.id, name: p.name, isPriceMultiplier: p.isPriceMultiplier })),
-    paramsRaw: parameters,
-    formDataIsArray: Array.isArray(node.formData),
-    formData: node.formData,
-  });
-
   const items: NonNullable<SOWService['pricingDetails']> = [];
 
   const normalizePrice = (value: unknown): number | undefined => {
@@ -391,17 +379,9 @@ const getNodePricingDetails = (node: any, customerCategory?: CustomerCategory): 
   // Price-multiplier parameters: surface the user-entered value that scales the
   // service cost (mirrors getMultiplier in utils/servicePricing.ts).
   parameters.forEach((param: any) => {
-    if (!param || param.isPriceMultiplier !== true || !param.id) {
-      // [TEMP DEBUG]
-      // eslint-disable-next-line no-console
-      if (param?.isPriceMultiplier === true) console.debug('[SOW mult skip — no id]', param);
-      return;
-    }
+    if (!param || param.isPriceMultiplier !== true || !param.id) return;
 
     const rawValue = formDataMap.get(param.id);
-    // [TEMP DEBUG]
-    // eslint-disable-next-line no-console
-    console.debug('[SOW mult candidate]', param.name, 'rawValue:', rawValue);
     if (rawValue === null || rawValue === undefined) return;
 
     let multiplierValue: number | undefined;
@@ -451,6 +431,43 @@ const calculateBasePricing = (workflows: Workflow[]): number => {
   });
 
   return totalCost;
+};
+
+/**
+ * Build per-workflow-node overlay records (in the same order generateServicesList
+ * produces services) so consumers reading a previously-saved SOW can re-derive
+ * pricingDetails / parameters / formData fields that aren't persisted on the
+ * SOW document.
+ */
+export interface SOWServicePricingOverlay {
+  serviceId: string;
+  pricingDetails: SOWService['pricingDetails'];
+  parameters?: any[];
+  formData?: any;
+  pricingMode?: 'SERVICE' | 'PARAMETER';
+}
+
+export const computeWorkflowPricingOverlays = (
+  workflows: any[] | null | undefined,
+  customerCategory?: CustomerCategory
+): SOWServicePricingOverlay[] => {
+  const out: SOWServicePricingOverlay[] = [];
+  if (!Array.isArray(workflows)) return out;
+  workflows.forEach((workflow: any) => {
+    const nodes = Array.isArray(workflow?.nodes) ? workflow.nodes : [];
+    nodes.forEach((node: any) => {
+      if (!node?.service?.id) return;
+      const pd = getNodePricingDetails(node, customerCategory);
+      out.push({
+        serviceId: String(node.service.id),
+        pricingDetails: pd && pd.length > 0 ? pd : undefined,
+        parameters: Array.isArray(node.service.parameters) ? node.service.parameters : undefined,
+        formData: node.formData,
+        pricingMode: node.service.pricingMode === 'PARAMETER' ? 'PARAMETER' : 'SERVICE',
+      });
+    });
+  });
+  return out;
 };
 
 // Generate services list for SOW
