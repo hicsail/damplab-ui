@@ -387,13 +387,30 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
       const stableSowNumber = existingSOW?.sowNumber?.trim()
         ? existingSOW.sowNumber
         : generatedSOW?.sowNumber ?? base.sowNumber;
+      // Saved SOWs don't persist pricingDetails (or service parameters/pricingMode),
+      // so when re-opening an existing SOW the editableSections.services list lacks
+      // them. Overlay the freshly-computed values from base.services so the fee
+      // schedule renders price-multiplier sub-rows etc. User edits to description
+      // are preserved.
+      const baseById = new Map(base.services.map((s) => [s.id, s]));
+      const mergedServices = editableSections.services.map((s: any) => {
+        const fresh = baseById.get(s.id);
+        if (!fresh) return s;
+        return {
+          ...s,
+          pricingDetails: s.pricingDetails ?? fresh.pricingDetails,
+          parameters: s.parameters ?? fresh.parameters,
+          formData: s.formData ?? fresh.formData,
+          pricingMode: s.pricingMode ?? fresh.pricingMode,
+        };
+      });
       return {
         ...base,
         id: stableId,
         sowNumber: stableSowNumber,
         scopeOfWork: editableSections.scopeOfWork,
         deliverables: editableSections.deliverables,
-        services: editableSections.services,
+        services: mergedServices,
         additionalInformation: editableSections.additionalInformation,
       };
     } catch {
