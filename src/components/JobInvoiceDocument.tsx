@@ -290,15 +290,22 @@ function formatMultiplierNotes(parameters: any[] | undefined, formData: unknown)
 }
 
 function formatParameterPricingLines(
-  details: Array<{ label: string; quantity: number; unitPrice: number; total: number }> | undefined
+  details:
+    | Array<{ label: string; quantity: number; unitPrice: number; total: number; kind?: 'option' | 'multiplier' }>
+    | undefined
 ): string[] {
   if (!Array.isArray(details) || !details.length) return [];
-  return details.map((d) => {
-    if (d.quantity > 1) {
-      return `${d.label}: ${d.quantity} × ${formatCurrency(d.unitPrice)} = ${formatCurrency(d.total)}`;
-    }
-    return `${d.label}: ${formatCurrency(d.total)}`;
-  });
+  // Multiplier-kind entries are surfaced separately via formatMultiplierNotes
+  // (which has richer formatting for array/multi-value cases) — skip them here
+  // to avoid double-rendering in the invoice.
+  return details
+    .filter((d) => d.kind !== 'multiplier')
+    .map((d) => {
+      if (d.quantity > 1) {
+        return `${d.label}: ${d.quantity} × ${formatCurrency(d.unitPrice)} = ${formatCurrency(d.total)}`;
+      }
+      return `${d.label}: ${formatCurrency(d.total)}`;
+    });
 }
 
 /** PARAMETER mode: priced parameter lines + any multiplier params. SERVICE mode: multiplier lines only, or empty. */

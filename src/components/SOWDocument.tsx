@@ -288,7 +288,9 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory, jo
                   <View style={{ marginTop: 2 }}>
                     {service.pricingDetails.map((item, idx) => (
                       <Text key={idx} style={styles.tableSubLine}>
-                        • {item.label}: {item.quantity} × {formatCurrency(item.unitPrice)} = {formatCurrency(item.total)}
+                        {item.kind === 'multiplier'
+                          ? `• ${item.label}: × ${item.quantity}`
+                          : `• ${item.label}: ${item.quantity} × ${formatCurrency(item.unitPrice)} = ${formatCurrency(item.total)}`}
                       </Text>
                     ))}
                   </View>

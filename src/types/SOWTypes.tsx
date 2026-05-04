@@ -78,6 +78,13 @@ export interface SOWService {
     quantity: number;
     unitPrice: number;
     total: number;
+    /**
+     * 'option' (default): traditional per-option line item showing
+     *   {label}: {quantity} × {unitPrice} = {total}.
+     * 'multiplier': parameter flagged as isPriceMultiplier — the value scales
+     *   the whole service cost. Rendered as "× {quantity}" with no per-unit math.
+     */
+    kind?: 'option' | 'multiplier';
   }>;
 }
 

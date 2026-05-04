@@ -376,6 +376,46 @@ const getNodePricingDetails = (node: any, customerCategory?: CustomerCategory): 
     });
   });
 
+  // Price-multiplier parameters: surface the user-entered value that scales the
+  // service cost (mirrors getMultiplier in utils/servicePricing.ts).
+  parameters.forEach((param: any) => {
+    if (!param || param.isPriceMultiplier !== true || !param.id) return;
+
+    const rawValue = formDataMap.get(param.id);
+    if (rawValue === null || rawValue === undefined) return;
+
+    let multiplierValue: number | undefined;
+    if (Array.isArray(rawValue)) {
+      let sum = 0;
+      let hasAny = false;
+      for (const v of rawValue) {
+        const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+        if (!Number.isFinite(n)) continue;
+        hasAny = true;
+        sum += n;
+      }
+      multiplierValue = hasAny ? sum : undefined;
+    } else {
+      const n =
+        typeof rawValue === 'number'
+          ? rawValue
+          : typeof rawValue === 'string' && rawValue.trim() !== ''
+          ? Number(rawValue)
+          : NaN;
+      multiplierValue = Number.isFinite(n) ? n : undefined;
+    }
+
+    if (multiplierValue === undefined) return;
+
+    items.push({
+      kind: 'multiplier',
+      label: param.name,
+      quantity: multiplierValue,
+      unitPrice: 0,
+      total: 0,
+    });
+  });
+
   return items;
 };
 
