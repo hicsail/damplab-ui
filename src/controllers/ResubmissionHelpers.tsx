@@ -52,10 +52,23 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
     const formData = [];
     const paramsData = service.service.parameters;
     const formValues = service.formData;
+    // Match saved values to parameters by id (not index): the catalog's parameter
+    // order can be edited after a workflow is saved, so positional matching
+    // would silently misalign values to the wrong slots.
+    const formValueById = new Map<string, any>(
+        Array.isArray(formValues)
+            ? formValues
+                .filter((v: any) => v && typeof v.id === 'string')
+                .map((v: any) => [v.id, v.value])
+            : []
+    );
     for (let i = 0; i < paramsData.length; i++) {
         const parameter = paramsData[i];
         const formId = Math.random().toString(36).substring(2, 9);
         const allowMultipleValues = !!parameter.allowMultipleValues;
+        const matched = parameter.id != null && formValueById.has(parameter.id)
+            ? formValueById.get(parameter.id)
+            : (Array.isArray(formValues) && formValues[i] ? formValues[i].value : undefined);
         formData.push({
             id: parameter.id ?? formId,
             nodeId: nodeId,
@@ -65,7 +78,7 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
             description: parameter.description,
             paramType: parameter.paramType ? parameter.paramType : null,
             resultParamValue: "",
-            value: formValues[i].value != null ? formValues[i].value : (allowMultipleValues ? [''] : null),
+            value: matched != null ? matched : (allowMultipleValues ? [''] : null),
             required: parameter.required,
             allowMultipleValues: allowMultipleValues || undefined,
         });
