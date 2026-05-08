@@ -14,7 +14,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { DeleteForeverSharp, PlusOne } from '@mui/icons-material';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SERVICES, GET_SOW_BY_JOB_ID }         from '../gql/queries';
-import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
+import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, MUTATE_JOB_STATE, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
 import { calculateServiceCost } from '../utils/servicePricing';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
@@ -156,6 +156,22 @@ export default function TechnicianView() {
     });
 
     const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
+    const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
+
+    const handleCloseJob = async () => {
+        if (!id) return;
+        const ok = window.confirm(
+            'Close this job? It will be marked CLOSED and removed from the lab monitor. This action is meant for jobs that are fully wrapped up.'
+        );
+        if (!ok) return;
+        try {
+            await changeJobStateMutation({ variables: { ID: id, State: 'CLOSED' } });
+            await refetchJob();
+        } catch (e) {
+            console.error('Failed to close job:', e);
+            window.alert('Could not close the job. Please try again.');
+        }
+    };
 
     const [addWorkflowToJob, { loading: addingWorkflow }] = useMutation(ADD_WORKFLOW_TO_JOB);
 
@@ -489,6 +505,7 @@ export default function TechnicianView() {
         const createText = "The job is currently being created.";
         const acceptText = "The job was accepted by the DAMP Lab. The client will be asked to sign and return the SOW.";
         const rejectText=  "The job was rejected by the DAMP Lab. The client will be asked to resubmit the job with changes.";
+        const closedText = "This job has been closed out. It is no longer active in the lab monitor.";
         const defaultText = "Invalid Case";
         switch (jobState) {
             case 'SUBMITTED':
@@ -499,6 +516,8 @@ export default function TechnicianView() {
                 return ['rgb(0, 256, 0, 0.5)', <Check />, acceptText];
             case 'REJECTED':
                 return ['rgb(256, 0, 0, 0.5)', <NotInterested />, rejectText];
+            case 'CLOSED':
+                return ['rgba(120, 120, 120, 0.35)', <Check />, closedText];
             default:
                 return ['rgb(0, 0, 0, 0)', <NotInterested />, defaultText];
         }
@@ -800,6 +819,15 @@ export default function TechnicianView() {
                         sx={{ textTransform: 'none' }}
                     >
                         Export job JSON
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        color="warning"
+                        onClick={handleCloseJob}
+                        disabled={!jobData || jobState === 'CLOSED' || closingJob}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        {jobState === 'CLOSED' ? 'Job closed' : closingJob ? 'Closing…' : 'Close job'}
                     </Button>
                 </Box>
                 <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
