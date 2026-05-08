@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Navigate } from 'react-router';
 import { useQuery, useMutation } from '@apollo/client';
 import {
@@ -7,6 +7,7 @@ import {
   CardContent,
   Typography,
   CircularProgress,
+  IconButton,
   Select,
   MenuItem,
   FormControl,
@@ -14,6 +15,8 @@ import {
   InputAdornment,
   TextField,
 } from '@mui/material';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -506,6 +509,14 @@ function DraggableCard({
   );
 }
 
+/**
+ * Items per page in each Lab Monitor column. Operations lists can grow into
+ * the hundreds and rendering them all at once was crashing the kiosk
+ * browsers, so we paginate client-side. The full result set still arrives in
+ * a single GraphQL query — only the rendered slice is bounded.
+ */
+const COLUMN_PAGE_SIZE = 20;
+
 function StatusColumn({
   title,
   variant,
@@ -521,6 +532,21 @@ function StatusColumn({
   const isCompleted = variant === 'completed';
 
   const { setNodeRef, isOver } = useDroppable({ id: columnState });
+
+  const [page, setPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(items.length / COLUMN_PAGE_SIZE));
+  // Items can disappear (drag/drop, polling refetch) — clamp the current page
+  // so we never end up rendering an empty slice past the end.
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
+  }, [page, totalPages]);
+  const pagedItems = useMemo(() => {
+    const start = page * COLUMN_PAGE_SIZE;
+    return items.slice(start, start + COLUMN_PAGE_SIZE);
+  }, [items, page]);
+  const showPager = items.length > COLUMN_PAGE_SIZE;
+  const rangeStart = items.length === 0 ? 0 : page * COLUMN_PAGE_SIZE + 1;
+  const rangeEnd = Math.min(items.length, (page + 1) * COLUMN_PAGE_SIZE);
 
   const HeaderIcon =
     variant === 'pending'
@@ -610,7 +636,7 @@ function StatusColumn({
             </Typography>
           )}
           {!loading &&
-            items.map((item) =>
+            pagedItems.map((item) =>
               item.nodeId && onUpdateAssignee != null ? (
                 <DraggableCard
                   key={item.id}
@@ -636,6 +662,44 @@ function StatusColumn({
               ),
             )}
         </Box>
+        {showPager && (
+          <Box
+            sx={{
+              mt: 1.5,
+              pt: 1,
+              borderTop: '1px solid',
+              borderColor: '#e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Typography variant="caption" sx={{ color: '#6b7280' }}>
+              {rangeStart}–{rangeEnd} of {items.length}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <IconButton
+                size="small"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                aria-label="Previous page"
+              >
+                <ChevronLeftIcon fontSize="small" />
+              </IconButton>
+              <Typography variant="caption" sx={{ color: '#6b7280', minWidth: 56, textAlign: 'center' }}>
+                Page {page + 1} of {totalPages}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                aria-label="Next page"
+              >
+                <ChevronRightIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
+        )}
       </CardContent>
     </Card>
   );
