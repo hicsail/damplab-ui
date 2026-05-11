@@ -10,14 +10,18 @@ are deployed copies of these.
 
 ## Environments
 
-| Env | EC2 | Public IP | URL | Image tags |
-| --- | --- | --- | --- | --- |
-| Staging | `i-0f1c9bf9cfc90bf9a` (t2.small) | `54.211.117.78` | TBD (currently the legacy `canvas.damplab.org` upstream) | `:main` |
-| Production | `i-05c55b9d6ae3de229` (t3.small) | `3.94.114.93` | `https://damplab-canvas.sail.codes/` | `:prod` |
+| Env | EC2 | Public IP | UI | Backend (Cloudflare → :3000) | Image tags |
+| --- | --- | --- | --- | --- | --- |
+| Staging | `i-0f1c9bf9cfc90bf9a` (t2.small) | `54.211.117.78` | (legacy upstream) | `https://damplab-backend.sail.codes` | `:main` |
+| Production | `i-05c55b9d6ae3de229` (t3.small) | `3.94.114.93` | `https://damplab-canvas.sail.codes/` | `https://damplab-canvas-backend.sail.codes` | `:prod` |
 
 Both live in `us-east-1c`, VPC `vpc-242ec241`, subnet `subnet-eaa3e0c2`. Auth is
-shared: production points at the staging-resident Keycloak at
-`https://damplab-keycloak.sail.codes`.
+shared: production's backend points at the staging-resident Keycloak at
+`https://damplab-keycloak.sail.codes` (realm `damplab`, client `damplabclient`).
+
+The backend hostnames are Cloudflare-proxied with an **Origin Rule rewriting
+the destination port to `3000`** — otherwise Cloudflare would forward to :80
+which is the UI's nginx. Mirror this when adding new environments.
 
 ## Promotion model
 
@@ -31,13 +35,24 @@ The release CI lives in each app repo, not here:
 - [`hicsail/damplab-ui/.github/workflows/release-prod.yml`](https://github.com/hicsail/damplab-ui/blob/main/.github/workflows/release-prod.yml)
 - [`hicsail/damplab-backend/.github/workflows/release-prod.yaml`](https://github.com/hicsail/damplab-backend/blob/main/.github/workflows/release-prod.yaml)
 
-It's a no-rebuild `docker buildx imagetools create` — same digest, new tag —
-so prod is **bit-identical to the tested staging image**. Side benefit: prod
-promotions take ~10 seconds.
+The two workflows differ on purpose because of how the apps are built:
 
-If you ever need a separate prod build with different `VITE_*` values, replace
-the imagetools step with a `docker/build-push-action` and feed it from
-`secrets.VITE_*_PROD`.
+- **`damplab-backend`** has no build args — the backend reads env at runtime
+  from the compose file. The release workflow does a no-rebuild
+  `docker buildx imagetools create` to retag `:main` → `:prod`. Fast
+  (~10 s) and bit-identical to the tested staging image.
+- **`damplab-ui`** is a Vite SPA, so the backend URL is baked into the JS
+  bundle at build time. Retagging `:main` would give prod a bundle that calls
+  the staging backend. The UI release workflow does a real `build-push-action`
+  with `VITE_BACKEND=secrets.VITE_BACKEND_PROD` — currently
+  `https://damplab-canvas-backend.sail.codes/graphql`. Keycloak settings are
+  shared with staging so they reuse `secrets.VITE_KEYCLOAK_*` directly.
+
+Repo secrets used by the UI release workflow:
+- `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN` (publish)
+- `VITE_BACKEND_PROD` (prod-specific, baked into bundle)
+- `VITE_KEYCLOAK_URL` / `VITE_KEYCLOAK_REALM` / `VITE_KEYCLOAK_CLIENT_ID`
+  (shared with staging)
 
 ## Deploying
 
@@ -106,21 +121,39 @@ aws ec2 run-instances --region us-east-1 \
 sudo docker volume create damplab-mongo
 ```
 
+## Initial data seed
+
+When the prod EC2 first came up its Mongo was empty. The catalog
+(`damplabservices`, 60 docs) and bundle definitions (`bundles`, 6 docs) were
+copied from staging via `mongodump --archive --gzip` → base64 over SSM →
+`mongorestore`. Jobs, workflows, workflownodes, SOWs, invoices, comments, and
+everything else started clean. Staging was read-only throughout — `mongodump`
+doesn't mutate the source.
+
+If you ever need to re-sync the catalog from staging to prod, the same
+approach works. Stage:
+
+```bash
+aws ssm send-command --region us-east-1 --instance-ids i-0f1c9bf9cfc90bf9a \
+  --document-name AWS-RunShellScript --parameters 'commands=[
+    "sudo docker exec damplab-backend-db-1 mongodump --quiet --db damplab --collection damplabservices --archive --gzip > /tmp/services.archive 2>/dev/null",
+    "sudo base64 -w0 /tmp/services.archive"
+  ]'
+```
+
+Capture the base64 from the output, then on prod base64-decode into the
+container and run `mongorestore --archive=... --gzip --nsInclude 'damplab.damplabservices'`.
+
 ## Known gaps / follow-ups
 
 - **No staging Mongo backup.** The staging backup service only mounts the
   Keycloak Postgres volume. We rely on staging being recreatable. Prod has
-  Mongo backed up.
-- **`:prod` images currently live only as local retags of `:main`** on the
-  prod box. The first `release-prod` workflow run publishes them to Docker
-  Hub properly. Until then, **don't run `docker compose pull` on prod** — it
-  will fail with `not found` and leave the running containers untouched
-  (they'd still be fine, but the recreate step won't have a fresh image).
-- **Keycloak client redirect URIs** need `https://damplab-canvas.sail.codes/*`
-  added before prod auth works end-to-end. Pending.
-- **DNS for `damplab-canvas.sail.codes`** needs to point to `3.94.114.93`.
-  Cloudflare, presumably — the existing `*.sail.codes` records are there.
-- **UI build args.** The current prod UI image is identical to staging's, so
-  its bundle calls whatever `VITE_BACKEND` was at CI time. If staging and prod
-  need to talk to different backend hostnames, build prod separately (see the
-  rationale comment in `release-prod.yml`).
+  Mongo backed up to `s3://sail-data-backups/damplab-mongo-prod/`.
+- **Shared Keycloak is on staging.** Tearing down the staging EC2 takes auth
+  for both environments. If this becomes a real concern, move Keycloak to its
+  own tiny instance (the compose service is portable).
+- **No auto-deploy after a release-prod workflow.** We still need to manually
+  `aws ssm send-command` to pull and recreate on the prod EC2 after the
+  workflow succeeds. Future work: add a GH→AWS OIDC role with
+  `ssm:SendCommand` on the two instance IDs and chain the SSM step into the
+  workflow.

@@ -6,10 +6,10 @@
 
 ## Environments
 
-| Env | EC2 (us-east-1c) | Public IP | URL | Image tag |
+| Env | EC2 (us-east-1c) | UI | Backend (Cloudflare → :3000) | Image tag |
 | --- | --- | --- | --- | --- |
-| **Staging** | `i-0f1c9bf9cfc90bf9a` (t2.small) | `54.211.117.78` | (legacy upstream — see Cloudflare) | `:main` |
-| **Production** | `i-05c55b9d6ae3de229` (t3.small) | `3.94.114.93` | `https://damplab-canvas.sail.codes/` | `:prod` |
+| **Staging** | `i-0f1c9bf9cfc90bf9a` (t2.small) | (legacy upstream) | `https://damplab-backend.sail.codes` | `:main` |
+| **Production** | `i-05c55b9d6ae3de229` (t3.small) | `https://damplab-canvas.sail.codes/` | `https://damplab-canvas-backend.sail.codes` | `:prod` |
 
 Both share auth via the staging Keycloak at `https://damplab-keycloak.sail.codes`
 (realm `damplab`, client `damplabclient`). Prod compose runs **only** UI +
@@ -47,13 +47,12 @@ EC2/IAM rights used during the prod bootstrap. The bootstrap is documented in
 
 ## Known gaps to clean up later
 
-- `:prod` was first published to Docker Hub by running `release-prod.yml`
-  manually after the prod EC2 was already retag-bootstrapped locally. Future
-  promotions go through CI normally.
 - Staging Mongo data is **not** backed up — only the Keycloak Postgres volume
-  is. Prod has Mongo backup wired up.
-- Prod UI bundle's `VITE_BACKEND` and friends are inherited from the `:main`
-  build args (no separate prod build). Fine for now since both envs point at
-  shared services; revisit if they ever need divergent endpoints.
+  is. Prod has Mongo backup wired up to
+  `s3://sail-data-backups/damplab-mongo-prod/`.
+- Shared Keycloak still physically lives on the staging EC2. Tearing staging
+  down takes auth for both envs. Movable if it becomes a concern.
+- No auto-deploy after a `release-prod` workflow run — still need a follow-up
+  `aws ssm send-command` to pull & recreate. Future: GH→AWS OIDC role.
 - `ops/` lives in this repo for now; intent is to migrate to a dedicated
   `hicsail/damplab-ops` repo once the layout is stable.
