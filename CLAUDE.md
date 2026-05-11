@@ -1,0 +1,59 @@
+# DAMPLab Canvas — Claude notes
+
+## Repos
+- `hicsail/damplab-ui` (this repo) — Vite/React frontend
+- `hicsail/damplab-backend` — NestJS/MongoDB backend, sibling checkout at `../damplab-backend`
+
+## Environments
+
+| Env | EC2 (us-east-1c) | Public IP | URL | Image tag |
+| --- | --- | --- | --- | --- |
+| **Staging** | `i-0f1c9bf9cfc90bf9a` (t2.small) | `54.211.117.78` | (legacy upstream — see Cloudflare) | `:main` |
+| **Production** | `i-05c55b9d6ae3de229` (t3.small) | `3.94.114.93` | `https://damplab-canvas.sail.codes/` | `:prod` |
+
+Both share auth via the staging Keycloak at `https://damplab-keycloak.sail.codes`
+(realm `damplab`, client `damplabclient`). Prod compose runs **only** UI +
+backend + Mongo + Mongo-backup; staging additionally runs Keycloak + Postgres +
+Keycloak-backup. Authoritative compose files in [`ops/`](./ops/).
+
+## Deploy / release flow
+
+```
+push to main  ──►  CI builds :main  ──►  staging EC2: docker compose pull && up -d
+git tag v*    ──►  release-prod CI promotes :main → :prod (and :v*)
+manual run    ──►  same workflow with workflow_dispatch
+```
+
+The promotion is a no-rebuild `docker buildx imagetools create` — same digest,
+new tag. Workflow files:
+- [`.github/workflows/docker-image.yml`](./.github/workflows/docker-image.yml) — builds `:main` on push
+- [`.github/workflows/release-prod.yml`](./.github/workflows/release-prod.yml) — promotes to `:prod`
+
+After a release-prod run, deploy on the prod EC2:
+```bash
+aws ssm send-command --region us-east-1 \
+  --instance-ids i-05c55b9d6ae3de229 \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["cd /home/ubuntu/damplab && sudo docker compose pull && sudo docker compose up -d"]'
+```
+
+(Staging uses the same command with instance ID `i-0f1c9bf9cfc90bf9a`.)
+
+## AWS access
+
+IAM user `asad2` (account `135854645631`) has SSM access to both instances and
+EC2/IAM rights used during the prod bootstrap. The bootstrap is documented in
+[`ops/README.md`](./ops/README.md).
+
+## Known gaps to clean up later
+
+- `:prod` was first published to Docker Hub by running `release-prod.yml`
+  manually after the prod EC2 was already retag-bootstrapped locally. Future
+  promotions go through CI normally.
+- Staging Mongo data is **not** backed up — only the Keycloak Postgres volume
+  is. Prod has Mongo backup wired up.
+- Prod UI bundle's `VITE_BACKEND` and friends are inherited from the `:main`
+  build args (no separate prod build). Fine for now since both envs point at
+  shared services; revisit if they ever need divergent endpoints.
+- `ops/` lives in this repo for now; intent is to migrate to a dedicated
+  `hicsail/damplab-ops` repo once the layout is stable.
