@@ -1,78 +1,91 @@
 name: Release to prod
 
-# Promotes a previously-built :main (or another source ref) to the floating
-# :prod tag, and optionally also publishes an immutable :vX.Y.Z label. This is
-# the staging-to-prod gate: nothing reaches the prod EC2 unless this workflow
-# runs.
+# Builds a PROD-specific image with VITE_BACKEND_PROD baked into the bundle,
+# then publishes it as :prod (and optionally :vX.Y.Z).
 #
-# The promotion is a no-rebuild "imagetools" manifest copy — same digest, new
-# tag — so it's fast and bit-identical to staging. If you ever need a separate
-# prod build with prod-specific VITE_* values, replace this with a proper
-# build-and-push (see docker-image.yml for the template) and feed it from
-# `secrets.VITE_*_PROD`.
+# The reason this can't be a cheap `imagetools create` retag of :main: the UI
+# is a static Vite bundle, so the backend URL is hard-coded at build time. The
+# :main image's bundle talks to the staging backend; prod needs its own build.
+# Keycloak settings are shared (same realm/client), so we reuse those secrets.
 
 on:
   workflow_dispatch:
     inputs:
-      source_ref:
-        description: 'Source tag/branch to promote (default: main)'
-        required: false
-        default: 'main'
       version_tag:
-        description: 'Optional immutable version label (e.g. v1.4.0)'
+        description: 'Optional immutable version label (e.g. v1.4.0). :prod always moves.'
         required: false
         default: ''
   push:
     tags: ['v*.*.*']
 
 jobs:
-  promote:
+  build-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Resolve refs
-        id: refs
+      - name: Resolve tags
+        id: tags
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
             VER="${GITHUB_REF#refs/tags/}"
-            SRC="$VER"            # tag push: promote the just-built tag's image
           else
             VER="${{ github.event.inputs.version_tag }}"
-            SRC="${{ github.event.inputs.source_ref }}"
           fi
-          echo "version=$VER" >> "$GITHUB_OUTPUT"
-          echo "source=$SRC" >> "$GITHUB_OUTPUT"
-          echo "Source: hicsail/damplab-ui:$SRC"
-          echo "Version: ${VER:-<none>}"
+          TAGS="hicsail/damplab-ui:prod"
+          if [ -n "$VER" ]; then
+            TAGS="$TAGS"$'\n'"hicsail/damplab-ui:$VER"
+          fi
+          {
+            echo "version=$VER"
+            echo "tags<<EOF"
+            echo "$TAGS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Will publish:"
+          echo "$TAGS"
 
-      - name: Promote → :prod
-        run: |
-          docker buildx imagetools create \
-            --tag hicsail/damplab-ui:prod \
-            hicsail/damplab-ui:${{ steps.refs.outputs.source }}
-
-      - name: Publish :${{ steps.refs.outputs.version }}
-        if: steps.refs.outputs.version != ''
-        run: |
-          docker buildx imagetools create \
-            --tag hicsail/damplab-ui:${{ steps.refs.outputs.version }} \
-            hicsail/damplab-ui:${{ steps.refs.outputs.source }}
+      - name: Build and push prod image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_BACKEND=${{ secrets.VITE_BACKEND_PROD }}
+            VITE_KEYCLOAK_URL=${{ secrets.VITE_KEYCLOAK_URL }}
+            VITE_KEYCLOAK_REALM=${{ secrets.VITE_KEYCLOAK_REALM }}
+            VITE_KEYCLOAK_CLIENT_ID=${{ secrets.VITE_KEYCLOAK_CLIENT_ID }}
 
       - name: Summary
         run: |
           {
-            echo "### Promoted to prod 🚀"
+            echo "### Published prod image 🚀"
             echo ""
-            echo "- source: \`hicsail/damplab-ui:${{ steps.refs.outputs.source }}\`"
-            echo "- now tagged as: \`:prod\`${{ steps.refs.outputs.version && format(' and `:{0}`', steps.refs.outputs.version) || '' }}"
+            echo "Tags:"
+            echo "\`\`\`"
+            echo "${{ steps.tags.outputs.tags }}"
+            echo "\`\`\`"
             echo ""
             echo "On the prod EC2:"
             echo "\`\`\`"
-            echo "cd /home/ubuntu/damplab && docker compose pull damplab-ui && docker compose up -d damplab-ui"
+            echo "aws ssm send-command --region us-east-1 \\"
+            echo "  --instance-ids i-05c55b9d6ae3de229 \\"
+            echo "  --document-name AWS-RunShellScript \\"
+            echo "  --parameters 'commands=[\"cd /home/ubuntu/damplab && sudo docker compose pull damplab-ui && sudo docker compose up -d damplab-ui\"]'"
             echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"
