@@ -1,0 +1,78 @@
+name: Release to prod
+
+# Promotes a previously-built :main (or another source ref) to the floating
+# :prod tag, and optionally also publishes an immutable :vX.Y.Z label. This is
+# the staging-to-prod gate: nothing reaches the prod EC2 unless this workflow
+# runs.
+#
+# The promotion is a no-rebuild "imagetools" manifest copy — same digest, new
+# tag — so it's fast and bit-identical to staging. If you ever need a separate
+# prod build with prod-specific VITE_* values, replace this with a proper
+# build-and-push (see docker-image.yml for the template) and feed it from
+# `secrets.VITE_*_PROD`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: 'Source tag/branch to promote (default: main)'
+        required: false
+        default: 'main'
+      version_tag:
+        description: 'Optional immutable version label (e.g. v1.4.0)'
+        required: false
+        default: ''
+  push:
+    tags: ['v*.*.*']
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Resolve refs
+        id: refs
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VER="${GITHUB_REF#refs/tags/}"
+            SRC="$VER"            # tag push: promote the just-built tag's image
+          else
+            VER="${{ github.event.inputs.version_tag }}"
+            SRC="${{ github.event.inputs.source_ref }}"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "source=$SRC" >> "$GITHUB_OUTPUT"
+          echo "Source: hicsail/damplab-ui:$SRC"
+          echo "Version: ${VER:-<none>}"
+
+      - name: Promote → :prod
+        run: |
+          docker buildx imagetools create \
+            --tag hicsail/damplab-ui:prod \
+            hicsail/damplab-ui:${{ steps.refs.outputs.source }}
+
+      - name: Publish :${{ steps.refs.outputs.version }}
+        if: steps.refs.outputs.version != ''
+        run: |
+          docker buildx imagetools create \
+            --tag hicsail/damplab-ui:${{ steps.refs.outputs.version }} \
+            hicsail/damplab-ui:${{ steps.refs.outputs.source }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### Promoted to prod 🚀"
+            echo ""
+            echo "- source: \`hicsail/damplab-ui:${{ steps.refs.outputs.source }}\`"
+            echo "- now tagged as: \`:prod\`${{ steps.refs.outputs.version && format(' and `:{0}`', steps.refs.outputs.version) || '' }}"
+            echo ""
+            echo "On the prod EC2:"
+            echo "\`\`\`"
+            echo "cd /home/ubuntu/damplab && docker compose pull damplab-ui && docker compose up -d damplab-ui"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
