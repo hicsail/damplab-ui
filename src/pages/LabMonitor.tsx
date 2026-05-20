@@ -3,6 +3,7 @@ import { useParams, Navigate } from 'react-router';
 import { useQuery, useMutation } from '@apollo/client';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Typography,
@@ -21,6 +22,8 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
+import InventoryPickerDialog from '../components/InventoryPickerDialog';
 import {
   DndContext,
   DragOverlay,
@@ -51,6 +54,10 @@ export interface LabMonitorItem {
   assigneeDisplayName?: string | null;
   estimatedMinutes?: number | null;
   startedAt?: string | null;
+  /** Inventory IDs this node is currently holding (only on node-based API responses). */
+  usedInventoryIds?: string[];
+  /** Inventory IDs the service typically requires (informational). */
+  serviceInventoryRequirementIds?: string[];
 }
 
 export interface LabMonitorStaffMember {
@@ -156,11 +163,12 @@ interface LabMonitorNode {
   id: string;
   label?: string;
   state: WorkflowNodeState;
+  usedInventory?: string[] | null;
   assigneeId?: string | null;
   assigneeDisplayName?: string | null;
   estimatedMinutes?: number | null;
   startedAt?: string | null;
-  service?: { name: string } | null;
+  service?: { id?: string; name: string; inventoryRequirements?: string[] | null } | null;
   workflow?: { id: string; job?: { id: string; name: string; submitted?: string } | null } | null;
 }
 
@@ -189,6 +197,10 @@ function nodesToItems(nodes: LabMonitorNode[]): LabMonitorItem[] {
     assigneeDisplayName: node.assigneeDisplayName ?? undefined,
     estimatedMinutes: node.estimatedMinutes ?? undefined,
     startedAt: node.startedAt ?? undefined,
+    usedInventoryIds: Array.isArray(node.usedInventory) ? node.usedInventory.map(String) : [],
+    serviceInventoryRequirementIds: Array.isArray(node.service?.inventoryRequirements)
+      ? (node.service!.inventoryRequirements as any[]).map(String)
+      : []
   }));
 }
 
@@ -305,6 +317,8 @@ function OperationCard({
     setEstInput(item.estimatedMinutes != null ? String(item.estimatedMinutes) : '');
   }, [item.estimatedMinutes]);
   const elapsed = isRunning ? elapsedMinutes(item.startedAt) : null;
+  const [inventoryOpen, setInventoryOpen] = React.useState(false);
+  const heldCount = item.usedInventoryIds?.length ?? 0;
 
   const handleEstBlur = () => {
     if (!nodeId || !onUpdateEstimatedTime) return;
@@ -433,6 +447,25 @@ function OperationCard({
               </Typography>
             </Box>
           )}
+          {isRunning && nodeId && (
+            <Box sx={{ minWidth: 120 }}>
+              <Typography variant="caption" sx={{ color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Inventory
+              </Typography>
+              <Box sx={{ mt: 0.25 }}>
+                <Button
+                  size="small"
+                  variant={heldCount > 0 ? 'contained' : 'outlined'}
+                  color="primary"
+                  startIcon={<PrecisionManufacturingIcon fontSize="small" />}
+                  onClick={() => setInventoryOpen(true)}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {heldCount > 0 ? `${heldCount} in use` : 'Select…'}
+                </Button>
+              </Box>
+            </Box>
+          )}
         </Box>
         {isRunning && !elapsed && (
           <Box
@@ -467,6 +500,16 @@ function OperationCard({
           </Box>
         )}
       </CardContent>
+      {isRunning && nodeId && (
+        <InventoryPickerDialog
+          open={inventoryOpen}
+          onClose={() => setInventoryOpen(false)}
+          nodeId={nodeId}
+          nodeLabel={item.serviceName}
+          currentlyHeldIds={item.usedInventoryIds ?? []}
+          suggestedIds={item.serviceInventoryRequirementIds ?? []}
+        />
+      )}
     </Card>
   );
 }

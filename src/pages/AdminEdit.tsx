@@ -4,9 +4,10 @@ import { ToolBar } from '../components/edit/ToolBar';
 import { EditBundlesTable } from '../components/edit/EditBundlesTable';
 import { EditCategoriesTable } from '../components/edit/EditCategoriesTable';
 import { EditServicesTable } from '../components/edit/EditServicesTable';
+import { EditInventoryTable } from '../components/edit/EditInventoryTable';
 import { AppContext } from '../contexts/App';
 
-type EditTypes = 'Services' | 'Categories' | 'Bundles';
+type EditTypes = 'Services' | 'Categories' | 'Bundles' | 'Inventory';
 
 export default function AdminEdit () {
   const { refreshCatalog } = useContext(AppContext);
@@ -22,6 +23,7 @@ export default function AdminEdit () {
       case 'Services': return <EditServicesTable searchString={searchString} />;
       case 'Categories': return <EditCategoriesTable searchString={searchString} />;
       case 'Bundles': return <EditBundlesTable searchString={searchString} />;
+      case 'Inventory': return <EditInventoryTable searchString={searchString} />;
     }
   }
 

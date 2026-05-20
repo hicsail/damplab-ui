@@ -1,4 +1,4 @@
-import { useApolloClient } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
   Box,
@@ -18,7 +18,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { UPDATE_SERVICE } from '../gql/queries';
+import { GET_ACTIVE_INVENTORY_ITEMS, UPDATE_SERVICE } from '../gql/queries';
 import { AppContext } from '../contexts/App';
 import { DeliverablesEditor } from '../components/edit/DeliverablesEditor';
 
@@ -55,6 +55,12 @@ export default function AdminEditService() {
   const [externalNoSalaryPrice, setExternalNoSalaryPrice] = useState('');
   const [fallbackPrice, setFallbackPrice] = useState('');
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([]);
+  const [inventoryRequirementIds, setInventoryRequirementIds] = useState<string[]>([]);
+  const { data: inventoryData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
+  const inventoryOptions: Array<{ id: string; name: string; type?: string }> = useMemo(
+    () => (inventoryData?.activeInventoryItems ?? []).map((i: any) => ({ id: String(i.id), name: i.name, type: i.type })),
+    [inventoryData]
+  );
   const [deliverables, setDeliverables] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -111,6 +117,13 @@ export default function AdminEditService() {
       pricing.legacy != null ? String(pricing.legacy) : row.price != null ? String(row.price) : ''
     );
     setAllowedConnectionIds((row.allowedConnections || []).map((s: any) => String(s.id)));
+    // inventoryRequirements is returned as [String] (ObjectId strings, since
+    // the resolver doesn't deep-populate inventory items today).
+    setInventoryRequirementIds(
+      Array.isArray(row.inventoryRequirements)
+        ? row.inventoryRequirements.map((x: any) => (typeof x === 'string' ? x : String(x?.id ?? x?._id ?? x)))
+        : []
+    );
     setDeliverables(Array.isArray(row.deliverables) ? [...row.deliverables] : []);
   }, [service]);
 
@@ -175,6 +188,7 @@ export default function AdminEditService() {
       parameters: row.parameters ?? [],
       paramGroups: row.paramGroups ?? [],
       allowedConnections: allowedConnectionIds,
+      inventoryRequirements: inventoryRequirementIds,
       description: description.trim(),
       deliverables
     };
@@ -374,6 +388,39 @@ export default function AdminEditService() {
             </MenuItem>
           ))}
         </Select>
+      </FormControl>
+
+      <FormControl>
+        <InputLabel id="edit-service-inventory-label">Required inventory</InputLabel>
+        <Select
+          labelId="edit-service-inventory-label"
+          multiple
+          value={inventoryRequirementIds}
+          label="Required inventory"
+          onChange={(event) => setInventoryRequirementIds(event.target.value as string[])}
+          input={<OutlinedInput label="Required inventory" />}
+          renderValue={(selected) => {
+            const selectedIds = selected as string[];
+            return inventoryOptions
+              .filter((i) => selectedIds.includes(i.id))
+              .map((i) => i.name)
+              .join(', ');
+          }}
+          MenuProps={MENU_PROPS}
+        >
+          {inventoryOptions.length === 0 && (
+            <MenuItem disabled value="">No inventory items defined yet</MenuItem>
+          )}
+          {inventoryOptions.map((i) => (
+            <MenuItem key={i.id} value={i.id}>
+              <Checkbox checked={inventoryRequirementIds.includes(i.id)} />
+              <ListItemText primary={i.name} secondary={i.type ?? undefined} />
+            </MenuItem>
+          ))}
+        </Select>
+        <Typography variant="caption" sx={{ mt: 0.5, color: 'text.secondary' }}>
+          Informational only — surfaces these items first in the lab monitor picker. Staff aren&apos;t blocked from starting work without them.
+        </Typography>
       </FormControl>
 
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>

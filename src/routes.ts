@@ -43,6 +43,9 @@ export default [
         route("/edit/services/:serviceId", "./pages/AdminEditService.tsx"),
         route("/edit/bundles/new", "./pages/AdminNewBundle.tsx"),
         route("/edit/bundles/:bundleId", "./pages/AdminEditBundle.tsx"),
+        route("/edit/inventory/new", "./pages/AdminNewInventoryItem.tsx"),
+        route("/edit/inventory/:id", "./pages/AdminEditInventoryItem.tsx"),
+        route("/inventory", "./pages/Inventory.tsx"),
 
         /* Old comments from pre-React-Router-migration App.tsx: */
         /* <Route path = "/client_view/:id" element = {<PrivateRouteAdmin> <Tracking /> </PrivateRouteAdmin>} /> */
