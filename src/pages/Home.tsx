@@ -13,6 +13,7 @@ import WorkHistoryIcon from '@mui/icons-material/WorkHistory';
 import SchoolIcon from '@mui/icons-material/School';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import PeopleIcon from '@mui/icons-material/People';
+import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
@@ -199,6 +200,10 @@ export default function Home() {
                 <MenuButton navigateTo="/lab-status-tv">
                   <MonitorIcon />
                   Lab Status TV
+                </MenuButton>
+                <MenuButton navigateTo="/inventory">
+                  <PrecisionManufacturingIcon />
+                  Inventory Availability
                 </MenuButton>
               </MenuSection>
 
