@@ -404,6 +404,20 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
           pricingMode: s.pricingMode ?? fresh.pricingMode,
         };
       });
+      // Per-service price overrides flow from the modal's Cost field into
+      // pricing.baseCost (and through to totalCost). Adjustments stay separate
+      // — they're still applied on top of the (possibly-overridden) base.
+      const overriddenBaseCost = mergedServices.reduce(
+        (sum: number, s: any) => sum + (typeof s.cost === 'number' && Number.isFinite(s.cost) ? s.cost : 0),
+        0
+      );
+      const discountAmount = (base.pricing.adjustments || [])
+        .filter((a) => a.type === 'discount')
+        .reduce((sum, a) => sum + a.amount, 0);
+      const additionalCost = (base.pricing.adjustments || [])
+        .filter((a) => a.type === 'additional_cost')
+        .reduce((sum, a) => sum + a.amount, 0);
+      const overriddenTotalCost = overriddenBaseCost - discountAmount + additionalCost;
       return {
         ...base,
         id: stableId,
@@ -411,6 +425,11 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
         scopeOfWork: editableSections.scopeOfWork,
         deliverables: editableSections.deliverables,
         services: mergedServices,
+        pricing: {
+          ...base.pricing,
+          baseCost: overriddenBaseCost,
+          totalCost: overriddenTotalCost,
+        },
         additionalInformation: editableSections.additionalInformation,
       };
     } catch {
@@ -839,25 +858,59 @@ const SOWGeneratorModal: React.FC<SOWGeneratorModalProps> = ({ open, onClose, jo
                     Add Deliverable
                   </Button>
                   
-                  {/* Services Editor - only descriptions */}
+                  {/* Services Editor — description + per-line price override.
+                      Editing the cost here just changes the price on the SOW;
+                      it does NOT add a discount/adjustment row. The total
+                      recomputes from sum(services[].cost) in buildFinalSOWData. */}
                   <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Services</Typography>
-                  {editableSections.services.map((service, index) => (
-                    <Card key={service.id} sx={{ mb: 1, p: 1 }}>
-                      <Typography variant="body2" fontWeight="bold">{service.name}</Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Description"
-                        value={service.description}
-                        onChange={(e) => {
-                          const newServices = [...editableSections.services];
-                          newServices[index] = {...service, description: e.target.value};
-                          setEditableSections({...editableSections, services: newServices});
-                        }}
-                        sx={{ mt: 1 }}
-                      />
-                    </Card>
-                  ))}
+                  {editableSections.services.map((service, index) => {
+                    const baseService = generatedSOW?.services?.find((g: any) => String(g.id) === String(service.id));
+                    const defaultCost = typeof baseService?.cost === 'number' ? baseService.cost : null;
+                    const currentCost = typeof service.cost === 'number' ? service.cost : 0;
+                    const isOverridden = defaultCost != null && Math.abs(defaultCost - currentCost) > 0.001;
+                    return (
+                      <Card key={service.id} sx={{ mb: 1, p: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                          <Typography variant="body2" fontWeight="bold">{service.name}</Typography>
+                          {isOverridden && (
+                            <Typography variant="caption" color="warning.main">
+                              Default ${defaultCost!.toLocaleString()}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 1, mt: 1 }}>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Description"
+                            value={service.description}
+                            onChange={(e) => {
+                              const newServices = [...editableSections.services];
+                              newServices[index] = { ...service, description: e.target.value };
+                              setEditableSections({ ...editableSections, services: newServices });
+                            }}
+                          />
+                          <TextField
+                            fullWidth
+                            size="small"
+                            label="Cost"
+                            type="number"
+                            inputProps={{ min: 0, step: '0.01' }}
+                            value={currentCost === 0 && !isOverridden ? '' : String(currentCost)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const parsed = raw === '' ? 0 : Number(raw);
+                              const newServices = [...editableSections.services];
+                              newServices[index] = { ...service, cost: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0 };
+                              setEditableSections({ ...editableSections, services: newServices });
+                            }}
+                            InputProps={{ startAdornment: <Box sx={{ pr: 0.5, color: 'text.secondary' }}>$</Box> }}
+                            helperText={isOverridden ? 'Overridden from default' : undefined}
+                          />
+                        </Box>
+                      </Card>
+                    );
+                  })}
                   
                   {/* Additional Information */}
                   <TextField
