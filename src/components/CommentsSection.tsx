@@ -20,11 +20,21 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { format } from 'date-fns';
 
 import { GET_COMMENTS_BY_JOB_ID } from '../gql/queries';
-import { CREATE_COMMENT, DELETE_COMMENT, CREATE_JOB_ATTACHMENT_UPLOAD_URLS, ADD_JOB_ATTACHMENTS } from '../gql/mutations';
+import { CREATE_COMMENT, DELETE_COMMENT, CREATE_JOB_ATTACHMENT_UPLOAD_URLS } from '../gql/mutations';
 import { UserContext } from '../contexts/UserContext';
+
+interface CommentAttachment {
+  filename?: string;
+  key: string;
+  contentType: string;
+  size: number;
+  uploadedAt?: string | null;
+  url?: string | null;
+}
 
 interface Comment {
   id: string;
@@ -34,6 +44,7 @@ interface Comment {
   createdAt: string;
   updatedAt?: string;
   isInternal: boolean;
+  attachments?: CommentAttachment[] | null;
 }
 
 interface CommentsSectionProps {
@@ -90,7 +101,6 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
   });
 
   const [createAttachmentUploadUrls] = useMutation(CREATE_JOB_ATTACHMENT_UPLOAD_URLS);
-  const [addJobAttachments] = useMutation(ADD_JOB_ATTACHMENTS);
 
   const handleAttachmentChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -105,7 +115,11 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
       if (USE_BACKEND) {
         const token = await userContext.userProps?.getAccessToken();
 
-        // If there are attachments, upload them first
+        // Upload any selected files to S3 first, then pass the resulting
+        // {key,filename,contentType,size} tuples into the createComment input
+        // so the attachments are stored ON the comment (and render inline
+        // beneath it) rather than on the job-level Attachments section.
+        let attachmentInputs: Array<{ filename?: string; key: string; contentType: string; size: number }> = [];
         if (attachmentFiles.length > 0) {
           const filesForRequest = attachmentFiles.map((file) => ({
             filename: file.name,
@@ -114,15 +128,8 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
           }));
 
           const uploadUrlResult = await createAttachmentUploadUrls({
-            variables: {
-              jobId,
-              files: filesForRequest,
-            },
-            context: {
-              headers: {
-                authorization: token ? `Bearer ${token}` : '',
-              },
-            },
+            variables: { jobId, files: filesForRequest },
+            context: { headers: { authorization: token ? `Bearer ${token}` : '' } },
           });
 
           const uploads = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
@@ -133,34 +140,18 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
               if (!file) return;
               await fetch(u.uploadUrl, {
                 method: 'PUT',
-                headers: {
-                  'Content-Type': u.contentType || 'application/octet-stream',
-                },
+                headers: { 'Content-Type': u.contentType || 'application/octet-stream' },
                 body: file,
               });
             })
           );
 
-          const attachmentInputs = uploads.map((u: any) => ({
+          attachmentInputs = uploads.map((u: any) => ({
             filename: u.filename,
             key: u.key,
             contentType: u.contentType,
             size: u.size,
           }));
-
-          if (attachmentInputs.length > 0) {
-            await addJobAttachments({
-              variables: {
-                jobId,
-                attachments: attachmentInputs,
-              },
-              context: {
-                headers: {
-                  authorization: token ? `Bearer ${token}` : '',
-                },
-              },
-            });
-          }
         }
 
         await createCommentMutation({
@@ -171,6 +162,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
               author: currentUser.email,
               authorType: currentUser.isStaff ? 'STAFF' : 'CLIENT',
               isInternal: currentUser.isStaff ? isInternal : false,
+              attachments: attachmentInputs.length > 0 ? attachmentInputs : undefined,
             },
           },
         });
@@ -310,6 +302,36 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
                 <Typography variant="body2" sx={{ mb: 1, whiteSpace: 'pre-wrap' }}>
                   {comment.content}
                 </Typography>
+                {Array.isArray(comment.attachments) && comment.attachments.length > 0 && (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                    {comment.attachments.map((att: CommentAttachment, idx: number) => {
+                      const label = att.filename || 'attachment';
+                      const kb = att.size > 0 ? ` (${(att.size / 1024).toFixed(1)} KB)` : '';
+                      return att.url ? (
+                        <Chip
+                          key={`${att.key}-${idx}`}
+                          icon={<AttachFileIcon />}
+                          label={`${label}${kb}`}
+                          size="small"
+                          variant="outlined"
+                          component="a"
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          clickable
+                        />
+                      ) : (
+                        <Chip
+                          key={`${att.key}-${idx}`}
+                          icon={<AttachFileIcon />}
+                          label={`${label}${kb}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      );
+                    })}
+                  </Box>
+                )}
                 <Typography variant="caption" color="text.secondary">
                   {format(new Date(comment.createdAt), 'MMM d, yyyy h:mm a')}
                   {comment.updatedAt && comment.updatedAt !== comment.createdAt && ' (edited)'}

@@ -815,6 +815,14 @@ export const GET_COMMENTS_BY_JOB_ID = gql`
       createdAt
       updatedAt
       isInternal
+      attachments {
+        filename
+        key
+        contentType
+        size
+        uploadedAt
+        url
+      }
     }
   }
 `;

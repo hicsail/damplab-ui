@@ -410,6 +410,14 @@ export const CREATE_COMMENT = gql`
       authorType
       createdAt
       isInternal
+      attachments {
+        filename
+        key
+        contentType
+        size
+        uploadedAt
+        url
+      }
     }
   }
 `;
