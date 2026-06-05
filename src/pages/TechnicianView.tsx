@@ -15,7 +15,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { DeleteForeverSharp, PlusOne } from '@mui/icons-material';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SERVICES, GET_SOW_BY_JOB_ID }         from '../gql/queries';
-import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, SCREEN_JOB_SEQUENCES, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
+import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, MUTATE_JOB_STATE, SCREEN_JOB_SEQUENCES, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
 import { calculateServiceCost } from '../utils/servicePricing';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
@@ -69,6 +69,31 @@ const toPendingFiles = (files: FileList | null): PendingParamFile[] => {
     }));
 };
 
+const stripTypename = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(stripTypename);
+    if (!value || typeof value !== 'object') return value;
+    const out: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([k, v]) => {
+        if (k === '__typename') return;
+        out[k] = stripTypename(v);
+    });
+    return out;
+};
+
+const downloadJson = (filename: string, payload: unknown) => {
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // Let the browser start the download before revoking.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+};
+
 export default function TechnicianView() {
 
     const { id }                              = useParams();
@@ -83,7 +108,7 @@ export default function TechnicianView() {
     const [jobInstitution, setJobInstitution] = useState('');
     const [jobEmail, setJobEmail]             = useState('');
     const [jobNotes, setJobNotes] = useState('');
-    const [workflows, setWorklows]            = useState([]);  // ▶ URLSearchParams {}
+    const [workflows, setWorklows]            = useState<any[]>([]);  // ▶ URLSearchParams {}
     const [attachments, setAttachments] = useState<any[]>([]);
 
     const { loading, error, data, refetch: refetchJob } = useQuery(GET_JOB_BY_ID, {
@@ -167,6 +192,22 @@ export default function TechnicianView() {
     });
 
     const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
+    const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
+
+    const handleCloseJob = async () => {
+        if (!id) return;
+        const ok = window.confirm(
+            'Close this job? It will be marked CLOSED and removed from the lab monitor. This action is meant for jobs that are fully wrapped up.'
+        );
+        if (!ok) return;
+        try {
+            await changeJobStateMutation({ variables: { ID: id, State: 'CLOSED' } });
+            await refetchJob();
+        } catch (e) {
+            console.error('Failed to close job:', e);
+            window.alert('Could not close the job. Please try again.');
+        }
+    };
 
     const [addWorkflowToJob, { loading: addingWorkflow }] = useMutation(ADD_WORKFLOW_TO_JOB);
 
@@ -397,7 +438,7 @@ export default function TechnicianView() {
                 const metas = tokenOrTokens.map((t) => uploadedMetaByToken.get(t)).filter(Boolean).map((m) => JSON.stringify(m));
                 return { ...p, value: metas };
             }
-            const meta = uploadedMetaByToken.get(tokenOrTokens);
+            const meta = typeof tokenOrTokens === 'string' ? uploadedMetaByToken.get(tokenOrTokens) : undefined;
             return { ...p, value: meta ? JSON.stringify(meta) : null };
         });
     };
@@ -510,6 +551,7 @@ export default function TechnicianView() {
         const createText = "The job is currently being created.";
         const acceptText = "The job was accepted by the DAMP Lab. The client will be asked to sign and return the SOW.";
         const rejectText=  "The job was rejected by the DAMP Lab. The client will be asked to resubmit the job with changes.";
+        const closedText = "This job has been closed out. It is no longer active in the lab monitor.";
         const defaultText = "Invalid Case";
         switch (jobState) {
             case 'SUBMITTED':
@@ -520,6 +562,8 @@ export default function TechnicianView() {
                 return ['rgb(0, 256, 0, 0.5)', <Check />, acceptText];
             case 'REJECTED':
                 return ['rgb(256, 0, 0, 0.5)', <NotInterested />, rejectText];
+            case 'CLOSED':
+                return ['rgba(120, 120, 120, 0.35)', <Check />, closedText];
             default:
                 return ['rgb(0, 0, 0, 0)', <NotInterested />, defaultText];
         }
@@ -547,6 +591,18 @@ export default function TechnicianView() {
         } catch (e) {
             console.error('Failed to update job customer category:', e);
         }
+    };
+
+    const handleExportJobJson = () => {
+        if (!id || !jobData) return;
+        const exportPayload = stripTypename({
+            exportedAt: new Date().toISOString(),
+            job: jobData,
+            sow: sowFullData,
+            invoices,
+        });
+        const displayId = (jobData as any)?.jobId ?? id;
+        downloadJson(`DAMP-Job-${displayId}.json`, exportPayload);
     };
 
     // const workflowCard = (
@@ -886,6 +942,23 @@ export default function TechnicianView() {
                         sx={{ textTransform: 'none' }}
                     >
                         Add service
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        onClick={handleExportJobJson}
+                        disabled={!jobData}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        Export job JSON
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        color="warning"
+                        onClick={handleCloseJob}
+                        disabled={!jobData || jobState === 'CLOSED' || closingJob}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        {jobState === 'CLOSED' ? 'Job closed' : closingJob ? 'Closing…' : 'Close job'}
                     </Button>
                 </Box>
                 <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>

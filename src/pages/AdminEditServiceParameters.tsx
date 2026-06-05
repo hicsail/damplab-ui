@@ -18,8 +18,26 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { AppContext } from '../contexts/App';
 import { UPDATE_SERVICE } from '../gql/queries';
 import { validateParameter } from '../components/edit/parameters/ParameterValidation';
@@ -38,6 +56,60 @@ const createId = () =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+/**
+ * Sortable row in the parameter list. The drag handle is the only listener
+ * surface so that clicking the row body still selects the parameter.
+ */
+function SortableParamRow({
+  dragKey,
+  label,
+  selected,
+  onSelect
+}: {
+  dragKey: string;
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: dragKey
+  });
+  return (
+    <Box
+      ref={setNodeRef}
+      sx={{
+        display: 'flex',
+        alignItems: 'stretch',
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+        backgroundColor: isDragging ? 'action.hover' : undefined,
+        borderRadius: 1
+      }}
+    >
+      <Box
+        {...attributes}
+        {...listeners}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          px: 0.5,
+          cursor: 'grab',
+          color: 'text.secondary',
+          touchAction: 'none',
+          '&:active': { cursor: 'grabbing' }
+        }}
+        aria-label='Drag to reorder parameter'
+      >
+        <DragIndicatorIcon fontSize='small' />
+      </Box>
+      <ListItemButton selected={selected} onClick={onSelect} sx={{ flex: 1 }}>
+        <ListItemText primary={label} secondary={undefined} />
+      </ListItemButton>
+    </Box>
+  );
+}
 
 export default function AdminEditServiceParameters() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -59,8 +131,35 @@ export default function AdminEditServiceParameters() {
 
   useEffect(() => {
     if (!service) return;
-    setParameters((prev) => (prev.length ? prev : service.parameters ?? []));
+    setParameters((prev) =>
+      prev.length
+        ? prev
+        : (service.parameters ?? []).map((p: any) => ({ ...p, _dragKey: createId() }))
+    );
   }, [service]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setParameters((prev) => {
+      const oldIndex = prev.findIndex((p) => p._dragKey === active.id);
+      const newIndex = prev.findIndex((p) => p._dragKey === over.id);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      const reordered = arrayMove(prev, oldIndex, newIndex);
+      // Keep the currently-selected parameter selected after the move.
+      setSelectedParameterIndex((current) => {
+        const currentKey = prev[current]?._dragKey;
+        const nextIndex = reordered.findIndex((p) => p._dragKey === currentKey);
+        return nextIndex >= 0 ? nextIndex : current;
+      });
+      return reordered;
+    });
+  };
 
   if (!service) {
     return (
@@ -110,7 +209,8 @@ export default function AdminEditServiceParameters() {
           paramType: 'input',
           required: false,
           allowMultipleValues: false,
-          isPriceMultiplier: false
+          isPriceMultiplier: false,
+          _dragKey: createId()
         }
       ];
       setSelectedParameterIndex(next.length - 1);
@@ -125,7 +225,8 @@ export default function AdminEditServiceParameters() {
 
       const tableParseErrors: string[] = [];
       const normalizedParameters = parameters.map((parameter, index) => {
-        const normalized = { ...parameter };
+        const { _dragKey: _strip, ...rest } = parameter;
+        const normalized = { ...rest };
         if (!normalized.id || String(normalized.id).trim() === '') {
           normalized.id = idFromName(normalized.name ?? '');
         }
@@ -209,20 +310,28 @@ export default function AdminEditServiceParameters() {
             <Typography variant='subtitle1' sx={{ px: 1, pt: 1 }}>
               Parameters
             </Typography>
-            <List dense disablePadding>
-              {parameters.map((parameter, index) => (
-                <ListItemButton
-                  key={`${parameter.id || 'param'}-${index}`}
-                  selected={selectedParameterIndex === index}
-                  onClick={() => setSelectedParameterIndex(index)}
-                >
-                  <ListItemText
-                    primary={parameter.name?.trim() ? parameter.name : 'Untitled parameter'}
-                  secondary={undefined}
-                  />
-                </ListItemButton>
-              ))}
-            </List>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={parameters.map((p) => p._dragKey)}
+                strategy={verticalListSortingStrategy}
+              >
+                <List dense disablePadding>
+                  {parameters.map((parameter, index) => (
+                    <SortableParamRow
+                      key={parameter._dragKey}
+                      dragKey={parameter._dragKey}
+                      label={parameter.name?.trim() ? parameter.name : 'Untitled parameter'}
+                      selected={selectedParameterIndex === index}
+                      onSelect={() => setSelectedParameterIndex(index)}
+                    />
+                  ))}
+                </List>
+              </SortableContext>
+            </DndContext>
             <Box sx={{ p: 1 }}>
               <Button fullWidth variant='outlined' startIcon={<AddIcon />} onClick={addParameter}>
                 Add parameter

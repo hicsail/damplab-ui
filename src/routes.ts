@@ -14,7 +14,8 @@ export default [
         route("/training", "./pages/Training.tsx"),
         route("/training/admin-edit", "./pages/TrainingAdminEdit.tsx"),
         route("/training/canvas", "./pages/TrainingCanvas.tsx"),
-        route("/admin/services-catalog", "./pages/AdminServicesCatalog.tsx"),
+        route("/services-catalog", "./pages/AdminServicesCatalog.tsx"),
+        route("/admin/services-catalog", "./pages/AdminServicesCatalog.tsx", { id: "admin-services-catalog-legacy" }),
         route("/bugs", "./pages/Bugs.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
@@ -42,6 +43,9 @@ export default [
         route("/edit/services/:serviceId", "./pages/AdminEditService.tsx"),
         route("/edit/bundles/new", "./pages/AdminNewBundle.tsx"),
         route("/edit/bundles/:bundleId", "./pages/AdminEditBundle.tsx"),
+        route("/edit/inventory/new", "./pages/AdminNewInventoryItem.tsx"),
+        route("/edit/inventory/:id", "./pages/AdminEditInventoryItem.tsx"),
+        route("/inventory", "./pages/Inventory.tsx"),
         route("/screener", "./pages/Screener.tsx"),
 
         /* Old comments from pre-React-Router-migration App.tsx: */

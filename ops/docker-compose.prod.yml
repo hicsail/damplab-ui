@@ -1,0 +1,62 @@
+# Production stack for damplab-canvas-prod (i-05c55b9d6ae3de229).
+# Mirror of the live compose at /home/ubuntu/damplab/docker-compose.yml.
+# Source of truth: this file. Updates land on the box via SSM (see ops/README.md).
+#
+# Differences from staging:
+# - No keycloak / keycloak-db / tls services — prod uses the staging Keycloak
+#   at https://damplab-keycloak.sail.codes for shared auth.
+# - Image tags pinned to :prod (floating, advanced only by the release-prod.yml
+#   workflow in each app repo).
+# - Mongo volume is backed up to s3://sail-data-backups/damplab-mongo-prod/.
+
+services:
+
+  damplab-ui:
+    image: hicsail/damplab-ui:prod
+    ports:
+      - 80:80
+    restart: unless-stopped
+    depends_on:
+      - damplab-backend
+
+  damplab-backend:
+    image: hicsail/damplab-backend:prod
+    ports:
+      - 3000:3000
+    environment:
+      - MONGO_URI=mongodb://backend-db:27017/damplab
+      - JWKS_ENDPOINT=${JWKS_ENDPOINT}
+      - AWS_REGION=us-east-1
+      - JOB_ATTACHMENTS_BUCKET=${JOB_ATTACHMENTS_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - KEYCLOAK_SERVER_URL=${KEYCLOAK_SERVER_URL}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
+      - KEYCLOAK_LAB_STAFF_GROUP_NAME=${KEYCLOAK_LAB_STAFF_GROUP_NAME}
+    restart: unless-stopped
+    depends_on:
+      - backend-db
+
+  backend-db:
+    image: mongo:7.0
+    volumes:
+      - damplab-mongo:/data/db
+    restart: unless-stopped
+
+  backup:
+    image: offen/docker-volume-backup:v2.43.3
+    environment:
+      BACKUP_CRON_EXPRESSION: "5 2 * * 3"
+      AWS_S3_BUCKET_NAME: sail-data-backups
+      AWS_S3_PATH: damplab-mongo-prod
+      AWS_ACCESS_KEY_ID: ${BACKUP_AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${BACKUP_AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - damplab-mongo:/backup:ro
+    restart: unless-stopped
+
+volumes:
+  damplab-mongo:
+    external: true

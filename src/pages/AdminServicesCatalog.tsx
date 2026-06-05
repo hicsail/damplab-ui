@@ -15,6 +15,28 @@ import {
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { AppContext } from '../contexts/App';
 
+function formatMoney(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '';
+  return `$${numeric.toFixed(2)}`;
+}
+
+function getPricingValue(row: any, key: 'internal' | 'externalAcademic' | 'externalMarket' | 'externalNoSalary'): unknown {
+  const pricing = row?.pricing ?? {};
+
+  if (key === 'internal') return pricing.internal ?? row?.internalPrice;
+  if (key === 'externalAcademic') return pricing.externalAcademic ?? row?.externalAcademicPrice;
+  if (key === 'externalMarket')
+    return (
+      pricing.externalMarket ??
+      pricing.external ??
+      row?.externalMarketPrice ??
+      row?.externalPrice
+    );
+  return pricing.externalNoSalary ?? row?.externalNoSalaryPrice;
+}
+
 export default function AdminServicesCatalog() {
   const { services } = useContext(AppContext);
   const [selectedService, setSelectedService] = useState<any | null>(null);
@@ -38,24 +60,36 @@ export default function AdminServicesCatalog() {
       minWidth: 260,
     },
     {
-      field: 'pricingMode',
-      headerName: 'Pricing Mode',
-      width: 160,
-      valueGetter: (_value, row) => row.pricingMode ?? 'SERVICE',
-      valueFormatter: (value) =>
-        value === 'PARAMETER' ? 'Parameter-based' : 'Service price',
+      field: 'pricingInternal',
+      headerName: 'Internal',
+      width: 120,
+      type: 'number',
+      valueGetter: (_value, row) => getPricingValue(row, 'internal'),
+      valueFormatter: (value) => formatMoney(value),
     },
     {
-      field: 'price',
-      headerName: 'Service Price',
-      width: 140,
+      field: 'pricingExternalAcademic',
+      headerName: 'External (Academic)',
+      width: 170,
       type: 'number',
-      valueFormatter: (value) => {
-        if (value === undefined || value === null || value === '') return '';
-        const numeric = Number(value);
-        if (!Number.isFinite(numeric)) return '';
-        return `$${numeric.toFixed(2)}`;
-      },
+      valueGetter: (_value, row) => getPricingValue(row, 'externalAcademic'),
+      valueFormatter: (value) => formatMoney(value),
+    },
+    {
+      field: 'pricingExternalMarket',
+      headerName: 'External (Market)',
+      width: 160,
+      type: 'number',
+      valueGetter: (_value, row) => getPricingValue(row, 'externalMarket'),
+      valueFormatter: (value) => formatMoney(value),
+    },
+    {
+      field: 'pricingExternalNoSalary',
+      headerName: 'External (No Salary)',
+      width: 180,
+      type: 'number',
+      valueGetter: (_value, row) => getPricingValue(row, 'externalNoSalary'),
+      valueFormatter: (value) => formatMoney(value),
     },
     {
       field: 'parameters',
@@ -87,10 +121,10 @@ export default function AdminServicesCatalog() {
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="h4" gutterBottom>
-        Admin Services Catalog (Read-only)
+        Services Catalog
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-        View DAMPLab services, their parameters, and pricing details. This page is read-only for all non‑staff users.
+        Read-only view of DAMPLab services, their parameters, and pricing. Prices are shown across the four customer categories.
       </Typography>
 
       <Card>
@@ -120,6 +154,29 @@ export default function AdminServicesCatalog() {
           {selectedService?.name || 'Service parameters'}
         </DialogTitle>
         <DialogContent dividers>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`Internal: ${formatMoney(getPricingValue(selectedService, 'internal')) || '—'}`}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`External (Academic): ${formatMoney(getPricingValue(selectedService, 'externalAcademic')) || '—'}`}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`External (Market): ${formatMoney(getPricingValue(selectedService, 'externalMarket')) || '—'}`}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`External (No Salary): ${formatMoney(getPricingValue(selectedService, 'externalNoSalary')) || '—'}`}
+            />
+          </Box>
+
           {parameters.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               No parameters are defined for this service.

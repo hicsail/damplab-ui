@@ -421,6 +421,14 @@ export const CREATE_COMMENT = gql`
       authorType
       createdAt
       isInternal
+      attachments {
+        filename
+        key
+        contentType
+        size
+        uploadedAt
+        url
+      }
     }
   }
 `;
@@ -484,6 +492,7 @@ export const SET_USER_KEYCLOAK_CUSTOMER_CATEGORY = gql`
       firstName
       lastName
       customerCategory
+      isDefaultExternalCustomer
     }
   }
 `;

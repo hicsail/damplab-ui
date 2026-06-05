@@ -31,6 +31,7 @@ export const GET_SERVICES = gql`
                 id
                 name
             }
+            inventoryRequirements
         }
     }
 `;
@@ -444,8 +445,11 @@ export const GET_LAB_MONITOR_NODES = gql`
             assigneeDisplayName
             estimatedMinutes
             startedAt
+            usedInventory
             service {
+                id
                 name
+                inventoryRequirements
             }
             workflow {
                 id
@@ -838,6 +842,14 @@ export const GET_COMMENTS_BY_JOB_ID = gql`
       createdAt
       updatedAt
       isInternal
+      attachments {
+        filename
+        key
+        contentType
+        size
+        uploadedAt
+        url
+      }
     }
   }
 `;
@@ -886,6 +898,112 @@ export const SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
       firstName
       lastName
       customerCategory
+      isDefaultExternalCustomer
     }
   }
 `;
+
+export const LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
+  query ListKeycloakUsersForCustomerManagement($category: CustomerManagementUserListCategory!, $offset: Int, $limit: Int) {
+    listKeycloakUsersForCustomerManagement(category: $category, offset: $offset, limit: $limit) {
+      items {
+        id
+        username
+        email
+        firstName
+        lastName
+        customerCategory
+        isDefaultExternalCustomer
+      }
+      hasNextPage
+    }
+  }
+`;
+
+// ─── Inventory ────────────────────────────────────────────────────────────
+// CRUD + lookups for the inventory/scheduling feature.
+
+const INVENTORY_FIELDS = `
+  id
+  name
+  type
+  description
+  location
+  quantity
+  isDeleted
+`;
+
+export const GET_INVENTORY_ITEMS = gql`
+  query GetInventoryItems {
+    inventoryItems {
+      ${INVENTORY_FIELDS}
+    }
+  }
+`;
+
+export const GET_ACTIVE_INVENTORY_ITEMS = gql`
+  query GetActiveInventoryItems {
+    activeInventoryItems {
+      ${INVENTORY_FIELDS}
+    }
+  }
+`;
+
+export const CREATE_INVENTORY_ITEM = gql`
+  mutation CreateInventoryItem($item: CreateInventoryItem!) {
+    createInventoryItem(item: $item) {
+      ${INVENTORY_FIELDS}
+    }
+  }
+`;
+
+export const UPDATE_INVENTORY_ITEM = gql`
+  mutation UpdateInventoryItem($item: ID!, $changes: InventoryItemChange!) {
+    updateInventoryItem(item: $item, changes: $changes) {
+      ${INVENTORY_FIELDS}
+    }
+  }
+`;
+
+export const DELETE_INVENTORY_ITEM = gql`
+  mutation DeleteInventoryItem($item: ID!) {
+    deleteInventoryItem(item: $item)
+  }
+`;
+
+// In-progress nodes currently holding any inventory — powers the availability board.
+export const GET_IN_PROGRESS_NODES_HOLDING_INVENTORY = gql`
+  query GetInProgressNodesHoldingInventory {
+    getInProgressNodesHoldingInventory {
+      _id
+      label
+      usedInventory
+      startedAt
+      assigneeDisplayName
+      workflow {
+        id
+        job {
+          id
+          name
+          jobId
+        }
+      }
+      service {
+        id
+        name
+      }
+    }
+  }
+`;
+
+// Set the inventory items a node is holding (rejects items held by another in-progress node).
+export const SET_WORKFLOW_NODE_USED_INVENTORY = gql`
+  mutation SetWorkflowNodeUsedInventory($_ID: ID!, $inventoryIds: [ID!]!) {
+    setWorkflowNodeUsedInventory(workflowNode: $_ID, inventoryIds: $inventoryIds) {
+      _id
+      state
+      usedInventory
+    }
+  }
+`;
+
