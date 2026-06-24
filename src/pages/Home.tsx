@@ -14,6 +14,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import PeopleIcon from '@mui/icons-material/People';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
+import InsightsIcon from '@mui/icons-material/Insights';
 import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
@@ -204,6 +205,10 @@ export default function Home() {
                 <MenuButton navigateTo="/inventory">
                   <PrecisionManufacturingIcon />
                   Inventory Availability
+                </MenuButton>
+                <MenuButton navigateTo="/lab-assistant">
+                  <InsightsIcon />
+                  Lab Status Assistant
                 </MenuButton>
               </MenuSection>
 
