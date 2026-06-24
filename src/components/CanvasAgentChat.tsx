@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { DeepChat } from 'deep-chat-react';
 import { Box, Fab, IconButton, Paper, Stack, Typography } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -21,17 +21,32 @@ export default function CanvasAgentChat() {
   const userContext: UserContextProps = useContext(UserContext);
   const [lastNote, setLastNote] = useState<string | null>(null);
 
+  // The DeepChat web component keeps its own conversation state. If we hand it
+  // a new `connect` object on re-render (which happens when setNodes/setEdges
+  // bump the root context), it resets and the messages vanish. So we build the
+  // handler ONCE (stable identity) and have it read live values from refs.
+  const servicesRef = useRef(services);
+  const setNodesRef = useRef(setNodes);
+  const setEdgesRef = useRef(setEdges);
+  const getTokenRef = useRef(userContext.userProps?.getAccessToken);
+  useEffect(() => {
+    servicesRef.current = services;
+    setNodesRef.current = setNodes;
+    setEdgesRef.current = setEdges;
+    getTokenRef.current = userContext.userProps?.getAccessToken;
+  }, [services, setNodes, setEdges, userContext.userProps]);
+
   // Replace the canvas with the agent's proposed workflow, hydrated against the
   // live catalog. Replacing (not appending) matches "describe it → see it".
   const applyWorkflow = (spec: AgentWorkflowSpec) => {
     try {
-      const { nodes, edges, missingServiceIds } = hydrateAgentWorkflow(spec, services || []);
+      const { nodes, edges, missingServiceIds } = hydrateAgentWorkflow(spec, servicesRef.current || []);
       if (nodes.length === 0) {
         setLastNote('The assistant proposed a workflow but none of its services matched the catalog.');
         return;
       }
-      setNodes(nodes as any);
-      setEdges(edges as any);
+      setNodesRef.current?.(nodes as any);
+      setEdgesRef.current?.(edges as any);
       setLastNote(
         missingServiceIds.length > 0
           ? `Rendered ${nodes.length} step(s). Skipped ${missingServiceIds.length} unknown service(s).`
@@ -44,12 +59,13 @@ export default function CanvasAgentChat() {
 
   // DeepChat custom request handler: streams SSE from the backend, appends text
   // chunks to the chat bubble, and hydrates the canvas when a workflow arrives.
+  // Built once (empty deps) so DeepChat never sees a changed prop.
   const connect = useMemo(
     () => ({
       stream: true,
       handler: async (body: any, signals: any) => {
         try {
-          const token = await userContext.userProps?.getAccessToken();
+          const token = await getTokenRef.current?.();
           const msgs: any[] = Array.isArray(body?.messages) ? body.messages : [];
           const last = msgs[msgs.length - 1];
           const message = last?.text ?? '';
@@ -111,8 +127,9 @@ export default function CanvasAgentChat() {
         }
       }
     }),
-    // services/setNodes are read inside applyWorkflow via closure; rebuild when they change
-    [services, userContext.userProps]
+    // Stable identity — live values are read from refs inside the handler.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
 
   if (!open) {
@@ -137,8 +154,6 @@ export default function CanvasAgentChat() {
         bottom: 24,
         right: 24,
         width: 400,
-        height: 560,
-        maxHeight: '80vh',
         zIndex: 1300,
         display: 'flex',
         flexDirection: 'column',
@@ -150,7 +165,7 @@ export default function CanvasAgentChat() {
         direction="row"
         alignItems="center"
         justifyContent="space-between"
-        sx={{ px: 2, py: 1, bgcolor: 'primary.main', color: 'primary.contrastText' }}
+        sx={{ px: 2, py: 1, bgcolor: 'primary.main', color: 'primary.contrastText', flexShrink: 0 }}
       >
         <Stack direction="row" spacing={1} alignItems="center">
           <AutoAwesomeIcon fontSize="small" />
@@ -163,26 +178,30 @@ export default function CanvasAgentChat() {
         </IconButton>
       </Stack>
 
-      <Box sx={{ flex: 1, minHeight: 0 }}>
-        <DeepChat
-          connect={connect as any}
-          style={{ width: '100%', height: '100%', border: 'none', borderRadius: 0 }}
-          introMessage={{
-            text:
-              "Hi! Describe the lab workflow you want — an end goal, sample type, or the operations you have in mind — and I'll assemble it on the canvas. I'll ask questions if I need more detail."
-          }}
-          textInput={{ placeholder: { text: 'e.g. 16S sequencing of 8 bacterial samples' } }}
-          messageStyles={{
-            default: {
-              ai: { bubble: { backgroundColor: '#f1f5f9', color: '#111827' } },
-              user: { bubble: { backgroundColor: '#1976d2', color: 'white' } }
-            }
-          }}
-        />
-      </Box>
+      {/* DeepChat needs an explicit pixel height — it does NOT size to a flex
+          parent. Without this its message list grows unbounded and the input
+          box gets pushed out of the clipped panel. */}
+      <DeepChat
+        connect={connect as any}
+        // Include the FULL conversation in body.messages (default only sends the
+        // latest), so the handler can forward prior turns to the agent as history.
+        requestBodyLimits={{ maxMessages: -1 }}
+        style={{ width: '100%', height: '480px', border: 'none', borderRadius: '0px', backgroundColor: 'white' }}
+        introMessage={{
+          text:
+            "Hi! Describe the lab workflow you want — an end goal, sample type, or the operations you have in mind — and I'll assemble it on the canvas. I'll ask questions if I need more detail."
+        }}
+        textInput={{ placeholder: { text: 'e.g. Gibson Assembly then sequencing' } }}
+        messageStyles={{
+          default: {
+            ai: { bubble: { backgroundColor: '#f1f5f9', color: '#111827', maxWidth: '85%' } },
+            user: { bubble: { backgroundColor: '#1976d2', color: 'white', maxWidth: '85%' } }
+          }
+        }}
+      />
 
       {lastNote && (
-        <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc' }}>
+        <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc', flexShrink: 0 }}>
           <Typography variant="caption" color="text.secondary">
             {lastNote}
           </Typography>

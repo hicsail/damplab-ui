@@ -78,21 +78,38 @@ export function hydrateAgentWorkflow(spec: AgentWorkflowSpec, services: any[]): 
     createdIds.push(nodeId);
   });
 
+  const mkEdge = (sourceId: string, targetId: string) => ({
+    id: Math.random().toString(36).substring(2, 9),
+    source: sourceId,
+    target: targetId,
+    animated: true,
+    arrowHeadType: 'arrowclosed',
+    labelStyle: { fill: '#f6ab6c', fontWeight: 700 },
+    style: { stroke: 'green' }
+  });
+
   const edges: any[] = [];
+  const seen = new Set<string>();
   specEdges.forEach((e) => {
     const sourceId = createdIds[e?.from];
     const targetId = createdIds[e?.to];
-    if (!sourceId || !targetId) return;
-    edges.push({
-      id: Math.random().toString(36).substring(2, 9),
-      source: sourceId,
-      target: targetId,
-      animated: true,
-      arrowHeadType: 'arrowclosed',
-      labelStyle: { fill: '#f6ab6c', fontWeight: 700 },
-      style: { stroke: 'green' }
-    });
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    const key = `${sourceId}->${targetId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    edges.push(mkEdge(sourceId, targetId));
   });
+
+  // Fallback: if the agent produced 2+ nodes but no usable edges, wire them
+  // into a linear pipeline in the order given. The user describes sequential
+  // steps ("X then Y then Z"), so a connected chain is the expected result
+  // even when the catalog's allowedConnections wouldn't permit the link.
+  if (edges.length === 0) {
+    const ordered = createdIds.filter((id): id is string => !!id);
+    for (let i = 0; i < ordered.length - 1; i++) {
+      edges.push(mkEdge(ordered[i], ordered[i + 1]));
+    }
+  }
 
   return { nodes, edges, missingServiceIds };
 }
