@@ -1,7 +1,8 @@
-import { useContext, useEffect, useMemo, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { DeepChat } from 'deep-chat-react';
-import { Box, Paper, Stack, Typography } from '@mui/material';
+import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material';
 import InsightsIcon from '@mui/icons-material/Insights';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 
 /** Resolve the REST lab-status endpoint from the configured GraphQL backend URL. */
@@ -21,6 +22,29 @@ export default function LabStatusAssistant() {
   useEffect(() => {
     getTokenRef.current = userContext.userProps?.getAccessToken;
   }, [userContext.userProps]);
+
+  // Attached CSV is kept in a ref (read by the stable handler) AND mirrored to
+  // state for the chip. It persists across turns so the confirm turn re-sends
+  // the same CSV the proposal was built from; cleared explicitly.
+  const csvRef = useRef<{ filename: string; content: string } | null>(null);
+  const [csvName, setCsvName] = useState<string | null>(null);
+
+  const handleCsvSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      csvRef.current = { filename: file.name, content: String(reader.result ?? '') };
+      setCsvName(file.name);
+    };
+    reader.readAsText(file);
+  };
+
+  const clearCsv = () => {
+    csvRef.current = null;
+    setCsvName(null);
+  };
 
   // Stable handler (built once) so DeepChat never resets mid-conversation.
   const connect = useMemo(
@@ -43,7 +67,7 @@ export default function LabStatusAssistant() {
               'Content-Type': 'application/json',
               ...(token ? { Authorization: `Bearer ${token}` } : {})
             },
-            body: JSON.stringify({ message, history })
+            body: JSON.stringify({ message, history, csv: csvRef.current || undefined })
           });
           if (!resp.ok || !resp.body) {
             signals.onResponse({ error: `Assistant request failed (${resp.status}).` });
@@ -95,14 +119,21 @@ export default function LabStatusAssistant() {
     <Box sx={{ p: 3, height: '100%' }}>
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
         <InsightsIcon color="primary" />
-        <Box>
+        <Box sx={{ flex: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Lab Status Assistant
+            Lab Ops Assistant
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Ask about current lab status — operations running, jobs by state, inventory in use. Answers are queried live from the database.
+            Ask about lab status, or attach a CSV to create catalog services. Data changes are previewed and require your explicit confirmation before anything is written.
           </Typography>
         </Box>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button component="label" variant="outlined" size="small" startIcon={<UploadFileIcon />} sx={{ textTransform: 'none' }}>
+            Attach CSV
+            <input type="file" accept=".csv,text/csv" hidden onChange={handleCsvSelected} />
+          </Button>
+          {csvName && <Chip label={csvName} size="small" onDelete={clearCsv} color="primary" variant="outlined" />}
+        </Stack>
       </Stack>
 
       <Paper variant="outlined" sx={{ overflow: 'hidden', borderRadius: 2, maxWidth: 1000 }}>
