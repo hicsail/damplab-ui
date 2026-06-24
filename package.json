@@ -20,6 +20,7 @@
     "@react-router/node": "^7.5.3",
     "@types/xlsx": "^0.0.36",
     "date-fns": "^4.1.0",
+    "deep-chat-react": "^2.4.2",
     "formik": "^2.4.6",
     "graphql": "^16.10.0",
     "isbot": "^5",

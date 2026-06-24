@@ -12,6 +12,7 @@ import { addNodesAndEdgesFromServiceIdsAlt }            from '../controllers/Res
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
 import RightSidebar   from '../components/RightSidebar';
+import CanvasAgentChat from '../components/CanvasAgentChat';
 import { GET_JOB_BY_ID }    from '../gql/queries';
 import { MUTATE_JOB_STATE } from '../gql/mutations';
 import { AppContext }    from '../contexts/App';
@@ -215,6 +216,7 @@ export default function MainFlow() {
                     </div>
                 </ReactFlowProvider>
             </div>
+            <CanvasAgentChat />
         </>
     )
 }
