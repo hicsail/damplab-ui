@@ -28,16 +28,22 @@ export function hydrateAgentWorkflow(spec: AgentWorkflowSpec, services: any[]): 
   const specNodes = Array.isArray(spec?.nodes) ? spec.nodes : [];
   const specEdges = Array.isArray(spec?.edges) ? spec.edges : [];
   const byId = new Map(services.map((s: any) => [String(s.id), s]));
+  // Name fallback: the agent now reads services from Mongo and returns the _id
+  // as serviceId. If an id ever doesn't line up (format drift), fall back to a
+  // case-insensitive name match so the workflow still renders.
+  const byName = new Map(services.map((s: any) => [String(s.name || '').trim().toLowerCase(), s]));
 
   const createdIds: Array<string | null> = [];
   const nodes: any[] = [];
   const missingServiceIds: string[] = [];
 
   specNodes.forEach((sn, index) => {
-    const service = byId.get(String(sn.serviceId));
+    const service =
+      byId.get(String(sn.serviceId)) ||
+      (sn.serviceName ? byName.get(String(sn.serviceName).trim().toLowerCase()) : undefined);
     if (!service) {
       createdIds.push(null); // keep index alignment for edges
-      if (sn.serviceId) missingServiceIds.push(String(sn.serviceId));
+      if (sn.serviceId || sn.serviceName) missingServiceIds.push(String(sn.serviceName || sn.serviceId));
       return;
     }
     const nodeId = Math.random().toString(36).substring(2, 9);
