@@ -32,6 +32,7 @@ export const GET_SERVICES = gql`
                 name
             }
             inventoryRequirements
+            notes
         }
     }
 `;

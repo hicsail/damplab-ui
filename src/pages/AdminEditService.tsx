@@ -62,6 +62,7 @@ export default function AdminEditService() {
     [inventoryData]
   );
   const [deliverables, setDeliverables] = useState<string[]>([]);
+  const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -125,6 +126,7 @@ export default function AdminEditService() {
         : []
     );
     setDeliverables(Array.isArray(row.deliverables) ? [...row.deliverables] : []);
+    setNotes(typeof row.notes === 'string' ? row.notes : '');
   }, [service]);
 
   const parsePrice = (value: string): number | null => {
@@ -190,7 +192,8 @@ export default function AdminEditService() {
       allowedConnections: allowedConnectionIds,
       inventoryRequirements: inventoryRequirementIds,
       description: description.trim(),
-      deliverables
+      deliverables,
+      notes: notes.trim()
     };
 
     try {
@@ -362,6 +365,16 @@ export default function AdminEditService() {
           helperText="Used only if internal and external prices are empty."
         />
       </Box>
+
+      <TextField
+        label="Notes (internal)"
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+        multiline
+        minRows={3}
+        placeholder="Miscellaneous notes for DAMPLab staff…"
+        helperText="Internal only — not shown to customers."
+      />
 
       <FormControl>
         <InputLabel id="edit-service-connections-label">Can be combined with</InputLabel>

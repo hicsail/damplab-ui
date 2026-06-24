@@ -66,6 +66,7 @@ export default function AdminNewService() {
   const [externalNoSalaryPrice, setExternalNoSalaryPrice] = useState('');
   const [fallbackPrice, setFallbackPrice] = useState('');
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([]);
+  const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -133,7 +134,8 @@ export default function AdminNewService() {
       paramGroups: [],
       allowedConnections: allowedConnectionIds,
       description: description.trim(),
-      deliverables: []
+      deliverables: [],
+      notes: notes.trim()
     };
 
     try {
@@ -267,6 +269,16 @@ export default function AdminNewService() {
           helperText='Used only if internal and external prices are empty.'
         />
       </Box>
+
+      <TextField
+        label='Notes (internal)'
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+        multiline
+        minRows={3}
+        placeholder='Miscellaneous notes for DAMPLab staff…'
+        helperText='Internal only — not shown to customers.'
+      />
 
       <FormControl>
         <InputLabel id='new-service-connections-label'>Can be combined with</InputLabel>
