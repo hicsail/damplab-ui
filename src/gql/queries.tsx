@@ -1094,13 +1094,29 @@ export const GET_IN_PROGRESS_NODES_HOLDING_INVENTORY = gql`
   }
 `;
 
-// Set the inventory items a node is holding (rejects items held by another in-progress node).
+// Set the inventory items a node is holding, with an optional planned time window.
+// Rejects items conflicting with other operations OR calendar bookings (shared pool).
 export const SET_WORKFLOW_NODE_USED_INVENTORY = gql`
-  mutation SetWorkflowNodeUsedInventory($_ID: ID!, $inventoryIds: [ID!]!) {
-    setWorkflowNodeUsedInventory(workflowNode: $_ID, inventoryIds: $inventoryIds) {
+  mutation SetWorkflowNodeUsedInventory($_ID: ID!, $inventoryIds: [ID!]!, $reservationStart: DateTime, $reservationEnd: DateTime) {
+    setWorkflowNodeUsedInventory(workflowNode: $_ID, inventoryIds: $inventoryIds, reservationStart: $reservationStart, reservationEnd: $reservationEnd) {
       _id
       state
       usedInventory
+      inventoryReservationStart
+      inventoryReservationEnd
+    }
+  }
+`;
+
+// Inventory items unavailable in a window — shared pool across operations + bookings.
+export const GET_INVENTORY_AVAILABILITY = gql`
+  query InventoryAvailability($from: DateTime, $to: DateTime, $excludeNodeId: ID) {
+    inventoryAvailability(from: $from, to: $to, excludeNodeId: $excludeNodeId) {
+      itemId
+      source
+      label
+      start
+      end
     }
   }
 `;
