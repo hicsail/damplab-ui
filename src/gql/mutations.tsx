@@ -137,6 +137,18 @@ export const MUTATE_NODE_STATUS = gql`
     }
 `;
 
+export const SET_WORKFLOW_NODE_COMPLETED_STEPS = gql`
+    mutation SetWorkflowNodeCompletedSteps($workflowNode: ID!, $completedSteps: [String!]!) {
+        setWorkflowNodeCompletedSteps(
+            workflowNode: $workflowNode,
+            completedSteps: $completedSteps
+        ) {
+            _id
+            completedSteps
+        }
+    }
+`;
+
 export const UPDATE_WORKFLOW_NODE_ASSIGNEE = gql`
     mutation UpdateWorkflowNodeAssignee($workflowNode: ID!, $assigneeId: String, $assigneeDisplayName: String) {
         updateWorkflowNodeAssignee(
@@ -482,6 +494,66 @@ export const SET_USER_KEYCLOAK_CUSTOMER_CATEGORY = gql`
       lastName
       customerCategory
       isDefaultExternalCustomer
+    }
+  }
+`;
+
+const BOOKING_RESULT_FIELDS = `
+  _id
+  inventoryName
+  inventoryType
+  kind
+  startTime
+  endTime
+  quantity
+  usedOn
+  status
+  actualHours
+  actualQuantity
+  usageConfirmed
+  rateSnapshot
+  cost
+  billingStatus
+`;
+
+export const CREATE_BOOKING = gql`
+  mutation CreateBooking($input: CreateBookingInput!) {
+    createBooking(input: $input) {
+      ${BOOKING_RESULT_FIELDS}
+    }
+  }
+`;
+
+export const CONFIRM_BOOKING_USAGE = gql`
+  mutation ConfirmBookingUsage($id: ID!, $actualHours: Float, $actualQuantity: Int) {
+    confirmBookingUsage(id: $id, actualHours: $actualHours, actualQuantity: $actualQuantity) {
+      ${BOOKING_RESULT_FIELDS}
+    }
+  }
+`;
+
+export const CANCEL_BOOKING = gql`
+  mutation CancelBooking($id: ID!) {
+    cancelBooking(id: $id) {
+      _id
+      status
+    }
+  }
+`;
+
+export const GENERATE_USAGE_BILLING = gql`
+  mutation GenerateUsageBilling($input: GenerateUsageBillingInput!) {
+    generateUsageBilling(input: $input) {
+      sow {
+        id
+        sowNumber
+        totalCost
+      }
+      invoice {
+        id
+        invoiceNumber
+        totalCost
+      }
     }
   }
 `;

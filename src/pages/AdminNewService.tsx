@@ -67,6 +67,7 @@ export default function AdminNewService() {
   const [fallbackPrice, setFallbackPrice] = useState('');
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
+  const [protocolId, setProtocolId] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -74,6 +75,13 @@ export default function AdminNewService() {
     () => services.map((service: any) => ({ id: String(service.id), name: String(service.name) })),
     [services]
   );
+
+  const extractProtocolId = (value: string): string => {
+    const v = value.trim();
+    if (!v) return '';
+    const m = v.match(/protocols\.io\/(?:view|edit|run)\/([^/?#]+)/i);
+    return m ? m[1] : v;
+  };
 
   const parsePrice = (value: string): number | null => {
     const trimmed = value.trim();
@@ -135,7 +143,8 @@ export default function AdminNewService() {
       allowedConnections: allowedConnectionIds,
       description: description.trim(),
       deliverables: [],
-      notes: notes.trim()
+      notes: notes.trim(),
+      protocolId: extractProtocolId(protocolId) || null
     };
 
     try {
@@ -186,6 +195,14 @@ export default function AdminNewService() {
         onChange={(event) => setIcon(event.target.value)}
         placeholder='https://…'
         helperText='Optional. Used in the catalog and workflow views.'
+      />
+
+      <TextField
+        label='protocols.io protocol'
+        value={protocolId}
+        onChange={(event) => setProtocolId(event.target.value)}
+        placeholder='n92ld46yxl5b  or  https://www.protocols.io/view/…'
+        helperText='Optional. Paste the protocols.io protocol id or its full URL. Technicians assigned this operation can open the protocol in the bench view.'
       />
 
       <Box

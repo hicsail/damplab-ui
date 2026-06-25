@@ -23,13 +23,17 @@ export default [
         route("/checkout", "./pages/Checkout.tsx"),
         route("/jobs/:jobId", "./pages/JobSubmitted.tsx"), //config later so only owner of job or admin can access
         route("/client_view/:id", "./pages/ClientView.tsx"), // Client job tracking page with SOW viewer and comments
-        route("/my_jobs", "./pages/MyJobs.tsx") // List of current user's submitted jobs
+        route("/my_jobs", "./pages/MyJobs.tsx"), // List of current user's submitted jobs
+        route("/book-inventory", "./pages/BookInventory.tsx") // Customer: book inventory (machines by time, consumables by qty)
     ]),
     layout("./layouts/PrivateRouteDamplabStaff.tsx", [
         route("/lab-monitor/:screen", "./pages/LabMonitor.tsx"),
         route("/lab-status-tv", "./pages/LabStatusTV.tsx"),
         route("/lab-assistant", "./pages/LabStatusAssistant.tsx"),
         route("/technician_view/:id", "./pages/TechnicianView.tsx"),
+        route("/technician_bench", "./pages/TechnicianBench.tsx"),
+        route("/inventory-calendar", "./pages/InventoryCalendar.tsx"),
+        route("/usage-billing", "./pages/UsageBilling.tsx"),
         route("/dashboard", "./pages/Dashboard.tsx"),
         route("/customer-management", "./pages/CustomerManagement.tsx"),
         route("/dominos", "./pages/Dominos.tsx"),

@@ -16,6 +16,9 @@ import PeopleIcon from '@mui/icons-material/People';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
 import InsightsIcon from '@mui/icons-material/Insights';
 import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
+import ScienceIcon from '@mui/icons-material/Science';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
@@ -155,6 +158,10 @@ export default function Home() {
               <FormatListBulletedIcon />
               Services Catalog
             </MenuButton>
+            <MenuButton navigateTo="/book-inventory">
+              <EventAvailableIcon />
+              Book Inventory
+            </MenuButton>
             <MenuButton navigateTo="/training">
               <SchoolIcon />
               Learning Hub
@@ -187,6 +194,10 @@ export default function Home() {
                   <SupervisorAccountOutlinedIcon />
                   Staff submit job
                 </MenuButton>
+                <MenuButton navigateTo="/technician_bench">
+                  <ScienceIcon />
+                  My Bench
+                </MenuButton>
               </MenuSection>
 
               <MenuSection title="Staff: displays">
@@ -205,6 +216,14 @@ export default function Home() {
                 <MenuButton navigateTo="/inventory">
                   <PrecisionManufacturingIcon />
                   Inventory Availability
+                </MenuButton>
+                <MenuButton navigateTo="/inventory-calendar">
+                  <EventAvailableIcon />
+                  Inventory Schedule
+                </MenuButton>
+                <MenuButton navigateTo="/usage-billing">
+                  <ReceiptLongIcon />
+                  Usage Billing
                 </MenuButton>
                 <MenuButton navigateTo="/lab-assistant">
                   <InsightsIcon />

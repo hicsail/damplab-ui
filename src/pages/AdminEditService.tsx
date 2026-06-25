@@ -63,6 +63,7 @@ export default function AdminEditService() {
   );
   const [deliverables, setDeliverables] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
+  const [protocolId, setProtocolId] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -127,7 +128,17 @@ export default function AdminEditService() {
     );
     setDeliverables(Array.isArray(row.deliverables) ? [...row.deliverables] : []);
     setNotes(typeof row.notes === 'string' ? row.notes : '');
+    setProtocolId(typeof row.protocolId === 'string' ? row.protocolId : '');
   }, [service]);
+
+  // Accept either a bare protocols.io id/slug or a full protocol URL; store just
+  // the slug segment (no slashes, so it's safe as a REST path param server-side).
+  const extractProtocolId = (value: string): string => {
+    const v = value.trim();
+    if (!v) return '';
+    const m = v.match(/protocols\.io\/(?:view|edit|run)\/([^/?#]+)/i);
+    return m ? m[1] : v;
+  };
 
   const parsePrice = (value: string): number | null => {
     const trimmed = value.trim();
@@ -193,7 +204,8 @@ export default function AdminEditService() {
       inventoryRequirements: inventoryRequirementIds,
       description: description.trim(),
       deliverables,
-      notes: notes.trim()
+      notes: notes.trim(),
+      protocolId: extractProtocolId(protocolId) || null
     };
 
     try {
@@ -282,6 +294,14 @@ export default function AdminEditService() {
         onChange={(event) => setIcon(event.target.value)}
         placeholder="https://…"
         helperText="Optional. Used in the catalog and workflow views."
+      />
+
+      <TextField
+        label="protocols.io protocol"
+        value={protocolId}
+        onChange={(event) => setProtocolId(event.target.value)}
+        placeholder="n92ld46yxl5b  or  https://www.protocols.io/view/…"
+        helperText="Optional. Paste the protocols.io protocol id or its full URL. Technicians assigned this operation can open the protocol in the bench view."
       />
 
       <Box

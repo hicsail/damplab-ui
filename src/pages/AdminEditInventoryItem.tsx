@@ -17,6 +17,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GET_INVENTORY_ITEMS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
+import { EMPTY_RATE_PRICING, InventoryRateFields, pricingToRateForm, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
 
 const TYPE_OPTIONS = [
   { value: 'ROBOT', label: 'Robot' },
@@ -52,6 +53,9 @@ export default function AdminEditInventoryItem() {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [bookable, setBookable] = useState(false);
+  const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
+  const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,6 +67,9 @@ export default function AdminEditInventoryItem() {
     setDescription(item.description ?? '');
     setLocation(item.location ?? '');
     setQuantity(String(item.quantity ?? 1));
+    setBookable(!!item.bookable);
+    setRateType(item.rateType === 'PER_UNIT' ? 'PER_UNIT' : 'HOURLY');
+    setPricing(pricingToRateForm(item.pricing));
   }, [item?.id]);
 
   if (loading && !item) {
@@ -102,7 +109,10 @@ export default function AdminEditInventoryItem() {
             type,
             description: description.trim() || undefined,
             location: location.trim() || undefined,
-            quantity: parsedQty
+            quantity: parsedQty,
+            bookable,
+            rateType: bookable ? rateType : null,
+            pricing: bookable ? ratePricingToInput(pricing) : null
           }
         }
       });
@@ -163,6 +173,16 @@ export default function AdminEditInventoryItem() {
         />
       </Box>
       <TextField label='Description' value={description} onChange={(e) => setDescription(e.target.value)} multiline minRows={3} />
+
+      <InventoryRateFields
+        bookable={bookable}
+        setBookable={setBookable}
+        rateType={rateType}
+        setRateType={setRateType}
+        pricing={pricing}
+        setPricing={setPricing}
+        itemType={type}
+      />
 
       <Stack direction='row' spacing={2}>
         <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>Cancel</Button>

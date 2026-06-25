@@ -33,6 +33,7 @@ export const GET_SERVICES = gql`
             }
             inventoryRequirements
             notes
+            protocolId
         }
     }
 `;
@@ -550,6 +551,8 @@ export const UPDATE_SERVICE = gql`
       pricingMode
       icon
       deliverables
+      notes
+      protocolId
     }
   }
 `;
@@ -579,6 +582,7 @@ export const CREATE_SERVICE = gql`
       description
       paramGroups
       deliverables
+      protocolId
       allowedConnections {
           id
           name
@@ -828,6 +832,55 @@ export const GET_COMMENTS_BY_JOB_ID = gql`
   }
 `;
 
+export const GET_ASSIGNED_OPERATIONS = gql`
+  query AssignedOperations {
+    assignedOperations {
+      _id
+      id
+      label
+      state
+      startedAt
+      completedSteps
+      additionalInstructions
+      formData
+      service {
+        id
+        name
+        description
+        protocolId
+        parameters
+      }
+      job {
+        id
+        name
+        jobId
+      }
+    }
+  }
+`;
+
+export const GET_COMMENTS_BY_NODE_ID = gql`
+  query GetCommentsByNodeId($nodeId: ID!) {
+    commentsByNodeId(nodeId: $nodeId) {
+      id
+      content
+      author
+      authorType
+      createdAt
+      updatedAt
+      isInternal
+      attachments {
+        filename
+        key
+        contentType
+        size
+        uploadedAt
+        url
+      }
+    }
+  }
+`;
+
 // Bug report queries
 export const GET_BUG_REPORTS = gql`
   query BugReports($filter: BugReportsFilterInput) {
@@ -905,6 +958,16 @@ const INVENTORY_FIELDS = `
   location
   quantity
   isDeleted
+  bookable
+  rateType
+  pricing {
+    internal
+    externalAcademic
+    externalMarket
+    externalNoSalary
+    external
+    legacy
+  }
 `;
 
 export const GET_INVENTORY_ITEMS = gql`
@@ -935,6 +998,67 @@ export const UPDATE_INVENTORY_ITEM = gql`
   mutation UpdateInventoryItem($item: ID!, $changes: InventoryItemChange!) {
     updateInventoryItem(item: $item, changes: $changes) {
       ${INVENTORY_FIELDS}
+    }
+  }
+`;
+
+const BOOKING_FIELDS = `
+  _id
+  inventoryItem
+  inventoryName
+  inventoryType
+  ownerSub
+  ownerEmail
+  ownerName
+  ownerInstitution
+  customerCategory
+  kind
+  startTime
+  endTime
+  quantity
+  usedOn
+  status
+  actualHours
+  actualQuantity
+  usageConfirmed
+  rateSnapshot
+  cost
+  billingStatus
+  notes
+`;
+
+export const GET_MY_BOOKINGS = gql`
+  query MyBookings {
+    myBookings {
+      ${BOOKING_FIELDS}
+    }
+  }
+`;
+
+export const GET_BOOKINGS = gql`
+  query Bookings($from: DateTime, $to: DateTime, $inventoryItemId: ID) {
+    bookings(from: $from, to: $to, inventoryItemId: $inventoryItemId) {
+      ${BOOKING_FIELDS}
+    }
+  }
+`;
+
+export const GET_BILLABLE_OWNERS = gql`
+  query BillableOwners {
+    billableOwners {
+      ownerSub
+      ownerEmail
+      ownerName
+      bookingCount
+      totalCost
+    }
+  }
+`;
+
+export const GET_BILLABLE_BOOKINGS = gql`
+  query BillableBookings($ownerSub: String!) {
+    billableBookings(ownerSub: $ownerSub) {
+      ${BOOKING_FIELDS}
     }
   }
 `;

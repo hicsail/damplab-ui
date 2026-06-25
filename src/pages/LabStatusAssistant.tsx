@@ -1,8 +1,7 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef } from 'react';
 import { DeepChat } from 'deep-chat-react';
-import { Box, Button, Chip, Paper, Stack, Typography } from '@mui/material';
+import { Box, Paper, Stack, Typography } from '@mui/material';
 import InsightsIcon from '@mui/icons-material/Insights';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 
 /** Resolve the REST lab-status endpoint from the configured GraphQL backend URL. */
@@ -11,10 +10,72 @@ function labStatusUrl(): string {
   return backend.replace(/\/graphql\/?$/, '') + '/api/agent/lab-status/chat';
 }
 
+interface ExtractedRequest {
+  messages: Array<{ role?: string; text?: string }>;
+  fileText: string | null;
+  fileName: string | null;
+}
+
 /**
- * Full-screen, staff-only lab-status assistant. Embedded (not floating) DeepChat
+ * Normalize DeepChat's request body for our handler. DeepChat sends a plain
+ * `{ messages }` object for text-only turns, but a `FormData` (with a `files`
+ * array + `message1`, `message2`, … entries) when a file is attached. We read
+ * the attached file's text so the backend/n8n can parse the CSV. Also tolerates
+ * the inline-file shape (a message carrying `files:[{src,name}]`) just in case.
+ */
+async function extractRequest(body: any): Promise<ExtractedRequest> {
+  const messages: ExtractedRequest['messages'] = [];
+  let fileText: string | null = null;
+  let fileName: string | null = null;
+
+  if (typeof FormData !== 'undefined' && body instanceof FormData) {
+    // Message content is stored under message0/message1/... (tolerate 0- or 1-based).
+    for (let i = 0; i < 1000; i++) {
+      const raw = body.get(`message${i}`);
+      if (raw == null) {
+        if (i === 0) continue; // 1-based: skip the missing message0 and keep looking
+        break; // contiguous run ended
+      }
+      try {
+        messages.push(typeof raw === 'string' ? JSON.parse(raw) : (raw as any));
+      } catch {
+        messages.push({ role: 'user', text: String(raw) });
+      }
+    }
+    const files = body.getAll('files');
+    const file = files && files.length ? (files[files.length - 1] as File) : null;
+    if (file && typeof (file as any).text === 'function') {
+      fileText = await file.text();
+      fileName = file.name || 'upload.csv';
+    }
+  } else {
+    const msgs: any[] = Array.isArray(body?.messages) ? body.messages : [];
+    messages.push(...msgs);
+    // Inline-file fallback: a message may carry files:[{ src, name }] (src = data URL).
+    for (let i = msgs.length - 1; i >= 0 && !fileText; i--) {
+      const f = Array.isArray(msgs[i]?.files) ? msgs[i].files[msgs[i].files.length - 1] : null;
+      if (f?.src) {
+        try {
+          fileText = await (await fetch(f.src)).text();
+        } catch {
+          fileText = String(f.src);
+        }
+        fileName = f.name || 'upload.csv';
+      }
+    }
+  }
+  return { messages, fileText, fileName };
+}
+
+/**
+ * Full-screen, staff-only lab-ops assistant. Embedded (not floating) DeepChat
  * that streams answers from the backend lab-status agent, which queries Mongo
- * via n8n. Pure Q&A — no canvas hydration.
+ * via n8n and can propose catalog-service creation from an attached CSV.
+ *
+ * CSV attachment uses DeepChat's native input-bar attach button (mixedFiles).
+ * We read the file's text in the handler and keep it in a ref so it persists
+ * across turns — the "confirm" turn re-sends the same CSV the proposal was
+ * built from (n8n re-parses it deterministically before inserting).
  */
 export default function LabStatusAssistant() {
   const userContext: UserContextProps = useContext(UserContext);
@@ -23,28 +84,9 @@ export default function LabStatusAssistant() {
     getTokenRef.current = userContext.userProps?.getAccessToken;
   }, [userContext.userProps]);
 
-  // Attached CSV is kept in a ref (read by the stable handler) AND mirrored to
-  // state for the chip. It persists across turns so the confirm turn re-sends
-  // the same CSV the proposal was built from; cleared explicitly.
+  // Last-seen CSV, kept so a follow-up "confirm" (sent with no new attachment)
+  // still carries the file the proposal was based on.
   const csvRef = useRef<{ filename: string; content: string } | null>(null);
-  const [csvName, setCsvName] = useState<string | null>(null);
-
-  const handleCsvSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-selecting the same file
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      csvRef.current = { filename: file.name, content: String(reader.result ?? '') };
-      setCsvName(file.name);
-    };
-    reader.readAsText(file);
-  };
-
-  const clearCsv = () => {
-    csvRef.current = null;
-    setCsvName(null);
-  };
 
   // Stable handler (built once) so DeepChat never resets mid-conversation.
   const connect = useMemo(
@@ -53,13 +95,19 @@ export default function LabStatusAssistant() {
       handler: async (body: any, signals: any) => {
         try {
           const token = await getTokenRef.current?.();
-          const msgs: any[] = Array.isArray(body?.messages) ? body.messages : [];
-          const last = msgs[msgs.length - 1];
+          const { messages, fileText, fileName } = await extractRequest(body);
+
+          // A freshly-attached file updates the persisted CSV.
+          if (fileText && fileText.trim()) {
+            csvRef.current = { filename: fileName || 'upload.csv', content: fileText };
+          }
+
+          const last = messages[messages.length - 1];
           const message = last?.text ?? '';
-          const history = msgs
+          const history = messages
             .slice(0, -1)
             .filter((m) => m && typeof m.text === 'string')
-            .map((m) => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text }));
+            .map((m) => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text as string }));
 
           const resp = await fetch(labStatusUrl(), {
             method: 'POST',
@@ -124,28 +172,22 @@ export default function LabStatusAssistant() {
             Lab Ops Assistant
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Ask about lab status, or attach a CSV to create catalog services. Data changes are previewed and require your explicit confirmation before anything is written.
+            Ask about lab status, or attach a CSV (📎 in the message bar) to create catalog services. Changes are previewed and require your explicit confirmation before anything is written.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <Button component="label" variant="outlined" size="small" startIcon={<UploadFileIcon />} sx={{ textTransform: 'none' }}>
-            Attach CSV
-            <input type="file" accept=".csv,text/csv" hidden onChange={handleCsvSelected} />
-          </Button>
-          {csvName && <Chip label={csvName} size="small" onDelete={clearCsv} color="primary" variant="outlined" />}
-        </Stack>
       </Stack>
 
       <Paper variant="outlined" sx={{ overflow: 'hidden', borderRadius: 2, maxWidth: 1000 }}>
         <DeepChat
           connect={connect as any}
           requestBodyLimits={{ maxMessages: -1 }}
+          mixedFiles={{ files: { acceptedFormats: '.csv,.txt', maxNumberOfFiles: 1 } }}
           style={{ width: '100%', height: 'calc(100vh - 230px)', minHeight: '420px', border: 'none', borderRadius: '0px', backgroundColor: 'white' }}
           introMessage={{
             text:
-              "Hi! I can report on the current state of the lab. Try: “How many operations are running right now?”, “Break down jobs by status”, or “How much inventory is in use?”"
+              "Hi! I can report on the current state of the lab — try “How many operations are running right now?” or “Break down jobs by status”. You can also attach a CSV (📎) to create catalog services; I'll show you exactly what will be created and wait for your confirmation."
           }}
-          textInput={{ placeholder: { text: 'Ask about lab status…' } }}
+          textInput={{ placeholder: { text: 'Ask about lab status, or attach a CSV…' } }}
           messageStyles={{
             default: {
               ai: { bubble: { backgroundColor: '#f1f5f9', color: '#111827', maxWidth: '85%' } },
