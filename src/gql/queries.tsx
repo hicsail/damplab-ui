@@ -32,6 +32,8 @@ export const GET_SERVICES = gql`
                 name
             }
             inventoryRequirements
+            notes
+            protocolId
         }
     }
 `;
@@ -576,6 +578,8 @@ export const UPDATE_SERVICE = gql`
       pricingMode
       icon
       deliverables
+      notes
+      protocolId
     }
   }
 `;
@@ -605,6 +609,7 @@ export const CREATE_SERVICE = gql`
       description
       paramGroups
       deliverables
+      protocolId
       allowedConnections {
           id
           name
@@ -854,6 +859,55 @@ export const GET_COMMENTS_BY_JOB_ID = gql`
   }
 `;
 
+export const GET_ASSIGNED_OPERATIONS = gql`
+  query AssignedOperations {
+    assignedOperations {
+      _id
+      id
+      label
+      state
+      startedAt
+      completedSteps
+      additionalInstructions
+      formData
+      service {
+        id
+        name
+        description
+        protocolId
+        parameters
+      }
+      job {
+        id
+        name
+        jobId
+      }
+    }
+  }
+`;
+
+export const GET_COMMENTS_BY_NODE_ID = gql`
+  query GetCommentsByNodeId($nodeId: ID!) {
+    commentsByNodeId(nodeId: $nodeId) {
+      id
+      content
+      author
+      authorType
+      createdAt
+      updatedAt
+      isInternal
+      attachments {
+        filename
+        key
+        contentType
+        size
+        uploadedAt
+        url
+      }
+    }
+  }
+`;
+
 // Bug report queries
 export const GET_BUG_REPORTS = gql`
   query BugReports($filter: BugReportsFilterInput) {
@@ -931,6 +985,16 @@ const INVENTORY_FIELDS = `
   location
   quantity
   isDeleted
+  bookable
+  rateType
+  pricing {
+    internal
+    externalAcademic
+    externalMarket
+    externalNoSalary
+    external
+    legacy
+  }
 `;
 
 export const GET_INVENTORY_ITEMS = gql`
@@ -961,6 +1025,67 @@ export const UPDATE_INVENTORY_ITEM = gql`
   mutation UpdateInventoryItem($item: ID!, $changes: InventoryItemChange!) {
     updateInventoryItem(item: $item, changes: $changes) {
       ${INVENTORY_FIELDS}
+    }
+  }
+`;
+
+const BOOKING_FIELDS = `
+  _id
+  inventoryItem
+  inventoryName
+  inventoryType
+  ownerSub
+  ownerEmail
+  ownerName
+  ownerInstitution
+  customerCategory
+  kind
+  startTime
+  endTime
+  quantity
+  usedOn
+  status
+  actualHours
+  actualQuantity
+  usageConfirmed
+  rateSnapshot
+  cost
+  billingStatus
+  notes
+`;
+
+export const GET_MY_BOOKINGS = gql`
+  query MyBookings {
+    myBookings {
+      ${BOOKING_FIELDS}
+    }
+  }
+`;
+
+export const GET_BOOKINGS = gql`
+  query Bookings($from: DateTime, $to: DateTime, $inventoryItemId: ID) {
+    bookings(from: $from, to: $to, inventoryItemId: $inventoryItemId) {
+      ${BOOKING_FIELDS}
+    }
+  }
+`;
+
+export const GET_BILLABLE_OWNERS = gql`
+  query BillableOwners {
+    billableOwners {
+      ownerSub
+      ownerEmail
+      ownerName
+      bookingCount
+      totalCost
+    }
+  }
+`;
+
+export const GET_BILLABLE_BOOKINGS = gql`
+  query BillableBookings($ownerSub: String!) {
+    billableBookings(ownerSub: $ownerSub) {
+      ${BOOKING_FIELDS}
     }
   }
 `;
@@ -996,13 +1121,29 @@ export const GET_IN_PROGRESS_NODES_HOLDING_INVENTORY = gql`
   }
 `;
 
-// Set the inventory items a node is holding (rejects items held by another in-progress node).
+// Set the inventory items a node is holding, with an optional planned time window.
+// Rejects items conflicting with other operations OR calendar bookings (shared pool).
 export const SET_WORKFLOW_NODE_USED_INVENTORY = gql`
-  mutation SetWorkflowNodeUsedInventory($_ID: ID!, $inventoryIds: [ID!]!) {
-    setWorkflowNodeUsedInventory(workflowNode: $_ID, inventoryIds: $inventoryIds) {
+  mutation SetWorkflowNodeUsedInventory($_ID: ID!, $inventoryIds: [ID!]!, $reservationStart: DateTime, $reservationEnd: DateTime) {
+    setWorkflowNodeUsedInventory(workflowNode: $_ID, inventoryIds: $inventoryIds, reservationStart: $reservationStart, reservationEnd: $reservationEnd) {
       _id
       state
       usedInventory
+      inventoryReservationStart
+      inventoryReservationEnd
+    }
+  }
+`;
+
+// Inventory items unavailable in a window — shared pool across operations + bookings.
+export const GET_INVENTORY_AVAILABILITY = gql`
+  query InventoryAvailability($from: DateTime, $to: DateTime, $excludeNodeId: ID) {
+    inventoryAvailability(from: $from, to: $to, excludeNodeId: $excludeNodeId) {
+      itemId
+      source
+      label
+      start
+      end
     }
   }
 `;

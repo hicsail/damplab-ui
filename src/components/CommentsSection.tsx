@@ -23,7 +23,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { format } from 'date-fns';
 
-import { GET_COMMENTS_BY_JOB_ID } from '../gql/queries';
+import { GET_COMMENTS_BY_JOB_ID, GET_COMMENTS_BY_NODE_ID } from '../gql/queries';
 import { CREATE_COMMENT, DELETE_COMMENT, CREATE_JOB_ATTACHMENT_UPLOAD_URLS } from '../gql/mutations';
 import { UserContext } from '../contexts/UserContext';
 
@@ -53,10 +53,20 @@ interface CommentsSectionProps {
     email: string;
     isStaff: boolean;
   };
+  /**
+   * When set, the section is scoped to a single operation (workflow node):
+   * it loads/creates comments tagged with this node id (technician bench notes)
+   * rather than all job-level comments. jobId is still required (attachments are
+   * stored under the job and the backend validates the job).
+   */
+  nodeId?: string;
+  /** 'comments' (default) = full job comment thread; 'notes' = per-operation bench notes (staff-only, no internal toggle). */
+  variant?: 'comments' | 'notes';
 }
 
 
-export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, currentUser }) => {
+export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, currentUser, nodeId, variant = 'comments' }) => {
+  const isNotes = variant === 'notes' || !!nodeId;
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -68,17 +78,19 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
 
   const userContext = useContext(UserContext);
 
-  const { data, loading, error, refetch } = useQuery(GET_COMMENTS_BY_JOB_ID, {
-    variables: { jobId },
-    skip: !USE_BACKEND || !jobId, // Skip query if backend not ready or no jobId
+  // Scope to a node (bench note) when nodeId is provided, else the whole job.
+  const scopeByNode = !!nodeId;
+  const { data, loading, error, refetch } = useQuery(scopeByNode ? GET_COMMENTS_BY_NODE_ID : GET_COMMENTS_BY_JOB_ID, {
+    variables: scopeByNode ? { nodeId } : { jobId },
+    skip: !USE_BACKEND || (scopeByNode ? !nodeId : !jobId),
     pollInterval: USE_BACKEND ? 5000 : 0, // Poll every 5 seconds for new comments
     errorPolicy: 'all', // Continue even if there are errors
   });
 
   // Temporary mock data - remove once backend is ready
   const [mockComments, setMockComments] = useState<Comment[]>([]);
-  
-  const comments = USE_BACKEND ? (data?.commentsByJobId || []) : mockComments;
+
+  const comments = USE_BACKEND ? ((scopeByNode ? data?.commentsByNodeId : data?.commentsByJobId) || []) : mockComments;
 
   const [createCommentMutation] = useMutation(CREATE_COMMENT, {
     onCompleted: () => {
@@ -158,10 +170,13 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
           variables: {
             input: {
               jobId,
+              // Tag bench notes with the operation so they show per-operation.
+              ...(nodeId ? { nodeId } : {}),
               content: newComment.trim(),
               author: currentUser.email,
               authorType: currentUser.isStaff ? 'STAFF' : 'CLIENT',
-              isInternal: currentUser.isStaff ? isInternal : false,
+              // Bench notes are staff-only by definition; full comment threads honor the toggle.
+              isInternal: isNotes ? true : currentUser.isStaff ? isInternal : false,
               attachments: attachmentInputs.length > 0 ? attachmentInputs : undefined,
             },
           },
@@ -204,7 +219,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
   };
 
   // Filter comments based on user type
-  const visibleComments = comments.filter(comment => {
+  const visibleComments = (comments as Comment[]).filter((comment: Comment) => {
     if (currentUser.isStaff) {
       // Staff can see all comments
       return true;
@@ -239,7 +254,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
     <Card sx={{ mt: 3 }}>
       <CardContent>
         <Typography variant="h6" gutterBottom>
-          Comments
+          {isNotes ? 'Notes & files' : 'Comments'}
         </Typography>
         <Divider sx={{ mb: 2 }} />
 
@@ -247,7 +262,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
         <Box sx={{ mb: 3, maxHeight: '400px', overflowY: 'auto' }}>
           {sortedComments.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-              No comments yet. Be the first to comment!
+              {isNotes ? 'No notes yet for this operation.' : 'No comments yet. Be the first to comment!'}
             </Typography>
           ) : (
             sortedComments.map((comment) => (
@@ -349,7 +364,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
             fullWidth
             multiline
             rows={3}
-            placeholder="Add a comment..."
+            placeholder={isNotes ? 'Add a note about this operation…' : 'Add a comment...'}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             sx={{ mb: 1 }}
@@ -375,7 +390,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
               </Typography>
             )}
           </Box>
-          {currentUser.isStaff && (
+          {!isNotes && currentUser.isStaff && (
             <FormControlLabel
               control={
                 <Checkbox
@@ -394,7 +409,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
               onClick={handleSubmitComment}
               disabled={!newComment.trim()}
             >
-              Post Comment
+              {isNotes ? 'Add note' : 'Post Comment'}
             </Button>
           </Box>
         </Box>

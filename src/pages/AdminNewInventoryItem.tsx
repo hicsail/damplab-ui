@@ -15,6 +15,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_INVENTORY_ITEM } from '../gql/queries';
+import { EMPTY_RATE_PRICING, InventoryRateFields, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
 
 const TYPE_OPTIONS = [
   { value: 'ROBOT', label: 'Robot' },
@@ -46,6 +47,9 @@ export default function AdminNewInventoryItem() {
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [bookable, setBookable] = useState(false);
+  const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
+  const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -70,7 +74,10 @@ export default function AdminNewInventoryItem() {
             type,
             description: description.trim() || undefined,
             location: location.trim() || undefined,
-            quantity: parsedQty
+            quantity: parsedQty,
+            bookable,
+            rateType: bookable ? rateType : undefined,
+            pricing: bookable ? ratePricingToInput(pricing) : undefined
           }
         }
       });
@@ -137,6 +144,16 @@ export default function AdminNewInventoryItem() {
         multiline
         minRows={3}
         placeholder='Model, capabilities, notes…'
+      />
+
+      <InventoryRateFields
+        bookable={bookable}
+        setBookable={setBookable}
+        rateType={rateType}
+        setRateType={setRateType}
+        pricing={pricing}
+        setPricing={setPricing}
+        itemType={type}
       />
 
       <Stack direction='row' spacing={2}>

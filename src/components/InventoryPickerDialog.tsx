@@ -1,6 +1,7 @@
 import { ApolloError, useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
+  Box,
   Button,
   Checkbox,
   Chip,
@@ -16,12 +17,11 @@ import {
   Stack,
   Typography
 } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  GET_ACTIVE_INVENTORY_ITEMS,
-  GET_IN_PROGRESS_NODES_HOLDING_INVENTORY,
-  SET_WORKFLOW_NODE_USED_INVENTORY
-} from '../gql/queries';
+import { GET_ACTIVE_INVENTORY_ITEMS, GET_INVENTORY_AVAILABILITY, SET_WORKFLOW_NODE_USED_INVENTORY } from '../gql/queries';
 
 export interface InventoryPickerDialogProps {
   open: boolean;
@@ -44,11 +44,10 @@ interface InventoryItemRow {
   description?: string;
 }
 
-interface HeldByEntry {
+interface Conflict {
   itemId: string;
-  byNodeId: string;
-  byLabel: string;
-  byJobName?: string;
+  source: 'OPERATION' | 'BOOKING';
+  label: string;
 }
 
 function formatGqlError(error: unknown): string {
@@ -60,9 +59,10 @@ function formatGqlError(error: unknown): string {
 }
 
 /**
- * Lets staff pick which inventory items a workflow node is using. Items
- * currently held by other IN_PROGRESS nodes are surfaced as disabled with a
- * "held by …" hint, so the user immediately sees why they can't pick them.
+ * Lets staff pick which inventory items a workflow node uses, for a planned time
+ * window. Items conflicting in that window — held by another operation OR booked
+ * on the scheduling calendar (one shared availability pool) — are disabled with a
+ * reason. The chosen window is saved as the operation's inventory reservation.
  */
 export default function InventoryPickerDialog({
   open,
@@ -74,13 +74,28 @@ export default function InventoryPickerDialog({
   onSaved
 }: InventoryPickerDialogProps) {
   const client = useApolloClient();
-  const { data: itemsData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, {
+
+  const [start, setStart] = useState<Date | null>(null);
+  const [end, setEnd] = useState<Date | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setSelected(new Set(currentlyHeldIds.map(String)));
+      setErrorMessage(null);
+      setStart(new Date());
+      setEnd(new Date(Date.now() + 2 * 60 * 60 * 1000));
+    }
+  }, [open, currentlyHeldIds.join('|')]);
+
+  const { data: itemsData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network', skip: !open });
+  // Conflicts (ops + bookings) for the selected window, excluding this node's own holds.
+  const { data: availData } = useQuery(GET_INVENTORY_AVAILABILITY, {
     fetchPolicy: 'cache-and-network',
-    skip: !open
-  });
-  const { data: heldData, refetch: refetchHeld } = useQuery(GET_IN_PROGRESS_NODES_HOLDING_INVENTORY, {
-    fetchPolicy: 'cache-and-network',
-    skip: !open
+    skip: !open,
+    variables: { from: start, to: end, excludeNodeId: nodeId }
   });
 
   const items: InventoryItemRow[] = useMemo(
@@ -94,49 +109,29 @@ export default function InventoryPickerDialog({
     [itemsData]
   );
 
-  // Map of inventoryId → who's holding it (excluding ourselves).
-  const heldByOthers = useMemo(() => {
-    const map = new Map<string, HeldByEntry>();
-    const nodes: any[] = heldData?.getInProgressNodesHoldingInventory ?? [];
-    for (const n of nodes) {
-      if (String(n._id) === String(nodeId)) continue;
-      for (const invId of n.usedInventory ?? []) {
-        map.set(String(invId), {
-          itemId: String(invId),
-          byNodeId: String(n._id),
-          byLabel: n.label || n.service?.name || 'another node',
-          byJobName: n.workflow?.job?.name
-        });
-      }
+  // itemId → first conflict in the window.
+  const conflictByItem = useMemo(() => {
+    const map = new Map<string, Conflict>();
+    for (const c of (availData?.inventoryAvailability ?? []) as Conflict[]) {
+      if (!map.has(String(c.itemId))) map.set(String(c.itemId), { ...c, itemId: String(c.itemId) });
     }
     return map;
-  }, [heldData, nodeId]);
-
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [saving, setSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setSelected(new Set(currentlyHeldIds.map(String)));
-      setErrorMessage(null);
-    }
-  }, [open, currentlyHeldIds.join('|')]);
+  }, [availData]);
 
   const suggestedSet = useMemo(() => new Set((suggestedIds ?? []).map(String)), [suggestedIds?.join('|')]);
 
-  // Sort: currently-selected → suggested → available → held-by-others (disabled).
+  // Sort: selected/suggested/available first, conflicted (disabled) last.
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
-      const aHeld = heldByOthers.has(a.id) ? 1 : 0;
-      const bHeld = heldByOthers.has(b.id) ? 1 : 0;
-      if (aHeld !== bHeld) return aHeld - bHeld;
-      const aSug = suggestedSet.has(a.id) ? 0 : 1;
-      const bSug = suggestedSet.has(b.id) ? 0 : 1;
-      if (aSug !== bSug) return aSug - bSug;
+      const aC = conflictByItem.has(a.id) && !selected.has(a.id) ? 1 : 0;
+      const bC = conflictByItem.has(b.id) && !selected.has(b.id) ? 1 : 0;
+      if (aC !== bC) return aC - bC;
+      const aS = suggestedSet.has(a.id) ? 0 : 1;
+      const bS = suggestedSet.has(b.id) ? 0 : 1;
+      if (aS !== bS) return aS - bS;
       return a.name.localeCompare(b.name);
     });
-  }, [items, heldByOthers, suggestedSet]);
+  }, [items, conflictByItem, suggestedSet, selected]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -154,9 +149,8 @@ export default function InventoryPickerDialog({
       const ids = [...selected];
       await client.mutate({
         mutation: SET_WORKFLOW_NODE_USED_INVENTORY,
-        variables: { _ID: nodeId, inventoryIds: ids }
+        variables: { _ID: nodeId, inventoryIds: ids, reservationStart: start, reservationEnd: end }
       });
-      await refetchHeld();
       onSaved?.(ids);
       onClose();
     } catch (e) {
@@ -167,62 +161,72 @@ export default function InventoryPickerDialog({
   };
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth='sm' fullWidth>
-      <DialogTitle>
-        Inventory in use
-        {nodeLabel ? <Typography variant='caption' display='block' color='text.secondary'>{nodeLabel}</Typography> : null}
-      </DialogTitle>
-      <DialogContent dividers>
-        {errorMessage && <Alert severity='error' sx={{ mb: 1 }}>{errorMessage}</Alert>}
-        {items.length === 0 ? (
-          <Typography color='text.secondary'>No inventory items defined yet.</Typography>
-        ) : (
-          <List disablePadding>
-            {sortedItems.map((it) => {
-              const heldBy = heldByOthers.get(it.id);
-              const isHeldByOther = !!heldBy;
-              const isChecked = selected.has(it.id);
-              const isSuggested = suggestedSet.has(it.id);
-              return (
-                <ListItem key={it.id} disablePadding>
-                  <ListItemButton
-                    dense
-                    disabled={isHeldByOther}
-                    onClick={() => toggle(it.id)}
-                  >
-                    <ListItemIcon>
-                      <Checkbox edge='start' checked={isChecked} tabIndex={-1} disableRipple />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={
-                        <Stack direction='row' spacing={1} alignItems='center' useFlexGap flexWrap='wrap'>
-                          <span>{it.name}</span>
-                          {it.type && <Chip size='small' label={it.type} />}
-                          {isSuggested && <Chip size='small' color='primary' variant='outlined' label='Suggested' />}
-                          {isHeldByOther && (
-                            <Chip
-                              size='small'
-                              color='warning'
-                              label={`In use by ${heldBy?.byLabel}${heldBy?.byJobName ? ` (${heldBy.byJobName})` : ''}`}
-                            />
-                          )}
-                        </Stack>
-                      }
-                      secondary={[it.location, it.description].filter(Boolean).join(' · ') || undefined}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              );
-            })}
-          </List>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button onClick={handleSave} variant='contained' disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth='sm' fullWidth>
+        <DialogTitle>
+          Inventory for this operation
+          {nodeLabel ? <Typography variant='caption' display='block' color='text.secondary'>{nodeLabel}</Typography> : null}
+        </DialogTitle>
+        <DialogContent dividers>
+          {errorMessage && <Alert severity='error' sx={{ mb: 1 }}>{errorMessage}</Alert>}
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant='body2' color='text.secondary' sx={{ mb: 1 }}>
+              Reserve for this time window. Items already held by another operation or booked on the calendar for this window are disabled.
+            </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <DateTimePicker label='Reserve from' value={start} onChange={setStart} slotProps={{ textField: { size: 'small', fullWidth: true } }} />
+              <DateTimePicker label='Reserve until' value={end} onChange={setEnd} slotProps={{ textField: { size: 'small', fullWidth: true } }} />
+            </Stack>
+          </Box>
+
+          {items.length === 0 ? (
+            <Typography color='text.secondary'>No inventory items defined yet.</Typography>
+          ) : (
+            <List disablePadding>
+              {sortedItems.map((it) => {
+                const conflict = conflictByItem.get(it.id);
+                const isChecked = selected.has(it.id);
+                // A conflict we're not already holding blocks selection.
+                const isBlocked = !!conflict && !isChecked;
+                const isSuggested = suggestedSet.has(it.id);
+                return (
+                  <ListItem key={it.id} disablePadding>
+                    <ListItemButton dense disabled={isBlocked} onClick={() => toggle(it.id)}>
+                      <ListItemIcon>
+                        <Checkbox edge='start' checked={isChecked} tabIndex={-1} disableRipple />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={
+                          <Stack direction='row' spacing={1} alignItems='center' useFlexGap flexWrap='wrap'>
+                            <span>{it.name}</span>
+                            {it.type && <Chip size='small' label={it.type} />}
+                            {isSuggested && <Chip size='small' color='primary' variant='outlined' label='Suggested' />}
+                            {isBlocked && (
+                              <Chip
+                                size='small'
+                                color={conflict?.source === 'BOOKING' ? 'info' : 'warning'}
+                                label={conflict?.source === 'BOOKING' ? `Booked — ${conflict?.label}` : `In use — ${conflict?.label}`}
+                              />
+                            )}
+                          </Stack>
+                        }
+                        secondary={[it.location, it.description].filter(Boolean).join(' · ') || undefined}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                );
+              })}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} variant='contained' disabled={saving}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </LocalizationProvider>
   );
 }
