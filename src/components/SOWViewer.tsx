@@ -523,6 +523,33 @@ export const SOWViewer: React.FC<SOWViewerProps> = ({ jobId, jobDisplayId, sowDa
                 <Typography variant="body2"><strong>Timeline:</strong> {fullSOWData.timeline.startDate} - {fullSOWData.timeline.endDate}</Typography>
                 <Typography variant="body2"><strong>Total Cost:</strong> ${fullSOWData.pricing.totalCost.toLocaleString()}</Typography>
                 <Typography variant="body2"><strong>Pricing Category:</strong> {getCustomerCategoryLabel(customerCategory ?? undefined)}</Typography>
+                {Array.isArray(fullSOWData.pricing.adjustments) && fullSOWData.pricing.adjustments.length > 0 && (
+                  <Box sx={{ mt: 0.5 }}>
+                    <Typography variant="body2"><strong>Pricing adjustments:</strong></Typography>
+                    <ul style={{ marginTop: 4, marginBottom: 0 }}>
+                      {fullSOWData.pricing.adjustments.map((adj: any, i: number) => {
+                        const typeLabel = adj.type === 'discount' ? 'Discount' : adj.type === 'additional_cost' ? 'Additional cost' : 'Special term';
+                        const desc = (adj.description || '').trim() || typeLabel;
+                        const reason = (adj.reason || '').trim();
+                        const amt =
+                          adj.type === 'discount'
+                            ? `−$${Math.abs(adj.amount).toLocaleString()}`
+                            : adj.type === 'additional_cost'
+                              ? `+$${Math.abs(adj.amount).toLocaleString()}`
+                              : '';
+                        return (
+                          <li key={i}>
+                            <Typography variant="body2">
+                              {desc}
+                              {reason ? ` — ${reason}` : ''}
+                              {amt ? ` (${amt})` : ''}
+                            </Typography>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </Box>
+                )}
               </Box>
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" gutterBottom><strong>Scope of Work:</strong></Typography>

@@ -301,18 +301,42 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory, jo
               </View>
             </View>
           ))}
-          {sowData.pricing.discount && (
-            <View style={styles.tableRow}>
-              <View style={styles.tableCellLarge}>
-                <Text style={styles.italic}>
-                  Discount{(sowData.pricing.discount.reason || '').trim() ? ` — ${sowData.pricing.discount.reason}` : ''}
-                </Text>
-              </View>
-              <View style={styles.tableCell}>
-                <Text style={styles.italic}>{formatCurrency(-Math.abs(sowData.pricing.discount.amount))}</Text>
-              </View>
-            </View>
-          )}
+          {Array.isArray(sowData.pricing.adjustments) && sowData.pricing.adjustments.length > 0
+            ? sowData.pricing.adjustments.map((adj, i) => {
+                const typeLabel =
+                  adj.type === 'discount' ? 'Discount' : adj.type === 'additional_cost' ? 'Additional cost' : 'Special term';
+                const desc = (adj.description || '').trim() || typeLabel;
+                const reason = (adj.reason || '').trim();
+                const label = reason ? `${desc} — ${reason}` : desc;
+                const amountText =
+                  adj.type === 'discount'
+                    ? formatCurrency(-Math.abs(adj.amount))
+                    : adj.type === 'additional_cost'
+                      ? formatCurrency(Math.abs(adj.amount))
+                      : '—'; // special terms are noted but don't change the total
+                return (
+                  <View key={i} style={styles.tableRow}>
+                    <View style={styles.tableCellLarge}>
+                      <Text style={styles.italic}>{label}</Text>
+                    </View>
+                    <View style={styles.tableCell}>
+                      <Text style={styles.italic}>{amountText}</Text>
+                    </View>
+                  </View>
+                );
+              })
+            : sowData.pricing.discount && (
+                <View style={styles.tableRow}>
+                  <View style={styles.tableCellLarge}>
+                    <Text style={styles.italic}>
+                      Discount{(sowData.pricing.discount.reason || '').trim() ? ` — ${sowData.pricing.discount.reason}` : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.tableCell}>
+                    <Text style={styles.italic}>{formatCurrency(-Math.abs(sowData.pricing.discount.amount))}</Text>
+                  </View>
+                </View>
+              )}
           <View style={[styles.tableRow, { fontWeight: 'bold', backgroundColor: '#f9f9f9' }]}>
             <Text style={styles.tableCellLarge}>Total</Text>
             <Text style={styles.tableCell}>{formatCurrency(sowData.pricing.totalCost)}</Text>
