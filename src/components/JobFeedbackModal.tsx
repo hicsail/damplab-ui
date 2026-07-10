@@ -29,7 +29,18 @@ const FeedbackField = styled(TextField)`
 
 
 export default function JobFeedbackModal(props: any) {
-  const { onClose, id, jobName, jobUsername, jobEmail, jobInstitution, jobTime, jobState } = props;
+  const {
+    onClose,
+    id,
+    jobName,
+    jobUsername,
+    jobEmail,
+    jobInstitution,
+    jobTime,
+    jobState,
+    screeningBlocksAccept = false,
+    screeningMessage = null,
+  } = props;
   
   const [feedbackType,      setFeedbackType]      = useState("");
   const [feedbackMessage,   setFeedbackMessage]   = useState("");
@@ -139,6 +150,12 @@ export default function JobFeedbackModal(props: any) {
 
             <FormControlLabel control={<Radio />} value="looks-good"    label="Accept job (ready to proceed)" />
 
+            {feedbackType === "looks-good" && screeningBlocksAccept && screeningMessage ? (
+              <Typography variant="body2" color="error" sx={{ mb: 1, ml: 1 }}>
+                {screeningMessage}
+              </Typography>
+            ) : null}
+
             <FormControlLabel control={<Radio />} value="minor-changes" label="Request minor changes" />
               {feedbackType === "minor-changes" && (
                 <FeedbackField
@@ -187,7 +204,11 @@ export default function JobFeedbackModal(props: any) {
               variant="contained"
               color="primary"
               onClick={handleSubmit}
-              disabled={!feedbackType || (feedbackType !== 'looks-good' && !feedbackMessage.trim())}
+              disabled={
+                !feedbackType ||
+                (feedbackType !== 'looks-good' && !feedbackMessage.trim()) ||
+                (feedbackType === 'looks-good' && screeningBlocksAccept)
+              }
             >
               {feedbackType === "looks-good"
                 ? "Accept Job"

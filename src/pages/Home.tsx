@@ -19,6 +19,7 @@ import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccount
 import ScienceIcon from '@mui/icons-material/Science';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import BiotechIcon from '@mui/icons-material/Biotech';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
@@ -252,6 +253,10 @@ export default function Home() {
                   <EditIcon />
                   Data Translation
                 </MenuButton>
+              <MenuButton navigateTo="/screener">
+                <BiotechIcon />
+                Screener<br />(SecureDNA)
+              </MenuButton>
               </MenuSection>
             </>
           )}
