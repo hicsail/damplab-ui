@@ -557,3 +557,18 @@ export const GENERATE_USAGE_BILLING = gql`
     }
   }
 `;
+
+export const CREATE_API_KEY = gql`
+  mutation CreateApiKey($name: String!, $expiresAt: DateTime) {
+    createApiKey(name: $name, expiresAt: $expiresAt) {
+      key
+      apiKey { id name prefix scope createdAt }
+    }
+  }
+`;
+
+export const REVOKE_API_KEY = gql`
+  mutation RevokeApiKey($id: ID!) {
+    revokeApiKey(id: $id) { id revoked revokedAt }
+  }
+`;

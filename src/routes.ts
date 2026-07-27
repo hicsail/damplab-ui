@@ -36,6 +36,7 @@ export default [
         route("/usage-billing", "./pages/UsageBilling.tsx"),
         route("/dashboard", "./pages/Dashboard.tsx"),
         route("/customer-management", "./pages/CustomerManagement.tsx"),
+        route("/api-keys", "./pages/ApiKeys.tsx"),
         route("/dominos", "./pages/Dominos.tsx"),
         route("/elabs", "./pages/ELabs.tsx"),
         route("/kernel", "./pages/Kernel.tsx"),

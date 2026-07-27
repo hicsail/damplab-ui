@@ -19,6 +19,7 @@ import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccount
 import ScienceIcon from '@mui/icons-material/Science';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import AnnouncementBox from '../components/AnnouncementBox';
@@ -239,6 +240,10 @@ export default function Home() {
                 <MenuButton navigateTo="/customer-management">
                   <PeopleIcon />
                   Customer Management
+                </MenuButton>
+                <MenuButton navigateTo="/api-keys">
+                  <VpnKeyIcon />
+                  API Keys
                 </MenuButton>
                 <MenuButton navigateTo="/edit_announcements">
                   <CampaignIcon />

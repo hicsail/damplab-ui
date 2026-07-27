@@ -888,6 +888,12 @@ export const GET_BUG_REPORTS = gql`
       items {
         id
         description
+        severity
+        area
+        stepsToReproduce
+        expected
+        actual
+        tag
         reporterName
         reporterEmail
         createdAt
@@ -1121,3 +1127,20 @@ export const GET_INVENTORY_AVAILABILITY = gql`
   }
 `;
 
+
+export const GET_API_KEYS = gql`
+  query ApiKeys {
+    apiKeys {
+      id
+      name
+      prefix
+      scope
+      createdBy
+      createdAt
+      lastUsedAt
+      expiresAt
+      revoked
+      revokedAt
+    }
+  }
+`;

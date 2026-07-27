@@ -7,11 +7,15 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  FormControl,
   IconButton,
+  InputLabel,
   Link,
   List,
   ListItem,
   ListItemText,
+  MenuItem,
+  Select,
   Stack,
   TextField,
   Typography,
@@ -38,9 +42,24 @@ interface BugAttachmentUpload {
   size: number;
 }
 
+type Severity = 'BLOCKER' | 'MAJOR' | 'MINOR' | 'COSMETIC';
+const SEVERITIES: Severity[] = ['BLOCKER', 'MAJOR', 'MINOR', 'COSMETIC'];
+const SEVERITY_COLOR: Record<Severity, 'error' | 'warning' | 'info' | 'default'> = {
+  BLOCKER: 'error',
+  MAJOR: 'warning',
+  MINOR: 'info',
+  COSMETIC: 'default'
+};
+
 interface BugReportItem {
   id: string;
   description: string;
+  severity?: Severity | null;
+  area?: string | null;
+  stepsToReproduce?: string | null;
+  expected?: string | null;
+  actual?: string | null;
+  tag?: string | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
   createdAt: string;
@@ -50,8 +69,16 @@ interface BugReportItem {
 export default function Bugs() {
   const [searchText, setSearchText] = useState('');
   const [reporterFilter, setReporterFilter] = useState('');
+  const [severityFilter, setSeverityFilter] = useState<Severity | ''>('');
+  const [tagFilter, setTagFilter] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newDescription, setNewDescription] = useState('');
+  const [severity, setSeverity] = useState<Severity>('MINOR');
+  const [area, setArea] = useState('');
+  const [steps, setSteps] = useState('');
+  const [expected, setExpected] = useState('');
+  const [actual, setActual] = useState('');
+  const [tag, setTag] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -60,13 +87,15 @@ export default function Bugs() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const currentFilter = () => ({
+    searchText: searchText || null,
+    reporter: reporterFilter || null,
+    severity: severityFilter || null,
+    tag: tagFilter || null
+  });
+
   const { data, loading, refetch } = useQuery(GET_BUG_REPORTS, {
-    variables: {
-      filter: {
-        searchText: searchText || null,
-        reporter: reporterFilter || null
-      }
-    },
+    variables: { filter: currentFilter() },
     fetchPolicy: 'network-only'
   });
 
@@ -84,6 +113,12 @@ export default function Bugs() {
 
   const handleOpenDialog = () => {
     setNewDescription('');
+    setSeverity('MINOR');
+    setArea('');
+    setSteps('');
+    setExpected('');
+    setActual('');
+    setTag(tagFilter || '');
     setFiles([]);
     setIsDialogOpen(true);
   };
@@ -105,7 +140,13 @@ export default function Bugs() {
       const createResult = await createBugReport({
         variables: {
           input: {
-            description: newDescription.trim()
+            description: newDescription.trim(),
+            severity,
+            area: area.trim() || null,
+            stepsToReproduce: steps.trim() || null,
+            expected: expected.trim() || null,
+            actual: actual.trim() || null,
+            tag: tag.trim() || null
           }
         }
       });
@@ -179,12 +220,7 @@ export default function Bugs() {
 
   const handleSearchSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    refetch({
-      filter: {
-        searchText: searchText || null,
-        reporter: reporterFilter || null
-      }
-    });
+    refetch({ filter: currentFilter() });
   };
 
   const handleSnackbarClose = () => {
@@ -225,6 +261,21 @@ export default function Bugs() {
               value={reporterFilter}
               onChange={(e) => setReporterFilter(e.target.value)}
               fullWidth
+            />
+            <FormControl sx={{ minWidth: 150 }}>
+              <InputLabel id="bug-sev-filter">Severity</InputLabel>
+              <Select labelId="bug-sev-filter" label="Severity" value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value as Severity | '')}>
+                <MenuItem value="">Any</MenuItem>
+                {SEVERITIES.map((s) => <MenuItem key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Tag"
+              placeholder="testathon"
+              variant="outlined"
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              sx={{ minWidth: 140 }}
             />
             <Stack direction="row" spacing={1}>
               <Button type="submit" variant="contained">
@@ -269,9 +320,23 @@ export default function Bugs() {
                     <ListItemText
                       primary={
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                            {bug.severity && (
+                              <Chip size="small" label={bug.severity.charAt(0) + bug.severity.slice(1).toLowerCase()} color={SEVERITY_COLOR[bug.severity]} />
+                            )}
+                            {bug.area && <Chip size="small" variant="outlined" label={bug.area} />}
+                            {bug.tag && <Chip size="small" variant="outlined" color="secondary" label={`#${bug.tag}`} />}
+                          </Stack>
                           <Typography variant="subtitle1" sx={{ fontWeight: 500 }}>
                             {bug.description.length > 160 ? `${bug.description.slice(0, 160)}…` : bug.description}
                           </Typography>
+                          {(bug.stepsToReproduce || bug.expected || bug.actual) && (
+                            <Box sx={{ mt: 0.25 }}>
+                              {bug.stepsToReproduce && <Typography variant="body2" color="text.secondary"><strong>Steps:</strong> {bug.stepsToReproduce}</Typography>}
+                              {bug.expected && <Typography variant="body2" color="text.secondary"><strong>Expected:</strong> {bug.expected}</Typography>}
+                              {bug.actual && <Typography variant="body2" color="text.secondary"><strong>Actual:</strong> {bug.actual}</Typography>}
+                            </Box>
+                          )}
                           <Typography variant="caption" color="text.secondary">
                             {reporterLabel} · {created}
                           </Typography>
@@ -331,16 +396,31 @@ export default function Bugs() {
         <DialogTitle>Report a bug</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <FormControl sx={{ minWidth: 160 }}>
+                <InputLabel id="bug-sev">Severity</InputLabel>
+                <Select labelId="bug-sev" label="Severity" value={severity} onChange={(e) => setSeverity(e.target.value as Severity)}>
+                  {SEVERITIES.map((s) => <MenuItem key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</MenuItem>)}
+                </Select>
+              </FormControl>
+              <TextField label="Where (page / feature)" placeholder="e.g. SOW generator" value={area} onChange={(e) => setArea(e.target.value)} fullWidth />
+            </Stack>
             <TextField
               label="Description"
-              placeholder="Describe what you were doing, what you expected, and what went wrong."
+              placeholder="One-line summary of the problem."
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
               multiline
-              minRows={4}
+              minRows={2}
               required
               fullWidth
             />
+            <TextField label="Steps to reproduce" placeholder={'1. Go to…\n2. Click…\n3. …'} value={steps} onChange={(e) => setSteps(e.target.value)} multiline minRows={3} fullWidth />
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField label="Expected" placeholder="What you expected" value={expected} onChange={(e) => setExpected(e.target.value)} multiline minRows={2} fullWidth />
+              <TextField label="Actual" placeholder="What happened" value={actual} onChange={(e) => setActual(e.target.value)} multiline minRows={2} fullWidth />
+            </Stack>
+            <TextField label="Tag (optional)" placeholder="testathon" value={tag} onChange={(e) => setTag(e.target.value)} helperText="Use a shared tag (e.g. testathon) so this event's reports can be filtered." fullWidth />
             <Box>
               <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />}>
                 Attach screenshots (optional)
