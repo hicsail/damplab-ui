@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef, useEffect, useContext } from 'react';
-import { useParams } from 'react-router';
+import { useParams, useNavigate } from 'react-router';
 import { useApolloClient, useMutation } from '@apollo/client';
-import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOptions, 
+import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOptions,
                     applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection, Panel } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@mui/material';
+import HomeIcon from '@mui/icons-material/Home';
 
 import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
@@ -32,6 +33,7 @@ const fitViewOptions: FitViewOptions = {
 
 export default function MainFlow() {
     const apolloClient = useApolloClient();
+    const navigate                                                 = useNavigate();
     const { id }                                                   = useParams();
     const reactFlowWrapper                                         = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance]                = useState<any>(null);
@@ -195,6 +197,17 @@ export default function MainFlow() {
                             <Background />
 
                             <Controls />
+                            <Panel position="top-left" style={{ marginLeft: 8, marginTop: 8 }}>
+                                <Button
+                                    variant="contained"
+                                    size="small"
+                                    startIcon={<HomeIcon />}
+                                    onClick={() => navigate('/')}
+                                    sx={{ textTransform: 'none', backgroundColor: 'white', color: 'primary.main', '&:hover': { backgroundColor: '#f0f0f0' } }}
+                                >
+                                    Home
+                                </Button>
+                            </Panel>
                             <Panel position="bottom-left" style={{ marginLeft: 8, marginBottom: 8 }}>
                                 <Button
                                     variant="outlined"

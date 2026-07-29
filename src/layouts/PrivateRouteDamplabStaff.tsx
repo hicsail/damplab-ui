@@ -5,13 +5,21 @@ import {
   UserContextProps,
   UserProps,
 } from "../contexts/UserContext";
+import AppBreadcrumbs from "../components/AppBreadcrumbs";
 
 // Admins can access all pages
 const PrivateRouteDamplabStaff = () => {
   const userContext: UserContextProps = useContext(UserContext);
   const userProps: UserProps = userContext.userProps;
 
-  return userProps?.isDamplabStaff ? <Outlet /> : <Navigate to="/login" />;
+  return userProps?.isDamplabStaff ? (
+    <>
+      <AppBreadcrumbs />
+      <Outlet />
+    </>
+  ) : (
+    <Navigate to="/login" />
+  );
 };
 
 export default PrivateRouteDamplabStaff;
