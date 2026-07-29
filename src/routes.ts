@@ -37,6 +37,8 @@ export default [
         route("/dashboard", "./pages/Dashboard.tsx"),
         route("/customer-management", "./pages/CustomerManagement.tsx"),
         route("/api-keys", "./pages/ApiKeys.tsx"),
+        route("/stations", "./pages/Stations.tsx"),
+        route("/protocol-map", "./pages/ProtocolMap.tsx"),
         route("/dominos", "./pages/Dominos.tsx"),
         route("/elabs", "./pages/ELabs.tsx"),
         route("/kernel", "./pages/Kernel.tsx"),

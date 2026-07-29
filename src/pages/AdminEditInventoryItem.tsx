@@ -16,7 +16,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { GET_INVENTORY_ITEMS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
+import { GET_INVENTORY_ITEMS, GET_STATIONS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, pricingToRateForm, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
 
 const TYPE_OPTIONS = [
@@ -46,12 +46,15 @@ export default function AdminEditInventoryItem() {
   const navigate = useNavigate();
   const client = useApolloClient();
   const { data, loading } = useQuery(GET_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
+  const { data: stationData } = useQuery(GET_STATIONS, { fetchPolicy: 'cache-and-network' });
+  const stations: any[] = stationData?.stations ?? [];
   const item: any = data?.inventoryItems?.find((x: any) => String(x.id) === String(itemId));
 
   const [name, setName] = useState('');
   const [type, setType] = useState('MACHINE');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [stationId, setStationId] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [bookable, setBookable] = useState(false);
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
@@ -66,6 +69,7 @@ export default function AdminEditInventoryItem() {
     setType(item.type ?? 'MACHINE');
     setDescription(item.description ?? '');
     setLocation(item.location ?? '');
+    setStationId(item.stationId ?? '');
     setQuantity(String(item.quantity ?? 1));
     setBookable(!!item.bookable);
     setRateType(item.rateType === 'PER_UNIT' ? 'PER_UNIT' : 'HOURLY');
@@ -109,6 +113,7 @@ export default function AdminEditInventoryItem() {
             type,
             description: description.trim() || undefined,
             location: location.trim() || undefined,
+            stationId: stationId || null,
             quantity: parsedQty,
             bookable,
             rateType: bookable ? rateType : null,
@@ -154,7 +159,7 @@ export default function AdminEditInventoryItem() {
       </Snackbar>
 
       <TextField label='Name' value={name} onChange={(e) => setName(e.target.value)} required />
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
         <FormControl>
           <InputLabel id='inventory-type-label'>Type</InputLabel>
           <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
@@ -163,7 +168,21 @@ export default function AdminEditInventoryItem() {
             ))}
           </Select>
         </FormControl>
-        <TextField label='Location' value={location} onChange={(e) => setLocation(e.target.value)} />
+        <FormControl>
+          <InputLabel id='inventory-station-label'>Station</InputLabel>
+          <Select
+            labelId='inventory-station-label'
+            value={stationId}
+            label='Station'
+            onChange={(e) => setStationId(e.target.value)}
+          >
+            <MenuItem value=''><em>Unassigned</em></MenuItem>
+            {stations.map((s) => (
+              <MenuItem key={s.id} value={s.id}>{s.name}{s.zone ? ` — ${s.zone}` : ''}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} />
         <TextField
           label='Quantity'
           type='number'

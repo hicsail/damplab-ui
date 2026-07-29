@@ -16,6 +16,7 @@ import {
   Typography
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GET_ACTIVE_INVENTORY_ITEMS, UPDATE_SERVICE } from '../gql/queries';
@@ -303,6 +304,18 @@ export default function AdminEditService() {
         placeholder="n92ld46yxl5b  or  https://www.protocols.io/view/…"
         helperText="Optional. Paste the protocols.io protocol id or its full URL. Technicians assigned this operation can open the protocol in the bench view."
       />
+
+      {extractProtocolId(protocolId) && (
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<AccountTreeIcon />}
+          onClick={() => navigate(`/protocol-map?protocolId=${encodeURIComponent(extractProtocolId(protocolId))}`)}
+          sx={{ alignSelf: 'flex-start' }}
+        >
+          Map protocol steps → services &amp; equipment
+        </Button>
+      )}
 
       <Box
         sx={{

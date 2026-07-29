@@ -1,4 +1,4 @@
-import { ApolloError, useApolloClient } from '@apollo/client';
+import { ApolloError, useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
   Box,
@@ -14,7 +14,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { CREATE_INVENTORY_ITEM } from '../gql/queries';
+import { CREATE_INVENTORY_ITEM, GET_STATIONS } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
 
 const TYPE_OPTIONS = [
@@ -46,7 +46,10 @@ export default function AdminNewInventoryItem() {
   const [type, setType] = useState('MACHINE');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [stationId, setStationId] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const { data: stationData } = useQuery(GET_STATIONS, { fetchPolicy: 'cache-and-network' });
+  const stations: any[] = stationData?.stations ?? [];
   const [bookable, setBookable] = useState(false);
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
@@ -74,6 +77,7 @@ export default function AdminNewInventoryItem() {
             type,
             description: description.trim() || undefined,
             location: location.trim() || undefined,
+            stationId: stationId || undefined,
             quantity: parsedQty,
             bookable,
             rateType: bookable ? rateType : undefined,
@@ -117,7 +121,7 @@ export default function AdminNewInventoryItem() {
         autoFocus
       />
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
         <FormControl>
           <InputLabel id='inventory-type-label'>Type</InputLabel>
           <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
@@ -126,7 +130,16 @@ export default function AdminNewInventoryItem() {
             ))}
           </Select>
         </FormControl>
-        <TextField label='Location' value={location} onChange={(e) => setLocation(e.target.value)} placeholder='Bench A, room 304…' />
+        <FormControl>
+          <InputLabel id='inventory-station-label'>Station</InputLabel>
+          <Select labelId='inventory-station-label' value={stationId} label='Station' onChange={(e) => setStationId(e.target.value)}>
+            <MenuItem value=''><em>Unassigned</em></MenuItem>
+            {stations.map((s) => (
+              <MenuItem key={s.id} value={s.id}>{s.name}{s.zone ? ` — ${s.zone}` : ''}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} placeholder='Bench A, room 304…' />
         <TextField
           label='Quantity'
           type='number'

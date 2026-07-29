@@ -965,6 +965,7 @@ const INVENTORY_FIELDS = `
   quantity
   isDeleted
   bookable
+  stationId
   rateType
   pricing {
     internal
@@ -1142,5 +1143,106 @@ export const GET_API_KEYS = gql`
       revoked
       revokedAt
     }
+  }
+`;
+
+// ── Stations (equipment→station map) ─────────────────────────────────────────
+const STATION_FIELDS = `
+  id
+  name
+  type
+  zone
+  capacity
+  x
+  y
+  notes
+  isDeleted
+`;
+
+export const GET_STATIONS = gql`
+  query GetStations($includeDeleted: Boolean) {
+    stations(includeDeleted: $includeDeleted) {
+      ${STATION_FIELDS}
+      equipment { id name }
+    }
+  }
+`;
+
+export const CREATE_STATION = gql`
+  mutation CreateStation($input: CreateStationInput!) {
+    createStation(input: $input) { ${STATION_FIELDS} }
+  }
+`;
+
+export const UPDATE_STATION = gql`
+  mutation UpdateStation($input: UpdateStationInput!) {
+    updateStation(input: $input) { ${STATION_FIELDS} }
+  }
+`;
+
+export const DELETE_STATION = gql`
+  mutation DeleteStation($id: ID!) {
+    deleteStation(id: $id) { id isDeleted }
+  }
+`;
+
+// ── Protocol Step → Service → Equipment map ──────────────────────────────────
+export const GET_PROTOCOL_STEP_MAPPINGS = gql`
+  query GetProtocolStepMappings($protocolId: String!) {
+    protocolStepMappings(protocolId: $protocolId) {
+      id
+      protocolId
+      stepId
+      stepNumber
+      stepTitle
+      serviceId
+      equipmentIds
+      requiresNoEquipment
+      paramTags
+      reviewed
+      updatedBy
+    }
+  }
+`;
+
+export const RESOLVE_PROTOCOL = gql`
+  query ResolveProtocol($protocolId: String!) {
+    resolveProtocol(protocolId: $protocolId) {
+      protocolId
+      title
+      fullyMapped
+      totalStepCount
+      mappedStepCount
+      steps {
+        stepId
+        number
+        title
+        status
+        requiresNoEquipment
+        issues
+        service { id name missing }
+        equipment { id name missing station { id name zone x y } }
+      }
+    }
+  }
+`;
+
+export const UPSERT_PROTOCOL_STEP_MAPPING = gql`
+  mutation UpsertProtocolStepMapping($input: UpsertProtocolStepMappingInput!) {
+    upsertProtocolStepMapping(input: $input) {
+      id
+      stepId
+      serviceId
+      equipmentIds
+      requiresNoEquipment
+      paramTags
+      reviewed
+    }
+  }
+`;
+
+export const DELETE_PROTOCOL_STEP_MAPPING = gql`
+  mutation DeleteProtocolStepMapping($protocolId: String!, $stepId: String!) {
+    deleteProtocolStepMapping(protocolId: $protocolId, stepId: $stepId)
   }
 `;
