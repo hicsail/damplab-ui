@@ -4,14 +4,18 @@ import {
   Box,
   Button,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_INVENTORY_ITEM, GET_STATIONS } from '../gql/queries';
@@ -24,6 +28,17 @@ const TYPE_OPTIONS = [
   { value: 'CONSUMABLE', label: 'Consumable' },
   { value: 'OTHER', label: 'Other' }
 ];
+
+/** One editable row of the placement editor: where the item lives and how many are there. */
+interface PlacementRow {
+  stationId: string;
+  quantity: string;
+}
+
+const parsePlacementQuantity = (raw: string): number => {
+  const n = Math.floor(Number(raw));
+  return Number.isFinite(n) && n > 0 ? n : 1;
+};
 
 function formatGqlError(error: unknown): string {
   const fallback = 'Unable to save inventory item. Please try again.';
@@ -46,8 +61,7 @@ export default function AdminNewInventoryItem() {
   const [type, setType] = useState('MACHINE');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
-  const [stationId, setStationId] = useState('');
-  const [quantity, setQuantity] = useState('1');
+  const [placements, setPlacements] = useState<PlacementRow[]>([]);
   const { data: stationData } = useQuery(GET_STATIONS, { fetchPolicy: 'cache-and-network' });
   const stations: any[] = stationData?.stations ?? [];
   const [bookable, setBookable] = useState(false);
@@ -56,17 +70,31 @@ export default function AdminNewInventoryItem() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const chosenStationIds = placements.map((p) => p.stationId).filter(Boolean);
+  const hasDuplicateStation = new Set(chosenStationIds).size !== chosenStationIds.length;
+  const totalUnits = placements
+    .filter((p) => !!p.stationId)
+    .reduce((sum, p) => sum + parsePlacementQuantity(p.quantity), 0);
+
+  const setPlacementRow = (index: number, patch: Partial<PlacementRow>) =>
+    setPlacements((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  const addPlacementRow = () => setPlacements((prev) => [...prev, { stationId: '', quantity: '1' }]);
+  const removePlacementRow = (index: number) =>
+    setPlacements((prev) => prev.filter((_, i) => i !== index));
+
   const handleSave = async () => {
     setErrorMessage(null);
     if (!name.trim()) {
       setErrorMessage('Name is required.');
       return;
     }
-    const parsedQty = Number(quantity);
-    if (!Number.isFinite(parsedQty) || parsedQty < 1) {
-      setErrorMessage('Quantity must be a positive integer.');
+    if (hasDuplicateStation) {
+      setErrorMessage('Each station can only appear once — combine the duplicate rows instead.');
       return;
     }
+    const placementsInput = placements
+      .filter((p) => !!p.stationId)
+      .map((p) => ({ stationId: p.stationId, quantity: parsePlacementQuantity(p.quantity) }));
     try {
       setIsSaving(true);
       await client.mutate({
@@ -77,8 +105,7 @@ export default function AdminNewInventoryItem() {
             type,
             description: description.trim() || undefined,
             location: location.trim() || undefined,
-            stationId: stationId || undefined,
-            quantity: parsedQty,
+            placements: placementsInput,
             bookable,
             rateType: bookable ? rateType : undefined,
             pricing: bookable ? ratePricingToInput(pricing) : undefined
@@ -106,10 +133,6 @@ export default function AdminNewInventoryItem() {
         Back to catalog
       </Button>
       <Typography variant='h2'>Add inventory item</Typography>
-      <Typography variant='body1' color='text.secondary'>
-        For now each record is one physical thing. You can group fungible items by leaving
-        them as separate records.
-      </Typography>
 
       {!!errorMessage && <Alert severity='error'>{errorMessage}</Alert>}
 
@@ -121,7 +144,7 @@ export default function AdminNewInventoryItem() {
         autoFocus
       />
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
         <FormControl>
           <InputLabel id='inventory-type-label'>Type</InputLabel>
           <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
@@ -130,24 +153,74 @@ export default function AdminNewInventoryItem() {
             ))}
           </Select>
         </FormControl>
-        <FormControl>
-          <InputLabel id='inventory-station-label'>Station</InputLabel>
-          <Select labelId='inventory-station-label' value={stationId} label='Station' onChange={(e) => setStationId(e.target.value)}>
-            <MenuItem value=''><em>Unassigned</em></MenuItem>
-            {stations.map((s) => (
-              <MenuItem key={s.id} value={s.id}>{s.name}{s.zone ? ` — ${s.zone}` : ''}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
         <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} placeholder='Bench A, room 304…' />
-        <TextField
-          label='Quantity'
-          type='number'
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          inputProps={{ min: 1, step: 1 }}
-          helperText='Reserved for future multi-unit support. Keep at 1 for now.'
-        />
+      </Box>
+
+      <Box>
+        <Typography variant='subtitle1' sx={{ mb: 0.5 }}>Stations</Typography>
+        <Typography variant='body2' color='text.secondary' sx={{ mb: 1.5 }}>
+          This item can live at several stations. Add one row per station and set how many units are
+          there.
+        </Typography>
+        <Stack spacing={1.5}>
+          {placements.length === 0 && (
+            <Typography variant='body2' color='text.secondary'>
+              Not placed at any station yet.
+            </Typography>
+          )}
+          {placements.map((row, index) => (
+            <Stack key={index} direction='row' spacing={1} alignItems='center'>
+              <FormControl size='small' sx={{ flex: 1 }}>
+                <InputLabel id={`inventory-station-label-${index}`}>Station</InputLabel>
+                <Select
+                  labelId={`inventory-station-label-${index}`}
+                  value={row.stationId}
+                  label='Station'
+                  onChange={(e) => setPlacementRow(index, { stationId: e.target.value })}
+                >
+                  <MenuItem value=''><em>Select a station</em></MenuItem>
+                  {stations
+                    .filter((s) => s.id === row.stationId || !chosenStationIds.includes(s.id))
+                    .map((s) => (
+                      <MenuItem key={s.id} value={s.id}>{s.name}{s.zone ? ` — ${s.zone}` : ''}</MenuItem>
+                    ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label='Quantity'
+                type='number'
+                size='small'
+                value={row.quantity}
+                onChange={(e) => setPlacementRow(index, { quantity: e.target.value })}
+                inputProps={{ min: 1, step: 1 }}
+                sx={{ width: 120 }}
+              />
+              <Tooltip title='Remove station'>
+                <IconButton size='small' onClick={() => removePlacementRow(index)}>
+                  <DeleteOutlineIcon fontSize='small' />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          ))}
+          {hasDuplicateStation && (
+            <Alert severity='warning'>
+              The same station is listed more than once. Combine those rows before saving.
+            </Alert>
+          )}
+          <Typography variant='caption' color='text.secondary'>
+            Total units across all stations: {totalUnits}
+          </Typography>
+          <Button
+            variant='outlined'
+            size='small'
+            startIcon={<AddIcon />}
+            onClick={addPlacementRow}
+            sx={{ alignSelf: 'flex-start' }}
+            disabled={stations.length > 0 && chosenStationIds.length >= stations.length}
+          >
+            Add station
+          </Button>
+        </Stack>
       </Box>
 
       <TextField

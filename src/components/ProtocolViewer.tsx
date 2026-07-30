@@ -207,22 +207,30 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
                         {meta.requiresNoEquipment && !hasEquip && (
                           <Chip size="small" variant="outlined" label="No equipment required" />
                         )}
-                        {equip.map((eq) => (
-                          <Chip
-                            key={eq.id}
-                            size="small"
-                            variant="outlined"
-                            color={eq.missing || !eq.station ? 'warning' : 'default'}
-                            icon={<BuildOutlinedIcon />}
-                            label={
-                              eq.missing
-                                ? 'equipment removed'
-                                : eq.station
-                                ? `${eq.name} · ${eq.station.name}${eq.station.zone ? ` (${eq.station.zone})` : ''}`
-                                : `${eq.name} · no station`
-                            }
-                          />
-                        ))}
+                        {equip.map((eq) => {
+                          // Equipment can sit at several stations; list each with its count.
+                          const placements: any[] = Array.isArray(eq.placements) ? eq.placements : [];
+                          const where = placements
+                            .filter((p) => p?.station)
+                            .map((p) => `${p.station.name} ×${p.quantity ?? 1}`)
+                            .join(', ');
+                          return (
+                            <Chip
+                              key={eq.id}
+                              size="small"
+                              variant="outlined"
+                              color={eq.missing || !where ? 'warning' : 'default'}
+                              icon={<BuildOutlinedIcon />}
+                              label={
+                                eq.missing
+                                  ? 'equipment removed'
+                                  : where
+                                  ? `${eq.name} · ${where}`
+                                  : `${eq.name} · no station`
+                              }
+                            />
+                          );
+                        })}
                         {(meta.issues ?? []).map((iss: string, i: number) => (
                           <Chip key={`iss-${i}`} size="small" color="warning" variant="outlined" icon={<WarningAmberIcon />} label={iss} />
                         ))}

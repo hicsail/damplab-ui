@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   FormControl,
+  IconButton,
   InputLabel,
   ListItemText,
   MenuItem,
@@ -12,8 +13,13 @@ import {
   Select,
   Stack,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useContext, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_SERVICE } from '../gql/queries';
@@ -67,7 +73,7 @@ export default function AdminNewService() {
   const [fallbackPrice, setFallbackPrice] = useState('');
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
-  const [protocolId, setProtocolId] = useState('');
+  const [protocolIds, setProtocolIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -82,6 +88,24 @@ export default function AdminNewService() {
     const m = v.match(/protocols\.io\/(?:view|edit|run)\/([^/?#]+)/i);
     return m ? m[1] : v;
   };
+
+  const setProtocolRow = (index: number, value: string) =>
+    setProtocolIds((prev) => prev.map((p, i) => (i === index ? value : p)));
+
+  const addProtocolRow = () => setProtocolIds((prev) => [...prev, '']);
+
+  const removeProtocolRow = (index: number) =>
+    setProtocolIds((prev) => prev.filter((_, i) => i !== index));
+
+  const moveProtocolRow = (index: number, delta: number) =>
+    setProtocolIds((prev) => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(target, 0, moved);
+      return next;
+    });
 
   const parsePrice = (value: string): number | null => {
     const trimmed = value.trim();
@@ -144,7 +168,7 @@ export default function AdminNewService() {
       description: description.trim(),
       deliverables: [],
       notes: notes.trim(),
-      protocolId: extractProtocolId(protocolId) || null
+      protocolIds: protocolIds.map((p) => extractProtocolId(p)).filter((p) => !!p)
     };
 
     try {
@@ -197,13 +221,65 @@ export default function AdminNewService() {
         helperText='Optional. Used in the catalog and workflow views.'
       />
 
-      <TextField
-        label='protocols.io protocol'
-        value={protocolId}
-        onChange={(event) => setProtocolId(event.target.value)}
-        placeholder='n92ld46yxl5b  or  https://www.protocols.io/view/…'
-        helperText='Optional. Paste the protocols.io protocol id or its full URL. Technicians assigned this operation can open the protocol in the bench view.'
-      />
+      <Box>
+        <Typography variant='subtitle1' sx={{ mb: 0.5 }}>
+          Protocols (in execution order)
+        </Typography>
+        <Typography variant='body2' color='text.secondary' sx={{ mb: 1.5 }}>
+          Optional. Paste each protocols.io protocol id or its full URL. The order below is the
+          sequence technicians run them in on the bench — use the arrows to reorder.
+        </Typography>
+        <Stack spacing={1.5}>
+          {protocolIds.length === 0 && (
+            <Typography variant='body2' color='text.secondary'>
+              No protocols linked yet.
+            </Typography>
+          )}
+          {protocolIds.map((value, index) => (
+            <Stack key={index} direction='row' spacing={1} alignItems='center'>
+              <Typography variant='body2' sx={{ minWidth: 24, color: 'text.secondary' }}>
+                {index + 1}.
+              </Typography>
+              <TextField
+                label={`Protocol ${index + 1}`}
+                value={value}
+                onChange={(event) => setProtocolRow(index, event.target.value)}
+                placeholder='n92ld46yxl5b  or  https://www.protocols.io/view/…'
+                size='small'
+                sx={{ flex: 1 }}
+              />
+              <Tooltip title='Move up'>
+                <IconButton size='small' onClick={() => moveProtocolRow(index, -1)} disabled={index === 0}>
+                  <ArrowUpwardIcon fontSize='small' />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title='Move down'>
+                <IconButton
+                  size='small'
+                  onClick={() => moveProtocolRow(index, 1)}
+                  disabled={index === protocolIds.length - 1}
+                >
+                  <ArrowDownwardIcon fontSize='small' />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title='Remove'>
+                <IconButton size='small' onClick={() => removeProtocolRow(index)}>
+                  <DeleteOutlineIcon fontSize='small' />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          ))}
+          <Button
+            variant='outlined'
+            size='small'
+            startIcon={<AddIcon />}
+            onClick={addProtocolRow}
+            sx={{ alignSelf: 'flex-start' }}
+          >
+            Add protocol
+          </Button>
+        </Stack>
+      </Box>
 
       <Box
         sx={{

@@ -151,7 +151,13 @@ export default function TechnicianBench() {
           const st = stateName(op.state);
           const service = op.service ?? {};
           const job = op.job ?? {};
-          const protocolId: string | undefined = service.protocolId || undefined;
+          // protocolIds is the admin-specified execution order. Older/cached rows may
+          // still only carry the deprecated single protocolId.
+          const protocolIds: string[] = Array.isArray(service.protocolIds)
+            ? service.protocolIds.filter((p: any) => typeof p === 'string' && p.trim())
+            : typeof service.protocolId === 'string' && service.protocolId.trim()
+              ? [service.protocolId]
+              : [];
           const serverSteps: string[] = Array.isArray(op.completedSteps) ? op.completedSteps : [];
           const effectiveSteps = stepOverrides[op._id] ?? serverSteps;
           const names = paramNameLookup(service.parameters);
@@ -163,7 +169,14 @@ export default function TechnicianBench() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', width: '100%' }}>
                   <Typography sx={{ fontWeight: 600 }}>{op.label || service.name || 'Operation'}</Typography>
                   <Chip size="small" label={STATE_LABEL[st]} color={STATE_COLOR[st]} />
-                  {protocolId && <Chip size="small" variant="outlined" label="Protocol linked" color="info" />}
+                  {protocolIds.length > 0 && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      color="info"
+                      label={protocolIds.length === 1 ? 'Protocol linked' : `${protocolIds.length} protocols linked`}
+                    />
+                  )}
                   <Box sx={{ flex: 1 }} />
                   {job.id && (
                     <Typography variant="caption" color="text.secondary">
@@ -227,16 +240,23 @@ export default function TechnicianBench() {
                     )}
                   </Box>
 
-                  {/* Protocol */}
-                  {protocolId ? (
-                    <Box>
-                      <Divider sx={{ mb: 1 }} />
-                      <ProtocolViewer
-                        protocolId={protocolId}
-                        completedStepIds={effectiveSteps}
-                        onToggleStep={(stepId, done) => handleToggleStep(op._id, serverSteps, stepId, done)}
-                      />
-                    </Box>
+                  {/* Protocols, rendered in the admin-specified execution order */}
+                  {protocolIds.length > 0 ? (
+                    <Stack spacing={2}>
+                      {protocolIds.map((pid, index) => (
+                        <Box key={`${pid}-${index}`}>
+                          <Divider sx={{ mb: 1 }} />
+                          <Typography variant="overline" color="text.secondary" sx={{ display: 'block' }}>
+                            Protocol {index + 1} of {protocolIds.length}
+                          </Typography>
+                          <ProtocolViewer
+                            protocolId={pid}
+                            completedStepIds={effectiveSteps}
+                            onToggleStep={(stepId, done) => handleToggleStep(op._id, serverSteps, stepId, done)}
+                          />
+                        </Box>
+                      ))}
+                    </Stack>
                   ) : (
                     <Typography variant="body2" color="text.secondary">
                       No protocol linked to this service.{' '}

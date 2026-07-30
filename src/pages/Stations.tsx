@@ -101,10 +101,18 @@ export default function Stations() {
     }
   };
 
+  /** Units of an equipment item that sit at this particular station. */
+  const unitsAtStation = (item: any, stationId: string): number => {
+    const placements: any[] = Array.isArray(item?.placements) ? item.placements : [];
+    const match = placements.find((p) => String(p?.stationId) === String(stationId));
+    const qty = Number(match?.quantity);
+    return Number.isFinite(qty) && qty > 0 ? qty : 1;
+  };
+
   const handleDelete = async (s: any) => {
     const count = s.equipment?.length ?? 0;
     const warn = count > 0
-      ? `\n\n${count} piece(s) of equipment are assigned here and will become unassigned in protocol resolution.`
+      ? `\n\n${count} equipment item(s) are placed here. This station will be dropped from their placements, and protocol resolution will only point at their remaining stations.`
       : '';
     if (!window.confirm(`Delete station "${s.name}"?${warn}`)) return;
     await deleteStation({ variables: { id: s.id } });
@@ -122,8 +130,9 @@ export default function Stations() {
       </Stack>
 
       <Typography variant='body1' color='text.secondary'>
-        Stations are the physical locations where equipment lives and protocol steps run. Assign
-        equipment to a station on the inventory editor; the coordinates feed the future layout view.
+        Stations are the physical locations where equipment lives and protocol steps run. A piece of
+        equipment can be placed at several stations, with a quantity per station — set those
+        placements on the inventory editor. The coordinates feed the future layout view.
       </Typography>
 
       {error && <Alert severity='error'>{error.message}</Alert>}
@@ -154,7 +163,9 @@ export default function Stations() {
                     ? <Typography variant='body2' color='text.secondary'>none</Typography>
                     : (
                       <Stack direction='row' spacing={0.5} flexWrap='wrap' useFlexGap>
-                        {s.equipment.map((e: any) => <Chip key={e.id} size='small' label={e.name} />)}
+                        {s.equipment.map((e: any) => (
+                          <Chip key={e.id} size='small' label={`${e.name} ×${unitsAtStation(e, s.id)}`} />
+                        ))}
                       </Stack>
                     )}
                 </TableCell>

@@ -33,7 +33,7 @@ export const GET_SERVICES = gql`
             }
             inventoryRequirements
             notes
-            protocolId
+            protocolIds
         }
     }
 `;
@@ -552,7 +552,7 @@ export const UPDATE_SERVICE = gql`
       icon
       deliverables
       notes
-      protocolId
+      protocolIds
     }
   }
 `;
@@ -582,7 +582,7 @@ export const CREATE_SERVICE = gql`
       description
       paramGroups
       deliverables
-      protocolId
+      protocolIds
       allowedConnections {
           id
           name
@@ -847,7 +847,7 @@ export const GET_ASSIGNED_OPERATIONS = gql`
         id
         name
         description
-        protocolId
+        protocolIds
         parameters
       }
       job {
@@ -965,7 +965,10 @@ const INVENTORY_FIELDS = `
   quantity
   isDeleted
   bookable
-  stationId
+  placements {
+    stationId
+    quantity
+  }
   rateType
   pricing {
     internal
@@ -1163,7 +1166,7 @@ export const GET_STATIONS = gql`
   query GetStations($includeDeleted: Boolean) {
     stations(includeDeleted: $includeDeleted) {
       ${STATION_FIELDS}
-      equipment { id name }
+      equipment { id name placements { stationId quantity } }
     }
   }
 `;
@@ -1186,7 +1189,7 @@ export const DELETE_STATION = gql`
   }
 `;
 
-// ── Protocol Step → Service → Equipment map ──────────────────────────────────
+// ── Protocol Step → Equipment map ────────────────────────────────────────────
 export const GET_PROTOCOL_STEP_MAPPINGS = gql`
   query GetProtocolStepMappings($protocolId: String!) {
     protocolStepMappings(protocolId: $protocolId) {
@@ -1195,7 +1198,6 @@ export const GET_PROTOCOL_STEP_MAPPINGS = gql`
       stepId
       stepNumber
       stepTitle
-      serviceId
       equipmentIds
       requiresNoEquipment
       paramTags
@@ -1220,8 +1222,7 @@ export const RESOLVE_PROTOCOL = gql`
         status
         requiresNoEquipment
         issues
-        service { id name missing }
-        equipment { id name missing station { id name zone x y } }
+        equipment { id name missing placements { quantity station { id name zone x y } } }
       }
     }
   }
@@ -1232,7 +1233,6 @@ export const UPSERT_PROTOCOL_STEP_MAPPING = gql`
     upsertProtocolStepMapping(input: $input) {
       id
       stepId
-      serviceId
       equipmentIds
       requiresNoEquipment
       paramTags

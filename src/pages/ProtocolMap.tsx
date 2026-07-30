@@ -10,14 +10,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
-  FormControl,
   FormControlLabel,
   IconButton,
-  InputLabel,
   LinearProgress,
-  MenuItem,
   Paper,
-  Select,
   Stack,
   TextField,
   Typography
@@ -29,8 +25,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import {
-  GET_SERVICES,
   GET_ACTIVE_INVENTORY_ITEMS,
+  GET_STATIONS,
   RESOLVE_PROTOCOL,
   GET_PROTOCOL_STEP_MAPPINGS,
   UPSERT_PROTOCOL_STEP_MAPPING
@@ -38,7 +34,6 @@ import {
 
 interface ParamTag { label: string; value: string; }
 interface EditState {
-  serviceId: string;
   equipmentIds: string[];
   requiresNoEquipment: boolean;
   paramTags: ParamTag[];
@@ -66,10 +61,29 @@ export default function ProtocolMap() {
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [banner, setBanner] = useState<string | null>(null);
 
-  const { data: svcData } = useQuery(GET_SERVICES, { fetchPolicy: 'cache-first' });
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
-  const services: any[] = svcData?.services ?? [];
+  const { data: stationData } = useQuery(GET_STATIONS, { fetchPolicy: 'cache-and-network' });
   const inventory: any[] = invData?.activeInventoryItems ?? [];
+
+  // stationId → display name, so equipment labels can spell out every station an
+  // item lives at (equipment can be placed at more than one station).
+  const stationNames = useMemo(() => {
+    const m = new Map<string, string>();
+    (stationData?.stations ?? []).forEach((s: any) => m.set(String(s.id), String(s.name ?? s.id)));
+    return m;
+  }, [stationData]);
+
+  const placementSummary = (item: any): string => {
+    const placements: any[] = Array.isArray(item?.placements) ? item.placements : [];
+    if (placements.length === 0) return 'no station';
+    return placements
+      .map((p) => {
+        const name = stationNames.get(String(p?.stationId)) ?? 'unknown station';
+        const qty = Number(p?.quantity);
+        return `${name}${Number.isFinite(qty) && qty > 1 ? ` ×${qty}` : ''}`;
+      })
+      .join(', ');
+  };
 
   const [loadResolve, { data: resolveData, loading: resolving, error: resolveErr, refetch: refetchResolve }] =
     useLazyQuery(RESOLVE_PROTOCOL, { fetchPolicy: 'network-only' });
@@ -107,7 +121,6 @@ export default function ProtocolMap() {
     for (const step of resolved.steps) {
       const m = byStep.get(step.stepId);
       next[step.stepId] = {
-        serviceId: m?.serviceId ?? step.service?.id ?? '',
         equipmentIds: m?.equipmentIds ?? (step.equipment ?? []).map((e: any) => e.id),
         requiresNoEquipment: !!(m?.requiresNoEquipment ?? step.requiresNoEquipment),
         paramTags: coerceTags(m?.paramTags),
@@ -134,7 +147,6 @@ export default function ProtocolMap() {
             stepId: step.stepId,
             stepNumber: step.number || undefined,
             stepTitle: step.title || undefined,
-            serviceId: e.serviceId || null,
             equipmentIds: e.requiresNoEquipment ? [] : e.equipmentIds,
             requiresNoEquipment: e.requiresNoEquipment,
             paramTags: e.paramTags.filter((t) => t.label.trim() || t.value.trim()),
@@ -163,9 +175,10 @@ export default function ProtocolMap() {
         <Typography variant='h2'>Protocol Step Map</Typography>
       </Stack>
       <Typography variant='body1' color='text.secondary'>
-        Map each protocols.io step to a Canvas service and the equipment it requires. Equipment
-        resolves to its station via the inventory editor. Only references are stored — protocol
-        content is always fetched live from protocols.io.
+        Map each protocols.io step to the equipment it requires. A piece of equipment can live at
+        several stations at once — its placements are managed in the inventory editor and shown
+        here for reference. Only references are stored — protocol content is always fetched live
+        from protocols.io.
       </Typography>
 
       <Paper variant='outlined' sx={{ p: 2 }}>
@@ -227,32 +240,38 @@ export default function ProtocolMap() {
                     </Alert>
                   )}
 
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-                    <FormControl size='small'>
-                      <InputLabel id={`svc-${step.stepId}`}>Service</InputLabel>
-                      <Select
-                        labelId={`svc-${step.stepId}`}
-                        label='Service'
-                        value={e.serviceId}
-                        onChange={(ev) => patch(step.stepId, { serviceId: ev.target.value })}
-                      >
-                        <MenuItem value=''><em>None</em></MenuItem>
-                        {services.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
-                      </Select>
-                    </FormControl>
-
-                    <Autocomplete
-                      multiple
-                      size='small'
-                      disabled={e.requiresNoEquipment}
-                      options={inventory}
-                      getOptionLabel={(o: any) => o.name}
-                      isOptionEqualToValue={(o: any, v: any) => o.id === v.id}
-                      value={inventory.filter((i) => e.equipmentIds.includes(i.id))}
-                      onChange={(_, val: any[]) => patch(step.stepId, { equipmentIds: val.map((v) => v.id) })}
-                      renderInput={(params) => <TextField {...params} label='Equipment' placeholder='Add equipment…' />}
-                    />
-                  </Box>
+                  <Autocomplete
+                    multiple
+                    fullWidth
+                    size='small'
+                    disabled={e.requiresNoEquipment}
+                    options={inventory}
+                    getOptionLabel={(o: any) => o.name}
+                    isOptionEqualToValue={(o: any, v: any) => o.id === v.id}
+                    value={inventory.filter((i) => e.equipmentIds.includes(i.id))}
+                    onChange={(_, val: any[]) => patch(step.stepId, { equipmentIds: val.map((v) => v.id) })}
+                    renderOption={(props, o: any) => (
+                      <li {...props} key={o.id}>
+                        <Stack spacing={0}>
+                          <Typography variant='body2'>{o.name}</Typography>
+                          <Typography variant='caption' color='text.secondary'>{placementSummary(o)}</Typography>
+                        </Stack>
+                      </li>
+                    )}
+                    renderTags={(value: any[], getTagProps) =>
+                      value.map((o, idx) => (
+                        <Chip
+                          {...getTagProps({ index: idx })}
+                          key={o.id}
+                          size='small'
+                          variant='outlined'
+                          color={(o.placements ?? []).length === 0 ? 'warning' : 'default'}
+                          label={`${o.name} · ${placementSummary(o)}`}
+                        />
+                      ))
+                    }
+                    renderInput={(params) => <TextField {...params} label='Equipment' placeholder='Add equipment…' />}
+                  />
 
                   <FormControlLabel
                     control={
