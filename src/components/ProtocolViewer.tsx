@@ -1,6 +1,10 @@
-import { useContext, useEffect, useState } from 'react';
-import { Alert, Box, Button, Checkbox, CircularProgress, Link, Typography } from '@mui/material';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Link, Stack, Typography } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { useQuery } from '@apollo/client';
+import { RESOLVE_PROTOCOL } from '../gql/queries';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 
 /** Resolve the REST protocols proxy endpoint from the configured GraphQL backend URL. */
@@ -93,6 +97,18 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [protocolId]);
 
+  // Resolved step → service → equipment → station chain (read-only guidance for the bench).
+  const { data: resolvedData } = useQuery(RESOLVE_PROTOCOL, {
+    variables: { protocolId },
+    skip: !protocolId,
+    fetchPolicy: 'cache-and-network'
+  });
+  const stepMeta = useMemo(() => {
+    const m = new Map<string, any>();
+    (resolvedData?.resolveProtocol?.steps ?? []).forEach((s: any) => m.set(s.stepId, s));
+    return m;
+  }, [resolvedData]);
+
   const done = new Set(completedStepIds || []);
   const fallbackUrl = `https://www.protocols.io/view/${encodeURIComponent(protocolId)}`;
   const total = protocol?.steps.length ?? 0;
@@ -180,6 +196,39 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
                     sx={{ '& p': { m: 0, mb: 0.5 }, '& img': { maxWidth: '100%' }, fontSize: '0.9rem', wordBreak: 'break-word' }}
                     dangerouslySetInnerHTML={{ __html: sanitizeHtml(step.html) }}
                   />
+                  {(() => {
+                    const meta = stepMeta.get(step.id);
+                    if (!meta) return null;
+                    const equip: any[] = meta.equipment ?? [];
+                    const hasEquip = equip.length > 0;
+                    if (!hasEquip && !meta.requiresNoEquipment && !(meta.issues?.length)) return null;
+                    return (
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+                        {meta.requiresNoEquipment && !hasEquip && (
+                          <Chip size="small" variant="outlined" label="No equipment required" />
+                        )}
+                        {equip.map((eq) => (
+                          <Chip
+                            key={eq.id}
+                            size="small"
+                            variant="outlined"
+                            color={eq.missing || !eq.station ? 'warning' : 'default'}
+                            icon={<BuildOutlinedIcon />}
+                            label={
+                              eq.missing
+                                ? 'equipment removed'
+                                : eq.station
+                                ? `${eq.name} · ${eq.station.name}${eq.station.zone ? ` (${eq.station.zone})` : ''}`
+                                : `${eq.name} · no station`
+                            }
+                          />
+                        ))}
+                        {(meta.issues ?? []).map((iss: string, i: number) => (
+                          <Chip key={`iss-${i}`} size="small" color="warning" variant="outlined" icon={<WarningAmberIcon />} label={iss} />
+                        ))}
+                      </Stack>
+                    );
+                  })()}
                 </Box>
               </Box>
             );
