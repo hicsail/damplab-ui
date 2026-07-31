@@ -7,6 +7,7 @@ import {
   CardContent,
   Chip,
   FormControl,
+  IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -15,12 +16,16 @@ import {
   Skeleton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DescriptionIcon from '@mui/icons-material/Description';
 import SearchIcon from '@mui/icons-material/Search';
 import FiberNewIcon from '@mui/icons-material/FiberNew';
+import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
+import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined';
+import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 
 export interface JobListItem {
   id: string;
@@ -31,10 +36,20 @@ export interface JobListItem {
   username?: string;
   institute?: string;
   email?: string;
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
+  archivedFromState?: string;
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 25, 50] as const;
 export const STATE_OPTIONS = ['', 'SUBMITTED', 'QUEUED', 'IN_PROGRESS', 'COMPLETE'];
+export type ArchiveFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
+export const ARCHIVE_FILTER_LABELS: Record<ArchiveFilter, string> = {
+  ACTIVE: 'Active',
+  ARCHIVED: 'Archived',
+  ALL: 'All'
+};
 
 export interface SubmittedJobsListProps {
   /** Server-provided items for current page. */
@@ -61,6 +76,11 @@ export interface SubmittedJobsListProps {
   onBack?: () => void;
   backLabel?: string;
   isJobNew?: (job: JobListItem) => boolean;
+  /** Staff only. Supplying this renders the per-job archive/restore action. */
+  onArchiveToggle?: (job: JobListItem) => void;
+  /** Staff only. Supplying both renders the Active/Archived/All filter. */
+  archiveFilter?: ArchiveFilter;
+  onArchiveFilterChange?: (value: ArchiveFilter) => void;
 }
 
 export default function SubmittedJobsList({
@@ -86,6 +106,9 @@ export default function SubmittedJobsList({
   onBack,
   backLabel = 'Back to Home',
   isJobNew,
+  onArchiveToggle,
+  archiveFilter,
+  onArchiveFilterChange,
 }: SubmittedJobsListProps) {
   const totalPages = Math.max(1, Math.ceil(totalCount / limit));
   const pageSafe = Math.min(Math.max(1, page), totalPages);
@@ -192,6 +215,22 @@ export default function SubmittedJobsList({
             </Select>
           </FormControl>
         )}
+        {isStaff && archiveFilter && onArchiveFilterChange && (
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Archive</InputLabel>
+            <Select
+              value={archiveFilter}
+              label="Archive"
+              onChange={(e) => onArchiveFilterChange(e.target.value as ArchiveFilter)}
+            >
+              {(Object.keys(ARCHIVE_FILTER_LABELS) as ArchiveFilter[]).map((k) => (
+                <MenuItem key={k} value={k}>
+                  {ARCHIVE_FILTER_LABELS[k]}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
       </Stack>
 
       {loading ? (
@@ -261,6 +300,15 @@ export default function SubmittedJobsList({
                           variant="outlined"
                         />
                       ) : null}
+                      {job.isArchived && (
+                        <Chip
+                          icon={<Inventory2OutlinedIcon sx={{ fontSize: 16 }} />}
+                          label="Archived"
+                          size="small"
+                          color="warning"
+                          variant="outlined"
+                        />
+                      )}
                       <Chip
                         label={job.state ?? '—'}
                         size="small"
@@ -275,6 +323,26 @@ export default function SubmittedJobsList({
                           color="success"
                           variant="outlined"
                         />
+                      )}
+                      {isStaff && onArchiveToggle && (
+                        <Tooltip title={job.isArchived ? 'Restore job' : 'Archive job'}>
+                          <IconButton
+                            size="small"
+                            aria-label={job.isArchived ? `Restore job ${job.name}` : `Archive job ${job.name}`}
+                            // The whole Card is a router Link, so suppress navigation.
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onArchiveToggle(job);
+                            }}
+                          >
+                            {job.isArchived ? (
+                              <UnarchiveOutlinedIcon fontSize="small" />
+                            ) : (
+                              <ArchiveOutlinedIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </Box>
                   </Box>

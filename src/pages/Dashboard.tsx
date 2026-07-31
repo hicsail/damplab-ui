@@ -1,15 +1,34 @@
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { useMutation, useQuery } from '@apollo/client';
-import { Box, Button, Alert, Stack } from '@mui/material';
+import {
+  Box,
+  Button,
+  Alert,
+  Stack,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Snackbar,
+  Typography,
+} from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SubmittedJobsList, {
+  type ArchiveFilter,
   type JobListItem,
   STATE_OPTIONS,
 } from '../components/SubmittedJobsList';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { ALL_JOBS, JOBS_FEED_STATUS } from '../gql/queries';
-import { MARK_JOBS_FEED_VIEWED } from '../gql/mutations';
+import { ARCHIVE_JOB, MARK_JOBS_FEED_VIEWED, UNARCHIVE_JOB } from '../gql/mutations';
+
+/**
+ * States where lab work is genuinely under way, so archiving is worth a warning.
+ * Admins can still proceed — this only makes sure it isn't done by accident.
+ */
+const ACTIVE_WORK_STATES = new Set(['IN_PROGRESS', 'QUEUED', 'ACCEPTED', 'WAITING_FOR_SOW']);
 
 export default function Dashboard() {
   const [markJobsFeedViewed] = useMutation(MARK_JOBS_FEED_VIEWED);
@@ -19,7 +38,12 @@ export default function Dashboard() {
   const [searchInput, setSearchInput] = React.useState('');
   const [stateFilter, setStateFilter] = React.useState<string>(STATE_OPTIONS[0]);
   const [hasSowFilter, setHasSowFilter] = React.useState<'all' | 'yes' | 'no'>('all');
+  const [archiveFilter, setArchiveFilter] = React.useState<ArchiveFilter>('ACTIVE');
   const [lastViewedAt, setLastViewedAt] = React.useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = React.useState<JobListItem | null>(null);
+  const [archiveBusy, setArchiveBusy] = React.useState(false);
+  const [toast, setToast] = React.useState<string | null>(null);
+  const [archiveError, setArchiveError] = React.useState<string | null>(null);
 
   const search = useDebouncedValue(searchInput, 300);
 
@@ -29,16 +53,19 @@ export default function Dashboard() {
       limit,
       sortBy: 'SUBMITTED',
       sortOrder: 'DESC',
+      archiveFilter,
     };
     if (search.trim()) inp.search = search.trim();
     if (stateFilter) inp.state = stateFilter;
     if (hasSowFilter !== 'all') inp.hasSow = hasSowFilter === 'yes';
     return inp;
-  }, [page, limit, search, stateFilter, hasSowFilter]);
+  }, [page, limit, search, stateFilter, hasSowFilter, archiveFilter]);
 
-  const { data, loading, error } = useQuery(ALL_JOBS, {
+  const { data, loading, error, refetch } = useQuery(ALL_JOBS, {
     variables: { input },
   });
+  const [archiveJob] = useMutation(ARCHIVE_JOB);
+  const [unarchiveJob] = useMutation(UNARCHIVE_JOB);
   const { data: feedStatusData } = useQuery(JOBS_FEED_STATUS, {
     fetchPolicy: 'network-only'
   });
@@ -64,6 +91,10 @@ export default function Dashboard() {
       username: j.username != null ? String(j.username) : undefined,
       institute: j.institute != null ? String(j.institute) : undefined,
       email: j.email != null ? String(j.email) : undefined,
+      isArchived: Boolean(j.isArchived),
+      archivedAt: j.archivedAt != null ? String(j.archivedAt) : undefined,
+      archivedBy: j.archivedBy != null ? String(j.archivedBy) : undefined,
+      archivedFromState: j.archivedFromState != null ? String(j.archivedFromState) : undefined,
       sow: j.sow
         ? {
             id: String((j.sow as Record<string, unknown>).id ?? ''),
@@ -91,6 +122,49 @@ export default function Dashboard() {
     },
     [lastViewedAt]
   );
+
+  const handleArchiveFilterChange = useCallback((v: ArchiveFilter) => {
+    setArchiveFilter(v);
+    setPage(1);
+  }, []);
+
+  // Restoring is harmless, so it applies straight away. Archiving always asks,
+  // and the dialog escalates its wording when work is under way.
+  const handleArchiveToggle = useCallback(
+    async (job: JobListItem) => {
+      setArchiveError(null);
+      if (job.isArchived) {
+        try {
+          await unarchiveJob({ variables: { jobId: job.id } });
+          await refetch();
+          setToast(`Restored "${job.name}".`);
+        } catch (e: any) {
+          setArchiveError(e?.graphQLErrors?.[0]?.message || e?.message || 'Could not restore the job.');
+        }
+        return;
+      }
+      setArchiveTarget(job);
+    },
+    [unarchiveJob, refetch]
+  );
+
+  const confirmArchive = useCallback(async () => {
+    if (!archiveTarget) return;
+    setArchiveBusy(true);
+    setArchiveError(null);
+    try {
+      await archiveJob({ variables: { jobId: archiveTarget.id } });
+      await refetch();
+      setToast(`Archived "${archiveTarget.name}".`);
+      setArchiveTarget(null);
+    } catch (e: any) {
+      setArchiveError(e?.graphQLErrors?.[0]?.message || e?.message || 'Could not archive the job.');
+    } finally {
+      setArchiveBusy(false);
+    }
+  }, [archiveTarget, archiveJob, refetch]);
+
+  const targetIsActiveWork = archiveTarget ? ACTIVE_WORK_STATES.has(archiveTarget.state) : false;
 
   const content = error ? (
     <Alert severity="error">
@@ -120,6 +194,9 @@ export default function Dashboard() {
       onBack={() => navigate('/')}
       backLabel="Back to Home"
       isJobNew={isJobNew}
+      onArchiveToggle={handleArchiveToggle}
+      archiveFilter={archiveFilter}
+      onArchiveFilterChange={handleArchiveFilterChange}
     />
   );
 
@@ -163,6 +240,65 @@ export default function Dashboard() {
         </Stack>
       </Stack>
       {content}
+
+      <Dialog open={!!archiveTarget} onClose={() => (archiveBusy ? null : setArchiveTarget(null))} fullWidth maxWidth="sm">
+        <DialogTitle>Archive this job?</DialogTitle>
+        <DialogContent>
+          <DialogContentText component="div">
+            <Typography variant="body1" sx={{ fontWeight: 600, mb: 1 }}>
+              {archiveTarget?.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Current status: {archiveTarget?.state?.replace('_', ' ') || '—'}
+            </Typography>
+          </DialogContentText>
+
+          {targetIsActiveWork && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              This job is still <strong>{archiveTarget?.state?.replace('_', ' ')}</strong> — work has not
+              finished. Archiving removes it from the jobs dashboard and the lab monitor boards, so
+              technicians will no longer see it. You can archive it anyway if that's what you intend.
+            </Alert>
+          )}
+
+          <Typography variant="body2" color="text.secondary">
+            Nothing is deleted. The job keeps its status, SOW and invoices, and you can restore it at any
+            time from the <strong>Archived</strong> filter.
+          </Typography>
+
+          {archiveError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {archiveError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setArchiveTarget(null)} disabled={archiveBusy}>
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmArchive}
+            variant="contained"
+            color={targetIsActiveWork ? 'warning' : 'primary'}
+            disabled={archiveBusy}
+          >
+            {archiveBusy ? 'Archiving…' : targetIsActiveWork ? 'Archive anyway' : 'Archive job'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={!!toast}
+        autoHideDuration={4000}
+        onClose={() => setToast(null)}
+        message={toast ?? ''}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+      {archiveError && !archiveTarget && (
+        <Alert severity="error" sx={{ mt: 2 }} onClose={() => setArchiveError(null)}>
+          {archiveError}
+        </Alert>
+      )}
     </Box>
   );
 }

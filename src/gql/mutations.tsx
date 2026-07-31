@@ -581,3 +581,29 @@ export const REVOKE_API_KEY = gql`
     revokeApiKey(id: $id) { id revoked revokedAt }
   }
 `;
+
+export const ARCHIVE_JOB = gql`
+  mutation ArchiveJob($jobId: ID!) {
+    archiveJob(jobId: $jobId) {
+      id
+      state
+      isArchived
+      archivedAt
+      archivedBy
+      archivedFromState
+    }
+  }
+`;
+
+export const UNARCHIVE_JOB = gql`
+  mutation UnarchiveJob($jobId: ID!) {
+    unarchiveJob(jobId: $jobId) {
+      id
+      state
+      isArchived
+      archivedAt
+      archivedBy
+      archivedFromState
+    }
+  }
+`;

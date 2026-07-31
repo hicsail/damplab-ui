@@ -276,6 +276,10 @@ export const ALL_JOBS = gql`
                 username
                 institute
                 email
+                isArchived
+                archivedAt
+                archivedBy
+                archivedFromState
                 sow {
                     id
                     sowNumber
