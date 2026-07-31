@@ -406,6 +406,15 @@ export const CREATE_INVOICE = gql`
         cost
         category
       }
+      subtotal
+      adjustments {
+        type
+        description
+        reason
+        amount
+        appliedAmount
+        prorationFactor
+      }
       totalCost
       createdAt
     }

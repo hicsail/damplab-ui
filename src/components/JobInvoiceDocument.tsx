@@ -366,6 +366,15 @@ export interface JobInvoiceDocumentProps {
       formData?: any;
       pricingDetails?: Array<{ label: string; quantity: number; unitPrice: number; total: number }>;
     }>;
+    subtotal?: number | null;
+    adjustments?: Array<{
+      type?: string | null;
+      description?: string | null;
+      reason?: string | null;
+      amount?: number | null;
+      appliedAmount?: number | null;
+      prorationFactor?: number | null;
+    }> | null;
     totalCost?: number | null;
     billedToName?: string | null;
     billedToEmail?: string | null;
@@ -387,7 +396,21 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
   const { line1, line2 } = splitAddressLines(invoice?.billedToAddress ?? sow?.clientAddress ?? '');
 
   const services = (invoice?.services?.length ? invoice.services : (sow?.services ?? [])) as any[];
-  const invoiceTotal = Number(invoice?.totalCost) || services.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
+  const lineItemSum = services.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
+  // `subtotal` is absent on invoices generated before adjustments were carried
+  // across, so fall back to the line-item sum for those historical documents.
+  const subtotal = invoice?.subtotal != null ? Number(invoice.subtotal) : lineItemSum;
+  // Only adjustments that actually move money get a row; SPECIAL_TERM is a note
+  // (appliedAmount 0) and is listed separately below the total.
+  const allAdjustments = Array.isArray(invoice?.adjustments) ? invoice!.adjustments! : [];
+  const monetaryAdjustments = allAdjustments.filter((a) => Number(a?.appliedAmount) !== 0);
+  const noteAdjustments = allAdjustments.filter((a) => Number(a?.appliedAmount) === 0 && (a?.description || a?.reason));
+  const invoiceTotal = invoice?.totalCost != null ? Number(invoice.totalCost) : lineItemSum;
+  // True when the adjustment was scaled because this invoice covers only part of the job.
+  const isProrated = monetaryAdjustments.some((a) => {
+    const f = Number(a?.prorationFactor);
+    return Number.isFinite(f) && f > 0 && f < 0.999;
+  });
 
   const isInternal = customerCategory === 'INTERNAL_CUSTOMERS';
   const getCustomerCategoryLabel = (category?: JobInvoiceDocumentProps['customerCategory']): string => {
@@ -551,6 +574,30 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
             );
           })}
 
+          {/* Only show a Subtotal line when something adjusts it, so an invoice
+              with no adjustments keeps its original single-Total look. */}
+          {monetaryAdjustments.length > 0 && (
+            <>
+              <View style={styles.totalRow}>
+                <Text style={styles.text}>Subtotal&nbsp;&nbsp;{formatCurrency(subtotal)}</Text>
+              </View>
+              {monetaryAdjustments.map((adj, i) => {
+                const applied = Number(adj?.appliedAmount) || 0;
+                const label = adj?.description || (adj?.type === 'DISCOUNT' ? 'Discount' : 'Additional cost');
+                return (
+                  <View style={styles.totalRow} key={`adj-${i}`}>
+                    <Text style={styles.text}>
+                      {label}
+                      {adj?.reason ? ` (${adj.reason})` : ''}
+                      &nbsp;&nbsp;
+                      {applied < 0 ? `-${formatCurrency(Math.abs(applied))}` : formatCurrency(applied)}
+                    </Text>
+                  </View>
+                );
+              })}
+            </>
+          )}
+
           <View style={styles.totalRow}>
             <Text style={styles.strong}>Total&nbsp;&nbsp;{formatCurrency(invoiceTotal)}</Text>
           </View>
@@ -560,6 +607,17 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
           <Text style={styles.strong}>Note to customer</Text>
           <Text style={styles.text}>Service Prices for {fyShort}</Text>
           <Text style={styles.text}>Pricing category: {pricingCategoryLabel}</Text>
+          {isProrated && (
+            <Text style={styles.text}>
+              This invoice covers part of the job; pricing adjustments are applied in proportion to the services billed here.
+            </Text>
+          )}
+          {noteAdjustments.map((adj, i) => (
+            <Text style={styles.text} key={`term-${i}`}>
+              {adj?.description || 'Special term'}
+              {adj?.reason ? ` — ${adj.reason}` : ''}
+            </Text>
+          ))}
         </View>
       </Page>
     </Document>

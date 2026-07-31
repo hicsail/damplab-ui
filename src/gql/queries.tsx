@@ -803,6 +803,15 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         cost
         category
       }
+      subtotal
+      adjustments {
+        type
+        description
+        reason
+        amount
+        appliedAmount
+        prorationFactor
+      }
       totalCost
       createdAt
     }
