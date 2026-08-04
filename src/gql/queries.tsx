@@ -1259,3 +1259,55 @@ export const DELETE_PROTOCOL_STEP_MAPPING = gql`
     deleteProtocolStepMapping(protocolId: $protocolId, stepId: $stepId)
   }
 `;
+
+// ── Bug backlog (ClickUp-backed, filed by the n8n triage workflow) ───────────
+const BACKLOG_CARD_FIELDS = `
+  id
+  title
+  status
+  isClosed
+  severity
+  area
+  category
+  summary
+  stepsToReproduce
+  expected
+  actual
+  proposedFix
+  assignees
+  reporterName
+  reporterEmail
+  sessionTag
+  occurrences
+  sourceBugId
+  commentCount
+  clickupUrl
+  createdAt
+  updatedAt
+`;
+
+export const GET_BACKLOG_CARDS = gql`
+  query BacklogCards {
+    backlogAvailable
+    backlogCards {
+      ${BACKLOG_CARD_FIELDS}
+    }
+  }
+`;
+
+export const GET_BACKLOG_CARD = gql`
+  query BacklogCard($id: ID!) {
+    backlogCard(id: $id) {
+      card {
+        ${BACKLOG_CARD_FIELDS}
+      }
+      comments {
+        id
+        author
+        fromApp
+        text
+        createdAt
+      }
+    }
+  }
+`;

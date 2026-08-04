@@ -17,6 +17,7 @@ export default [
         route("/services-catalog", "./pages/AdminServicesCatalog.tsx"),
         route("/admin/services-catalog", "./pages/AdminServicesCatalog.tsx", { id: "admin-services-catalog-legacy" }),
         route("/bugs", "./pages/Bugs.tsx"),
+        route("/backlog", "./pages/Backlog.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
         route("/staff_submit", "./pages/StaffJobSubmit.tsx"),

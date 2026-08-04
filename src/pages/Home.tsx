@@ -172,6 +172,10 @@ export default function Home() {
               <BugReportIcon />
               Bugs
             </MenuButton>
+            <MenuButton navigateTo="/backlog">
+              <FormatListBulletedIcon />
+              Bug Backlog
+            </MenuButton>
             <MenuButton onClick={() => (window.location.href = 'https://www.damplab.org/services')}>
               <img src="/damp-white.svg" height="30px" alt="DAMP Logo" />
               DAMPLab Site

@@ -607,3 +607,15 @@ export const UNARCHIVE_JOB = gql`
     }
   }
 `;
+
+export const ADD_BACKLOG_COMMENT = gql`
+  mutation AddBacklogComment($cardId: ID!, $body: String!) {
+    addBacklogComment(cardId: $cardId, body: $body) {
+      id
+      author
+      fromApp
+      text
+      createdAt
+    }
+  }
+`;
