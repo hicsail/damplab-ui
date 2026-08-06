@@ -31,6 +31,7 @@ import SendIcon from '@mui/icons-material/Send';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import { GET_BACKLOG_CARDS, GET_BACKLOG_CARD } from '../gql/queries';
 import { ADD_BACKLOG_COMMENT } from '../gql/mutations';
 
@@ -196,6 +197,9 @@ export default function Backlog() {
                   {c.area && <Chip size="small" variant="outlined" label={c.area} />}
                   {c.category && <Chip size="small" variant="outlined" label={c.category} />}
                   {c.occurrences > 1 && <Chip size="small" color="warning" label={`reported ×${c.occurrences}`} />}
+                  {c.reporterName && (
+                    <Chip size="small" variant="outlined" icon={<PersonOutlineIcon sx={{ fontSize: 15 }} />} label={c.reporterName} />
+                  )}
                   {c.commentCount > 0 && (
                     <Chip size="small" variant="outlined" icon={<ChatBubbleOutlineIcon sx={{ fontSize: 15 }} />} label={c.commentCount} />
                   )}
@@ -270,12 +274,26 @@ function CardDialog({ id, onClose, onCommented }: { id: string; onClose: () => v
               )}
             </Stack>
 
-            <Typography variant="caption" color="text.secondary">
-              Reported {fmt(card.createdAt)}
-              {card.reporterName ? ` by ${card.reporterName}` : ''}
-              {card.sessionTag ? ` · ${card.sessionTag}` : ''}
-              {card.assignees?.length ? ` · assigned to ${card.assignees.join(', ')}` : ''}
-            </Typography>
+            {/* Reporter is shown prominently, with a mailto, so whoever picks the
+                bug up can go straight back to them for missing detail. */}
+            <Paper variant="outlined" sx={{ p: 1.25, bgcolor: 'action.hover' }}>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <PersonOutlineIcon fontSize="small" color="action" />
+                <Typography variant="body2">
+                  <strong>{card.reporterName || 'Unknown reporter'}</strong>
+                </Typography>
+                {card.reporterEmail && (
+                  <MuiLink href={`mailto:${card.reporterEmail}?subject=${encodeURIComponent('Bug: ' + (card.title || ''))}`} variant="body2">
+                    {card.reporterEmail}
+                  </MuiLink>
+                )}
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                  {fmt(card.createdAt)}
+                  {card.sessionTag ? ` · ${card.sessionTag}` : ''}
+                  {card.assignees?.length ? ` · assigned to ${card.assignees.join(', ')}` : ''}
+                </Typography>
+              </Stack>
+            </Paper>
 
             {card.summary && <Section title="Summary" body={card.summary} />}
             {card.stepsToReproduce && <Section title="Steps to reproduce" body={card.stepsToReproduce} />}
