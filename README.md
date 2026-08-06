@@ -123,7 +123,8 @@ This [React](https://reactjs.org/) app is built on [Vite](https://vite.dev/) and
  - [Chris Krenz](https://github.com/chris-krenz) (primary contact as of mid 2024)
  - [Rishi Shah](https://github.com/ShahRishi)
  - [Greg Frasco](https://github.com/gregfrasco)
- 
+ - [Arezoo Sadeghi](https://github.com/asadeg02)
+
 
 ## License
 
