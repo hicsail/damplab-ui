@@ -1,7 +1,20 @@
 import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
 
 import { NodeParameter } from '../types/CanvasTypes';
+import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 import { services as legacyServices } from '../data/services';
+
+const RUN_COUNT_PARAM_DEF = {
+    id              : RUN_COUNT_PARAM_ID,
+    name            : 'Number of runs',
+    type            : 'number',
+    required        : false,
+    description     : 'Price = base price × this number.',
+    paramType       : 'input',
+    isPriceMultiplier: true,
+    options         : null,
+    allowMultipleValues: false,
+};
 
 
 export const getServiceFromId = (services: any, id: string) => {
@@ -56,6 +69,11 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
     const nodeId = Math.random().toString(36).substring(2, 9);  // Sufficient variance?
     const formData: NodeParameter[] = generateFormDataFromParams(service.parameters ?? [], nodeId);
     
+    const serviceParams = service.parameters ?? [];
+    const parametersWithRunCount = serviceParams.some((p: any) => p?.id === RUN_COUNT_PARAM_ID)
+        ? serviceParams
+        : [...serviceParams, RUN_COUNT_PARAM_DEF];
+
     const nodeData = {
         id                    : nodeId,
         label                 : service.name,
@@ -70,7 +88,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         description           : service.description,
         allowedConnections    : service.allowedConnections,
         icon                  : service.icon,
-        parameters            : service.parameters,
+        parameters            : parametersWithRunCount,
         additionalInstructions: "",
         formData              : formData,
         serviceId             : service.id,
@@ -287,7 +305,7 @@ export const paramsFilledOnNode = (node: any) : Boolean => {
 
 export const searchForEndService : any = (serviceId : string, endServiceId: string, visited: any[]) => {
     
-    const service: any | undefined = services.find(s => s.id === serviceId);
+    const service: any | undefined = legacyServices.find((s: any) => s.id === serviceId);
    
     if (!service) {
         return null;
@@ -302,7 +320,7 @@ export const searchForEndService : any = (serviceId : string, endServiceId: stri
     }
     if (service.allowedConnections) {
         for (const connection of service.allowedConnections) {
-        const connectedService = services.find(s => s.id === connection);
+        const connectedService = legacyServices.find((s: any) => s.id === connection);
         const result = searchForEndService(connectedService, endServiceId, visited);
         if (result) {
             return result;

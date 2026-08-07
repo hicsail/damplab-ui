@@ -505,7 +505,6 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                       multiline={
                         param.name === "Additional Notes" ? true : false
                       }
-                      helperText={param.description ? param.description : null}
                       size="small"
                       label={param.name}
                       type={param.type}
@@ -519,6 +518,7 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
                       error={Boolean(formik.errors[param.id])}
                       helperText={formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
                       InputLabelProps={{ shrink: true }}
+                      inputProps={param.isPriceMultiplier === true && param.type === 'number' ? { min: 1, step: 1 } : undefined}
                     />
                   </div>
                 );

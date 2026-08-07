@@ -1,10 +1,11 @@
 import React, { memo, useContext, useEffect, useState } from 'react';
 import { Handle, Position } from 'reactflow';
-import { Box, Button } from '@mui/material';
+import { Badge, Box, Button } from '@mui/material';
 import WarningIcon     from '@mui/icons-material/Warning';
 
 import { CanvasContext } from '../contexts/Canvas';
 import { ImagesServicesDict } from '../assets/icons';
+import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 
 
 type Input = {
@@ -70,26 +71,43 @@ export default memo((input: Input) => {
         return filled;
     }
 
+    const runCountEntry = Array.isArray(data.data.formData)
+        ? data.data.formData.find((p: any) => p?.id === RUN_COUNT_PARAM_ID)
+        : undefined;
+    const runCountRaw = runCountEntry?.value;
+    const runCount = typeof runCountRaw === 'number' ? runCountRaw
+        : typeof runCountRaw === 'string' && runCountRaw.trim() !== '' ? Number(runCountRaw)
+        : 1;
+    const showBadge = Number.isFinite(runCount) && runCount > 1;
+
     return (
         <div>
             <Box>
-                <Button variant="outlined" title={data.data.label} onClick={handleOpen} sx={{boxShadow: 2}} 
-                style={{ width: 250, display: 'flex', justifyContent: 'space-around', background : background }}>
-                    <div>
-                        {/* URL (e.g. to Google Drive) from the DB... */}
-                        {/* <img src={data.data.icon} alt=" " style={{ width: 30 }} /> */}
-                        {/* Local files in src/assets/icons folder... */}
-                        <img src={ImagesServicesDict[data.data.label]} alt=" " style={{ width: 30 }} />
-                    </div>
-                    <p style={{ fontSize: 12, marginLeft: 5, marginRight: 5 }}>
-                        {data.data.label}
-                    </p>
-                    <div>
-                        { allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
-                    </div> 
-                </Button>
+                <Badge
+                    badgeContent={showBadge ? `×${runCount}` : undefined}
+                    color="primary"
+                    anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+                    invisible={!showBadge}
+                    sx={{ '& .MuiBadge-badge': { fontSize: 10, fontWeight: 'bold', minWidth: 20, height: 20 } }}
+                >
+                    <Button variant="outlined" title={data.data.label} onClick={handleOpen} sx={{boxShadow: 2}}
+                    style={{ width: 250, display: 'flex', justifyContent: 'space-around', background : background }}>
+                        <div>
+                            {/* URL (e.g. to Google Drive) from the DB... */}
+                            {/* <img src={data.data.icon} alt=" " style={{ width: 30 }} /> */}
+                            {/* Local files in src/assets/icons folder... */}
+                            <img src={ImagesServicesDict[data.data.label]} alt=" " style={{ width: 30 }} />
+                        </div>
+                        <p style={{ fontSize: 12, marginLeft: 5, marginRight: 5 }}>
+                            {data.data.label}
+                        </p>
+                        <div>
+                            { allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
+                        </div>
+                    </Button>
+                </Badge>
                 <Handle type="target" position={Position.Top} isConnectable={isConnectable} style={{width: 10, height: 10}}/>
-                <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} style={{width: 10, height: 10}}/>      
+                <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} style={{width: 10, height: 10}}/>
             </Box>
         </div>
     );

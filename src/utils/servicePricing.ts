@@ -1,4 +1,7 @@
 export type ServicePricingMode = 'SERVICE' | 'PARAMETER';
+
+/** Reserved formData entry id injected universally on every canvas node. */
+export const RUN_COUNT_PARAM_ID = '__runCount';
 export type CustomerCategory =
   | 'INTERNAL_CUSTOMERS'
   | 'EXTERNAL_CUSTOMER_ACADEMIC'
@@ -254,48 +257,56 @@ export const calculateParameterCostWithCategory = (
   return total;
 };
 
-const getMultiplier = (parameters: unknown, rawFormData: unknown): number => {
-  if (!Array.isArray(parameters)) return 1;
+const resolveQty = (rawValue: unknown): number | undefined => {
+  if (Array.isArray(rawValue)) {
+    let sum = 0, hasAny = false;
+    for (const v of rawValue) {
+      const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+      if (!Number.isFinite(n)) continue;
+      hasAny = true;
+      sum += n;
+    }
+    return hasAny ? sum : undefined;
+  }
+  const n =
+    typeof rawValue === 'number' ? rawValue
+    : typeof rawValue === 'string' && rawValue.trim() !== '' ? Number(rawValue)
+    : NaN;
+  return Number.isFinite(n) ? n : undefined;
+};
 
+const getMultiplier = (parameters: unknown, rawFormData: unknown): number => {
   const multiValueParamIds = getMultiValueParamIds(parameters, rawFormData);
   const formData = normalizeFormDataToArray(rawFormData, multiValueParamIds);
   const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
 
   let multiplier = 1;
 
-  for (const param of parameters as ServiceParameterDefinition[]) {
-    if (!param || typeof param !== 'object') continue;
-    if (param.isPriceMultiplier !== true) continue;
-    const id = typeof param.id === 'string' ? param.id : undefined;
-    if (!id) continue;
+  // Universal run count: read directly from formData so it works even when parameter
+  // definitions are unavailable (e.g. after loading a submitted job from the backend,
+  // where `parameters` is stripped before storage).
+  const runCountRaw = formDataMap.get(RUN_COUNT_PARAM_ID);
+  if (runCountRaw !== null && runCountRaw !== undefined) {
+    const qty = resolveQty(runCountRaw);
+    if (qty !== undefined) multiplier *= qty;
+  }
 
-    const rawValue = formDataMap.get(id);
-    if (rawValue === null || rawValue === undefined) continue;
+  // Additional isPriceMultiplier params from service parameter definitions.
+  // RUN_COUNT_PARAM_ID is excluded here (already handled above) to prevent double-counting.
+  if (Array.isArray(parameters)) {
+    for (const param of parameters as ServiceParameterDefinition[]) {
+      if (!param || typeof param !== 'object') continue;
+      if (param.isPriceMultiplier !== true) continue;
+      const id = typeof param.id === 'string' ? param.id : undefined;
+      if (!id || id === RUN_COUNT_PARAM_ID) continue;
 
-    let qty: number | undefined;
+      const rawValue = formDataMap.get(id);
+      if (rawValue === null || rawValue === undefined) continue;
 
-    if (Array.isArray(rawValue)) {
-      let sum = 0;
-      let hasAny = false;
-      for (const v of rawValue) {
-        const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
-        if (!Number.isFinite(n)) continue;
-        hasAny = true;
-        sum += n;
-      }
-      qty = hasAny ? sum : undefined;
-    } else {
-      const n =
-        typeof rawValue === 'number'
-          ? rawValue
-          : typeof rawValue === 'string' && rawValue.trim() !== ''
-          ? Number(rawValue)
-          : NaN;
-      qty = Number.isFinite(n) ? n : undefined;
+      const qty = resolveQty(rawValue);
+      if (qty === undefined) continue;
+      multiplier *= qty;
     }
-
-    if (qty === undefined) continue;
-    multiplier *= qty;
   }
 
   return multiplier;
