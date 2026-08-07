@@ -603,73 +603,119 @@ export default function AdminEditServiceParameters() {
                   <Grid size={12}>
                     <Stack spacing={1}>
                       <Typography variant='subtitle1'>Choices</Typography>
-                      {(selectedParameter.options ?? []).map((option: any, optionIndex: number) => (
+                      <Typography variant='caption' color='text.secondary'>
+                        Prices are per customer category, matching the service-level pricing
+                        fields. Leave a category blank to charge the fallback price for it.
+                      </Typography>
+                      {(selectedParameter.options ?? []).map((option: any, optionIndex: number) => {
+                        const patchOption = (patch: Record<string, any>) => {
+                          const nextOptions = [...(selectedParameter.options ?? [])];
+                          nextOptions[optionIndex] = {
+                            ...nextOptions[optionIndex],
+                            id: nextOptions[optionIndex]?.id || createId(),
+                            ...patch
+                          };
+                          updateParameter(selectedParameterIndex, { options: nextOptions });
+                        };
+
+                        // Writes both the flat field and the nested `pricing` entry, and keeps
+                        // the legacy generic `external*` in step with market -- mirroring how
+                        // service-level pricing is persisted in AdminEditService.tsx.
+                        const patchPrice = (
+                          field: 'price' | 'internalPrice' | 'externalAcademicPrice' | 'externalMarketPrice' | 'externalNoSalaryPrice',
+                          pricingKey: 'legacy' | 'internal' | 'externalAcademic' | 'externalMarket' | 'externalNoSalary',
+                          rawValue: string
+                        ) => {
+                          const value = rawValue === '' ? undefined : Number(rawValue);
+                          const patch: Record<string, any> = {
+                            [field]: value,
+                            pricing: { ...(option.pricing ?? {}), [pricingKey]: value }
+                          };
+                          if (field === 'externalMarketPrice') {
+                            patch.externalPrice = value;
+                            patch.pricing.external = value;
+                          }
+                          patchOption(patch);
+                        };
+
+                        const priceValue = (
+                          field: string,
+                          pricingKey: string,
+                          legacyFallback?: unknown
+                        ) => option[field] ?? option.pricing?.[pricingKey] ?? legacyFallback ?? '';
+
+                        return (
                         <Box
                           key={`${option.id || 'option'}-${optionIndex}`}
-                          sx={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 1 }}
+                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}
                         >
-                          <TextField
-                            label='Choice label'
-                            value={option.name ?? ''}
-                            onChange={(event) => {
-                              const nextOptions = [...(selectedParameter.options ?? [])];
-                              nextOptions[optionIndex] = {
-                                ...nextOptions[optionIndex],
-                                id: nextOptions[optionIndex]?.id || createId(),
-                                name: event.target.value
-                              };
-                              updateParameter(selectedParameterIndex, { options: nextOptions });
-                            }}
-                          />
-                          <TextField
-                            label='Choice price'
-                            type='number'
-                            value={option.price ?? ''}
-                            onChange={(event) => {
-                              const nextOptions = [...(selectedParameter.options ?? [])];
-                              nextOptions[optionIndex] = {
-                                ...nextOptions[optionIndex],
-                                price:
-                                  event.target.value === ''
-                                    ? undefined
-                                    : Number(event.target.value)
-                              };
-                              updateParameter(selectedParameterIndex, { options: nextOptions });
-                            }}
-                          />
-                          <TextField
-                            label='Market price'
-                            type='number'
-                            value={option.externalMarketPrice ?? option.pricing?.externalMarket ?? option.externalPrice ?? ''}
-                            onChange={(event) => {
-                              const nextOptions = [...(selectedParameter.options ?? [])];
-                              nextOptions[optionIndex] = {
-                                ...nextOptions[optionIndex],
-                                externalMarketPrice:
-                                  event.target.value === ''
-                                    ? undefined
-                                    : Number(event.target.value),
-                                externalPrice:
-                                  event.target.value === ''
-                                    ? undefined
-                                    : Number(event.target.value)
-                              };
-                              updateParameter(selectedParameterIndex, { options: nextOptions });
-                            }}
-                          />
-                          <IconButton
-                            aria-label='Remove choice'
-                            onClick={() => {
-                              const nextOptions = (selectedParameter.options ?? []).filter(
-                                (_: any, i: number) => i !== optionIndex
-                              );
-                              updateParameter(selectedParameterIndex, { options: nextOptions });
+                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 1 }}>
+                            <TextField
+                              label='Choice label'
+                              value={option.name ?? ''}
+                              onChange={(event) => patchOption({ name: event.target.value })}
+                            />
+                            <IconButton
+                              aria-label='Remove choice'
+                              onClick={() => {
+                                const nextOptions = (selectedParameter.options ?? []).filter(
+                                  (_: any, i: number) => i !== optionIndex
+                                );
+                                updateParameter(selectedParameterIndex, { options: nextOptions });
+                              }}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Box>
+                          <Box
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(5, 1fr)',
+                              gap: 1,
+                              mt: 1.5
                             }}
                           >
-                            <DeleteIcon />
-                          </IconButton>
+                            <TextField
+                              label='Fallback price'
+                              type='number'
+                              size='small'
+                              value={priceValue('price', 'legacy')}
+                              onChange={(event) => patchPrice('price', 'legacy', event.target.value)}
+                            />
+                            <TextField
+                              label='Internal price'
+                              type='number'
+                              size='small'
+                              value={priceValue('internalPrice', 'internal')}
+                              onChange={(event) => patchPrice('internalPrice', 'internal', event.target.value)}
+                            />
+                            <TextField
+                              label='External customer (academic)'
+                              type='number'
+                              size='small'
+                              value={priceValue('externalAcademicPrice', 'externalAcademic')}
+                              onChange={(event) => patchPrice('externalAcademicPrice', 'externalAcademic', event.target.value)}
+                            />
+                            <TextField
+                              label='External customer (market)'
+                              type='number'
+                              size='small'
+                              // Pre-migration choices carried market pricing in the generic
+                              // `externalPrice`, so fall back to it for display.
+                              value={priceValue('externalMarketPrice', 'externalMarket', option.externalPrice)}
+                              onChange={(event) => patchPrice('externalMarketPrice', 'externalMarket', event.target.value)}
+                            />
+                            <TextField
+                              label='External customer (no salary)'
+                              type='number'
+                              size='small'
+                              value={priceValue('externalNoSalaryPrice', 'externalNoSalary')}
+                              onChange={(event) => patchPrice('externalNoSalaryPrice', 'externalNoSalary', event.target.value)}
+                            />
+                          </Box>
                         </Box>
-                      ))}
+                        );
+                      })}
                       <Box>
                         <Button
                           variant='outlined'
