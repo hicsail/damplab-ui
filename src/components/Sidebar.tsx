@@ -35,7 +35,7 @@ export default () => {
   const {setNodes, setEdges} = useContext(CanvasContext);
 
   const [category,         setCategory]         = useState('');
-  const [alignment,        setAlignment]        = useState('bundles');
+  const [alignment,        setAlignment]        = useState('services');
   const [filteredServices, setFilteredServices] = useState(services);
   const [filteredBundles,  setFilteredBundles]  = useState(bundles);
   const [searchText,       setSearchText]       = useState('');
