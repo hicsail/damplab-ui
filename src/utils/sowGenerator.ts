@@ -3,7 +3,7 @@
 import { addDays, format } from 'date-fns';
 import { SOWData, SOWTechnicianInputs, SOWPricingAdjustment, SOWService } from '../types/SOWTypes';
 import { Workflow } from '../gql/graphql';
-import { calculateServiceCost, CustomerCategory } from './servicePricing';
+import { calculateServiceCost, CustomerCategory, RUN_COUNT_PARAM_ID, RUN_COUNT_PARAM_NAME } from './servicePricing';
 
 // Constants
 const SOW_STORAGE_KEY = 'damplab-sows';
@@ -415,6 +415,31 @@ const getNodePricingDetails = (node: any, customerCategory?: CustomerCategory): 
       total: 0,
     });
   });
+
+  // The universal run count is injected into formData client-side and is not
+  // part of service.parameters, so the loop above cannot see it. Read it
+  // straight from formData, exactly as getMultiplier does. Skipped when the
+  // service happens to define the parameter itself (already handled above).
+  const serviceDefinesRunCount = parameters.some((p: any) => p?.id === RUN_COUNT_PARAM_ID);
+  if (!serviceDefinesRunCount) {
+    const runCountRaw = formDataMap.get(RUN_COUNT_PARAM_ID);
+    const runCount =
+      typeof runCountRaw === 'number'
+        ? runCountRaw
+        : typeof runCountRaw === 'string' && runCountRaw.trim() !== ''
+        ? Number(runCountRaw)
+        : NaN;
+    // A run count of 1 scales nothing, so showing it would only add noise.
+    if (Number.isFinite(runCount) && runCount !== 1) {
+      items.push({
+        kind: 'multiplier',
+        label: RUN_COUNT_PARAM_NAME,
+        quantity: runCount,
+        unitPrice: 0,
+        total: 0,
+      });
+    }
+  }
 
   return items;
 };

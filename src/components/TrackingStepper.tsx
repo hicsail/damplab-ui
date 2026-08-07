@@ -8,6 +8,7 @@ import PendingIcon from '@mui/icons-material/Pending';
 
 import { AppContext }         from '../contexts/App';
 import { ImagesServicesDict } from '../assets/icons';
+import { resolveParameterName } from '../utils/servicePricing';
 
 
 // the purpose of this component is to showcase nodes in a workflow and their details
@@ -152,7 +153,7 @@ export default function TrackingStepper(workflow: any) {
                                         {values.map((val: string, valueIdx: number) => (
                                             <div className='parameter' style={{ display: 'flex', marginBottom: 3, alignItems: 'center' }} key={valueIdx}>
                                                 <div className='parameter-name' style={{ minWidth: 120 }}>
-                                                    {valueIdx === 0 ? (parameter.name ?? parameter.id ?? 'Parameter') : ''}
+                                                    {valueIdx === 0 ? (resolveParameterName(parameter) ?? parameter.id ?? 'Parameter') : ''}
                                                 </div>
                                                 <div className='parameter-separator' style={{ marginLeft: 3, marginRight: 5 }}>{valueIdx === 0 ? ':' : ''}</div>
                                                 <div className='parameter-value' style={{ marginBottom: 3 }}>

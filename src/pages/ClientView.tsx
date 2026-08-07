@@ -14,7 +14,7 @@ import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '..
 import { SOWViewer }              from '../components/SOWViewer';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
-import { calculateServiceCost }   from '../utils/servicePricing';
+import { calculateServiceCost, resolveParameterName }   from '../utils/servicePricing';
 
 export default function Tracking() {
 
@@ -213,7 +213,7 @@ export default function Tracking() {
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
                                             {normalizeFormEntries(node?.formData).map((entry: any) => {
                                                 const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
-                                                const label = entry.name || paramDef?.name || 'Parameter';
+                                                const label = resolveParameterName(entry, paramDef) || 'Parameter';
                                                 const rawValue = entry.value ?? entry.resultParamValue;
                                                 return (
                                                     <Typography key={entry.id} variant='body2' color='text.secondary'>

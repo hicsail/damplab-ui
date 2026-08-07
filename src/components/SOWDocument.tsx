@@ -280,10 +280,27 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory, jo
             <Text style={styles.tableCellLarge}>Service Description</Text>
             <Text style={styles.tableCell}>Total Cost</Text>
           </View>
-          {sowData.services.map((service, index) => (
+          {sowData.services.map((service, index) => {
+            // Multiplier parameters scale the whole service cost, so the row
+            // total is otherwise an unexplained number. Show the arithmetic
+            // inline; the sub-lines below name which parameter supplied it.
+            const multipliers = (service.pricingDetails ?? []).filter((i) => i.kind === 'multiplier');
+            const multiplierProduct = multipliers.reduce(
+              (acc, i) => acc * (Number.isFinite(Number(i.quantity)) ? Number(i.quantity) : 1),
+              1
+            );
+            const showCalc =
+              multipliers.length > 0 && multiplierProduct !== 1 && Number.isFinite(service.cost);
+            const baseCost = showCalc ? service.cost / multiplierProduct : service.cost;
+            return (
             <View key={index} style={styles.tableRow}>
               <View style={styles.tableCellLarge}>
-                <Text>{service.name}</Text>
+                <Text>
+                  {service.name}
+                  {showCalc
+                    ? ` (${formatCurrency(baseCost)} × ${multiplierProduct} = ${formatCurrency(service.cost)})`
+                    : ''}
+                </Text>
                 {Array.isArray(service.pricingDetails) && service.pricingDetails.length > 0 && (
                   <View style={{ marginTop: 2 }}>
                     {service.pricingDetails.map((item, idx) => (
@@ -300,7 +317,8 @@ const SOWDocument: React.FC<SOWDocumentProps> = ({ sowData, customerCategory, jo
                 <Text>{formatCurrency(service.cost)}</Text>
               </View>
             </View>
-          ))}
+            );
+          })}
           {Array.isArray(sowData.pricing.adjustments) && sowData.pricing.adjustments.length > 0
             ? sowData.pricing.adjustments.map((adj, i) => {
                 const typeLabel =

@@ -2,6 +2,23 @@ export type ServicePricingMode = 'SERVICE' | 'PARAMETER';
 
 /** Reserved formData entry id injected universally on every canvas node. */
 export const RUN_COUNT_PARAM_ID = '__runCount';
+/** Display name for the injected run-count entry. Kept in sync with the
+ *  definitions in controllers/GraphHelpers.tsx and controllers/ReactFlowEvents.tsx. */
+export const RUN_COUNT_PARAM_NAME = 'Number of runs';
+
+/**
+ * Display name for a formData entry, or undefined if none can be determined.
+ *
+ * Submitted jobs store formData as `{ id, value }` only (see the backend's
+ * normalizeFormDataToArray), so `entry.name` is absent once a job is loaded
+ * back. The run-count entry is injected client-side and so is also missing
+ * from `service.parameters`, leaving both usual sources empty -- hence the
+ * explicit fallback to its known name. Callers supply their own last resort.
+ */
+export const resolveParameterName = (entry: any, paramDef?: any): string | undefined =>
+  entry?.name ||
+  paramDef?.name ||
+  (entry?.id === RUN_COUNT_PARAM_ID ? RUN_COUNT_PARAM_NAME : undefined);
 export type CustomerCategory =
   | 'INTERNAL_CUSTOMERS'
   | 'EXTERNAL_CUSTOMER_ACADEMIC'

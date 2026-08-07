@@ -2,6 +2,7 @@
 import React from 'react';
 import { Document, Page, Canvas, StyleSheet, View, Text, Image } from '@react-pdf/renderer';
 import { Workflow } from '../gql/graphql';
+import { resolveParameterName } from '../utils/servicePricing';
 
 // Register font
 import { Font } from '@react-pdf/renderer';
@@ -191,10 +192,10 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
           <View key={ind} style={styles.section}>
             <Text style={styles.service}>{service.label}</Text>
             {(Array.isArray(service.formData) ? service.formData : []).map((parameter: any, i: number) => {
-              const label = parameter.name ?? parameter.id ?? 'Parameter';
               const parameterDef = (service.parameters || service.service?.parameters || []).find(
                 (p: any) => p?.id === parameter.id
               );
+              const label = resolveParameterName(parameter, parameterDef) ?? parameter.id ?? 'Parameter';
               const displayValue = formatParameterDisplayValue(parameterDef, parameter.value);
               if (parameter.type === 'boolean') {
                 if (parameter.value === true) {
