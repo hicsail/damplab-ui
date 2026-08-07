@@ -15,7 +15,7 @@ import { DeleteForeverSharp, PlusOne } from '@mui/icons-material';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SERVICES, GET_SOW_BY_JOB_ID }         from '../gql/queries';
 import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, MUTATE_JOB_STATE, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
-import { calculateServiceCost } from '../utils/servicePricing';
+import { calculateServiceCost, resolveParameterName } from '../utils/servicePricing';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import JobPDFDocument             from '../components/JobPDFDocument';
@@ -673,7 +673,7 @@ export default function TechnicianView() {
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
                                             {normalizeFormEntries(node?.formData).map((entry: any) => {
                                                 const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
-                                                const label = entry.name || paramDef?.name || 'Parameter';
+                                                const label = resolveParameterName(entry, paramDef) || 'Parameter';
                                                 const rawValue = entry.value ?? entry.resultParamValue;
                                                 return (
                                                     <Typography key={entry.id} variant='body2' color='text.secondary'>

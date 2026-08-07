@@ -66,8 +66,8 @@ export function HydrateFallback() {
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
-  const isLabMonitor = location.pathname.startsWith('/lab-monitor');
+  // Do not call useLocation/useNavigate here — Layout is the document shell and
+  // can render outside router context (SPA / HydratedRouter), which throws.
   return (
     <html lang="en">
       <head>
@@ -82,9 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       <body>
         <div className="App">
-          <div style={{ padding: isLabMonitor ? 0 : 20 }}>
-            {children}
-          </div>
+          {children}
         </div>
         <ScrollRestoration />
         <Scripts />
@@ -94,6 +92,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function Root() {
+  const location = useLocation();
+  const isLabMonitor = location.pathname.startsWith('/lab-monitor');
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [activeComponentId, setActiveComponentId] = useState("");
@@ -218,8 +218,10 @@ export default function Root() {
               setNodeParams: setNodeParams,
             }}
           >
-            <HeaderBar />
-            <Outlet />
+            <div style={{ padding: isLabMonitor ? 0 : 20 }}>
+              <HeaderBar />
+              <Outlet />
+            </div>
           </CanvasContext>
         </AppContext>
       </ThemeProvider>

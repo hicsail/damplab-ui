@@ -12,9 +12,10 @@ interface CanvasPreviewProps {
     onClose: () => void;    // Closes dialog
 }
 
-// Defines node type used in preview. 
+// Defines node type used in preview. readOnly hides the delete control, since
+// this canvas is not editable (no onNodesChange, nodes not draggable).
 const nodeTypes = {
-    selectorNode: CustomDemoNode,
+    selectorNode: (props: any) => <CustomDemoNode {...props} readOnly />,
 };
 
 // This component must be called with an array of nodes for its workflow
