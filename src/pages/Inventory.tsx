@@ -1,6 +1,5 @@
 import { useQuery } from '@apollo/client';
 import {
-  Box,
   Chip,
   CircularProgress,
   Link,
@@ -9,14 +8,15 @@ import {
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router';
 import {
   GET_ACTIVE_INVENTORY_ITEMS,
   GET_IN_PROGRESS_NODES_HOLDING_INVENTORY
 } from '../gql/queries';
 import InventoryFilterBar, { type InventoryFilters } from '../components/InventoryFilterBar';
-import InventoryCard, { type InventoryItemRow, type HolderInfo } from '../components/InventoryCard';
+import { type InventoryItemRow, type HolderInfo } from '../components/InventoryCard';
+import InventoryCategoryGroup from '../components/InventoryCategoryGroup';
 
 const DEFAULT_FILTERS: InventoryFilters = {
   searchText: '',
@@ -115,6 +115,18 @@ export default function Inventory() {
   const inUseCount = useMemo(() => filteredItems.filter((i) => heldBy.has(i.id)).length, [filteredItems, heldBy]);
   const totalCount = filteredItems.length;
 
+  // Track which category sections are expanded (all collapsed by default).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = useCallback((key: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   return (
     <Stack spacing={3}>
       <Stack direction='row' spacing={2} alignItems='center'>
@@ -142,14 +154,14 @@ export default function Inventory() {
       )}
 
       {Object.entries(grouped).map(([type, rows]) => (
-        <Box key={type}>
-          <Typography variant='h5' sx={{ mb: 1 }}>{type}</Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
-            {rows.map((it) => (
-              <InventoryCard key={it.id} item={it} holder={heldBy.get(it.id)} />
-            ))}
-          </Box>
-        </Box>
+        <InventoryCategoryGroup
+          key={type}
+          type={type}
+          items={rows}
+          heldBy={heldBy}
+          expanded={expanded.has(type)}
+          onToggle={() => toggleExpanded(type)}
+        />
       ))}
     </Stack>
   );
