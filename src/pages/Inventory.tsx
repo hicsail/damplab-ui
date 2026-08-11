@@ -4,6 +4,8 @@ import {
   CircularProgress,
   Link,
   Stack,
+  Tab,
+  Tabs,
   Typography
 } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -13,11 +15,13 @@ import { Link as RouterLink } from 'react-router';
 import {
   GET_ACTIVE_INVENTORY_ITEMS,
   GET_BOOKINGS,
+  GET_BUNDLES_WITH_INVENTORY,
   GET_IN_PROGRESS_NODES_HOLDING_INVENTORY
 } from '../gql/queries';
 import InventoryFilterBar, { type InventoryFilters } from '../components/InventoryFilterBar';
 import { type InventoryItemRow, type HolderInfo, type NextBookingInfo } from '../components/InventoryCard';
 import InventoryCategoryGroup from '../components/InventoryCategoryGroup';
+import InventoryBundleGroup, { type BundleWithInventory } from '../components/InventoryBundleGroup';
 
 const DEFAULT_FILTERS: InventoryFilters = {
   searchText: '',
@@ -32,8 +36,11 @@ const DEFAULT_FILTERS: InventoryFilters = {
  * Grouped by item type, with a chip showing whether each item is free or in
  * use (and by which node / job, including elapsed time).
  */
+type ViewMode = 'type' | 'bundle';
+
 export default function Inventory() {
   const [filters, setFilters] = useState<InventoryFilters>(DEFAULT_FILTERS);
+  const [viewMode, setViewMode] = useState<ViewMode>('type');
 
   const { data: itemsData, loading: itemsLoading } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, {
     fetchPolicy: 'cache-and-network',
@@ -45,17 +52,34 @@ export default function Inventory() {
   });
 
   // Query upcoming bookings (next 7 days) to show "Next booking" on free items.
-  const bookingsFrom = useMemo(() => new Date().toISOString(), []);
-  const bookingsTo = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toISOString();
-  }, []);
+  // Variables are computed fresh each render so the polling query always uses current dates.
+  const now = new Date();
+  const bookingsTo = new Date(now);
+  bookingsTo.setDate(bookingsTo.getDate() + 7);
   const { data: bookingsData } = useQuery(GET_BOOKINGS, {
-    variables: { from: bookingsFrom, to: bookingsTo },
+    variables: { from: now.toISOString(), to: bookingsTo.toISOString() },
     fetchPolicy: 'cache-and-network',
     pollInterval: 60000
   });
+
+  const { data: bundlesData } = useQuery(GET_BUNDLES_WITH_INVENTORY, {
+    fetchPolicy: 'cache-and-network',
+    skip: viewMode !== 'bundle'
+  });
+
+  const bundles: BundleWithInventory[] = useMemo(
+    () => (bundlesData?.bundles ?? []).map((b: any) => ({
+      id: String(b.id),
+      label: b.label,
+      icon: b.icon,
+      services: (b.services ?? []).map((s: any) => ({
+        id: String(s.id),
+        name: s.name,
+        inventoryRequirements: (s.inventoryRequirements ?? []).map(String)
+      }))
+    })),
+    [bundlesData]
+  );
 
   const items: InventoryItemRow[] = useMemo(
     () => (itemsData?.activeInventoryItems ?? []).map((x: any) => ({
@@ -170,6 +194,15 @@ export default function Inventory() {
         <Chip label={`${totalCount} total`} />
       </Stack>
 
+      <Tabs
+        value={viewMode}
+        onChange={(_, v) => setViewMode(v)}
+        sx={{ borderBottom: 1, borderColor: 'divider' }}
+      >
+        <Tab label='By Type' value='type' sx={{ textTransform: 'none', fontWeight: 600, fontSize: '1rem' }} />
+        <Tab label='By Bundle' value='bundle' sx={{ textTransform: 'none', fontWeight: 600, fontSize: '1rem' }} />
+      </Tabs>
+
       <InventoryFilterBar
         filters={filters}
         onChange={setFilters}
@@ -184,7 +217,7 @@ export default function Inventory() {
         </Typography>
       )}
 
-      {Object.entries(grouped).map(([type, rows]) => (
+      {viewMode === 'type' && Object.entries(grouped).map(([type, rows]) => (
         <InventoryCategoryGroup
           key={type}
           type={type}
@@ -193,6 +226,18 @@ export default function Inventory() {
           nextBookingMap={nextBookingMap}
           expanded={expanded.has(type)}
           onToggle={() => toggleExpanded(type)}
+        />
+      ))}
+
+      {viewMode === 'bundle' && bundles.map((bundle) => (
+        <InventoryBundleGroup
+          key={bundle.id}
+          bundle={bundle}
+          allItems={items}
+          heldBy={heldBy}
+          nextBookingMap={nextBookingMap}
+          expanded={expanded.has(bundle.id)}
+          onToggle={() => toggleExpanded(bundle.id)}
         />
       ))}
     </Stack>
