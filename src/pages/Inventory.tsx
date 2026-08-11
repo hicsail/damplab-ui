@@ -12,10 +12,11 @@ import { useCallback, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router';
 import {
   GET_ACTIVE_INVENTORY_ITEMS,
+  GET_BOOKINGS,
   GET_IN_PROGRESS_NODES_HOLDING_INVENTORY
 } from '../gql/queries';
 import InventoryFilterBar, { type InventoryFilters } from '../components/InventoryFilterBar';
-import { type InventoryItemRow, type HolderInfo } from '../components/InventoryCard';
+import { type InventoryItemRow, type HolderInfo, type NextBookingInfo } from '../components/InventoryCard';
 import InventoryCategoryGroup from '../components/InventoryCategoryGroup';
 
 const DEFAULT_FILTERS: InventoryFilters = {
@@ -43,6 +44,19 @@ export default function Inventory() {
     pollInterval: 15000
   });
 
+  // Query upcoming bookings (next 7 days) to show "Next booking" on free items.
+  const bookingsFrom = useMemo(() => new Date().toISOString(), []);
+  const bookingsTo = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString();
+  }, []);
+  const { data: bookingsData } = useQuery(GET_BOOKINGS, {
+    variables: { from: bookingsFrom, to: bookingsTo },
+    fetchPolicy: 'cache-and-network',
+    pollInterval: 60000
+  });
+
   const items: InventoryItemRow[] = useMemo(
     () => (itemsData?.activeInventoryItems ?? []).map((x: any) => ({
       id: String(x.id),
@@ -68,12 +82,29 @@ export default function Inventory() {
           jobName: n.workflow?.job?.name,
           jobDisplayId: n.workflow?.job?.jobId,
           startedAt: n.startedAt ?? undefined,
+          estimatedMinutes: n.estimatedMinutes ?? undefined,
           assigneeDisplayName: n.assigneeDisplayName ?? undefined
         });
       }
     }
     return m;
   }, [heldData]);
+
+  // Map inventoryId → next upcoming booking (soonest per item, only RESERVED status).
+  const nextBookingMap = useMemo(() => {
+    const m = new Map<string, NextBookingInfo>();
+    const bookings: any[] = bookingsData?.bookings ?? [];
+    const sorted = [...bookings]
+      .filter((b: any) => b.status === 'RESERVED' && b.startTime)
+      .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    for (const b of sorted) {
+      const itemId = String(b.inventoryItem);
+      if (!m.has(itemId)) {
+        m.set(itemId, { startTime: b.startTime, ownerName: b.ownerName });
+      }
+    }
+    return m;
+  }, [bookingsData]);
 
   // Derive unique types and locations for dropdown options.
   const typeOptions = useMemo(() => [...new Set(items.map((it) => it.type || 'OTHER'))].sort(), [items]);
@@ -159,6 +190,7 @@ export default function Inventory() {
           type={type}
           items={rows}
           heldBy={heldBy}
+          nextBookingMap={nextBookingMap}
           expanded={expanded.has(type)}
           onToggle={() => toggleExpanded(type)}
         />

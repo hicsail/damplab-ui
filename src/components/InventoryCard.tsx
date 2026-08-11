@@ -1,5 +1,4 @@
 import {
-  Box,
   Card,
   CardContent,
   Chip,
@@ -7,6 +6,7 @@ import {
   Typography
 } from '@mui/material';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
+import InventoryHolderDetails from './InventoryHolderDetails';
 
 export interface InventoryItemRow {
   id: string;
@@ -24,24 +24,22 @@ export interface HolderInfo {
   jobName?: string;
   jobDisplayId?: string;
   startedAt?: string;
+  estimatedMinutes?: number;
   assigneeDisplayName?: string;
 }
 
-function elapsedMinutes(startedAt?: string | null): number | null {
-  if (!startedAt) return null;
-  const start = new Date(startedAt).getTime();
-  if (!Number.isFinite(start)) return null;
-  return Math.max(0, Math.round((Date.now() - start) / 60000));
+export interface NextBookingInfo {
+  startTime: string;
+  ownerName?: string;
 }
 
 interface InventoryCardProps {
   item: InventoryItemRow;
   holder?: HolderInfo;
+  nextBooking?: NextBookingInfo;
 }
 
-export default function InventoryCard({ item, holder }: InventoryCardProps) {
-  const elapsed = elapsedMinutes(holder?.startedAt);
-
+export default function InventoryCard({ item, holder, nextBooking }: InventoryCardProps) {
   return (
     <Card variant='outlined' sx={{ borderColor: holder ? '#dc2626' : '#16a34a' }}>
       <CardContent>
@@ -59,23 +57,21 @@ export default function InventoryCard({ item, holder }: InventoryCardProps) {
           <Typography variant='body2' color='text.secondary'>{item.location}</Typography>
         )}
         {holder ? (
-          <Box sx={{ mt: 1.5, p: 1, borderRadius: 1, backgroundColor: 'action.hover' }}>
-            <Typography variant='body2'>
-              <strong>{holder.nodeLabel}</strong>
-              {holder.jobName ? ` · ${holder.jobName}` : ''}
-              {holder.jobDisplayId ? ` (${holder.jobDisplayId})` : ''}
-            </Typography>
-            <Typography variant='caption' color='text.secondary' display='block'>
-              {holder.assigneeDisplayName ? `Assignee: ${holder.assigneeDisplayName}` : 'Unassigned'}
-              {elapsed != null ? ` · ${elapsed}m elapsed` : ''}
-            </Typography>
-          </Box>
+          <InventoryHolderDetails holder={holder} />
         ) : (
-          item.description && (
-            <Typography variant='caption' color='text.secondary' display='block' sx={{ mt: 1 }}>
-              {item.description}
-            </Typography>
-          )
+          <Stack spacing={0.5} sx={{ mt: 1 }}>
+            {item.description && (
+              <Typography variant='caption' color='text.secondary' display='block'>
+                {item.description}
+              </Typography>
+            )}
+            {nextBooking && (
+              <Typography variant='caption' color='info.main' display='block'>
+                Next booking: {new Date(nextBooking.startTime).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {nextBooking.ownerName ? ` · ${nextBooking.ownerName}` : ''}
+              </Typography>
+            )}
+          </Stack>
         )}
       </CardContent>
     </Card>
