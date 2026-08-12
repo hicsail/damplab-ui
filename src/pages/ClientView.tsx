@@ -11,7 +11,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
 import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '../gql/queries';
-import { SOWViewer }              from '../components/SOWViewer';
+import SowCustomerView            from '../components/sow/SowCustomerView';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { calculateServiceCost, resolveParameterName }   from '../utils/servicePricing';
@@ -348,15 +348,7 @@ export default function Tracking() {
                 </Box>
 
                 {/* SOW Status Indicator and Viewer */}
-                {sowData && (
-                    <SOWViewer 
-                        jobId={id || ''} 
-                        jobDisplayId={data?.ownJobById?.jobId ?? null}
-                        sowData={sowData}
-                        customerCategory={data?.ownJobById?.customerCategory ?? undefined}
-                        currentUser={{ email: workflowEmail, name: workflowUsername, isStaff: false }}
-                    />
-                )}
+                {sowData && <SowCustomerView jobId={id || ''} />}
 
                 {/* Invoices */}
                 <Box sx={{ mx: 3, my: 2 }}>

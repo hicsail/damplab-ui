@@ -18,11 +18,18 @@ function applyUiTerminologyReplacements(root: Node) {
     'PRE',
   ]);
 
+  // Opt-out for text that must render exactly as stored. The SOW document uses
+  // it: its wording is contract language held in the database and printed to PDF
+  // from the same strings, so rewriting it on screen would make the page, the
+  // record and the signed PDF disagree.
+  const VERBATIM_ATTR = 'data-verbatim-text';
+
   const isExcluded = (node: Node | null): boolean => {
     let cur: Node | null = node;
     while (cur) {
       if (cur instanceof HTMLElement) {
         if (cur.isContentEditable) return true;
+        if (cur.hasAttribute(VERBATIM_ATTR)) return true;
         const tag = cur.tagName;
         if (EXCLUDED_TAGS.has(tag)) return true;
       }

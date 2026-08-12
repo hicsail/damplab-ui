@@ -619,3 +619,79 @@ export const ADD_BACKLOG_COMMENT = gql`
     }
   }
 `;
+
+/* ---------------------------------------------------------------------------
+ * Versioned SOW document
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Creates the job's first SOW, built server-side from the job's workflows.
+ * Returns the existing SOW unchanged if the job already has one.
+ */
+export const CREATE_SOW_FOR_JOB = gql`
+    mutation CreateSowForJob($jobId: ID!) {
+        createSowForJob(jobId: $jobId) {
+            id
+            sowNumber
+            status
+        }
+    }
+`;
+
+export const SAVE_SOW_VERSION = gql`
+    mutation SaveSowVersion($sowId: ID!, $input: SaveSowVersionInput!) {
+        saveSowVersion(sowId: $sowId, input: $input) {
+            id
+            versionNumber
+            status
+        }
+    }
+`;
+
+export const SEND_SOW_TO_CUSTOMER = gql`
+    mutation SendSowToCustomer($sowId: ID!) {
+        sendSowToCustomer(sowId: $sowId) { id versionNumber status }
+    }
+`;
+
+export const FINALIZE_SOW = gql`
+    mutation FinalizeSow($sowId: ID!, $name: String!) {
+        finalizeSow(sowId: $sowId, name: $name) { id versionNumber status }
+    }
+`;
+
+export const DISCARD_SOW_DRAFT = gql`
+    mutation DiscardSowDraft($sowId: ID!, $versionNumber: Int!) {
+        discardSowDraft(sowId: $sowId, versionNumber: $versionNumber) {
+            id
+            currentVersionNumber
+            activeVersionNumber
+        }
+    }
+`;
+
+export const CANCEL_SOW = gql`
+    mutation CancelSow($sowId: ID!, $note: String) {
+        cancelSow(sowId: $sowId, note: $note) { id versionNumber status }
+    }
+`;
+
+export const ASK_SOW_QUESTION = gql`
+    mutation AskSowQuestion($sowId: ID!, $text: String!) {
+        askSowQuestion(sowId: $sowId, text: $text) {
+            id
+            questions { authorName isStaff text versionNumber createdAt }
+        }
+    }
+`;
+
+export const SIGN_SOW = gql`
+    mutation SignSow($sowId: ID!, $input: SignSowInput!) {
+        signSow(sowId: $sowId, input: $input) {
+            id
+            versionNumber
+            status
+            clientSignature { name signedAt consentedGroups }
+        }
+    }
+`;

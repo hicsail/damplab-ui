@@ -1311,3 +1311,73 @@ export const GET_BACKLOG_CARD = gql`
     }
   }
 `;
+
+/* ---------------------------------------------------------------------------
+ * Versioned SOW document
+ * ------------------------------------------------------------------------ */
+
+export const SOW_VERSION_FIELDS = gql`
+    fragment SowVersionFields on SowVersion {
+        id
+        versionNumber
+        status
+        visibleToCustomer
+        sentToCustomerAt
+        note
+        createdByName
+        createdAt
+        clientSignature { name signedAt consentedGroups legacySignatureDataUrl }
+        staffSignature { name signedAt legacySignatureDataUrl }
+        fields {
+            key
+            label
+            kind
+            order
+            value
+            calculatedValue
+            isOverridden
+            isEnabled
+            allowsTextOverride
+        }
+        inputs {
+            projectManager
+            projectLead
+            sowTitle
+            scopeOfWork
+            deliverables
+            baseCost
+            totalCost
+            customerCategory
+            periods { startDate durationDays label }
+            services { serviceId name description cost }
+            adjustments { type description amount reason }
+        }
+    }
+`;
+
+/** Everything the SOW editor needs in one round trip. */
+export const GET_SOW_EDITOR_STATE = gql`
+    ${SOW_VERSION_FIELDS}
+    query GetSowEditorState($jobId: ID!) {
+        sowByJobId(jobId: $jobId) {
+            id
+            sowNumber
+            currentVersionNumber
+            activeVersionNumber
+            documentStale
+            questions { authorName isStaff text versionNumber createdAt }
+            currentVersion { ...SowVersionFields }
+            activeVersion { versionNumber status }
+            versions { ...SowVersionFields }
+        }
+    }
+`;
+
+export const SOW_FIELD_PREVIEW = gql`
+    query SowFieldPreview($sowId: ID!, $inputs: SowInputsInput!) {
+        sowFieldPreview(sowId: $sowId, inputs: $inputs) {
+            key
+            calculatedValue
+        }
+    }
+`;

@@ -14,14 +14,14 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { DeleteForeverSharp, PlusOne } from '@mui/icons-material';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SERVICES, GET_SOW_BY_JOB_ID }         from '../gql/queries';
-import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, MUTATE_JOB_STATE, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
+import { ADD_WORKFLOW_TO_JOB, CHANGE_JOB_CUSTOMER_CATEGORY, CREATE_INVOICE, CREATE_SOW_FOR_JOB, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, MUTATE_JOB_STATE, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
 import { calculateServiceCost, resolveParameterName } from '../utils/servicePricing';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import JobPDFDocument             from '../components/JobPDFDocument';
 import JobInvoiceDocument         from '../components/JobInvoiceDocument';
-import SOWGeneratorModal          from '../components/SOWGeneratorModal';
-import { SOWViewer }              from '../components/SOWViewer';
+import SowEditorModal             from '../components/sow/SowEditorModal';
+import SowStatusCard              from '../components/sow/SowStatusCard';
 import { CommentsSection }        from '../components/CommentsSection';
 import { generateFormDataFromParams } from '../controllers/ReactFlowEvents';
 
@@ -155,6 +155,10 @@ export default function TechnicianView() {
         }
     });
 
+    const [createSowForJob] = useMutation(CREATE_SOW_FOR_JOB);
+    const [creatingSow, setCreatingSow] = useState(false);
+    const [sowCreateError, setSowCreateError] = useState<string | null>(null);
+
     const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
 
@@ -201,8 +205,36 @@ export default function TechnicianView() {
         setModalOpen(false);
     };
 
-    const handleOpenSOWModal = () => {
-        setSowModalOpen(true);
+    /**
+     * "Generate SOW" on a job that has none creates it first, then opens the
+     * editor on it — the editor edits an existing document and has nothing to
+     * show until one exists. The mutation returns the existing SOW when there
+     * already is one, so a double click is harmless.
+     */
+    const handleOpenSOWModal = async () => {
+        if (!id) return;
+        if (sowData) {
+            setSowModalOpen(true);
+            return;
+        }
+
+        setSowCreateError(null);
+        setCreatingSow(true);
+        try {
+            await createSowForJob({
+                variables: { jobId: id },
+                refetchQueries: [
+                    { query: GET_JOB_BY_ID, variables: { id } },
+                    { query: GET_SOW_BY_JOB_ID, variables: { jobId: id } }
+                ],
+                awaitRefetchQueries: true
+            });
+            setSowModalOpen(true);
+        } catch (error: any) {
+            setSowCreateError(error?.message ?? 'Could not generate the Statement of Work.');
+        } finally {
+            setCreatingSow(false);
+        }
     };
 
     const handleCloseSOWModal = () => {
@@ -754,10 +786,10 @@ export default function TechnicianView() {
                         variant='contained'
                         startIcon={<DescriptionIcon />}
                         onClick={handleOpenSOWModal}
-                        disabled={!jobData}
+                        disabled={!jobData || creatingSow}
                         sx={{ mr: 1 }}
                     >
-                        {sowData ? 'View / Edit SOW' : 'Generate SOW'}
+                        {creatingSow ? 'Generating…' : sowData ? 'Edit SOW' : 'Generate SOW'}
                     </Button>
                     <Button
                         color={sowFullData ? 'primary' : 'secondary'}
@@ -902,15 +934,17 @@ export default function TechnicianView() {
                     </Box>
                 )}
 
+                {sowCreateError && (
+                    <Box sx={{ mx: 3, my: 2 }}>
+                        <Alert severity="error" onClose={() => setSowCreateError(null)}>
+                            {sowCreateError}
+                        </Alert>
+                    </Box>
+                )}
+
                 {/* SOW Status Indicator */}
                 {sowData && (
-                    <SOWViewer 
-                        jobId={id || ''} 
-                        jobDisplayId={jobData?.jobId ?? null}
-                        sowData={sowData}
-                        customerCategory={jobData?.customerCategory ?? undefined}
-                        currentUser={{ email: jobEmail, name: jobUsername, isStaff: true }}
-                    />
+                    <SowStatusCard jobId={id || ''} onOpenEditor={handleOpenSOWModal} />
                 )}
 
                 {/* Invoices */}
@@ -976,10 +1010,11 @@ export default function TechnicianView() {
                 />
 
                 <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id}/>
-                <SOWGeneratorModal 
-                    open={sowModalOpen} 
-                    onClose={handleCloseSOWModal} 
-                    jobData={jobData}
+                <SowEditorModal
+                    open={sowModalOpen}
+                    onClose={handleCloseSOWModal}
+                    jobId={id ?? ''}
+                    jobName={jobData?.name}
                 />
 
                 <Dialog open={invoiceDialogOpen} onClose={closeInvoiceDialog} maxWidth="sm" fullWidth>
