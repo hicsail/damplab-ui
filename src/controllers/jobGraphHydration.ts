@@ -1,6 +1,7 @@
-import { generateFormDataFromParams, createNodeObject } from './ReactFlowEvents';
+import { generateFormDataFromParams, createNodeObject, serviceAllowsMultipleRuns, withRunCountParam } from './ReactFlowEvents';
 import { getWorkflowsFromGraph } from './GraphHelpers';
 import { NodeParameter } from '../types/CanvasTypes';
+import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 
 /**
  * Rebuilding a submitted job as an editable canvas.
@@ -33,13 +34,19 @@ export interface HydratedGraph {
  * values into the wrong slots. The positional path survives only as a fallback
  * for values saved before parameters carried ids.
  */
-export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId: string): NodeParameter[] => {
-    const fresh = generateFormDataFromParams(parameters ?? [], nodeId);
-
+export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId: string, service?: any): NodeParameter[] => {
     const savedList = Array.isArray(savedFormData) ? savedFormData : [];
     const savedById = new Map<string, any>(
         savedList.filter((entry: any) => entry && typeof entry.id === 'string').map((entry: any) => [entry.id, entry.value])
     );
+
+    // Creation is gated on the service's flag; hydration is not. A job saved
+    // while the service offered multiple runs keeps its count even if the
+    // catalogue has since stopped offering them — the entry is what pricing
+    // multiplies by, so dropping it here would quietly reprice the job the next
+    // time it was saved.
+    const includeRunCount = serviceAllowsMultipleRuns(service) || savedById.has(RUN_COUNT_PARAM_ID);
+    const fresh = generateFormDataFromParams(parameters ?? [], nodeId, { includeRunCount });
 
     return fresh.map((param, index) => {
         const matched = savedById.has(param.id) ? savedById.get(param.id) : savedList[index]?.value;
@@ -141,7 +148,11 @@ export const hydrateJobGraph = (job: any, services: any[]): HydratedGraph => {
             const service = services.find((s: any) => s.id === node?.service?.id) ?? node?.service;
             if (!service) continue;
 
-            const formData = mergeSavedFormData(service.parameters ?? [], node.formData, node.id);
+            const formData = mergeSavedFormData(service.parameters ?? [], node.formData, node.id, service);
+            // Keep the sidebar's parameter list in step with what formData
+            // actually holds, so a run count that survived hydration is still
+            // pinned to the top rather than buried under the service's own fields.
+            const parameters = withRunCountParam(service.parameters ?? [], formData.some((p) => p.id === RUN_COUNT_PARAM_ID));
             const stored = node?.reactNode?.position;
             const position =
                 stored && typeof stored.x === 'number' && typeof stored.y === 'number' ? { x: stored.x, y: stored.y } : fallback.get(node.id) ?? { x: 0, y: 0 };
@@ -160,7 +171,7 @@ export const hydrateJobGraph = (job: any, services: any[]): HydratedGraph => {
                 description: service.description,
                 allowedConnections: service.allowedConnections,
                 icon: service.icon,
-                parameters: service.parameters,
+                parameters,
                 additionalInstructions: node.additionalInstructions ?? '',
                 formData,
                 serviceId: service.id,
@@ -174,6 +185,101 @@ export const hydrateJobGraph = (job: any, services: any[]): HydratedGraph => {
             const reactNode: any = createNodeObject(node.id, data.label, 'selectorNode', position, data as any);
             if (data.locked) reactNode.draggable = false;
             allNodes.push(reactNode);
+        }
+
+        allEdges.push(...edges);
+    });
+
+    return { nodes: allNodes, edges: allEdges };
+};
+
+/**
+ * A stored version snapshot in the shape JobWorkflowCards renders.
+ *
+ * The cards were written against live workflow documents, which carry
+ * `node.service.parameters` (for naming parameters and resolving dropdown
+ * options) and `node.state` (for the status icon). A snapshot carries neither —
+ * it holds a serviceId and raw form values — so the catalogue is re-attached
+ * here and state is left undefined, which the icon helper already tolerates.
+ *
+ * Node order is the snapshot's own, which is the flow order the graph was saved
+ * with.
+ */
+export const versionWorkflowsAsCards = (versionWorkflows: any[] | undefined, services: any[]): any[] =>
+    (versionWorkflows ?? []).map((workflow: any, index: number) => ({
+        id: workflow?.workflowId ?? `version-workflow-${index}`,
+        name: workflow?.name,
+        nodes: (workflow?.nodes ?? []).map((snapshot: any) => {
+            const service = services.find((s: any) => s.id === snapshot?.serviceId);
+            return {
+                id: snapshot?.id,
+                label: snapshot?.label ?? snapshot?.serviceName ?? 'Removed service',
+                formData: snapshot?.formData ?? [],
+                price: snapshot?.price,
+                // Named `service` to match the live shape the cards destructure.
+                service: service ?? { id: snapshot?.serviceId, name: snapshot?.serviceName, parameters: [] }
+            };
+        })
+    }));
+
+/**
+ * Rebuild a stored version snapshot as a read-only canvas.
+ *
+ * Distinct from hydrateJobGraph, which reads the job's *live* workflow documents
+ * and carries operational state (node state, locks, workflow ids) that only
+ * applies to the present. A snapshot has none of that — it is content only — so
+ * the nodes it produces are for looking at, never for saving. Marked
+ * `historic: true` and made undraggable to keep that honest.
+ */
+export const hydrateVersionGraph = (versionWorkflows: any[] | undefined, services: any[]): HydratedGraph => {
+    const allNodes: any[] = [];
+    const allEdges: any[] = [];
+
+    (versionWorkflows ?? []).forEach((workflow: any, workflowIndex: number) => {
+        const snapshotNodes = workflow?.nodes ?? [];
+        const edges = (workflow?.edges ?? []).map((edge: any) => ({
+            id: edge.id ?? `${edge.source}->${edge.target}`,
+            source: edge.source,
+            target: edge.target,
+            animated: true,
+            style: { stroke: 'green' }
+        }));
+
+        const fallback = computeFallbackPositions(snapshotNodes, edges, workflowIndex);
+
+        for (const snapshot of snapshotNodes) {
+            if (!snapshot?.id) continue;
+            // A service deleted from the catalogue since is still nameable from
+            // the snapshot itself, so an old version stays readable.
+            const service = services.find((s: any) => s.id === snapshot.serviceId);
+            const position =
+                snapshot.position && typeof snapshot.position.x === 'number' ? { x: snapshot.position.x, y: snapshot.position.y } : fallback.get(snapshot.id) ?? { x: 0, y: 0 };
+
+            const formData = mergeSavedFormData(service?.parameters ?? [], snapshot.formData, snapshot.id, service);
+
+            const data = {
+                id: snapshot.id,
+                label: snapshot.label ?? snapshot.serviceName ?? 'Removed service',
+                price: snapshot.price ?? service?.price ?? 0,
+                description: service?.description ?? '',
+                allowedConnections: service?.allowedConnections ?? [],
+                icon: service?.icon ?? '',
+                parameters: withRunCountParam(service?.parameters ?? [], formData.some((p) => p.id === RUN_COUNT_PARAM_ID)),
+                additionalInstructions: snapshot.additionalInstructions ?? '',
+                formData,
+                serviceId: snapshot.serviceId,
+                pricing: service?.pricing,
+                pricingMode: service?.pricingMode,
+                historic: true,
+                // Reuses CanvasNode's existing suppression path, so a past
+                // version does not render a live delete button it would ignore.
+                locked: true
+            };
+
+            const node: any = createNodeObject(snapshot.id, data.label, 'selectorNode', position, data as any);
+            node.draggable = false;
+            node.deletable = false;
+            allNodes.push(node);
         }
 
         allEdges.push(...edges);
@@ -209,7 +315,11 @@ export const deriveGhostNodes = (baselineWorkflows: any[] | undefined, presentNo
                 icon: service?.icon ?? '',
                 parameters: service?.parameters ?? [],
                 additionalInstructions: snapshot.additionalInstructions ?? '',
-                formData: generateFormDataFromParams(service?.parameters ?? [], snapshot.id),
+                // The snapshot's own values, not a blank set: a ghost is a record
+                // of what was deleted, so it should be able to say what the node
+                // was configured with. Ghosts are unselectable today, which is the
+                // only reason blanks were survivable.
+                formData: mergeSavedFormData(service?.parameters ?? [], snapshot.formData, snapshot.id, service),
                 serviceId: snapshot.serviceId,
                 ghost: true
             };

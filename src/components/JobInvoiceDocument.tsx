@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, StyleSheet, View, Text, Image, Font } from '@react-pdf/renderer';
 import type { SOWData } from '../types/SOWTypes';
+import { RUN_COUNT_PARAM_ID, RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
 
 Font.register({ family: 'Courier-New', fonts: [{ src: '/fonts/Courier-New.ttf' }] });
 
@@ -261,8 +262,20 @@ function formDataToMap(formData: unknown): Map<string, unknown> {
 function formatMultiplierNotes(parameters: any[] | undefined, formData: unknown): string[] {
   const lines: string[] = [];
   const map = formDataToMap(formData);
+
+  // The run count is composed onto nodes client-side and never stored in the
+  // service's own `parameters`, so the loop below cannot see it. Without this the
+  // invoice total is right but never says a line was multiplied — the same gap
+  // extractRunCount was written to close for the SOW view.
+  const runCount = map.get(RUN_COUNT_PARAM_ID);
+  const runCountNum = typeof runCount === 'number' ? runCount : typeof runCount === 'string' && runCount.trim() !== '' ? Number(runCount) : NaN;
+  const reportedRunCount = Number.isFinite(runCountNum) && runCountNum > 1;
+  if (reportedRunCount) lines.push(`${RUN_COUNT_PARAM_NAME}: ${runCountNum}`);
+
   if (!Array.isArray(parameters)) return lines;
   for (const p of parameters) {
+    // A service that declares the run count itself would otherwise be listed twice.
+    if (reportedRunCount && p?.id === RUN_COUNT_PARAM_ID) continue;
     if (!p || p.isPriceMultiplier !== true || typeof p.id !== 'string') continue;
     const raw = map.get(p.id);
     if (raw === undefined || raw === null || raw === '') continue;

@@ -12,7 +12,9 @@ import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID }         from
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import { diffJobGraphs, currentDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, latestContentVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import JobVersionHistory from '../components/JobVersionHistory';
+import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import JobPDFDocument             from '../components/JobPDFDocument';
@@ -21,6 +23,7 @@ import SowEditorModal             from '../components/sow/SowEditorModal';
 import SowStatusCard              from '../components/sow/SowStatusCard';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
+import { AppContext }             from '../contexts/App';
 
 const stripTypename = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stripTypename);
@@ -52,6 +55,8 @@ export default function TechnicianView() {
     const { id }                              = useParams();
     const navigate                            = useNavigate();
     const userContext                         = useContext(UserContext);
+    // The catalogue, for re-attaching parameter definitions to a version snapshot.
+    const { services }                        = useContext(AppContext);
 
     const [workflowName, setWorkflowName]     = useState('');
     const [workflowState, setWorkflowState]   = useState('');
@@ -62,7 +67,11 @@ export default function TechnicianView() {
     const [jobInstitution, setJobInstitution] = useState('');
     const [jobEmail, setJobEmail]             = useState('');
     const [jobNotes, setJobNotes] = useState('');
-    const [workflows, setWorklows]            = useState<any[]>([]);  // ▶ URLSearchParams {}
+    const [workflows, setWorklows]            = useState<any[]>([]);
+    // Which version of the graph is on screen, and what it is compared against.
+    // Both start unset so the automatic cross-party pair stays the default.
+    const [viewingVersion, setViewingVersion] = useState<number | null>(null);
+    const [baselineVersionNumber, setBaselineVersionNumber] = useState<number | null | undefined>(undefined);
     const [attachments, setAttachments] = useState<any[]>([]);
 
     const { loading, error, data, refetch: refetchJob } = useQuery(GET_JOB_BY_ID, {
@@ -311,14 +320,38 @@ export default function TechnicianView() {
     //     </Card>
     // );
 
-    // Highlight what changed since the last version written by the other side.
+    // Highlight what changed since the last version written by the other side,
+    // unless the reader has picked a different pair from the history.
     const versions = (jobData as any)?.versions ?? [];
-    const { current: currentVersion, baseline: baselineVersion } = currentDiffPair(versions);
+    const { current: currentVersion, baseline: baselineVersion } = selectedDiffPair(versions, viewingVersion, baselineVersionNumber);
     const graphDiff = currentVersion && baselineVersion && currentVersion !== baselineVersion
         ? diffJobGraphs(baselineVersion.workflows, currentVersion.workflows)
         : undefined;
 
-    const workflowCard = <JobWorkflowCards workflows={workflows} fallbackName={workflowName} diff={graphDiff} currentVersion={currentVersion} baselineVersion={baselineVersion} />;
+    // Paging back shows that version's own graph; the newest one is the live job.
+    const latest = latestContentVersion(versions);
+    const isHistoricVersion = latest != null && viewingVersion != null && viewingVersion !== latest.versionNumber;
+    const cardWorkflows = isHistoricVersion ? versionWorkflowsAsCards(currentVersion?.workflows, services ?? []) : workflows;
+
+    const workflowCard = (
+        <>
+            {versions.length > 1 && (
+                <Box sx={{ mb: 1.5 }}>
+                    <JobVersionHistory
+                        versions={versions}
+                        viewing={viewingVersion ?? latest?.versionNumber ?? 0}
+                        baseline={baselineVersion?.versionNumber ?? null}
+                        onViewingChange={(v) => {
+                            setViewingVersion(v);
+                            setBaselineVersionNumber(undefined);
+                        }}
+                        onBaselineChange={setBaselineVersionNumber}
+                    />
+                </Box>
+            )}
+            <JobWorkflowCards workflows={cardWorkflows} fallbackName={workflowName} diff={graphDiff} currentVersion={currentVersion} baselineVersion={baselineVersion} />
+        </>
+    );
 
     return (
         <div>

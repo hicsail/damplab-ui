@@ -22,6 +22,7 @@ export const GET_SERVICES = gql`
                 legacy
             }
             pricingMode
+            allowMultipleRuns
             icon
             parameters
             description
@@ -123,6 +124,7 @@ export const GET_JOB_BY_ID = gql`
                             legacy
                         }
                         pricingMode
+                        allowMultipleRuns
                         icon
                         parameters
                         deliverables
@@ -152,6 +154,8 @@ export const GET_JOB_BY_ID = gql`
                 id
                 versionNumber
                 authorRole
+                jobState
+                isEvent
                 createdAt
                 createdByName
                 note
@@ -233,6 +237,7 @@ export const GET_OWN_JOB_BY_ID = gql`
                             legacy
                         }
                         pricingMode
+                        allowMultipleRuns
                         icon
                         parameters
                         allowedConnections {
@@ -261,6 +266,8 @@ export const GET_OWN_JOB_BY_ID = gql`
                 id
                 versionNumber
                 authorRole
+                jobState
+                isEvent
                 createdAt
                 createdByName
                 note
@@ -621,6 +628,7 @@ export const UPDATE_SERVICE = gql`
         legacy
       }
       pricingMode
+      allowMultipleRuns
       icon
       deliverables
       notes
@@ -649,6 +657,7 @@ export const CREATE_SERVICE = gql`
         legacy
       }
       pricingMode
+      allowMultipleRuns
       icon
       parameters
       description

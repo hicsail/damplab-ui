@@ -58,6 +58,22 @@ describe('mergeDraftOntoFresh', () => {
     const merged = mergeDraftOntoFresh([custom], [field()]);
     expect(merged.find((f) => f.key === 'custom-1')?.value).toBe('Ships on dry ice');
   });
+
+  it('empties a non-overridden required field whose saved calculatedValue is blank', () => {
+    // Why the load effect re-runs the preview against the restored draft's own
+    // inputs. Choosing a Project Manager writes `inputs`, not text, so the field
+    // is never marked overridden — and the fresh copy carries the value the
+    // server generated from the *last saved* inputs, which is empty. Merging
+    // alone therefore drops the section, which is what brought the red
+    // "Required" chip back and left Send disabled with staff visibly selected.
+    const draft = [field({ isOverridden: false, value: 'Jane – Project Manager', calculatedValue: 'Jane – Project Manager' })];
+    const fresh = [field({ value: '', calculatedValue: '' })];
+
+    const merged = mergeDraftOntoFresh(draft, fresh);
+
+    expect(merged[0].value).toBe('');
+    expect(merged[0].allowsEmpty).toBe(false);
+  });
 });
 
 describe('draftStorageKey', () => {

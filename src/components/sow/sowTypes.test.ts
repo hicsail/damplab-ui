@@ -1,5 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, SowVersionInputs } from './sowTypes';
+import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, SowVersionInputs } from './sowTypes';
+
+describe('consentSummaryLabels', () => {
+  it('reads the two boilerplate groups back as a single agreement', () => {
+    // The customer ticked one box; showing two lines implied two decisions.
+    expect(consentSummaryLabels(['CALCULATED', 'PROSE'])).toEqual(['the terms']);
+  });
+
+  it('says the same thing when only one boilerplate group was recorded', () => {
+    expect(consentSummaryLabels(['CALCULATED'])).toEqual(['the terms']);
+    expect(consentSummaryLabels(['PROSE'])).toEqual(['the terms']);
+  });
+
+  it('keeps custom sections as their own line', () => {
+    expect(consentSummaryLabels(['CALCULATED', 'PROSE', 'CUSTOM'])).toEqual(['the terms', 'the additional sections']);
+    expect(consentSummaryLabels(['CUSTOM'])).toEqual(['the additional sections']);
+  });
+
+  it('has nothing to say about an empty or missing consent', () => {
+    expect(consentSummaryLabels([])).toEqual([]);
+    expect(consentSummaryLabels(null)).toEqual([]);
+    expect(consentSummaryLabels(undefined)).toEqual([]);
+  });
+});
 
 describe('sowStatusLabel', () => {
   it('translates internal statuses to customer-facing wording', () => {

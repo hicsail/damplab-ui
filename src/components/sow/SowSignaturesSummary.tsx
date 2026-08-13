@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
-import { GROUP_LABELS, SowConsent } from './sowTypes';
+import { consentSummaryLabels, SowConsent } from './sowTypes';
 
 /**
  * What a signature actually covers: the groups agreed to and any per-section
@@ -31,9 +31,9 @@ export default function SowSignaturesSummary({ clientSignature, staffSignature }
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
           Signed {formatDate(clientSignature.signedAt)}
         </Typography>
-        {(clientSignature.consentedGroups ?? []).map((g) => (
-          <Typography key={g} variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <CheckCircleOutlineIcon fontSize="inherit" color="success" /> Agreed to {GROUP_LABELS[g] ?? g}
+        {consentSummaryLabels(clientSignature.consentedGroups).map((label) => (
+          <Typography key={label} variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <CheckCircleOutlineIcon fontSize="inherit" color="success" /> Agreed to {label}
           </Typography>
         ))}
         {(clientSignature.sectionInitials ?? []).map((s) => (

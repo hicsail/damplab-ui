@@ -6,10 +6,11 @@ import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOpt
 import 'reactflow/dist/style.css';
 import { Alert, Box, Button, Chip, CircularProgress, Snackbar, TextField, Typography } from '@mui/material';
 
-import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
+import { buildNodeParameters, createNodeObject } from '../controllers/ReactFlowEvents';
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
-import { hydrateJobGraph, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges } from '../controllers/jobGraphHydration';
-import { diffJobGraphs, currentDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow } from '../utils/jobGraphDiff';
+import { hydrateJobGraph, hydrateVersionGraph, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges } from '../controllers/jobGraphHydration';
+import { diffJobGraphs, latestContentVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike } from '../utils/jobGraphDiff';
+import JobVersionHistory from '../components/JobVersionHistory';
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
 import RightSidebar   from '../components/RightSidebar';
@@ -66,6 +67,27 @@ export default function JobEditor() {
 
     const [saveJobWorkflows] = useMutation(SAVE_JOB_WORKFLOWS);
 
+    const versions: JobVersionLike[] = useMemo(() => job?.versions ?? [], [job]);
+    const latest = useMemo(() => latestContentVersion(versions), [versions]);
+
+    /**
+     * Which version is on screen, and what it is compared against. Both default
+     * to the automatic choice, so leaving the pickers alone behaves exactly as
+     * the editor did before they existed.
+     */
+    const [viewing, setViewing] = useState<number | null>(null);
+    const [baseline, setBaseline] = useState<number | null | undefined>(undefined);
+
+    useEffect(() => {
+        if (!latest) return;
+        setViewing((prev) => prev ?? latest.versionNumber);
+    }, [latest]);
+
+    /** Viewing anything but the newest version is a read-only look at history. */
+    const isHistoric = latest != null && viewing != null && viewing !== latest.versionNumber;
+
+    const { baseline: baselineVersion } = useMemo(() => selectedDiffPair(versions, viewing, baseline), [versions, viewing, baseline]);
+
     /**
      * The graph to highlight against.
      *
@@ -78,10 +100,9 @@ export default function JobEditor() {
      * the latest version itself, so a freshly submitted job starts clean.
      */
     const baselineWorkflows: SnapshotWorkflow[] | undefined = useMemo(() => {
-        const versions = job?.versions ?? [];
         if (!versions.length) return undefined;
-        return currentDiffPair(versions).baseline?.workflows;
-    }, [job]);
+        return baselineVersion?.workflows;
+    }, [versions, baselineVersion]);
 
     /** The canvas, in the snapshot shape the differ speaks. */
     const canvasSnapshot: SnapshotWorkflow[] = useMemo(
@@ -107,15 +128,29 @@ export default function JobEditor() {
         [baselineWorkflows, canvasSnapshot]
     );
 
-    /** Rebuild the canvas from the job as last saved. */
+    /**
+     * Rebuild the canvas: from the job as last saved, or from a stored snapshot
+     * when the viewer has paged back through the history.
+     *
+     * Nodes, edges and the `hydrated` flag are set in one commit, and `hydrated`
+     * is never cleared once true. Switching versions re-hydrates after mount,
+     * which is exactly the window the flag exists to close — a frame with a
+     * populated baseline and empty nodes makes every baseline node look deleted,
+     * and the whole graph renders as unclickable ghosts.
+     */
     const resetToSavedJob = useCallback(() => {
         if (!job || !services?.length) return;
-        const { nodes: hydrated, edges: hydratedEdges } = hydrateJobGraph(job, services);
-        setNodes(hydrated);
-        setEdges(hydratedEdges);
+
+        const historicVersion = isHistoric ? versions.find((v) => v.versionNumber === viewing) : null;
+        const { nodes: nextNodes, edges: nextEdges } = historicVersion
+            ? hydrateVersionGraph(historicVersion.workflows, services)
+            : hydrateJobGraph(job, services);
+
+        setNodes(nextNodes);
+        setEdges(nextEdges);
         setActiveComponentId('');
         setHydrated(true);
-    }, [job, services]);
+    }, [job, services, isHistoric, versions, viewing]);
 
     useEffect(() => {
         resetToSavedJob();
@@ -161,21 +196,32 @@ export default function JobEditor() {
         return [...edges, ...deriveGhostEdges(baselineWorkflows, ghostIds, renderable)];
     }, [edges, nodes, ghostNodes, baselineWorkflows]);
 
+    // While viewing history the canvas is a picture of a past version, so every
+    // mutating handler is a no-op. Selection changes still go through: a reader
+    // needs to click a node to inspect its parameters.
     const onNodesChange = useCallback(
-        (changes: NodeChange[]) => setNodes((nds: any) => applyNodeChanges(changes, nds)),
-        []
+        (changes: NodeChange[]) => {
+            const allowed = isHistoric ? changes.filter((c) => c.type === 'select' || c.type === 'dimensions' || c.type === 'position') : changes;
+            if (!allowed.length) return;
+            setNodes((nds: any) => applyNodeChanges(allowed, nds));
+        },
+        [isHistoric]
     );
     const onEdgesChange = useCallback(
-        (changes: EdgeChange[]) => setEdges((eds: any) => applyEdgeChanges(changes, eds)),
-        []
+        (changes: EdgeChange[]) => {
+            if (isHistoric) return;
+            setEdges((eds: any) => applyEdgeChanges(changes, eds));
+        },
+        [isHistoric]
     );
     const onConnect = useCallback((connection: Connection) => {
+        if (isHistoric) return;
         const customConnection: any = connection;
         if (isValidConnection(services, nodes, customConnection.source, customConnection.target)) {
             customConnection.style = { stroke: 'green' };
         }
         setEdges((eds: any) => addEdge(customConnection, eds));
-    }, [services, nodes]);
+    }, [services, nodes, isHistoric]);
 
     const onDragOver = useCallback((event: any) => {
         event.preventDefault();
@@ -187,6 +233,7 @@ export default function JobEditor() {
     // purely by its absence from the baseline.
     const onDrop = useCallback((event: any) => {
         event.preventDefault();
+        if (isHistoric) return;
         const rawType = event.dataTransfer.getData('application/reactflow');
         if (!rawType) return;
 
@@ -210,7 +257,7 @@ export default function JobEditor() {
 
         const nodeId = Math.random().toString(36).substring(2, 9);
         setActiveComponentId(nodeId);
-        const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
+        const { formData, parameters } = buildNodeParameters(type, nodeId);
         const nodeData: NodeData = {
             id: nodeId,
             label: type.name,
@@ -225,20 +272,21 @@ export default function JobEditor() {
             description: type.description,
             allowedConnections: type.allowedConnections,
             icon: type.icon,
-            parameters: type.parameters,
+            parameters,
             additionalInstructions: '',
             formData,
             serviceId: type.id,
             paramGroups: type.paramGroups
         };
         setNodes((nds: any) => nds.concat(createNodeObject(nodeId, type.name, type.type, position, nodeData)));
-    }, [reactFlowInstance, services]);
+    }, [reactFlowInstance, services, isHistoric]);
 
     const handleSave = async () => {
+        if (isHistoric) return;
         setSaving(true);
         try {
             await saveJobWorkflows({
-                variables: { input: { jobId: id, note: note.trim() || undefined, workflows: buildSaveWorkflowsInput(nodes, edges) } }
+                variables: { input: { jobId: id, note: note.trim(), workflows: buildSaveWorkflowsInput(nodes, edges) } }
             });
             setNote('');
             setMessage({ text: 'Changes saved.', severity: 'success' });
@@ -319,19 +367,58 @@ export default function JobEditor() {
                                 </Box>
                             </Panel>
 
+                            {/* Bottom-right is the only free corner: Controls and the
+                                Revert button already share bottom-left. */}
+                            <Panel position="bottom-right" style={{ marginRight: 8, marginBottom: 8 }}>
+                                {viewing != null && (
+                                    <Box sx={{ backgroundColor: 'white', p: 0.75, borderRadius: 1, boxShadow: 2 }}>
+                                        <JobVersionHistory
+                                            versions={versions}
+                                            viewing={viewing}
+                                            baseline={baselineVersion?.versionNumber ?? null}
+                                            onViewingChange={(v) => {
+                                                setViewing(v);
+                                                // Re-derive rather than carry the old baseline forward: a
+                                                // baseline newer than the version being viewed would report
+                                                // every later edit as a deletion.
+                                                setBaseline(undefined);
+                                            }}
+                                            onBaselineChange={setBaseline}
+                                            dense
+                                        />
+                                    </Box>
+                                )}
+                            </Panel>
+
                             <Panel position="top-right" style={{ marginRight: 8, marginTop: 8, maxWidth: 300 }}>
-                                {/* The note is optional and describes this save, not the job — it
-                                    is shown alongside the diff summary in the job view. */}
+                                {isHistoric ? (
+                                    <Alert severity="info" sx={{ py: 0.25, fontSize: 12 }}>
+                                        Viewing version {viewing} — read only. Switch back to version {latest?.versionNumber} to edit.
+                                    </Alert>
+                                ) : (
+                                <>
+                                {/* The note describes this save, not the job, and is shown
+                                    alongside the diff summary in the job view. Required: the
+                                    version history is what the other party reads to understand
+                                    an edit, and an unlabelled entry tells them nothing. */}
                                 <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', backgroundColor: 'white', p: 0.75, borderRadius: 1, boxShadow: 2 }}>
                                     <TextField
                                         size="small"
-                                        placeholder="Note (optional)"
+                                        required
+                                        placeholder="What changed?"
                                         value={note}
                                         onChange={(event) => setNote(event.target.value)}
                                         disabled={saving}
                                         sx={{ width: 170, '& .MuiInputBase-input': { fontSize: 12, py: 0.75 } }}
                                     />
-                                    <Button variant="contained" size="small" onClick={handleSave} disabled={saving} sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}>
+                                    <Button
+                                        variant="contained"
+                                        size="small"
+                                        onClick={handleSave}
+                                        disabled={saving || !note.trim()}
+                                        title={!note.trim() ? 'Describe what you changed before saving' : undefined}
+                                        sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+                                    >
                                         {saving ? 'Saving…' : 'Save changes'}
                                     </Button>
                                 </Box>
@@ -340,25 +427,31 @@ export default function JobEditor() {
                                         {changeCount} node{changeCount === 1 ? '' : 's'} changed
                                     </Typography>
                                 )}
+                                </>
+                                )}
                             </Panel>
 
-                            <Panel position="bottom-left" style={{ marginLeft: 8, marginBottom: 8 }}>
-                                <Button
-                                    variant="outlined"
-                                    color="error"
-                                    size="small"
-                                    onClick={() => {
-                                        if (window.confirm('Discard your unsaved edits and return to the job as last saved?')) resetToSavedJob();
-                                    }}
-                                    sx={{ textTransform: 'none', backgroundColor: 'white' }}
-                                >
-                                    Revert to saved job
-                                </Button>
-                            </Panel>
+                            {!isHistoric && (
+                                <Panel position="bottom-left" style={{ marginLeft: 8, marginBottom: 8 }}>
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        size="small"
+                                        onClick={() => {
+                                            if (window.confirm('Discard your unsaved edits and return to the job as last saved?')) resetToSavedJob();
+                                        }}
+                                        sx={{ textTransform: 'none', backgroundColor: 'white' }}
+                                    >
+                                        Revert to saved job
+                                    </Button>
+                                </Panel>
+                            )}
                         </ReactFlow>
 
                         <div style={{ minWidth: '10%', width: 850, borderLeft: 'solid 1px' }}>
-                            <RightSidebar changedParamIdsByNode={changedParamIdsByNode} />
+                            {/* A past version's parameters are readable but not editable —
+                                the same treatment CanvasPreview already uses. */}
+                            <RightSidebar changedParamIdsByNode={changedParamIdsByNode} noMouseEvents={isHistoric} />
                         </div>
 
                     </div>

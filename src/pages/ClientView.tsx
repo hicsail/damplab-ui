@@ -10,7 +10,10 @@ import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '..
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import { CommentsSection }        from '../components/CommentsSection';
 import ResubmitJobModal          from '../components/ResubmitJobModal';
-import { diffJobGraphs, currentDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, latestContentVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import JobVersionHistory from '../components/JobVersionHistory';
+import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
+import { AppContext } from '../contexts/App';
 import { UserContext }            from '../contexts/UserContext';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
@@ -30,6 +33,12 @@ export default function Tracking() {
     const [workflowInstitution, setWorkflowInstitution] = useState('');
     const [workflowEmail,       setWorkflowEmail]       = useState('');  // ▶ URLSearchParams {}
     const [workflows,           setWorklows]            = useState([]);  // ▶ URLSearchParams {}
+    // The catalogue, for re-attaching parameter definitions to a version snapshot.
+    const { services }                                  = useContext(AppContext);
+    // Which version of the graph is on screen, and what it is compared against.
+    // Both start unset so the automatic cross-party pair stays the default.
+    const [viewingVersion, setViewingVersion] = useState<number | null>(null);
+    const [baselineVersionNumber, setBaselineVersionNumber] = useState<number | null | undefined>(undefined);
     const [sowData, setSowData] = useState<any>(null);
     const [attachments, setAttachments] = useState<any[]>([]);
     const [resubmitOpen, setResubmitOpen] = useState(false);
@@ -120,15 +129,39 @@ export default function Tracking() {
     const jobStatusIcon  = jobStatus()[1];
     const jobStatusText  = jobStatus()[2];
 
-    // Highlight what changed since the last version written by the other side.
+    // Highlight what changed since the last version written by the other side,
+    // unless the reader has picked a different pair from the history.
     const versions = (data?.ownJobById as any)?.versions ?? [];
-    const { current, baseline } = currentDiffPair(versions);
+    const { current, baseline } = selectedDiffPair(versions, viewingVersion, baselineVersionNumber);
     const graphDiff = current && baseline && current !== baseline ? diffJobGraphs(baseline.workflows, current.workflows) : undefined;
 
     // The editor is offered only while the lab is waiting on the customer.
     const canEdit = jobState === 'CHANGES_REQUESTED';
 
-    const workflowCard = <JobWorkflowCards workflows={workflows} diff={graphDiff} currentVersion={current} baselineVersion={baseline} />;
+    // Paging back shows that version's own graph; the newest one is the live job.
+    const latest = latestContentVersion(versions);
+    const isHistoricVersion = latest != null && viewingVersion != null && viewingVersion !== latest.versionNumber;
+    const cardWorkflows = isHistoricVersion ? versionWorkflowsAsCards(current?.workflows, services ?? []) : workflows;
+
+    const workflowCard = (
+        <>
+            {versions.length > 1 && (
+                <Box sx={{ mb: 1.5 }}>
+                    <JobVersionHistory
+                        versions={versions}
+                        viewing={viewingVersion ?? latest?.versionNumber ?? 0}
+                        baseline={baseline?.versionNumber ?? null}
+                        onViewingChange={(v) => {
+                            setViewingVersion(v);
+                            setBaselineVersionNumber(undefined);
+                        }}
+                        onBaselineChange={setBaselineVersionNumber}
+                    />
+                </Box>
+            )}
+            <JobWorkflowCards workflows={cardWorkflows} diff={graphDiff} currentVersion={current} baselineVersion={baseline} />
+        </>
+    );
 
     const getParameterFiles = () => getJobParameterFiles(workflows);
 

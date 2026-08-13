@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { diffJobGraphs, pickJobDiffBaseline, currentDiffPair, JobVersionLike, SnapshotWorkflow } from './jobGraphDiff';
+import { diffJobGraphs, pickJobDiffBaseline, currentDiffPair, selectedDiffPair, latestContentVersion, jobStateLabel, jobStateColor, JobVersionLike, SnapshotWorkflow } from './jobGraphDiff';
 
 function node(id: string, params: Record<string, any> = {}, over: Record<string, any> = {}) {
   return {
@@ -179,5 +179,112 @@ describe('currentDiffPair', () => {
     const { current, baseline } = currentDiffPair(flow);
     expect(current!.versionNumber).toBe(3);
     expect(baseline!.versionNumber).toBe(2);
+  });
+});
+
+describe('selectedDiffPair', () => {
+  const flow = [version(1, 'CUSTOMER'), version(2, 'STAFF'), version(3, 'CUSTOMER')];
+
+  it('falls back to the automatic pair when nothing has been picked', () => {
+    const { current, baseline } = selectedDiffPair(flow, null, undefined);
+    expect(current!.versionNumber).toBe(3);
+    expect(baseline!.versionNumber).toBe(2);
+  });
+
+  it('derives the baseline for the version being viewed when only that was picked', () => {
+    const { current, baseline } = selectedDiffPair(flow, 2, undefined);
+    expect(current!.versionNumber).toBe(2);
+    expect(baseline!.versionNumber).toBe(1);
+  });
+
+  it('honours an explicitly chosen baseline', () => {
+    const { current, baseline } = selectedDiffPair(flow, 3, 1);
+    expect(current!.versionNumber).toBe(3);
+    expect(baseline!.versionNumber).toBe(1);
+  });
+
+  it('treats a null baseline as "hide changes", not as "no baseline available"', () => {
+    const { current, baseline } = selectedDiffPair(flow, 3, null);
+    expect(current!.versionNumber).toBe(3);
+    expect(baseline).toBeNull();
+  });
+
+  it('falls back to the automatic pair when the chosen version is gone', () => {
+    const { current } = selectedDiffPair(flow, 99, undefined);
+    expect(current!.versionNumber).toBe(3);
+  });
+});
+
+describe('job state chips', () => {
+  it('labels a state in the reader\'s terms', () => {
+    expect(jobStateLabel('CHANGES_REQUESTED')).toBe('Changes Requested');
+    expect(jobStateLabel('IN_PROGRESS')).toBe('In Progress');
+  });
+
+  it('has nothing to show for a version written before the field existed', () => {
+    // Backfilled v1 and every pre-existing version carry no state.
+    expect(jobStateLabel(null)).toBeNull();
+    expect(jobStateLabel(undefined)).toBeNull();
+  });
+
+  it('passes an unrecognised state through rather than hiding it', () => {
+    expect(jobStateLabel('SOMETHING_NEW')).toBe('SOMETHING_NEW');
+  });
+
+  it('colours the states that carry a verdict', () => {
+    expect(jobStateColor('CHANGES_REQUESTED')).toBe('warning');
+    expect(jobStateColor('REJECTED')).toBe('error');
+    expect(jobStateColor('COMPLETE')).toBe('success');
+    expect(jobStateColor(null)).toBe('default');
+  });
+});
+
+describe('event versions', () => {
+  // A state change appends a version whose graph is copied verbatim from its
+  // predecessor. Every rule below exists so those rows can appear in the history
+  // — which is the point of the chips — without swallowing the diff.
+  const event = (n: number, authorRole: 'CUSTOMER' | 'STAFF', workflows: SnapshotWorkflow[] = []): JobVersionLike => ({
+    ...version(n, authorRole, workflows),
+    isEvent: true
+  });
+
+  it('never baselines against an event version', () => {
+    // v3 is a copy of v2, so comparing v4 to v3 would report no changes at all.
+    const flow = [version(1, 'CUSTOMER'), version(2, 'STAFF'), event(3, 'STAFF'), version(4, 'CUSTOMER')];
+    expect(pickJobDiffBaseline(flow, 4)).toBe(2);
+  });
+
+  it('does not treat a trailing event as the version to diff', () => {
+    // The reported failure mode: staff close a job right after the customer
+    // edited it, and the customer's edits stop being highlighted.
+    const flow = [version(1, 'CUSTOMER'), event(2, 'STAFF'), version(3, 'CUSTOMER'), event(4, 'STAFF')];
+    const { current, baseline } = currentDiffPair(flow);
+
+    expect(current!.versionNumber).toBe(3);
+    expect(baseline!.versionNumber).toBe(1);
+  });
+
+  it('reports the newest edit, not the newest row', () => {
+    const flow = [version(1, 'CUSTOMER'), version(2, 'STAFF'), event(3, 'STAFF')];
+    expect(latestContentVersion(flow)!.versionNumber).toBe(2);
+  });
+
+  it('falls back to the newest row when a job somehow has only events', () => {
+    const flow = [event(1, 'CUSTOMER'), event(2, 'STAFF')];
+    expect(latestContentVersion(flow)!.versionNumber).toBe(2);
+  });
+
+  it('is unaffected on a history with no events, which is every existing job', () => {
+    const flow = [version(1, 'CUSTOMER'), version(2, 'STAFF'), version(3, 'CUSTOMER')];
+    expect(latestContentVersion(flow)!.versionNumber).toBe(3);
+    expect(currentDiffPair(flow).baseline!.versionNumber).toBe(2);
+  });
+
+  it('still lets a reader select an event version explicitly', () => {
+    // Selecting one shows an empty diff, which is honest: nothing did change.
+    const flow = [version(1, 'CUSTOMER'), version(2, 'STAFF'), event(3, 'STAFF')];
+    const { current, baseline } = selectedDiffPair(flow, 3, undefined);
+    expect(current!.versionNumber).toBe(3);
+    expect(baseline!.versionNumber).toBe(1);
   });
 });

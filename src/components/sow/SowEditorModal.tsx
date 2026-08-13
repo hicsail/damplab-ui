@@ -154,6 +154,16 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
       setFields(mergeDraftOntoFresh(stored.fields, loadedFields));
       setInputs(stored.inputs);
       setNote(stored.note);
+      // Regenerate against the draft's own inputs before anything is rendered
+      // from them. mergeDraftOntoFresh takes `fresh.calculatedValue` for any
+      // section the staff member did not override by hand, and that value was
+      // generated from the *last saved* inputs — so a source-control choice made
+      // in the draft (picking a Project Manager, say) is missing from the text
+      // even though the dropdown restores showing it. Engagement Resources then
+      // reads as empty, takes back its red "Required" chip and blocks Send, with
+      // the staff visibly selected the whole time. Nothing else runs a preview on
+      // load; without this the only way out is to touch a source control again.
+      void runPreview(stored.inputs);
     } else {
       setFields(loadedFields);
       setInputs(loadedInputs);
@@ -378,7 +388,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
           sowId: sow.id,
           input: {
             baseVersionNumber: baseVersion,
-            note: note.trim() || null,
+            note: note.trim(),
             fields: fields.map((f) => ({ key: f.key, label: f.label, value: f.value, isEnabled: f.isEnabled, requiresInitials: f.requiresInitials })),
             inputs: toInputsPayload(inputs)
           }
@@ -551,7 +561,21 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
         </DialogContent>
 
         <DialogActions sx={{ px: 2, py: 1.5, gap: 1, flexWrap: 'wrap' }}>
-          <TextField size="small" placeholder="What changed? (optional)" value={note} onChange={(e) => setNote(e.target.value)} sx={{ flex: 1, minWidth: 220 }} disabled={busy || !sow} />
+          {/* Required: the note is what the version history reads back as, and an
+              unlabelled entry in an audit trail is worse than no entry. Only
+              enforced while there is something to save — an empty note must not
+              be what makes a clean, unedited document look broken. */}
+          <TextField
+            size="small"
+            required
+            placeholder="What changed?"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            error={dirty && !note.trim()}
+            helperText={dirty && !note.trim() ? 'Required to save' : ' '}
+            sx={{ flex: 1, minWidth: 220 }}
+            disabled={busy || !sow}
+          />
 
           {/* Only offered when there is an earlier version to fall back to; a SOW
               must always keep at least one document. */}
@@ -579,9 +603,13 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
             Reset
           </Button>
 
-          <Button onClick={handleSave} variant="outlined" disabled={busy || !sow || !dirty}>
-            Save
-          </Button>
+          <Tooltip title={dirty && !note.trim() ? 'Describe what you changed before saving.' : ''}>
+            <span>
+              <Button onClick={handleSave} variant="outlined" disabled={busy || !sow || !dirty || !note.trim()}>
+                Save
+              </Button>
+            </span>
+          </Tooltip>
 
           <Tooltip
             title={

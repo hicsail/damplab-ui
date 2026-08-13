@@ -1,4 +1,4 @@
-import { generateFormDataFromParams, createNodeObject } from './ReactFlowEvents';
+import { buildNodeParameters, createNodeObject } from './ReactFlowEvents';
 
 /**
  * Lean workflow spec the n8n agent returns. Node entries reference a catalog
@@ -47,7 +47,7 @@ export function hydrateAgentWorkflow(spec: AgentWorkflowSpec, services: any[]): 
       return;
     }
     const nodeId = Math.random().toString(36).substring(2, 9);
-    const formData = generateFormDataFromParams(service.parameters || [], nodeId);
+    const { formData, parameters } = buildNodeParameters(service, nodeId);
 
     // Overlay the agent-provided parameter values (matched by parameter id).
     const provided = sn.parameters || {};
@@ -72,7 +72,7 @@ export function hydrateAgentWorkflow(spec: AgentWorkflowSpec, services: any[]): 
       description: service.description,
       allowedConnections: service.allowedConnections,
       icon: service.icon,
-      parameters: service.parameters,
+      parameters,
       additionalInstructions: '',
       formData,
       serviceId: String(service.id),

@@ -1,20 +1,6 @@
-import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
+import { createNodeObject, buildNodeParameters } from './ReactFlowEvents';
 
-import { NodeParameter } from '../types/CanvasTypes';
-import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 import { services as legacyServices } from '../data/services';
-
-const RUN_COUNT_PARAM_DEF = {
-    id              : RUN_COUNT_PARAM_ID,
-    name            : 'Number of runs',
-    type            : 'number',
-    required        : false,
-    description     : 'Price = base price × this number.',
-    paramType       : 'input',
-    isPriceMultiplier: true,
-    options         : null,
-    allowMultipleValues: false,
-};
 
 
 export const getServiceFromId = (services: any, id: string) => {
@@ -67,12 +53,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
     
     const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
     const nodeId = Math.random().toString(36).substring(2, 9);  // Sufficient variance?
-    const formData: NodeParameter[] = generateFormDataFromParams(service.parameters ?? [], nodeId);
-    
-    const serviceParams = service.parameters ?? [];
-    const parametersWithRunCount = serviceParams.some((p: any) => p?.id === RUN_COUNT_PARAM_ID)
-        ? serviceParams
-        : [...serviceParams, RUN_COUNT_PARAM_DEF];
+    const { formData, parameters } = buildNodeParameters(service, nodeId);
 
     const nodeData = {
         id                    : nodeId,
@@ -88,7 +69,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         description           : service.description,
         allowedConnections    : service.allowedConnections,
         icon                  : service.icon,
-        parameters            : parametersWithRunCount,
+        parameters            : parameters,
         additionalInstructions: "",
         formData              : formData,
         serviceId             : service.id,

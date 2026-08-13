@@ -56,6 +56,24 @@ describe('mergeSavedFormData', () => {
     const merged = mergeSavedFormData(parameters, [{ id: '__runCount', value: 4 }], 'n1');
     expect(merged.find((p) => p.id === '__runCount')!.value).toBe(4);
   });
+
+  it('keeps a stored run count even when the service no longer allows multiple runs', () => {
+    // Creation is gated on the flag; hydration must not be. The entry is what
+    // pricing multiplies by, so dropping it here would reprice the job — at 1×
+    // instead of 4× — the next time anyone saved it.
+    const merged = mergeSavedFormData(parameters, [{ id: '__runCount', value: 4 }], 'n1', { allowMultipleRuns: false });
+    expect(merged.find((p) => p.id === '__runCount')!.value).toBe(4);
+  });
+
+  it('does not invent a run count for a job that never had one', () => {
+    const merged = mergeSavedFormData(parameters, [{ id: 'vol', value: 5 }], 'n1', { allowMultipleRuns: false });
+    expect(merged.some((p) => p.id === '__runCount')).toBe(false);
+  });
+
+  it('offers a run count on a service that allows it, even on a job saved without one', () => {
+    const merged = mergeSavedFormData(parameters, [{ id: 'vol', value: 5 }], 'n1', { allowMultipleRuns: true });
+    expect(merged.find((p) => p.id === '__runCount')!.value).toBe(1);
+  });
 });
 
 describe('hydrateJobGraph', () => {
@@ -305,6 +323,32 @@ describe('deriveGhostNodes', () => {
     const ghosts = deriveGhostNodes(baseline, new Set(['a']), []);
     expect(ghosts).toHaveLength(1);
     expect(ghosts[0].data.label).toBe('Service s1');
+  });
+
+  it('carries the deleted node\'s own parameter values, not a blank set', () => {
+    // A ghost is a record of what was removed, so it has to be able to say what
+    // the node was configured with. Previously it was rebuilt from the catalogue
+    // schema alone, which meant every value came back empty.
+    const withValues = [
+      {
+        workflowId: 'wf1',
+        nodes: [
+          { id: 'a', label: 'Service s1', serviceId: 's1', position: { x: 0, y: 0 } },
+          { id: 'b', label: 'Service s1', serviceId: 's1', position: { x: 0, y: 150 }, formData: [{ id: 'vol', value: 25 }] }
+        ],
+        edges: []
+      }
+    ];
+
+    const ghosts = deriveGhostNodes(withValues, new Set(['a']), [service('s1', [{ id: 'vol', name: 'Volume', type: 'number' }])]);
+
+    expect(ghosts[0].data.formData.find((p: any) => p.id === 'vol').value).toBe(25);
+  });
+
+  it('ghosts nothing when the reader has chosen to compare against nothing', () => {
+    // "Nothing — hide changes" in the compare-to picker means no baseline, which
+    // must read as "show me the graph as it is", not as "everything was deleted".
+    expect(deriveGhostNodes(undefined, new Set(['a']), [service('s1')])).toEqual([]);
   });
 
   it('is a no-op without a baseline', () => {

@@ -199,6 +199,30 @@ export const GROUP_LABELS: Record<SowFieldKind, string> = {
 export const GROUP_ORDER: SowFieldKind[] = ['CALCULATED', 'PROSE', 'CUSTOM'];
 
 /**
+ * How a stored consent reads back to a human.
+ *
+ * `consentedGroups` is finer-grained than the act that produced it: the customer
+ * ticks a single box covering the whole document, and it is fanned out into one
+ * entry per field kind present. Listing those entries separately —  "Agreed to
+ * the dates, people and costs", "Agreed to the standard terms" — claims they
+ * made distinct decisions they were never asked to make. The two boilerplate
+ * groups therefore collapse into one line here.
+ *
+ * Custom sections stay their own line: their content is written per SOW, so
+ * "the additional sections" is genuinely saying something the rest does not.
+ *
+ * Display only — the stored groups are untouched, so existing signatures keep
+ * whatever they recorded.
+ */
+export function consentSummaryLabels(groups: SowFieldKind[] | null | undefined): string[] {
+  const present = new Set(groups ?? []);
+  const labels: string[] = [];
+  if (present.has('CALCULATED') || present.has('PROSE')) labels.push('the terms');
+  if (present.has('CUSTOM')) labels.push(GROUP_LABELS.CUSTOM);
+  return labels;
+}
+
+/**
  * True when the local draft's service costs no longer match what the job
  * currently prices them at. Deliberately ignores adjustments — those are
  * always staff-authored, never auto-calculated, so editing one must never

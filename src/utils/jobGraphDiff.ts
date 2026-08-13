@@ -43,6 +43,10 @@ export interface JobVersionLike {
     createdAt?: string;
     createdByName?: string;
     note?: string | null;
+    /** The job's state when the version was written. Absent on versions predating the field. */
+    jobState?: string | null;
+    /** True for a state-change record rather than a graph edit; its graph is a copy of its predecessor's. */
+    isEvent?: boolean | null;
 }
 
 export interface ParamDiff {
@@ -261,7 +265,10 @@ export function pickJobDiffBaseline(versions: JobVersionLike[], versionNumber: n
     if (!current) return null;
 
     const earlierByOtherSide = versions
-        .filter((v) => v.versionNumber < versionNumber && v.authorRole !== current.authorRole)
+        // Event versions are skipped: their graph is a verbatim copy of the one
+        // before them, so comparing against one reports "nothing changed" and
+        // hides the edit it followed.
+        .filter((v) => v.versionNumber < versionNumber && v.authorRole !== current.authorRole && v.isEvent !== true)
         .sort((a, b) => b.versionNumber - a.versionNumber);
 
     return earlierByOtherSide.length ? earlierByOtherSide[0].versionNumber : null;
@@ -271,6 +278,22 @@ export function pickJobDiffBaseline(versions: JobVersionLike[], versionNumber: n
 export function latestVersion(versions: JobVersionLike[]): JobVersionLike | null {
     if (!versions.length) return null;
     return versions.reduce((newest, v) => (v.versionNumber > newest.versionNumber ? v : newest), versions[0]);
+}
+
+/**
+ * The newest version that actually holds a graph, which is what the live job
+ * looks like now.
+ *
+ * A state change appends an event version whose workflows are copied verbatim,
+ * so the newest version overall is often not the newest *edit*. Diffing and the
+ * read-only check both key off this rather than `latestVersion`: treating a
+ * trailing "Closed" event as the current version would make the customer's last
+ * edits stop highlighting the moment staff closed the job, and would put the
+ * editor into read-only mode on a job that is still editable.
+ */
+export function latestContentVersion(versions: JobVersionLike[]): JobVersionLike | null {
+    const content = versions.filter((v) => v.isEvent !== true);
+    return latestVersion(content.length ? content : versions);
 }
 
 /**
@@ -287,7 +310,10 @@ export function latestVersion(versions: JobVersionLike[]): JobVersionLike | null
  * baseline is that version itself, so nothing highlights until someone edits it.
  */
 export function currentDiffPair(versions: JobVersionLike[]): { current: JobVersionLike | null; baseline: JobVersionLike | null } {
-    const current = latestVersion(versions);
+    // The newest *edit*, not the newest row: a trailing state-change event holds
+    // a copy of this graph, and diffing it against its own predecessor would
+    // report no changes at all.
+    const current = latestContentVersion(versions);
     if (!current) return { current: null, baseline: null };
 
     const crossParty = pickJobDiffBaseline(versions, current.versionNumber);
@@ -296,7 +322,7 @@ export function currentDiffPair(versions: JobVersionLike[]): { current: JobVersi
     }
 
     const previous = versions
-        .filter((v) => v.versionNumber < current.versionNumber)
+        .filter((v) => v.versionNumber < current.versionNumber && v.isEvent !== true)
         .sort((a, b) => b.versionNumber - a.versionNumber)[0];
 
     return { current, baseline: previous ?? current };
@@ -307,4 +333,63 @@ export function jobVersionLabel(version: JobVersionLike): string {
     const date = version.createdAt ? new Date(version.createdAt) : null;
     const when = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
     return `v${version.versionNumber} · ${version.authorRole.toLowerCase()}${when ? ` · ${when}` : ''}`;
+}
+
+/**
+ * The pair to diff when the viewer has picked explicitly.
+ *
+ * Falls back to the automatic pair when nothing is chosen, so a page that has
+ * not wired up the pickers keeps behaving exactly as it did. A baseline of
+ * `null` means "compare against nothing" — an explicit choice to hide
+ * highlighting, distinct from "no baseline available".
+ */
+export function selectedDiffPair(
+    versions: JobVersionLike[],
+    viewing: number | null,
+    baseline: number | null | undefined
+): { current: JobVersionLike | null; baseline: JobVersionLike | null } {
+    if (viewing == null) return currentDiffPair(versions);
+
+    const current = versions.find((v) => v.versionNumber === viewing) ?? null;
+    if (!current) return currentDiffPair(versions);
+    if (baseline === undefined) return { current, baseline: versions.find((v) => v.versionNumber === (pickJobDiffBaseline(versions, viewing) ?? -1)) ?? null };
+    if (baseline === null) return { current, baseline: null };
+
+    return { current, baseline: versions.find((v) => v.versionNumber === baseline) ?? null };
+}
+
+/** Customer-facing wording for a job state; the raw enum name is a poor label. */
+export function jobStateLabel(state?: string | null): string | null {
+    if (!state) return null;
+    const LABELS: Record<string, string> = {
+        CREATING: 'Draft',
+        SUBMITTED: 'Submitted',
+        CHANGES_REQUESTED: 'Changes Requested',
+        ACCEPTED: 'Accepted',
+        WAITING_FOR_SOW: 'Waiting for SOW',
+        QUEUED: 'Queued',
+        IN_PROGRESS: 'In Progress',
+        COMPLETE: 'Complete',
+        REJECTED: 'Rejected',
+        CLOSED: 'Closed'
+    };
+    return LABELS[state] ?? state;
+}
+
+/** Chip colour for a job state, matching how the SOW history colours its statuses. */
+export function jobStateColor(state?: string | null): 'default' | 'info' | 'success' | 'warning' | 'error' {
+    switch (state) {
+        case 'SUBMITTED':
+        case 'ACCEPTED':
+            return 'info';
+        case 'CHANGES_REQUESTED':
+            return 'warning';
+        case 'COMPLETE':
+        case 'CLOSED':
+            return 'success';
+        case 'REJECTED':
+            return 'error';
+        default:
+            return 'default';
+    }
 }
