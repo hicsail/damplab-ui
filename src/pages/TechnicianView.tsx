@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { useParams } from 'react-router';
+import React, { useContext, useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
@@ -7,14 +7,12 @@ import { Box, Button, Card, CardContent, Typography, Alert, Chip, Link as MuiLin
 import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
-import PendingIcon from '@mui/icons-material/Pending';
-import LoopIcon from '@mui/icons-material/Loop';
-import DoneIcon from '@mui/icons-material/Done';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID }         from '../gql/queries';
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
-import { resolveParameterName } from '../utils/servicePricing';
+import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import { diffJobGraphs, currentDiffPair } from '../utils/jobGraphDiff';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import JobPDFDocument             from '../components/JobPDFDocument';
@@ -22,6 +20,7 @@ import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SowEditorModal             from '../components/sow/SowEditorModal';
 import SowStatusCard              from '../components/sow/SowStatusCard';
 import { CommentsSection }        from '../components/CommentsSection';
+import { UserContext }            from '../contexts/UserContext';
 
 const stripTypename = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stripTypename);
@@ -51,6 +50,8 @@ const downloadJson = (filename: string, payload: unknown) => {
 export default function TechnicianView() {
 
     const { id }                              = useParams();
+    const navigate                            = useNavigate();
+    const userContext                         = useContext(UserContext);
 
     const [workflowName, setWorkflowName]     = useState('');
     const [workflowState, setWorkflowState]   = useState('');
@@ -236,38 +237,7 @@ export default function TechnicianView() {
         setInvoiceDialogOpen(false);
     };
 
-    const getParameterFiles = (): Array<{ label: string; filename: string; url?: string }> => {
-        const files: Array<{ label: string; filename: string; url?: string }> = [];
-        workflows.forEach((workflow: any) => {
-            (workflow?.nodes ?? []).forEach((node: any) => {
-                const serviceParams = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
-                const fileParamMap = new Map(
-                    serviceParams
-                        .filter((p: any) => p && p.type === 'file' && typeof p.id === 'string')
-                        .map((p: any) => [p.id, p.name ?? 'File upload'])
-                );
-                if (!fileParamMap.size) return;
-
-                (node?.formData ?? []).forEach((entry: any) => {
-                    if (!fileParamMap.has(entry?.id)) return;
-                    const paramLabel = fileParamMap.get(entry.id);
-                    const rawValues = Array.isArray(entry.value) ? entry.value : [entry.value];
-                    rawValues.forEach((raw: any) => {
-                        const parsed = typeof raw === 'string' ? (() => {
-                            try { return JSON.parse(raw); } catch { return null; }
-                        })() : raw;
-                        if (!parsed || typeof parsed !== 'object' || !parsed.filename) return;
-                        files.push({
-                            label: `${node.label} - ${paramLabel}`,
-                            filename: parsed.filename,
-                            url: parsed.url
-                        });
-                    });
-                });
-            });
-        });
-        return files;
-    };
+    const getParameterFiles = () => getJobParameterFiles(workflows);
 
     // useEffect(() => {
     //     console.log(fetch('https://plasmapper.ca/api/features', {
@@ -288,6 +258,7 @@ export default function TechnicianView() {
         const acceptText = "The job was accepted by the DAMP Lab. The client will be asked to sign and return the SOW.";
         const rejectText=  "The job was rejected by the DAMP Lab. The client will be asked to resubmit the job with changes.";
         const closedText = "This job has been closed out. It is no longer active in the lab monitor.";
+        const changesText = "Changes were requested from the client. They can edit the workflow and resubmit.";
         const defaultText = "Invalid Case";
         switch (jobState) {
             case 'SUBMITTED':
@@ -300,6 +271,8 @@ export default function TechnicianView() {
                 return ['rgb(256, 0, 0, 0.5)', <NotInterested />, rejectText];
             case 'CLOSED':
                 return ['rgba(120, 120, 120, 0.35)', <Check />, closedText];
+            case 'CHANGES_REQUESTED':
+                return ['rgba(255, 152, 0, 0.4)', <Publish />, changesText];
             default:
                 return ['rgb(0, 0, 0, 0)', <NotInterested />, defaultText];
         }
@@ -338,108 +311,14 @@ export default function TechnicianView() {
     //     </Card>
     // );
 
-    const formatParameterValue = (parameterDef: any, value: unknown): string => {
-        const base = (() => {
-            if (Array.isArray(value)) return value.map((v) => String(v ?? '')).filter(Boolean).join(', ');
-            if (value === null || value === undefined || value === '') return '';
-            if (typeof value === 'object') {
-                const v = value as any;
-                if (typeof v.filename === 'string' && v.filename.trim() !== '') return v.filename;
-                if (typeof v.name === 'string' && v.name.trim() !== '') return v.name;
-                return '[File attached]';
-            }
-            return String(value);
-        })();
-        if (!parameterDef || parameterDef.type !== 'dropdown') return base;
-        const options = Array.isArray(parameterDef.options) ? parameterDef.options : [];
-        const optionNameById = new Map(
-            options
-                .filter((opt: any) => opt && typeof opt.id === 'string')
-                .map((opt: any) => [String(opt.id), String(opt.name ?? 'Option')] as const)
-        );
-        if (Array.isArray(value)) {
-            return value
-                .map((v) => optionNameById.get(String(v ?? '')) ?? String(v ?? ''))
-                .filter(Boolean)
-                .join(', ');
-        }
-        return optionNameById.get(String(value ?? '')) ?? base;
-    };
+    // Highlight what changed since the last version written by the other side.
+    const versions = (jobData as any)?.versions ?? [];
+    const { current: currentVersion, baseline: baselineVersion } = currentDiffPair(versions);
+    const graphDiff = currentVersion && baselineVersion && currentVersion !== baselineVersion
+        ? diffJobGraphs(baselineVersion.workflows, currentVersion.workflows)
+        : undefined;
 
-    const normalizeFormEntries = (rawFormData: any): Array<{ id: string; name?: string; value: unknown; resultParamValue?: unknown }> => {
-        if (Array.isArray(rawFormData)) {
-            return rawFormData
-                .filter((entry: any) => entry && typeof entry.id === 'string')
-                .map((entry: any) => ({
-                    id: entry.id,
-                    name: entry.name,
-                    value: entry.value,
-                    resultParamValue: entry.resultParamValue
-                }));
-        }
-        if (rawFormData && typeof rawFormData === 'object') {
-            return Object.entries(rawFormData).map(([id, value]) => ({
-                id,
-                value
-            }));
-        }
-        return [];
-    };
-
-    const getNodeStatusIcon = (state?: string) => {
-        switch (state) {
-            case 'QUEUED':
-                return <PendingIcon fontSize='small' color='disabled' />;
-            case 'IN_PROGRESS':
-                return <LoopIcon fontSize='small' color='warning' />;
-            case 'COMPLETE':
-                return <DoneIcon fontSize='small' color='success' />;
-            default:
-                return <HelpOutlineIcon fontSize='small' color='disabled' />;
-        }
-    };
-
-    const workflowCard = (
-        workflows.map((workflow: any, index: number) => {
-            return (
-                <Card key={workflow.id || `workflow-${index}`} sx={{m:1, boxShadow: 2}}>
-                    <CardContent>
-                        <Box sx={{display: 'flex', justifyContent: 'space-between'}}>
-                            <Typography sx={{ fontSize: 15 }} color="text.secondary" align="left">{workflow?.name ?? workflowName}</Typography>
-                            <Box />
-                        </Box>
-                        <Typography sx={{ fontSize: 13 }} color="text.secondary" align="left">{(workflow.state ?? '').replace('_', ' ')}</Typography>
-                        <Box sx={{ p: 1, m: 1 }}>
-                            {(workflow?.nodes ?? []).map((node: any, nodeIndex: number) => {
-                                const paramDefs = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
-                                return (
-                                    <Box key={`${node.id || nodeIndex}`} sx={{ mb: 1.5 }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            {getNodeStatusIcon(node.state)}
-                                            <Typography variant='subtitle2'>{node.label}</Typography>
-                                        </Box>
-                                        <Box sx={{ pl: 3, pt: 0.5 }}>
-                                            {normalizeFormEntries(node?.formData).map((entry: any) => {
-                                                const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
-                                                const label = resolveParameterName(entry, paramDef) || 'Parameter';
-                                                const rawValue = entry.value ?? entry.resultParamValue;
-                                                return (
-                                                    <Typography key={entry.id} variant='body2' color='text.secondary'>
-                                                        {label}: {formatParameterValue(paramDef, rawValue)}
-                                                    </Typography>
-                                                );
-                                            })}
-                                        </Box>
-                                        {nodeIndex < (workflow?.nodes?.length ?? 0) - 1 ? <Divider sx={{ mt: 1 }} /> : null}
-                                    </Box>
-                                );
-                            })}
-                        </Box>
-                    </CardContent>
-                </Card>
-            )
-        })
-    );
+    const workflowCard = <JobWorkflowCards workflows={workflows} fallbackName={workflowName} diff={graphDiff} currentVersion={currentVersion} baselineVersion={baselineVersion} />;
 
     return (
         <div>
@@ -528,6 +407,15 @@ export default function TechnicianView() {
                         ) : (
                             'Download Latest Invoice'
                         )}
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
+                        onClick={() => navigate(`/job_editor/${id}`)}
+                        disabled={jobState === 'CLOSED'}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        Edit Job
                     </Button>
                     <Button 
                         variant="contained"
@@ -697,12 +585,22 @@ export default function TechnicianView() {
                 <CommentsSection 
                     jobId={id || ''}
                     currentUser={{
-                        email: 'technician@bu.edu', // TODO: Get from auth context
+                        email: userContext.userProps?.idTokenParsed?.email ?? 'technician@bu.edu',
                         isStaff: true
                     }}
                 />
 
-                <JobFeedbackModal open={modalOpen} onClose={handleCloseModal} id={id}/>
+                <JobFeedbackModal
+                    open={modalOpen}
+                    onClose={handleCloseModal}
+                    id={id}
+                    jobName={jobName}
+                    jobUsername={jobUsername}
+                    jobEmail={jobEmail}
+                    jobInstitution={jobInstitution}
+                    jobTime={jobTime}
+                    jobState={jobState}
+                />
                 <SowEditorModal
                     open={sowModalOpen}
                     onClose={handleCloseSOWModal}

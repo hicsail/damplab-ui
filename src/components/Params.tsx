@@ -28,6 +28,12 @@ import { CanvasContext } from "../contexts/Canvas";
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
   onFormDataChange?: () => void;
+  /**
+   * Parameter ids that differ from the job editor's diff baseline. Only the job
+   * editor supplies this; on the ordinary canvas it is undefined and nothing is
+   * decorated.
+   */
+  changedParamIds?: Set<string>;
 }
 
 type PendingParamFile = {
@@ -45,8 +51,22 @@ const isPendingParamFile = (value: unknown): value is PendingParamFile =>
   (value as PendingParamFile).__kind === "pending-file" &&
   typeof (value as PendingParamFile).filename === "string";
 
-export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
+export default function ({ activeNode, onFormDataChange, changedParamIds }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
+
+  /** Marks one parameter as edited relative to the diff baseline. */
+  const wrapChanged = (param: any, element: React.ReactNode): React.ReactNode => {
+    if (!element || !changedParamIds?.has(param?.id)) return element;
+    return (
+      <Box
+        key={param.id}
+        sx={{ mt: 1, pl: 1, py: 0.5, borderLeft: '3px solid #ed6c02', backgroundColor: 'rgba(237, 108, 2, 0.08)', borderRadius: 0.5 }}
+      >
+        <Typography variant="caption" sx={{ display: 'block', color: '#ed6c02', fontWeight: 700 }}>Edited</Typography>
+        {element}
+      </Box>
+    );
+  };
   const { setNodes } = useContext(CanvasContext);
 
   // Backend may return formData with value as array for multi-value params without allowMultipleValues set
@@ -221,7 +241,7 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
           </AccordionSummary>
           <AccordionDetails>
         <div className="input-params" style={{ marginLeft: 8 }}>
-          {activeNode.data.formData.map((param: any) => {
+          {activeNode.data.formData.map((param: any) => wrapChanged(param, (() => {
             if (param.paramType !== "result") {
               if (param.type === "table") {
                 return (
@@ -525,7 +545,7 @@ export default function ({ activeNode, onFormDataChange }: ParamFormProps) {
             } else {
               return null;
             }
-          })}
+          })()))}
         </div>
           </AccordionDetails>
         </Accordion>

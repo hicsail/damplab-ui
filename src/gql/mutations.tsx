@@ -187,6 +187,15 @@ export const MUTATE_JOB_STATE = gql`
     }
 `;
 
+export const SAVE_JOB_WORKFLOWS = gql`
+    mutation SaveJobWorkflows($input: SaveJobWorkflowsInput!) {
+        saveJobWorkflows(input: $input) {
+            id
+            state
+        }
+    }
+`;
+
 export const CHANGE_JOB_CUSTOMER_CATEGORY = gql`
     mutation ChangeJobCustomerCategory($jobId: ID!, $customerCategory: CustomerCategory!) {
         changeJobCustomerCategory(jobId: $jobId, customerCategory: $customerCategory) {

@@ -26,6 +26,7 @@ import { format } from 'date-fns';
 import { GET_COMMENTS_BY_JOB_ID, GET_COMMENTS_BY_NODE_ID } from '../gql/queries';
 import { CREATE_COMMENT, DELETE_COMMENT, CREATE_JOB_ATTACHMENT_UPLOAD_URLS } from '../gql/mutations';
 import { UserContext } from '../contexts/UserContext';
+import CommentBody from './CommentBody';
 
 interface CommentAttachment {
   filename?: string;
@@ -62,10 +63,12 @@ interface CommentsSectionProps {
   nodeId?: string;
   /** 'comments' (default) = full job comment thread; 'notes' = per-operation bench notes (staff-only, no internal toggle). */
   variant?: 'comments' | 'notes';
+  /** Rendered in the section header, right-aligned. Used by the client view for "Resubmit job". */
+  headerAction?: React.ReactNode;
 }
 
 
-export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, currentUser, nodeId, variant = 'comments' }) => {
+export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, currentUser, nodeId, variant = 'comments', headerAction }) => {
   const isNotes = variant === 'notes' || !!nodeId;
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
@@ -253,9 +256,12 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
   return (
     <Card sx={{ mt: 3 }}>
       <CardContent>
-        <Typography variant="h6" gutterBottom>
-          {isNotes ? 'Notes & files' : 'Comments'}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+          <Typography variant="h6" gutterBottom>
+            {isNotes ? 'Notes & files' : 'Comments'}
+          </Typography>
+          {headerAction}
+        </Box>
         <Divider sx={{ mb: 2 }} />
 
         {/* Comments List */}
@@ -314,9 +320,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
                     )}
                   </Box>
                 </Box>
-                <Typography variant="body2" sx={{ mb: 1, whiteSpace: 'pre-wrap' }}>
-                  {comment.content}
-                </Typography>
+                <CommentBody content={comment.content} />
                 {Array.isArray(comment.attachments) && comment.attachments.length > 0 && (
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
                     {comment.attachments.map((att: CommentAttachment, idx: number) => {

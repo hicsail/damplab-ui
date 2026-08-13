@@ -134,13 +134,47 @@ export const GET_JOB_BY_ID = gql`
                     formData
                     state
                     additionalInstructions
+                    usedInventory
+                    reactNode
                 }
                 edges {
+                    id
+                    reactEdge
                     source {
                         id
                     }
                     target {
                         id
+                    }
+                }
+            }
+            versions {
+                id
+                versionNumber
+                authorRole
+                createdAt
+                createdByName
+                note
+                workflows {
+                    workflowId
+                    name
+                    nodes {
+                        id
+                        label
+                        serviceId
+                        serviceName
+                        formData
+                        additionalInstructions
+                        price
+                        position {
+                            x
+                            y
+                        }
+                    }
+                    edges {
+                        id
+                        source
+                        target
                     }
                 }
             }
@@ -209,13 +243,47 @@ export const GET_OWN_JOB_BY_ID = gql`
                     formData
                     state
                     additionalInstructions
+                    usedInventory
+                    reactNode
                 }
                 edges {
+                    id
+                    reactEdge
                     source {
                         id
                     }
                     target {
                         id
+                    }
+                }
+            }
+            versions {
+                id
+                versionNumber
+                authorRole
+                createdAt
+                createdByName
+                note
+                workflows {
+                    workflowId
+                    name
+                    nodes {
+                        id
+                        label
+                        serviceId
+                        serviceName
+                        formData
+                        additionalInstructions
+                        price
+                        position {
+                            x
+                            y
+                        }
+                    }
+                    edges {
+                        id
+                        source
+                        target
                     }
                 }
             }

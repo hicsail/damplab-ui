@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useMutation } from '@apollo/client';
-import { Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography, Checkbox } from "@mui/material";
+import { Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import { styled } from "@mui/system";
 
 import { MUTATE_JOB_STATE, CREATE_COMMENT } from '../gql/mutations';
@@ -33,7 +33,6 @@ export default function JobFeedbackModal(props: any) {
   
   const [feedbackType,      setFeedbackType]      = useState("");
   const [feedbackMessage,   setFeedbackMessage]   = useState("");
-  const [sendAsComment,     setSendAsComment]     = useState(true);
   const [mutationCompleted, setMutationCompleted] = useState(false);
 
   const [mutateJobState] = useMutation(MUTATE_JOB_STATE);
@@ -82,13 +81,21 @@ export default function JobFeedbackModal(props: any) {
         }
       });
   
-      if (sendAsComment && feedbackMessage.trim()) {
+      // Always posted — the customer cannot act on feedback they never see.
+      if (feedbackMessage.trim()) {
         const email = userContext.userProps?.idTokenParsed?.email ?? 'technician@bu.edu';
+        // Requesting changes hands the customer the editor; the link is what
+        // turns the request into something they can actually do.
+        const editorLink = `[Open the workflow editor](/job_editor/${id})`;
+        const content = updatedState === 'CHANGES_REQUESTED'
+          ? `${feedbackMessage.trim()}\n\n${editorLink}`
+          : feedbackMessage.trim();
+
         await createComment({
           variables: {
             input: {
               jobId: id,
-              content: feedbackMessage.trim(),
+              content,
               author: email,
               authorType: 'STAFF',
               isInternal: false,
@@ -139,7 +146,7 @@ export default function JobFeedbackModal(props: any) {
 
             <FormControlLabel control={<Radio />} value="looks-good"    label="Accept job (ready to proceed)" />
 
-            <FormControlLabel control={<Radio />} value="minor-changes" label="Request minor changes" />
+            <FormControlLabel control={<Radio />} value="minor-changes" label="Request clarification" />
               {feedbackType === "minor-changes" && (
                 <FeedbackField
                   fullWidth
@@ -147,12 +154,12 @@ export default function JobFeedbackModal(props: any) {
                   minRows={3}
                   onChange={handleFeedbackMessageChange}
                   value={feedbackMessage}
-                  label="Describe the minor changes needed"
+                  label="What needs clarifying?"
                   required
                 />
               )}
 
-            <FormControlLabel control={<Radio />} value="major-changes" label="Request major changes / redesign"/>
+            <FormControlLabel control={<Radio />} value="major-changes" label="Request design edits"/>
               {feedbackType === "major-changes" && (
                 <FeedbackField
                   fullWidth
@@ -168,15 +175,11 @@ export default function JobFeedbackModal(props: any) {
           </RadioGroup>
 
           <Box sx={{ mt: 1, mb: 2 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={sendAsComment}
-                  onChange={(e) => setSendAsComment(e.target.checked)}
-                />
-              }
-              label="Post this feedback as a visible comment to the client"
-            />
+            <Typography variant="body2" color="text.secondary">
+              {feedbackType && feedbackType !== 'looks-good'
+                ? 'This will be posted to the client as a comment, with a link to the workflow editor.'
+                : 'Your decision will be posted to the client as a comment.'}
+            </Typography>
           </Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>

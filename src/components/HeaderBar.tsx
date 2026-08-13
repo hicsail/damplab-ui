@@ -13,6 +13,12 @@ import "../styles/resubmit.css";
 export default function HeaderBar() {
     const navigate = useNavigate();
     const isResubmitting = useMatch("resubmission/:id");
+    // The job editor holds its own canvas state in a nested CanvasContext, which
+    // this bar (rendered from root) cannot see. Its save/load/checkout controls
+    // would therefore act on the user's *personal* canvas while they believe they
+    // are editing a job, so they are hidden there; the editor carries its own
+    // "Save changes" instead.
+    const isJobEditing = useMatch("job_editor/:id");
 
     // If snackbarMessage starts with "Success", then the snackbar will be green, otherwise it will be red to show an error.
     const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -140,8 +146,9 @@ export default function HeaderBar() {
                     </Button>
 
                     <div style={{ marginLeft: 'auto', marginRight: 10 }}>
-                        
-                        <LoadCanvasButton 
+
+                        { isJobEditing ? null : <>
+                        <LoadCanvasButton
                             loadCanvas={loadCanvasData}
                             areChangesUnsaved={areChangesUnsaved}
                         />
@@ -165,6 +172,7 @@ export default function HeaderBar() {
                               <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
                             )}
                           </IconButton>}
+                        </>}
 
                     </div>
                 </Toolbar>
