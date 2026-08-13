@@ -14,7 +14,7 @@ import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '..
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
-import { calculateServiceCost, resolveParameterName }   from '../utils/servicePricing';
+import { resolveParameterName }   from '../utils/servicePricing';
 
 export default function Tracking() {
 
@@ -178,8 +178,6 @@ export default function Tracking() {
         }
     };
 
-    const formatPrice = (value: number) => (Number.isFinite(value) ? `$${value.toFixed(2)}` : '[Price Pending Review]');
-
     const workflowCard = (
         workflows.map((workflow: any, index: number) => {
             return (
@@ -193,22 +191,11 @@ export default function Tracking() {
                         <Box sx={{ p: 1, m: 1 }}>
                             {(workflow?.nodes ?? []).map((node: any, nodeIndex: number) => {
                                 const paramDefs = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
-                                const servicePrice = calculateServiceCost(
-                                    node.service ?? {},
-                                    node.formData ?? [],
-                                    node?.service?.price ?? null,
-                                    data?.ownJobById?.customerCategory
-                                );
                                 return (
                                     <Box key={`${node.id || nodeIndex}`} sx={{ mb: 1.5 }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                {getNodeStatusIcon(node.state)}
-                                                <Typography variant='subtitle2'>{node.label}</Typography>
-                                            </Box>
-                                            <Typography variant='body2' color='text.secondary'>
-                                                {formatPrice(servicePrice)}
-                                            </Typography>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            {getNodeStatusIcon(node.state)}
+                                            <Typography variant='subtitle2'>{node.label}</Typography>
                                         </Box>
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
                                             {normalizeFormEntries(node?.formData).map((entry: any) => {

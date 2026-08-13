@@ -41,6 +41,8 @@ export interface SowVersionService {
   name: string;
   description?: string | null;
   cost: number;
+  /** Run-count multiplier baked into cost, if the underlying node has one. Informational only. */
+  runCount?: number | null;
 }
 
 export type SowAdjustmentType = 'DISCOUNT' | 'ADDITIONAL_COST';
@@ -104,6 +106,11 @@ export interface SowEditorState {
   currentVersionNumber: number;
   activeVersionNumber: number;
   documentStale: boolean;
+  /** What each current service line should cost right now — read fresh on every
+   *  query, independent of whatever a local draft's inputs.services holds. */
+  liveServices?: SowVersionService[];
+  /** The job's current pricing category — may differ from a stale local draft's. */
+  liveCustomerCategory?: string | null;
   currentVersion?: SowVersion | null;
   activeVersion?: { versionNumber: number; displayVersion?: string | null; status: SowStatus } | null;
   versions?: SowVersion[];
@@ -190,6 +197,31 @@ export const GROUP_LABELS: Record<SowFieldKind, string> = {
 };
 
 export const GROUP_ORDER: SowFieldKind[] = ['CALCULATED', 'PROSE', 'CUSTOM'];
+
+/**
+ * True when the local draft's service costs no longer match what the job
+ * currently prices them at. Deliberately ignores adjustments — those are
+ * always staff-authored, never auto-calculated, so editing one must never
+ * trip this. Backs the Fee Schedule "Stale" chip.
+ */
+export function feeScheduleIsStale(inputs: Pick<SowVersionInputs, 'services'>, sow?: { liveServices?: SowVersionService[] | null } | null): boolean {
+  const live = sow?.liveServices;
+  if (!live) return false;
+  const key = (list: SowVersionService[]) => list.map((s) => `${s.serviceId}:${Number(s.cost).toFixed(2)}`).join('|');
+  return key(inputs.services ?? []) !== key(live);
+}
+
+/**
+ * The inputs patch "Recalculate" (and a category change, which is a
+ * recalculate) applies: fresh service costs, baseCost/totalCost rederived
+ * from them the same way the server does (sow-version.service.ts), and
+ * adjustments left untouched — they were never auto-calculated to begin with.
+ */
+export function feeScheduleLivePatch(inputs: SowVersionInputs, liveServices: SowVersionService[], liveCustomerCategory?: string | null): Partial<SowVersionInputs> {
+  const baseCost = liveServices.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
+  const totalCost = (inputs.adjustments ?? []).reduce((sum, a) => sum + (a.type === 'DISCOUNT' ? -Math.abs(a.amount) : Math.abs(a.amount)), baseCost);
+  return { services: liveServices, baseCost, totalCost, customerCategory: liveCustomerCategory ?? inputs.customerCategory };
+}
 
 export function formatCurrency(amount: number): string {
   const n = Number.isFinite(amount) ? amount : 0;

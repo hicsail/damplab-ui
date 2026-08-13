@@ -23,7 +23,17 @@ interface Props {
   staff: StaffOption[];
   disabled?: boolean;
   onChange: (patch: Partial<SowVersionInputs>) => void;
+  /** feeSchedule only: the job's actual pricing category, and how to change it. */
+  liveCustomerCategory?: string | null;
+  onChangeCustomerCategory?: (category: string) => void;
 }
+
+const CUSTOMER_CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'INTERNAL_CUSTOMERS', label: 'Internal customers' },
+  { value: 'EXTERNAL_CUSTOMER_ACADEMIC', label: 'External (Academic)' },
+  { value: 'EXTERNAL_CUSTOMER_MARKET', label: 'External (Market)' },
+  { value: 'EXTERNAL_CUSTOMER_NO_SALARY', label: 'External (No salary)' }
+];
 
 const labelSx = { display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 500 } as const;
 
@@ -57,7 +67,7 @@ function StringListEditor({ items, onChange, disabled, addLabel }: { items: stri
   );
 }
 
-export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabled, onChange }: Props): React.JSX.Element | null {
+export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabled, onChange, liveCustomerCategory, onChangeCustomerCategory }: Props): React.JSX.Element | null {
   switch (fieldKey) {
     case 'sowTitle':
       return (
@@ -192,6 +202,24 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
       return (
         <Box>
           <Typography variant="caption" sx={labelSx}>
+            Pricing category — not shown to the customer, but drives what every line below costs.
+          </Typography>
+          <Select
+            size="small"
+            sx={{ mb: 2, minWidth: 260 }}
+            value={liveCustomerCategory ?? ''}
+            disabled={disabled || !onChangeCustomerCategory}
+            displayEmpty
+            onChange={(e) => onChangeCustomerCategory?.(String(e.target.value))}
+          >
+            {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+
+          <Typography variant="caption" sx={labelSx}>
             Service costs — these are what invoices bill from, so this section has no free-text edit.
           </Typography>
           {(inputs.services ?? []).map((s, i) => (
@@ -199,6 +227,11 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
               <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap title={s.name}>
                 {s.name}
               </Typography>
+              {typeof s.runCount === 'number' && s.runCount !== 1 && (
+                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                  × {s.runCount} runs
+                </Typography>
+              )}
               <TextField
                 size="small"
                 type="number"

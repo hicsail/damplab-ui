@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Box, Checkbox, Chip, Collapse, FormControlLabel, IconButton, TextField, Tooltip, Typography } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SowFieldSourceControls from './SowFieldSourceControls';
@@ -34,6 +35,11 @@ interface Props {
   onRenameCustom?: (key: string, label: string) => void;
   /** How this section differs from the version being compared against, if any. */
   diff?: FieldDiff;
+  /** feeSchedule only: local service costs no longer match the job's live figures. */
+  stale?: boolean;
+  onRecalculate?: () => void;
+  liveCustomerCategory?: string | null;
+  onChangeCustomerCategory?: (category: string) => void;
 }
 
 const DIFF_CHIP: Record<string, string> = {
@@ -49,7 +55,7 @@ function firstLine(text: string): string {
   return line.replace(/^-\s*/, '');
 }
 
-function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, diff }: Props): React.JSX.Element {
+function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, diff, stale, onRecalculate, liveCustomerCategory, onChangeCustomerCategory }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const key = field.key;
 
@@ -97,6 +103,7 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
               {field.label}
             </Typography>
             {needsAttention && <Chip size="small" label="Required" color="error" />}
+            {stale && <Chip size="small" label="Stale" color="warning" />}
             {diffKind && <Chip size="small" label={DIFF_CHIP[diffKind]} color="info" variant="outlined" />}
             {field.isOverridden && <Chip size="small" label="Edited" color="warning" variant="outlined" />}
             {!field.isEnabled && <Chip size="small" label="Hidden from customer" variant="outlined" />}
@@ -137,6 +144,22 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
           </Tooltip>
         )}
 
+        {onRecalculate && (
+          <Tooltip title="Pull the job's current service costs and pricing category back in — any adjustments you've added stay as they are.">
+            <span>
+              <IconButton
+                size="small"
+                color={stale ? 'warning' : 'default'}
+                disabled={readOnly}
+                aria-label={`Recalculate ${field.label} from the job's current figures`}
+                onClick={onRecalculate}
+              >
+                <RefreshIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
+
         {canEditText && field.isOverridden && (
           <Tooltip title="Revert to the generated text">
             <span>
@@ -167,7 +190,15 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
 
           {hasSourceControls && (
             <Box sx={{ mb: 2 }}>
-              <SowFieldSourceControls fieldKey={field.key} inputs={inputs} staff={staff} disabled={readOnly} onChange={onChangeInputs} />
+              <SowFieldSourceControls
+                fieldKey={field.key}
+                inputs={inputs}
+                staff={staff}
+                disabled={readOnly}
+                onChange={onChangeInputs}
+                liveCustomerCategory={liveCustomerCategory}
+                onChangeCustomerCategory={onChangeCustomerCategory}
+              />
             </Box>
           )}
 
