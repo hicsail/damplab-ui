@@ -6,7 +6,8 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { GET_SOW_EDITOR_STATE } from '../../gql/queries';
 import SowPdfDocument from './SowPdfDocument';
-import { SowEditorState, statusColor } from './sowTypes';
+import SowSignaturesSummary from './SowSignaturesSummary';
+import { SowEditorState, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 
 /**
  * Staff-side summary of a job's SOW: where it stands, who has signed, and whether
@@ -44,11 +45,11 @@ export default function SowStatusCard({ jobId, onOpenEditor }: Props): React.JSX
               {sow.sowNumber}
             </Typography>
             {active ? (
-              <Chip size="small" label={`v${active.versionNumber} · ${active.status}`} color={statusColor(active.status)} />
+              <Chip size="small" label={`${versionDisplayLabel(active)} · ${sowStatusLabel(active.status)}`} color={statusColor(active.status)} />
             ) : (
               <Chip size="small" label="Not sent yet" />
             )}
-            {hasUnsentDraft && <Chip size="small" variant="outlined" label={`Draft v${sow.currentVersionNumber} in progress`} />}
+            {hasUnsentDraft && <Chip size="small" variant="outlined" label={`Draft ${versionDisplayLabel(current)} in progress`} />}
           </Box>
 
           {sow.documentStale && (
@@ -58,16 +59,9 @@ export default function SowStatusCard({ jobId, onOpenEditor }: Props): React.JSX
           )}
 
           {active?.clientSignature && (
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              Signed by {active.clientSignature.name}
-              {active.staffSignature ? ` · countersigned by ${active.staffSignature.name}` : ''}
-            </Typography>
-          )}
-
-          {(sow.questions ?? []).some((q) => !q.isStaff) && (
-            <Alert severity="info" sx={{ mb: 1.5 }}>
-              The customer has asked a question about this document.
-            </Alert>
+            <Box sx={{ mb: 1.5 }}>
+              <SowSignaturesSummary clientSignature={active.clientSignature} staffSignature={active.staffSignature} />
+            </Box>
           )}
 
           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
@@ -77,7 +71,7 @@ export default function SowStatusCard({ jobId, onOpenEditor }: Props): React.JSX
             {forPdf && (
               <PDFDownloadLink
                 document={<SowPdfDocument version={forPdf} sowNumber={sow.sowNumber} />}
-                fileName={`${sow.sowNumber.replace(/\s+/g, '-')}-v${forPdf.versionNumber}.pdf`}
+                fileName={`${sow.sowNumber.replace(/\s+/g, '-')}-v${versionDisplayLabel(forPdf)}.pdf`}
                 style={{ textDecoration: 'none' }}
               >
                 {({ loading }) => (

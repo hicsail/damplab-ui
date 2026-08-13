@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, CircularProgress, Divider, FormControlLabel, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, CircularProgress, FormControlLabel, TextField, Typography } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { GET_SOW_EDITOR_STATE } from '../../gql/queries';
-import { ASK_SOW_QUESTION, SIGN_SOW } from '../../gql/mutations';
+import { SIGN_SOW } from '../../gql/mutations';
 import SowDiffText from './SowDiffText';
 import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
+import SowSignaturesSummary from './SowSignaturesSummary';
 import { diffVersions, previousCustomerVersion } from '../../utils/sowDiff';
-import { SowEditorState, SowField, SowFieldKind, statusColor } from './sowTypes';
+import { GROUP_ORDER, SowEditorState, SowField, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 
 /**
  * The customer's view of a Statement of Work.
@@ -24,19 +25,9 @@ interface Props {
   jobId: string;
 }
 
-/** Consent is per group, so the record says which kinds of content they agreed to. */
-const GROUP_COPY: Record<SowFieldKind, { label: string; help: string }> = {
-  CALCULATED: { label: 'the dates, people and costs', help: 'Period of performance, team, scope, deliverables and the fee schedule.' },
-  PROSE: { label: 'the standard terms', help: 'Responsibilities, invoicing, completion criteria and change control.' },
-  CUSTOM: { label: 'the additional sections', help: 'Sections the lab added specifically for this project.' }
-};
-
-const GROUP_ORDER: SowFieldKind[] = ['CALCULATED', 'PROSE', 'CUSTOM'];
-
 export default function SowCustomerView({ jobId }: Props): React.JSX.Element | null {
   const { data, loading, refetch } = useQuery(GET_SOW_EDITOR_STATE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
   const [signSow] = useMutation(SIGN_SOW);
-  const [askQuestion] = useMutation(ASK_SOW_QUESTION);
 
   const sow: SowEditorState | null = data?.sowByJobId ?? null;
   // The server returns only issued versions to a customer, so this history is
@@ -44,9 +35,9 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   const history = useMemo(() => sow?.versions ?? [], [sow?.versions]);
 
   const [viewing, setViewing] = useState<number | null>(null);
-  const [consent, setConsent] = useState<Set<SowFieldKind>>(new Set());
+  const [agreed, setAgreed] = useState(false);
+  const [initials, setInitials] = useState<Record<string, string>>({});
   const [name, setName] = useState('');
-  const [question, setQuestion] = useState('');
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<{ severity: 'success' | 'error' | 'info'; text: string } | null>(null);
 
@@ -69,46 +60,46 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
 
   const visible: SowField[] = useMemo(() => (version?.fields ?? []).filter((f) => f.isEnabled).sort((a, b) => a.order - b.order), [version]);
 
-  // Only ask about groups the document actually contains.
+  // Only present in the single consent statement if the document actually
+  // contains that kind of section — sent to the server as consentedGroups.
   const groups = useMemo(() => GROUP_ORDER.filter((g) => visible.some((f) => f.kind === g)), [visible]);
+  const sectionsNeedingInitials = useMemo(() => visible.filter((f) => f.requiresInitials), [visible]);
 
   const isCurrent = !!version && version.versionNumber === activeNumber;
   const awaitingSignature = isCurrent && version?.status === 'SENT';
   const signedName = version?.clientSignature?.name;
 
-  useEffect(() => setConsent(new Set()), [version?.id]);
+  useEffect(() => {
+    setAgreed(false);
+    setInitials({});
+  }, [version?.id]);
 
   if (!loading && !sow) return null;
 
-  const allConsented = groups.every((g) => consent.has(g));
-  const canSign = awaitingSignature && allConsented && name.trim().length > 0 && !busy;
+  const allInitialed = sectionsNeedingInitials.every((f) => (initials[f.key] ?? '').trim().length > 0);
+  const canSign = awaitingSignature && agreed && allInitialed && name.trim().length > 0 && !busy;
 
   const handleSign = async (): Promise<void> => {
     if (!sow || !version) return;
     setBusy(true);
     setBanner(null);
     try {
-      await signSow({ variables: { sowId: sow.id, input: { versionNumber: version.versionNumber, name: name.trim(), consentedGroups: [...consent] } } });
+      await signSow({
+        variables: {
+          sowId: sow.id,
+          input: {
+            versionNumber: version.versionNumber,
+            name: name.trim(),
+            consentedGroups: groups,
+            sectionInitials: sectionsNeedingInitials.map((f) => ({ key: f.key, initials: (initials[f.key] ?? '').trim() }))
+          }
+        }
+      });
       await refetch();
       setName('');
       setBanner({ severity: 'success', text: 'Thank you — your signature has been recorded.' });
     } catch (e: any) {
       setBanner({ severity: 'error', text: e?.message ?? 'The signature could not be recorded.' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleAsk = async (): Promise<void> => {
-    if (!sow || !question.trim()) return;
-    setBusy(true);
-    try {
-      await askQuestion({ variables: { sowId: sow.id, text: question.trim() } });
-      await refetch();
-      setQuestion('');
-      setBanner({ severity: 'success', text: 'Your question has been sent to the lab.' });
-    } catch (e: any) {
-      setBanner({ severity: 'error', text: e?.message ?? 'The question could not be sent.' });
     } finally {
       setBusy(false);
     }
@@ -123,11 +114,11 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
               Statement of Work
             </Typography>
             {sow?.sowNumber && <Typography variant="body2" color="text.secondary">{sow.sowNumber}</Typography>}
-            {version && <Chip size="small" label={`v${version.versionNumber} · ${version.status}`} color={statusColor(version.status)} />}
+            {version && <Chip size="small" label={`${versionDisplayLabel(version)} · ${sowStatusLabel(version.status)}`} color={statusColor(version.status)} />}
             {version && (
               <PDFDownloadLink
                 document={<SowPdfDocument version={version} sowNumber={sow?.sowNumber} />}
-                fileName={`${(sow?.sowNumber ?? 'SOW').replace(/\s+/g, '-')}-v${version.versionNumber}.pdf`}
+                fileName={`${(sow?.sowNumber ?? 'SOW').replace(/\s+/g, '-')}-v${versionDisplayLabel(version)}.pdf`}
                 style={{ textDecoration: 'none' }}
               >
                 {({ loading: pdfLoading }) => (
@@ -163,7 +154,7 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
 
               {!isCurrent && (
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  This is an earlier version, kept for your records. Version {activeNumber} is the current one.
+                  This is an earlier version, kept for your records. Version {versionDisplayLabel(history.find((v) => v.versionNumber === activeNumber))} is the current one.
                 </Alert>
               )}
 
@@ -186,6 +177,7 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                 {visible.map((f) => {
                   const d = diffByKey.get(f.key);
                   const changed = d && d.kind !== 'unchanged';
+                  const askInitials = awaitingSignature && !signedName && f.requiresInitials;
                   return (
                     <Box key={f.key} sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', borderLeft: '3px solid', borderLeftColor: changed ? 'info.main' : 'transparent', '&:last-of-type': { borderBottom: 'none' } }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -201,6 +193,21 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                           {f.value}
                         </Box>
                       )}
+                      {askInitials && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
+                          <TextField
+                            size="small"
+                            label="Initials"
+                            value={initials[f.key] ?? ''}
+                            onChange={(e) => setInitials((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                            sx={{ width: 120 }}
+                            disabled={busy}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            Please initial to confirm you have read this section.
+                          </Typography>
+                        </Box>
+                      )}
                     </Box>
                   );
                 })}
@@ -210,35 +217,16 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
               {awaitingSignature && !signedName && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                    Sign this Statement of Work
+                    Signing
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    Confirm each part of the document, then type your full name.
+                    Confirm the document{sectionsNeedingInitials.length > 0 ? ' — including the sections above asking for your initials —' : ''} then type your full name.
                   </Typography>
 
-                  {groups.map((g) => (
-                    <Box key={g} sx={{ mb: 1 }}>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={consent.has(g)}
-                            onChange={(e) =>
-                              setConsent((prev) => {
-                                const next = new Set(prev);
-                                if (e.target.checked) next.add(g);
-                                else next.delete(g);
-                                return next;
-                              })
-                            }
-                          />
-                        }
-                        label={<span>I have read and agree to {GROUP_COPY[g].label}</span>}
-                      />
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4, mt: -0.5 }}>
-                        {GROUP_COPY[g].help}
-                      </Typography>
-                    </Box>
-                  ))}
+                  <FormControlLabel
+                    control={<Checkbox checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />}
+                    label="I agree to all terms above, including scope of work, costs, and any client responsibilities."
+                  />
 
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 2, flexWrap: 'wrap' }}>
                     <TextField size="small" label="Your full name" value={name} onChange={(e) => setName(e.target.value)} sx={{ minWidth: 260 }} disabled={busy} />
@@ -246,41 +234,20 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                       Sign
                     </Button>
                   </Box>
-                  {!allConsented && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Confirm every section above to enable signing.</Typography>}
+                  {!agreed && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Confirm the checkbox above to enable signing.</Typography>}
+                  {agreed && !allInitialed && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Initial every flagged section above to enable signing.</Typography>}
                 </Box>
               )}
 
-              <Divider sx={{ my: 3 }} />
-
-              {/* Questions */}
-              <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                Questions
-              </Typography>
-              {(sow?.questions ?? []).length === 0 ? (
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                  Ask the lab anything about this document before you sign.
-                </Typography>
-              ) : (
-                <Box sx={{ mb: 1.5 }}>
-                  {(sow?.questions ?? []).map((q, i) => (
-                    <Box key={i} sx={{ mb: 1.5 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {q.isStaff ? 'DAMP Lab' : q.authorName}
-                        {q.versionNumber ? ` · v${q.versionNumber}` : ''} · {new Date(q.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </Typography>
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {q.text}
-                      </Typography>
-                    </Box>
-                  ))}
+              {/* Signatures */}
+              {version.clientSignature && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                    Signatures
+                  </Typography>
+                  <SowSignaturesSummary clientSignature={version.clientSignature} staffSignature={version.staffSignature} />
                 </Box>
               )}
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                <TextField size="small" multiline minRows={2} placeholder="Type your question" value={question} onChange={(e) => setQuestion(e.target.value)} sx={{ flex: 1, minWidth: 260 }} disabled={busy} />
-                <Button variant="outlined" onClick={handleAsk} disabled={busy || !question.trim()}>
-                  Send question
-                </Button>
-              </Box>
             </>
           )}
         </CardContent>

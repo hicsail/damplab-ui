@@ -1320,14 +1320,15 @@ export const SOW_VERSION_FIELDS = gql`
     fragment SowVersionFields on SowVersion {
         id
         versionNumber
+        displayVersion
         status
         visibleToCustomer
         sentToCustomerAt
         note
         createdByName
         createdAt
-        clientSignature { name signedAt consentedGroups legacySignatureDataUrl }
-        staffSignature { name signedAt legacySignatureDataUrl }
+        clientSignature { name signedAt consentedGroups sectionInitials { key label initials } legacySignatureDataUrl }
+        staffSignature { name signedAt sectionInitials { key label initials } legacySignatureDataUrl }
         fields {
             key
             label
@@ -1338,6 +1339,8 @@ export const SOW_VERSION_FIELDS = gql`
             isOverridden
             isEnabled
             allowsTextOverride
+            allowsEmpty
+            requiresInitials
         }
         inputs {
             projectManager
@@ -1365,9 +1368,8 @@ export const GET_SOW_EDITOR_STATE = gql`
             currentVersionNumber
             activeVersionNumber
             documentStale
-            questions { authorName isStaff text versionNumber createdAt }
             currentVersion { ...SowVersionFields }
-            activeVersion { versionNumber status }
+            activeVersion { versionNumber displayVersion status }
             versions { ...SowVersionFields }
         }
     }

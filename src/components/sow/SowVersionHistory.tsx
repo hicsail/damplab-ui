@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Chip, Divider, ListItemText, MenuItem, Select, Typography } from '@mui/material';
-import { SowVersion, statusColor } from './sowTypes';
+import { SowVersion, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 
 /**
  * Two pickers over the same history: which version is on screen, and which one it
@@ -18,13 +18,10 @@ interface Props {
   onBaselineChange: (versionNumber: number | null) => void;
   /** Customers compare against the last version they were sent; no choice offered. */
   lockBaseline?: boolean;
-  changedLabels?: string[];
 }
 
-function describe(v: SowVersion, changedLabels?: string[]): string {
-  if (v.note?.trim()) return v.note.trim();
-  if (changedLabels?.length) return `Changed: ${changedLabels.slice(0, 3).join(', ')}${changedLabels.length > 3 ? '…' : ''}`;
-  return 'No note';
+function describe(v: SowVersion): string {
+  return v.note?.trim() || 'No note';
 }
 
 function when(iso: string): string {
@@ -32,7 +29,7 @@ function when(iso: string): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export default function SowVersionHistory({ versions, viewing, baseline, onViewingChange, onBaselineChange, lockBaseline, changedLabels }: Props): React.JSX.Element {
+export default function SowVersionHistory({ versions, viewing, baseline, onViewingChange, onBaselineChange, lockBaseline }: Props): React.JSX.Element {
   const ordered = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
   const older = ordered.filter((v) => v.versionNumber < viewing);
   const baselineVersion = baseline != null ? versions.find((v) => v.versionNumber === baseline) : null;
@@ -48,8 +45,8 @@ export default function SowVersionHistory({ versions, viewing, baseline, onViewi
           const v = versions.find((x) => x.versionNumber === Number(val));
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <span>Version {String(val)}</span>
-              {v && <Chip size="small" label={v.status} color={statusColor(v.status)} />}
+              <span>Version {v ? versionDisplayLabel(v) : String(val)}</span>
+              {v && <Chip size="small" label={sowStatusLabel(v.status)} color={statusColor(v.status)} />}
             </Box>
           );
         }}
@@ -59,11 +56,11 @@ export default function SowVersionHistory({ versions, viewing, baseline, onViewi
             <ListItemText
               primary={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <span>Version {v.versionNumber}</span>
-                  <Chip size="small" label={v.status} color={statusColor(v.status)} />
+                  <span>Version {versionDisplayLabel(v)}</span>
+                  <Chip size="small" label={sowStatusLabel(v.status)} color={statusColor(v.status)} />
                 </Box>
               }
-              secondary={`${when(v.createdAt)} · ${v.createdByName} · ${describe(v, v.versionNumber === viewing ? changedLabels : undefined)}`}
+              secondary={`${when(v.createdAt)} · ${v.createdByName} · ${describe(v)}`}
             />
           </MenuItem>
         ))}
@@ -87,7 +84,7 @@ export default function SowVersionHistory({ versions, viewing, baseline, onViewi
             </MenuItem>
             {older.map((v) => (
               <MenuItem key={v.versionNumber} value={v.versionNumber}>
-                v{v.versionNumber} · {v.status.toLowerCase()} · {when(v.createdAt)}
+                {versionDisplayLabel(v)} · {sowStatusLabel(v.status).toLowerCase()} · {when(v.createdAt)}
               </MenuItem>
             ))}
           </Select>

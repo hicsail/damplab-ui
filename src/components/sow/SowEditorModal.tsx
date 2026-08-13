@@ -14,7 +14,7 @@ import SowFieldRow from './SowFieldRow';
 import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
 import { diffVersions, pickDiffBaseline } from '../../utils/sowDiff';
-import { CUSTOM_KEY_PREFIX, SowEditorState, SowField, SowVersionInputs, statusColor, toInputsPayload } from './sowTypes';
+import { CUSTOM_KEY_PREFIX, SowEditorState, SowField, SowVersionInputs, sowStatusLabel, statusColor, toInputsPayload, versionDisplayLabel } from './sowTypes';
 
 /**
  * Staff editor for the SOW document.
@@ -33,6 +33,66 @@ interface Props {
 }
 
 const PREVIEW_DEBOUNCE_MS = 300;
+const DRAFT_SAVE_DEBOUNCE_MS = 300;
+
+interface LocalDraft {
+  fields: SowField[];
+  inputs: SowVersionInputs;
+  note: string;
+}
+
+/** Unsaved edits survive closing the modal (and the tab) by living here, keyed
+ *  to the exact version they were made against — so a draft never resurfaces
+ *  against a version it wasn't written for (e.g. after someone else sent one). */
+export function draftStorageKey(sowId: string, versionNumber: number): string {
+  return `sow-draft:${sowId}:${versionNumber}`;
+}
+
+function readLocalDraft(key: string): LocalDraft | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.fields) || !parsed.inputs) return null;
+    return { fields: parsed.fields, inputs: parsed.inputs, note: typeof parsed.note === 'string' ? parsed.note : '' };
+  } catch {
+    return null; // corrupted or unavailable storage: fall back to the server copy
+  }
+}
+
+/**
+ * What Save actually sends for a field — everything else (`calculatedValue`,
+ * `kind`, `order`, ...) is server-derived and refreshes on every preview, even
+ * with no user edit. Comparing whole SowField objects for "dirty" would count
+ * that refresh as a change and leave Send disabled after an undo.
+ */
+function fieldFingerprint(f: SowField): unknown {
+  return { key: f.key, label: f.label, value: f.value, isEnabled: f.isEnabled, requiresInitials: f.requiresInitials };
+}
+
+export function fieldsFingerprint(fields: SowField[]): string {
+  return JSON.stringify(fields.map(fieldFingerprint));
+}
+
+/**
+ * Carries the draft's user-controlled state (value/isEnabled/overridden/...)
+ * over the version's freshly loaded fields, rather than restoring the draft
+ * wholesale — so a draft saved before the billing core moved doesn't quietly
+ * reinstate stale figures for a field the staff never touched by hand.
+ */
+export function mergeDraftOntoFresh(draftFields: SowField[], freshFields: SowField[]): SowField[] {
+  const draftByKey = new Map(draftFields.map((f) => [f.key, f]));
+  const seen = new Set<string>();
+  const merged = freshFields.map((fresh) => {
+    const draft = draftByKey.get(fresh.key);
+    seen.add(fresh.key);
+    if (!draft) return fresh;
+    return { ...fresh, isEnabled: draft.isEnabled, requiresInitials: draft.requiresInitials, isOverridden: draft.isOverridden, value: draft.isOverridden ? draft.value : fresh.calculatedValue ?? '' };
+  });
+  // Custom sections have no server counterpart to refresh against.
+  const customs = draftFields.filter((f) => !seen.has(f.key));
+  return [...merged, ...customs];
+}
 
 export default function SowEditorModal({ open, onClose, jobId, jobName }: Props): React.JSX.Element {
   const client = useApolloClient();
@@ -62,7 +122,6 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const [baseVersion, setBaseVersion] = useState<number>(0);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [note, setNote] = useState('');
-  const [dirty, setDirty] = useState(false);
   const [banner, setBanner] = useState<{ severity: 'success' | 'error' | 'info' | 'warning'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -71,15 +130,65 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const [finalizeSow] = useMutation(FINALIZE_SOW);
   const [discardDraft] = useMutation(DISCARD_SOW_DRAFT);
 
-  // Load server state into local state whenever a new version arrives.
+  // What the server actually holds for this version — dirty and Reset both
+  // compare against this rather than a boolean flag, so undoing a change (by
+  // hand or via Reset) is exactly "back to this" instead of "something was
+  // touched at some point."
+  const snapshotRef = useRef<{ fields: SowField[]; inputs: SowVersionInputs } | null>(null);
+  const draftKey = sow?.id && version ? draftStorageKey(sow.id, version.versionNumber) : null;
+
+  // Load server state whenever a new version arrives, then overlay any local
+  // draft still stored for that exact version — so closing the modal without
+  // saving and reopening it (even in a new tab) picks the edit back up.
   useEffect(() => {
     if (!version) return;
-    setFields([...version.fields].sort((a, b) => a.order - b.order));
-    setInputs({ ...version.inputs, periods: version.inputs.periods ?? [], services: version.inputs.services ?? [], adjustments: version.inputs.adjustments ?? [] });
+    const loadedFields = [...version.fields].sort((a, b) => a.order - b.order);
+    const loadedInputs = { ...version.inputs, periods: version.inputs.periods ?? [], services: version.inputs.services ?? [], adjustments: version.inputs.adjustments ?? [] };
+    snapshotRef.current = { fields: loadedFields, inputs: loadedInputs };
     setBaseVersion(version.versionNumber);
-    setDirty(false);
-    setNote('');
+
+    const key = sow?.id ? draftStorageKey(sow.id, version.versionNumber) : null;
+    const stored = key ? readLocalDraft(key) : null;
+    if (stored) {
+      setFields(mergeDraftOntoFresh(stored.fields, loadedFields));
+      setInputs(stored.inputs);
+      setNote(stored.note);
+    } else {
+      setFields(loadedFields);
+      setInputs(loadedInputs);
+      setNote('');
+    }
   }, [version?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // True whenever the in-progress document differs from what the server holds
+  // for this version — recomputed from the actual state (via the same
+  // projection Save sends, so a refreshed calculatedValue from the live
+  // preview doesn't count) rather than tracked as a one-way flag, so undoing an
+  // edit — by hand or via Reset — re-enables Send.
+  const dirty = useMemo(() => {
+    const snap = snapshotRef.current;
+    if (!snap || !inputs) return false;
+    return fieldsFingerprint(fields) !== fieldsFingerprint(snap.fields) || JSON.stringify(toInputsPayload(inputs)) !== JSON.stringify(toInputsPayload(snap.inputs));
+  }, [fields, inputs]);
+
+  // Debounced so typing doesn't hit localStorage on every keystroke. Cleared
+  // instead of written once there is nothing unsaved to remember.
+  useEffect(() => {
+    if (!draftKey) return undefined;
+    if (!dirty) {
+      window.localStorage.removeItem(draftKey);
+      return undefined;
+    }
+    const t = setTimeout(() => {
+      try {
+        window.localStorage.setItem(draftKey, JSON.stringify({ fields, inputs, note }));
+      } catch {
+        // Storage full or unavailable (private browsing): edits still work for
+        // this session, they just won't survive closing the modal.
+      }
+    }, DRAFT_SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [draftKey, dirty, fields, inputs, note]);
 
   // Land on the newest version, comparing against whatever is most informative.
   useEffect(() => {
@@ -113,9 +222,11 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const status = version?.status ?? 'DRAFT';
   const activeStatus = sow?.activeVersion?.status ?? null;
   const hasUnsentDraft = !!sow && sow.currentVersionNumber > sow.activeVersionNumber;
-  // A version the customer already holds is a record, not a draft: editing it
-  // means producing a new draft, which Save does on its own.
-  const readOnly = status !== 'DRAFT' || isHistoric;
+  // A version the customer already holds is a record, not a draft, but editing
+  // the *current* one is still allowed: Save spawns a new draft on top of it and
+  // leaves the customer's copy untouched until it's sent (see the banner below).
+  // Only a version from the history (isHistoric) or a cancelled SOW is locked.
+  const readOnly = isHistoric || status === 'CANCELLED';
 
   /* ---------------------------------------------------------------- preview */
 
@@ -136,9 +247,15 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
           prev.map((f) => {
             const calculated = byKey.get(f.key);
             if (calculated === undefined) return f; // custom sections have no generator
+            // A required field (Engagement Resources with no PM/Lead, say) that
+            // was hidden only for lack of content shows itself back the moment
+            // it has some — mirrors the same rule the server applies on save
+            // (sow-field-calculator.ts), so the checkbox doesn't lag a save
+            // behind what the staff member just typed.
+            const justPopulated = !f.allowsEmpty && !f.isEnabled && !(f.calculatedValue ?? '').trim() && !!calculated.trim();
             // Refresh the revert target always; move the visible text only when
             // the staff member has not taken the section over by hand.
-            return { ...f, calculatedValue: calculated, value: f.isOverridden ? f.value : calculated };
+            return { ...f, calculatedValue: calculated, value: f.isOverridden ? f.value : calculated, isEnabled: f.isEnabled || justPopulated };
           })
         );
       } catch {
@@ -157,7 +274,6 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
         previewTimer.current = setTimeout(() => runPreview(next), PREVIEW_DEBOUNCE_MS);
         return next;
       });
-      setDirty(true);
     },
     [runPreview]
   );
@@ -168,17 +284,22 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
 
   const patchField = useCallback((key: string, patch: Partial<SowField>) => {
     setFields((prev) => prev.map((f) => (f.key === key ? { ...f, ...patch } : f)));
-    setDirty(true);
   }, []);
+
+  const renameCustomField = useCallback((key: string, label: string) => patchField(key, { label }), [patchField]);
+
+  // Stable across renders (setState identity never changes), so rows that pass
+  // it straight through don't re-render just because a sibling's note field or
+  // the PDF preview changed — see toggleExpand below and React.memo on SowFieldRow.
+  const toggleExpand = useCallback((key: string) => setExpandedKey((k) => (k === key ? null : key)), []);
 
   const addCustomField = useCallback(() => {
     const key = `${CUSTOM_KEY_PREFIX}${uuid()}`;
     setFields((prev) => [
       ...prev,
-      { key, label: 'New section', kind: 'CUSTOM', order: 1000 + prev.filter((f) => f.key.startsWith(CUSTOM_KEY_PREFIX)).length, value: '', calculatedValue: null, isOverridden: false, isEnabled: true, allowsTextOverride: true }
+      { key, label: 'New section', kind: 'CUSTOM', order: 1000 + prev.filter((f) => f.key.startsWith(CUSTOM_KEY_PREFIX)).length, value: '', calculatedValue: null, isOverridden: false, isEnabled: true, allowsTextOverride: true, allowsEmpty: true, requiresInitials: false }
     ]);
     setExpandedKey(key);
-    setDirty(true);
   }, []);
 
   /* --------------------------------------------------------------- actions */
@@ -195,6 +316,18 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     }
   };
 
+  // Discards in-progress edits and the local draft behind them, landing back on
+  // exactly what Save would have overwritten — the counterpart to Save rather
+  // than a full reload, so it works without a round trip.
+  const handleReset = useCallback(() => {
+    const snap = snapshotRef.current;
+    if (!snap) return;
+    setFields(snap.fields);
+    setInputs(snap.inputs);
+    setNote('');
+    if (draftKey) window.localStorage.removeItem(draftKey);
+  }, [draftKey]);
+
   const handleSave = (): Promise<void> =>
     withBusy(async () => {
       if (!sow?.id || !inputs) return;
@@ -204,14 +337,15 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
           input: {
             baseVersionNumber: baseVersion,
             note: note.trim() || null,
-            fields: fields.map((f) => ({ key: f.key, label: f.label, value: f.value, isEnabled: f.isEnabled })),
+            fields: fields.map((f) => ({ key: f.key, label: f.label, value: f.value, isEnabled: f.isEnabled, requiresInitials: f.requiresInitials })),
             inputs: toInputsPayload(inputs)
           }
         }
       });
       const v = res.data?.saveSowVersion;
+      if (draftKey) window.localStorage.removeItem(draftKey);
       await refetch();
-      setBanner({ severity: 'success', text: `Saved as version ${v?.versionNumber}.` });
+      setBanner({ severity: 'success', text: `Saved as version ${versionDisplayLabel(v)}.` });
     });
 
   const handleSend = (): Promise<void> =>
@@ -219,7 +353,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
       if (!sow?.id) return;
       const res = await sendToCustomer({ variables: { sowId: sow.id } });
       await refetch();
-      setBanner({ severity: 'success', text: `Sent to the customer as version ${res.data?.sendSowToCustomer?.versionNumber}.` });
+      setBanner({ severity: 'success', text: `Sent to the customer as version ${versionDisplayLabel(res.data?.sendSowToCustomer)}.` });
     });
 
   const handleFinalize = (): Promise<void> =>
@@ -229,18 +363,30 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
       if (!name?.trim()) return;
       const res = await finalizeSow({ variables: { sowId: sow.id, name: name.trim() } });
       await refetch();
-      setBanner({ severity: 'success', text: `Finalized as version ${res.data?.finalizeSow?.versionNumber}.` });
+      setBanner({ severity: 'success', text: `Finalized as version ${versionDisplayLabel(res.data?.finalizeSow)}.` });
     });
 
   const handleDiscard = (): Promise<void> =>
     withBusy(async () => {
       if (!sow?.id || !version) return;
       await discardDraft({ variables: { sowId: sow.id, versionNumber: version.versionNumber } });
+      if (draftKey) window.localStorage.removeItem(draftKey);
       await refetch();
       setBanner({ severity: 'info', text: 'Draft discarded.' });
     });
 
   const enabledCount = useMemo(() => fields.filter((f) => f.isEnabled).length, [fields]);
+
+  // Mirrors the backend's sendToCustomer check, so staff see why Send is blocked
+  // before they click it rather than after a round trip.
+  const missingRequired = useMemo(() => fields.filter((f) => !f.allowsEmpty && (!f.isEnabled || !f.value?.trim())).map((f) => f.label), [fields]);
+
+  // react-pdf lays out and rasterizes the whole document to build the download
+  // blob, which is not cheap — PDFDownloadLink redoes it whenever its `document`
+  // element is a new instance, and JSX creates a new one on every render. Memoing
+  // the element itself is what stops that from happening on every keystroke
+  // elsewhere in the modal (e.g. the change note).
+  const pdfDocument = useMemo(() => (version ? <SowPdfDocument version={version} sowNumber={sow?.sowNumber} /> : null), [version, sow?.sowNumber]);
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -256,8 +402,10 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                 {jobName ? ` · ${jobName}` : ''}
               </Typography>
             </Box>
-            {version && <Chip size="small" label={`v${version.versionNumber} · ${status}`} color={statusColor(status)} />}
-            {hasUnsentDraft && activeStatus && <Chip size="small" variant="outlined" label={`Customer holds v${sow?.activeVersionNumber} (${activeStatus})`} />}
+            {version && <Chip size="small" label={`${versionDisplayLabel(version)} · ${sowStatusLabel(status)}`} color={statusColor(status)} />}
+            {hasUnsentDraft && activeStatus && (
+              <Chip size="small" variant="outlined" label={`Customer holds ${versionDisplayLabel(sow?.activeVersion)} (${sowStatusLabel(activeStatus)})`} />
+            )}
             <IconButton onClick={onClose} disabled={busy} aria-label="Close">
               <CloseIcon />
             </IconButton>
@@ -303,26 +451,31 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                       baseline={baseline}
                       onViewingChange={changeViewing}
                       onBaselineChange={setBaseline}
-                      changedLabels={(diff?.fields ?? []).filter((f) => f.kind !== 'unchanged').map((f) => f.label)}
                     />
                   </Box>
                 )}
 
                 {isHistoric && (
                   <Alert severity="info" sx={{ mb: 2 }}>
-                    Viewing version {version?.versionNumber} from the history. Switch back to version {sow.currentVersionNumber} to make changes.
+                    Viewing version {versionDisplayLabel(version)} from the history. Switch back to version {versionDisplayLabel(sow.currentVersion)} to make changes.
                   </Alert>
                 )}
 
                 {diff && !diff.hasChanges && baseline != null && (
                   <Alert severity="success" sx={{ mb: 2 }}>
-                    Nothing changed between version {baseline} and version {version?.versionNumber}.
+                    No edits were made between version {versionDisplayLabel(history.find((v) => v.versionNumber === baseline))} and version {versionDisplayLabel(version)}.
                   </Alert>
                 )}
 
                 {readOnly && !isHistoric && (
                   <Alert severity="info" sx={{ mb: 2 }}>
-                    Version {version?.versionNumber} is {status.toLowerCase()} and cannot be altered. Saving creates a new draft; the customer keeps the current version until you send the new one.
+                    This SOW is cancelled and cannot be altered.
+                  </Alert>
+                )}
+
+                {!readOnly && status !== 'DRAFT' && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    Version {versionDisplayLabel(version)} is {sowStatusLabel(status).toLowerCase()}. Editing it saves a new draft; the customer keeps this version until you send the new one.
                   </Alert>
                 )}
               </Box>
@@ -336,10 +489,10 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                     staff={staff}
                     readOnly={readOnly}
                     expanded={expandedKey === f.key}
-                    onToggleExpand={() => setExpandedKey((k) => (k === f.key ? null : f.key))}
-                    onChangeField={(patch) => patchField(f.key, patch)}
+                    onToggleExpand={toggleExpand}
+                    onChangeField={patchField}
                     onChangeInputs={patchInputs}
-                    onRenameCustom={(label) => patchField(f.key, { label })}
+                    onRenameCustom={renameCustomField}
                     diff={diffByKey.get(f.key)}
                   />
                 ))}
@@ -368,10 +521,10 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
             </Button>
           )}
 
-          {version && (
+          {version && pdfDocument && (
             <PDFDownloadLink
-              document={<SowPdfDocument version={version} sowNumber={sow?.sowNumber} />}
-              fileName={`${(sow?.sowNumber ?? 'SOW').replace(/\s+/g, '-')}-v${version.versionNumber}.pdf`}
+              document={pdfDocument}
+              fileName={`${(sow?.sowNumber ?? 'SOW').replace(/\s+/g, '-')}-v${versionDisplayLabel(version)}.pdf`}
               style={{ textDecoration: 'none' }}
             >
               {({ loading: pdfLoading }) => (
@@ -382,13 +535,25 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
             </PDFDownloadLink>
           )}
 
+          <Button onClick={handleReset} color="inherit" disabled={busy || !dirty}>
+            Reset
+          </Button>
+
           <Button onClick={handleSave} variant="outlined" disabled={busy || !sow || !dirty}>
             Save
           </Button>
 
-          <Tooltip title={status === 'DRAFT' ? '' : 'Save your changes first — only a draft can be sent.'}>
+          <Tooltip
+            title={
+              status !== 'DRAFT'
+                ? 'Save your changes first — only a draft can be sent.'
+                : missingRequired.length > 0
+                  ? `Complete before sending: ${missingRequired.join(', ')}.`
+                  : ''
+            }
+          >
             <span>
-              <Button onClick={handleSend} variant="contained" disabled={busy || !sow || dirty || status !== 'DRAFT'}>
+              <Button onClick={handleSend} variant="contained" disabled={busy || !sow || dirty || status !== 'DRAFT' || missingRequired.length > 0}>
                 Send to customer
               </Button>
             </span>

@@ -11,7 +11,7 @@ import { SowField, SowVersion } from './sowTypes';
  */
 
 function field(key: string, value: string, over: Partial<SowField> = {}): SowField {
-  return { key, label: key, kind: 'PROSE', order: 10, value, calculatedValue: value, isOverridden: false, isEnabled: true, allowsTextOverride: true, ...over };
+  return { key, label: key, kind: 'PROSE', order: 10, value, calculatedValue: value, isOverridden: false, isEnabled: true, allowsTextOverride: true, allowsEmpty: true, requiresInitials: false, ...over };
 }
 
 function version(fields: SowField[], over: Partial<SowVersion> = {}): SowVersion {

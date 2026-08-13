@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
-import { SowVersion } from './sowTypes';
+import { SowVersion, sowStatusLabel, versionDisplayLabel } from './sowTypes';
 
 /**
  * PDF rendering of a SOW version.
@@ -16,8 +16,8 @@ import { SowVersion } from './sowTypes';
 
 const styles = StyleSheet.create({
   page: { padding: 36, fontFamily: 'Helvetica', fontSize: 11, lineHeight: 1.4, color: '#111' },
-  logoBox: { backgroundColor: '#000000', padding: 8, marginBottom: 10, width: 220 },
-  logo: { width: 200, height: 32 },
+  logoBox: { marginBottom: 10 },
+  logo: { width: 138, height: 59 },
   org: { fontSize: 15, fontFamily: 'Helvetica-Bold', marginBottom: 2 },
   address: { fontSize: 10, color: '#444', marginBottom: 14 },
   meta: { fontSize: 9, color: '#666', marginBottom: 14 },
@@ -94,7 +94,7 @@ export default function SowPdfDocument({ version, sowNumber, logoUrl = '/Damplab
         </View>
 
         <Text style={styles.meta}>
-          {sowNumber ? `${sowNumber} · ` : ''}Version {version.versionNumber} · {version.status}
+          {sowNumber ? `${sowNumber} · ` : ''}Version {versionDisplayLabel(version)} · {sowStatusLabel(version.status)}
         </Text>
 
         {fields.map((f) => (
@@ -144,7 +144,7 @@ export default function SowPdfDocument({ version, sowNumber, logoUrl = '/Damplab
         </View>
 
         <Text style={styles.footer} fixed>
-          DAMP Lab · {sowNumber ?? 'Statement of Work'} · version {version.versionNumber}
+          DAMP Lab · {sowNumber ?? 'Statement of Work'} · version {versionDisplayLabel(version)}
         </Text>
       </Page>
     </Document>

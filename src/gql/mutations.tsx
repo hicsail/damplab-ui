@@ -643,6 +643,7 @@ export const SAVE_SOW_VERSION = gql`
         saveSowVersion(sowId: $sowId, input: $input) {
             id
             versionNumber
+            displayVersion
             status
         }
     }
@@ -650,13 +651,13 @@ export const SAVE_SOW_VERSION = gql`
 
 export const SEND_SOW_TO_CUSTOMER = gql`
     mutation SendSowToCustomer($sowId: ID!) {
-        sendSowToCustomer(sowId: $sowId) { id versionNumber status }
+        sendSowToCustomer(sowId: $sowId) { id versionNumber displayVersion status }
     }
 `;
 
 export const FINALIZE_SOW = gql`
     mutation FinalizeSow($sowId: ID!, $name: String!) {
-        finalizeSow(sowId: $sowId, name: $name) { id versionNumber status }
+        finalizeSow(sowId: $sowId, name: $name) { id versionNumber displayVersion status }
     }
 `;
 
@@ -676,22 +677,13 @@ export const CANCEL_SOW = gql`
     }
 `;
 
-export const ASK_SOW_QUESTION = gql`
-    mutation AskSowQuestion($sowId: ID!, $text: String!) {
-        askSowQuestion(sowId: $sowId, text: $text) {
-            id
-            questions { authorName isStaff text versionNumber createdAt }
-        }
-    }
-`;
-
 export const SIGN_SOW = gql`
     mutation SignSow($sowId: ID!, $input: SignSowInput!) {
         signSow(sowId: $sowId, input: $input) {
             id
             versionNumber
             status
-            clientSignature { name signedAt consentedGroups }
+            clientSignature { name signedAt consentedGroups sectionInitials { key label initials } }
         }
     }
 `;

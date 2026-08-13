@@ -24,6 +24,10 @@ export interface SowField {
   isEnabled: boolean;
   /** False on Fee Schedule, whose figures invoices bill from. */
   allowsTextOverride: boolean;
+  /** False on fields the document cannot be sent to the customer without. */
+  allowsEmpty: boolean;
+  /** Staff flag: when true, the customer must type their initials for this section before they can sign. */
+  requiresInitials: boolean;
 }
 
 export interface SowPeriod {
@@ -62,10 +66,17 @@ export interface SowVersionInputs {
   customerCategory?: string | null;
 }
 
+export interface SowSectionInitial {
+  key: string;
+  label: string;
+  initials: string;
+}
+
 export interface SowConsent {
   name: string;
   signedAt: string;
   consentedGroups?: SowFieldKind[];
+  sectionInitials?: SowSectionInitial[];
   /** Drawn signature carried over by the migration; absent on new signatures. */
   legacySignatureDataUrl?: string | null;
 }
@@ -73,6 +84,8 @@ export interface SowConsent {
 export interface SowVersion {
   id: string;
   versionNumber: number;
+  /** Human-facing "<sent-count>.<sub-revision>" label, e.g. "1.2". See sow-version.service.ts. */
+  displayVersion?: string | null;
   status: SowStatus;
   visibleToCustomer: boolean;
   sentToCustomerAt?: string | null;
@@ -91,9 +104,8 @@ export interface SowEditorState {
   currentVersionNumber: number;
   activeVersionNumber: number;
   documentStale: boolean;
-  questions: Array<{ authorName: string; isStaff: boolean; text: string; versionNumber?: number | null; createdAt: string }>;
   currentVersion?: SowVersion | null;
-  activeVersion?: { versionNumber: number; status: SowStatus } | null;
+  activeVersion?: { versionNumber: number; displayVersion?: string | null; status: SowStatus } | null;
   versions?: SowVersion[];
 }
 
@@ -142,6 +154,42 @@ const STATUS_COLORS: Record<SowStatus, 'default' | 'info' | 'warning' | 'success
 export function statusColor(status?: SowStatus | null): 'default' | 'info' | 'warning' | 'success' | 'error' {
   return status ? STATUS_COLORS[status] ?? 'default' : 'default';
 }
+
+/** Customer-facing wording for a SOW status — used anywhere a status appears in the UI, staff or customer side. */
+const STATUS_LABELS: Record<SowStatus, string> = {
+  DRAFT: 'Draft',
+  SENT: 'Sent to Customer',
+  SIGNED: 'Customer Signed',
+  FINAL: 'Finalized',
+  CANCELLED: 'Cancelled'
+};
+
+export function sowStatusLabel(status?: SowStatus | string | null): string {
+  return (status && STATUS_LABELS[status as SowStatus]) || (status ?? '—');
+}
+
+/**
+ * "1.2" style label for a version. `versionNumber` itself is major*1000+minor
+ * (see SowVersionService on the backend) — the field is always resolved
+ * whenever a query asks for it, but if some caller's selection set ever
+ * forgets to, decoding versionNumber directly here still produces the right
+ * label rather than the internal number falling through to the screen.
+ */
+export function versionDisplayLabel(v?: { displayVersion?: string | null; versionNumber: number } | null): string {
+  if (!v) return '';
+  if (v.displayVersion) return v.displayVersion;
+  return `${Math.floor(v.versionNumber / 1000)}.${v.versionNumber % 1000}`;
+}
+
+/** What each field kind is called when describing consent — shared between the
+ *  customer's signing checkbox/summary and the staff-side signature summary. */
+export const GROUP_LABELS: Record<SowFieldKind, string> = {
+  CALCULATED: 'the dates, people and costs',
+  PROSE: 'the standard terms',
+  CUSTOM: 'the additional sections'
+};
+
+export const GROUP_ORDER: SowFieldKind[] = ['CALCULATED', 'PROSE', 'CUSTOM'];
 
 export function formatCurrency(amount: number): string {
   const n = Number.isFinite(amount) ? amount : 0;
