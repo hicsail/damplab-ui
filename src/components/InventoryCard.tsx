@@ -1,12 +1,17 @@
+import { useState } from 'react';
 import {
   Card,
   CardContent,
   Chip,
+  IconButton,
   Stack,
+  Tooltip,
   Typography
 } from '@mui/material';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import InventoryHolderDetails from './InventoryHolderDetails';
+import InventoryItemCalendarDrawer from './InventoryItemCalendarDrawer';
 
 export interface InventoryItemRow {
   id: string;
@@ -40,12 +45,21 @@ interface InventoryCardProps {
 }
 
 export default function InventoryCard({ item, holder, nextBooking }: InventoryCardProps) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
   return (
     <Card variant='outlined' sx={{ borderColor: holder ? '#dc2626' : '#16a34a' }}>
       <CardContent>
         <Stack direction='row' alignItems='center' spacing={1} sx={{ mb: 1 }}>
           <PrecisionManufacturingIcon fontSize='small' />
           <Typography variant='subtitle1' sx={{ fontWeight: 600, flex: 1 }}>{item.name}</Typography>
+          {item.bookable && (
+            <Tooltip title='View schedule'>
+              <IconButton size='small' onClick={() => setCalendarOpen(true)}>
+                <CalendarMonthIcon fontSize='small' />
+              </IconButton>
+            </Tooltip>
+          )}
           <Chip size='small' variant='outlined' color={item.bookable ? 'info' : 'default'} label={item.bookable ? 'Bookable' : 'Non-Bookable'} />
           <Chip
             size='small'
@@ -74,6 +88,14 @@ export default function InventoryCard({ item, holder, nextBooking }: InventoryCa
           </Stack>
         )}
       </CardContent>
+      {item.bookable && (
+        <InventoryItemCalendarDrawer
+          open={calendarOpen}
+          onClose={() => setCalendarOpen(false)}
+          itemId={item.id}
+          itemName={item.name}
+        />
+      )}
     </Card>
   );
 }
