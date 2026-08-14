@@ -1,16 +1,10 @@
-import { useContext } from "react";
 import { Navigate, Outlet } from "react-router";
-import {
-  UserContext,
-  UserContextProps,
-  UserProps,
-} from "../contexts/UserContext";
+import { useEffectiveUser } from "../hooks/useEffectiveUser";
 import AppBreadcrumbs from "../components/AppBreadcrumbs";
 
-// Admins can access all pages
+// Admins can access all pages; redirects when in client view mode
 const PrivateRouteDamplabStaff = () => {
-  const userContext: UserContextProps = useContext(UserContext);
-  const userProps: UserProps = userContext.userProps;
+  const { userProps } = useEffectiveUser();
 
   return userProps?.isDamplabStaff ? (
     <>
@@ -18,7 +12,7 @@ const PrivateRouteDamplabStaff = () => {
       <Outlet />
     </>
   ) : (
-    <Navigate to="/login" />
+    <Navigate to="/" />
   );
 };
 

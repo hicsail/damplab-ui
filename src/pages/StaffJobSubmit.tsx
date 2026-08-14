@@ -18,6 +18,7 @@ import {
 
 import { CanvasContext } from '../contexts/Canvas';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
+import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { getWorkflowsFromGraph } from '../controllers/GraphHelpers';
 import { submitCanvasJob } from '../utils/canvasJobSubmission';
 
@@ -42,7 +43,7 @@ export default function StaffJobSubmit() {
   const navigate = useNavigate();
   const apolloClient = useApolloClient();
   const userContext: UserContextProps = useContext(UserContext);
-  const userProps = userContext.userProps;
+  const { userProps } = useEffectiveUser();
 
   const workflows = useMemo(
     () => getWorkflowsFromGraph(val.nodes, val.edges) || [],
