@@ -55,6 +55,22 @@ export const GET_BUNDLES = gql`
     }
 `;
 
+export const GET_BUNDLES_WITH_INVENTORY = gql`
+    query GetBundlesWithInventory {
+        bundles {
+            id
+            label
+            icon
+            services {
+                id
+                name
+                icon
+                inventoryRequirements
+            }
+        }
+    }
+`;
+
 export const GET_CATEGORIES = gql`
     query categories {
         categories {
@@ -1166,6 +1182,7 @@ export const GET_IN_PROGRESS_NODES_HOLDING_INVENTORY = gql`
       label
       usedInventory
       startedAt
+      estimatedMinutes
       assigneeDisplayName
       workflow {
         id
