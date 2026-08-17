@@ -1,15 +1,16 @@
 import { useState, useCallback, useRef, useEffect, useContext, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import ReactFlow, { ReactFlowProvider, Controls, Background, addEdge, FitViewOptions,
-                    applyNodeChanges, applyEdgeChanges, NodeChange, EdgeChange, Connection, Panel } from 'reactflow';
+                    applyEdgeChanges, NodeChange, EdgeChange, Connection, Panel } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Alert, Box, Button, Chip, CircularProgress, Snackbar, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Snackbar, TextField, Typography } from '@mui/material';
 
 import { buildNodeParameters, createNodeObject } from '../controllers/ReactFlowEvents';
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
-import { hydrateJobGraph, hydrateVersionGraph, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges } from '../controllers/jobGraphHydration';
-import { diffJobGraphs, latestContentVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike } from '../utils/jobGraphDiff';
+import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from '../controllers/jobGraphHydration';
+import { diffJobGraphs, latestContentVersion, latestVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
+import { missedContentVersion, missedUnfilteredContent, pickersAfterSave, seedLoadedVersionNumber } from '../utils/jobEditorSave';
 import JobVersionHistory from '../components/JobVersionHistory';
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
@@ -38,6 +39,7 @@ const fitViewOptions: FitViewOptions = { padding: 0.2 };
 export default function JobEditor() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const apolloClient = useApolloClient();
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     const { services } = useContext(AppContext);
@@ -53,10 +55,15 @@ export default function JobEditor() {
     // against an empty canvas.
     const [hydrated, setHydrated] = useState(false);
     const [nodeParams, setNodeParams] = useState<any>([]);
+    /** Client-side node ids present when the current version was loaded. Deletes of these become ghosts. */
+    const loadedIdsRef = useRef<Set<string>>(new Set());
 
     const [note, setNote] = useState('');
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ text: string; severity: 'success' | 'error' } | null>(null);
+    /** Latest content version this tab had when it last loaded or saved. Newer than this is a concurrent edit. */
+    const [loadedVersionNumber, setLoadedVersionNumber] = useState<number | null>(null);
+    const [conflict, setConflict] = useState<{ version: JobVersionLike | null; hidden: boolean } | null>(null);
 
     const { data, loading, error, refetch } = useQuery(isStaff ? GET_JOB_BY_ID : GET_OWN_JOB_BY_ID, {
         variables: { id },
@@ -68,7 +75,14 @@ export default function JobEditor() {
     const [saveJobWorkflows] = useMutation(SAVE_JOB_WORKFLOWS);
 
     const versions: JobVersionLike[] = useMemo(() => job?.versions ?? [], [job]);
-    const latest = useMemo(() => latestContentVersion(versions), [versions]);
+    // Staff skip trailing events so they do not land on a Closed copy.
+    // Customers use the newest row they are allowed to see, including a
+    // visible Request Changes event — otherwise View / hydrate would show
+    // the original submission and a save would overwrite live workflows.
+    const latest = useMemo(
+        () => (isStaff ? latestContentVersion(versions) : latestVersion(versions)),
+        [isStaff, versions]
+    );
 
     /**
      * Which version is on screen, and what it is compared against. Both default
@@ -78,26 +92,46 @@ export default function JobEditor() {
     const [viewing, setViewing] = useState<number | null>(null);
     const [baseline, setBaseline] = useState<number | null | undefined>(undefined);
 
+    // A different job is a different editor: drop the previous job's pickers,
+    // conflict dialog, and "what I loaded" marker so they cannot leak across.
     useEffect(() => {
-        if (!latest) return;
-        setViewing((prev) => prev ?? latest.versionNumber);
-    }, [latest]);
+        setViewing(null);
+        setBaseline(undefined);
+        setLoadedVersionNumber(null);
+        setConflict(null);
+        setHydrated(false);
+    }, [id]);
 
-    /** Viewing anything but the newest version is a read-only look at history. */
-    const isHistoric = latest != null && viewing != null && viewing !== latest.versionNumber;
+    useEffect(() => {
+        // Ignore a stale cache entry for the previous job while the new query is in flight.
+        if (!latest || !job || String(job.id) !== String(id)) return;
+        setViewing((prev) => prev ?? latest.versionNumber);
+        setLoadedVersionNumber((prev) => prev ?? seedLoadedVersionNumber(isStaff, latest.versionNumber, job.latestContentVersionNumber));
+    }, [latest, job, id, isStaff]);
+
+    /** Viewing anything but the newest version is a read-only look at history.
+     *  Suppressed while a save is in flight so a refetch that lands a new latest
+     *  before we snap the picker cannot flash the canvas into historic mode. */
+    const isHistoric = !saving && latest != null && viewing != null && viewing !== latest.versionNumber;
 
     const { baseline: baselineVersion } = useMemo(() => selectedDiffPair(versions, viewing, baseline), [versions, viewing, baseline]);
+
+    const viewedWorkflows: SnapshotWorkflow[] | undefined = useMemo(() => {
+        if (viewing == null) return undefined;
+        return versions.find((v) => v.versionNumber === viewing)?.workflows;
+    }, [versions, viewing]);
 
     /**
      * The graph to highlight against.
      *
-     * The canvas is hydrated from the job's *live* workflows — the user edits
-     * current reality — while the baseline comes from the version history. The
-     * highlight is baseline → canvas, which covers both cases in one
-     * computation: a customer arriving from a feedback link sees the
-     * technician's changes on open, and anyone's unsaved edits light up as they
-     * work. When nothing earlier was written by the other side the baseline is
-     * the latest version itself, so a freshly submitted job starts clean.
+     * Staff latest hydrates from the job's live workflows (ops state). Everyone
+     * else, and any historic view, hydrates from the selected version snapshot
+     * so a customer never lands on a hidden staff draft. The highlight is
+     * baseline → canvas: a customer arriving from a feedback link sees the
+     * technician's visible changes on open, and anyone's unsaved edits light up
+     * as they work. When nothing earlier was written by the other side the
+     * baseline is the latest allowed version itself, so a freshly submitted job
+     * starts clean.
      */
     const baselineWorkflows: SnapshotWorkflow[] | undefined = useMemo(() => {
         if (!versions.length) return undefined;
@@ -129,57 +163,89 @@ export default function JobEditor() {
     );
 
     /**
-     * Rebuild the canvas: from the job as last saved, or from a stored snapshot
-     * when the viewer has paged back through the history.
+     * Rebuild the canvas: staff latest stays live; everyone else, and any
+     * historic view, uses the selected version snapshot.
      *
-     * Nodes, edges and the `hydrated` flag are set in one commit, and `hydrated`
-     * is never cleared once true. Switching versions re-hydrates after mount,
-     * which is exactly the window the flag exists to close — a frame with a
-     * populated baseline and empty nodes makes every baseline node look deleted,
-     * and the whole graph renders as unclickable ghosts.
+     * Nodes, edges and the `hydrated` flag are set in one commit. `hydrated` is
+     * only cleared when the route job id changes — never mid-edit — because a
+     * frame with a populated baseline and empty nodes makes every baseline node
+     * look deleted, and the whole graph renders as unclickable ghosts.
      */
     const resetToSavedJob = useCallback(() => {
         if (!job || !services?.length) return;
+        if (String(job.id) !== String(id)) return;
 
-        const historicVersion = isHistoric ? versions.find((v) => v.versionNumber === viewing) : null;
-        const { nodes: nextNodes, edges: nextEdges } = historicVersion
-            ? hydrateVersionGraph(historicVersion.workflows, services)
-            : hydrateJobGraph(job, services);
+        const selected = viewing != null
+            ? versions.find((v) => v.versionNumber === viewing)
+            : null;
+
+        let nextNodes: any[];
+        let nextEdges: any[];
+        if (!isStaff) {
+            // Never hydrate live job.workflows for a customer: that document can
+            // hold a hidden staff draft. Missing selected snapshot falls back to
+            // the latest allowed row, including a visible Request Changes event.
+            const snapshot = selected ?? latestVersion(versions);
+            // Editable unless they have paged back to an older version. Without
+            // this the snapshot renders every node locked, which silently
+            // removes the delete button while leaving other edits working.
+            ({ nodes: nextNodes, edges: nextEdges } = snapshot
+                ? hydrateVersionGraph(snapshot.workflows, services, {
+                      editable: !isHistoric,
+                      lockedClientIds: lockedClientIdsFromJob(job)
+                  })
+                : { nodes: [], edges: [] });
+        } else {
+            const useSnapshot = isHistoric;
+            const snapshotVersion = selected ?? (useSnapshot ? latest : null);
+            ({ nodes: nextNodes, edges: nextEdges } =
+                useSnapshot && snapshotVersion
+                    ? hydrateVersionGraph(snapshotVersion.workflows, services)
+                    : hydrateJobGraph(job, services));
+        }
 
         setNodes(nextNodes);
         setEdges(nextEdges);
+        loadedIdsRef.current = new Set(nextNodes.map((n: any) => n.id));
         setActiveComponentId('');
         setHydrated(true);
-    }, [job, services, isHistoric, versions, viewing]);
+    }, [job, services, isStaff, isHistoric, versions, viewing, id, latest]);
 
     useEffect(() => {
         resetToSavedJob();
     }, [resetToSavedJob]);
 
     /**
-     * Ghosts are derived, never stored.
-     *
-     * Storing them meant reading node state to decide what to add to node state,
-     * which raced with hydration: on the mount commit `nodes` is still empty, so
-     * every baseline node looked deleted and the entire graph rendered as
-     * unclickable ghosts. `hydrated` also keeps them from flashing up in the one
-     * commit before hydration lands.
+     * Comparison ghosts (a node the baseline still has that this version does
+     * not) have to live in `nodes` state. Passing them only through the React
+     * Flow `nodes` prop as extras is the same-id re-insert that session-delete
+     * already proved does not stick. Hydration writes the live graph first and
+     * sets `hydrated`; this effect then inserts, so it never runs against an
+     * empty canvas.
      */
-    const ghostNodes = useMemo(
-        () => (hydrated ? deriveGhostNodes(baselineWorkflows, new Set(nodes.map((n) => n.id)), services ?? []) : []),
-        [hydrated, baselineWorkflows, nodes, services]
+    const ghostSource = useMemo(
+        () => unionGhostSources(viewedWorkflows, baselineWorkflows),
+        [viewedWorkflows, baselineWorkflows]
     );
+
+    useEffect(() => {
+        if (!hydrated) return;
+        setNodes((nds: any[]) => {
+            const liveIds = new Set(nds.filter((n) => !n.data?.ghost).map((n) => n.id));
+            const derived = deriveGhostNodes(ghostSource, liveIds, services ?? []);
+            return mergeComparisonGhosts(nds, derived, loadedIdsRef.current);
+        });
+    }, [hydrated, ghostSource, services]);
 
     /** Fold the diff onto the nodes React Flow renders, so CanvasNode can decorate without knowing about versions. */
     const decoratedNodes = useMemo(() => {
-        const live = nodes.map((node) => {
+        return nodes.map((node) => {
             const kind = diff.byNodeId.get(node.id)?.kind;
             const diffKind = kind === 'added' || kind === 'changed' ? kind : undefined;
             if (node.data?.diffKind === diffKind) return node;
             return { ...node, data: { ...node.data, diffKind } };
         });
-        return [...live, ...ghostNodes];
-    }, [nodes, diff, ghostNodes]);
+    }, [nodes, diff]);
 
     /** Which parameters changed, per node, so the parameter panel can mark them individually. */
     const changedParamIdsByNode = useMemo(() => {
@@ -191,10 +257,12 @@ export default function JobEditor() {
     }, [diff]);
 
     const decoratedEdges = useMemo(() => {
-        const ghostIds = new Set(ghostNodes.map((n) => n.id));
-        const renderable = new Set([...nodes.map((n) => n.id), ...ghostIds]);
-        return [...edges, ...deriveGhostEdges(baselineWorkflows, ghostIds, renderable)];
-    }, [edges, nodes, ghostNodes, baselineWorkflows]);
+        const ghostIds = new Set(nodes.filter((n) => n.data?.ghost).map((n) => n.id));
+        const renderable = new Set(nodes.map((n) => n.id));
+        const extras = deriveGhostEdges(ghostSource, ghostIds, renderable);
+        const extraIds = new Set(extras.map((e: any) => e.id));
+        return [...edges.filter((e: any) => !extraIds.has(e.id)), ...extras];
+    }, [edges, nodes, ghostSource]);
 
     // While viewing history the canvas is a picture of a past version, so every
     // mutating handler is a no-op. Selection changes still go through: a reader
@@ -203,9 +271,16 @@ export default function JobEditor() {
         (changes: NodeChange[]) => {
             const allowed = isHistoric ? changes.filter((c) => c.type === 'select' || c.type === 'dimensions' || c.type === 'position') : changes;
             if (!allowed.length) return;
-            setNodes((nds: any) => applyNodeChanges(allowed, nds));
+            // flatMap rather than filter+map: only the 'remove' variant of the
+            // NodeChange union carries an id, and TypeScript cannot carry that
+            // narrowing across two calls.
+            const ghosted = new Set(allowed.flatMap((c) => (c.type === 'remove' && loadedIdsRef.current.has(c.id) ? [c.id] : [])));
+            setNodes((nds: any) => applyJobEditorNodeChanges(allowed, nds, loadedIdsRef.current));
+            if (ghosted.size) {
+                setEdges((eds: any) => restoreGhostEdges(eds, edges, ghosted));
+            }
         },
-        [isHistoric]
+        [isHistoric, edges]
     );
     const onEdgesChange = useCallback(
         (changes: EdgeChange[]) => {
@@ -281,16 +356,75 @@ export default function JobEditor() {
         setNodes((nds: any) => nds.concat(createNodeObject(nodeId, type.name, type.type, position, nodeData)));
     }, [reactFlowInstance, services, isHistoric]);
 
+    const peekJob = async () => {
+        // no-cache so a concurrent save is visible without writing over this
+        // tab's job and re-hydrating the canvas (which would wipe unsaved edits).
+        const { data: peeked } = await apolloClient.query({
+            query: isStaff ? GET_JOB_BY_ID : GET_OWN_JOB_BY_ID,
+            variables: { id },
+            fetchPolicy: 'no-cache'
+        });
+        return peeked?.jobById ?? peeked?.ownJobById ?? null;
+    };
+
+    const applyPickersAfterSave = (freshVersions: JobVersionLike[], missedVersionNumber: number | null) => {
+        const newLatest = isStaff ? latestContentVersion(freshVersions) : latestVersion(freshVersions);
+        if (!newLatest) return;
+        const pickers = pickersAfterSave({
+            newLatestVersionNumber: newLatest.versionNumber,
+            missedVersionNumber
+        });
+        setViewing(pickers.viewing);
+        setBaseline(pickers.baseline);
+        setLoadedVersionNumber(newLatest.versionNumber);
+    };
+
+    const persistCanvas = async (missedVersionNumber: number | null) => {
+        await saveJobWorkflows({
+            variables: { input: { jobId: id, note: note.trim(), workflows: buildSaveWorkflowsInput(nodes, edges) } }
+        });
+        setNote('');
+        setMessage({ text: 'Changes saved.', severity: 'success' });
+        const result = await refetch();
+        const freshJob = result.data?.jobById ?? result.data?.ownJobById;
+        applyPickersAfterSave(freshJob?.versions ?? [], missedVersionNumber);
+    };
+
     const handleSave = async () => {
         if (isHistoric) return;
         setSaving(true);
         try {
-            await saveJobWorkflows({
-                variables: { input: { jobId: id, note: note.trim(), workflows: buildSaveWorkflowsInput(nodes, edges) } }
-            });
-            setNote('');
-            setMessage({ text: 'Changes saved.', severity: 'success' });
-            await refetch();
+            const peekedJob = await peekJob();
+            const peekedVersions: JobVersionLike[] = peekedJob?.versions ?? [];
+            const missed = isStaff
+                ? missedContentVersion(peekedVersions, loadedVersionNumber)
+                : null;
+            const missedHidden = !isStaff
+                ? missedUnfilteredContent(peekedJob?.latestContentVersionNumber, loadedVersionNumber)
+                : null;
+
+            if (missed) {
+                setConflict({ version: missed, hidden: false });
+                return;
+            }
+            if (missedHidden) {
+                setConflict({ version: null, hidden: true });
+                return;
+            }
+            await persistCanvas(null);
+        } catch (err: any) {
+            setMessage({ text: err?.message ?? 'Could not save changes.', severity: 'error' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const confirmConflictSave = async () => {
+        const missedVersionNumber = conflict?.hidden ? null : (conflict?.version?.versionNumber ?? null);
+        setConflict(null);
+        setSaving(true);
+        try {
+            await persistCanvas(missedVersionNumber);
         } catch (err: any) {
             setMessage({ text: err?.message ?? 'Could not save changes.', severity: 'error' });
         } finally {
@@ -363,7 +497,6 @@ export default function JobEditor() {
                                     <Chip size="small" label="New" sx={{ height: 18, fontSize: 10, backgroundColor: '#2e7d32', color: 'white', fontWeight: 700 }} />
                                     <Chip size="small" label="Edited" sx={{ height: 18, fontSize: 10, backgroundColor: '#ed6c02', color: 'white', fontWeight: 700 }} />
                                     <Chip size="small" label="Deleted" sx={{ height: 18, fontSize: 10, backgroundColor: '#757575', color: 'white', fontWeight: 700 }} />
-                                    <Chip size="small" label="🔒 Locked" sx={{ height: 18, fontSize: 10, backgroundColor: 'white' }} />
                                 </Box>
                             </Panel>
 
@@ -393,7 +526,7 @@ export default function JobEditor() {
                             <Panel position="top-right" style={{ marginRight: 8, marginTop: 8, maxWidth: 300 }}>
                                 {isHistoric ? (
                                     <Alert severity="info" sx={{ py: 0.25, fontSize: 12 }}>
-                                        Viewing version {viewing} — read only. Switch back to version {latest?.versionNumber} to edit.
+                                        Viewing version {jobVersionDisplayLabel(viewing!)} — read only. Switch back to version {jobVersionDisplayLabel(latest!.versionNumber)} to edit.
                                     </Alert>
                                 ) : (
                                 <>
@@ -457,6 +590,32 @@ export default function JobEditor() {
                     </div>
                 </ReactFlowProvider>
             </div>
+
+            <Dialog open={!!conflict} onClose={() => !saving && setConflict(null)}>
+                <DialogTitle>Someone else saved while you were editing</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {conflict?.hidden ? (
+                            <>
+                                The lab has saved a newer version while you were editing. Saving will keep their version in history and add yours as a new version. You will not see the lab’s unpublished draft.
+                            </>
+                        ) : conflict?.version ? (
+                            <>
+                                {conflict.version.createdByName || 'Another user'} saved version {jobVersionDisplayLabel(conflict.version.versionNumber)}
+                                {conflict.version.createdAt ? ` on ${new Date(conflict.version.createdAt).toLocaleString()}` : ''}
+                                {conflict.version.note?.trim() ? `: “${conflict.version.note.trim()}”` : '.'}
+                                {' '}Saving will keep their version and add yours as a new version. You can then compare the two and edit a follow-up version to reconcile.
+                            </>
+                        ) : null}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setConflict(null)} disabled={saving}>Cancel</Button>
+                    <Button onClick={confirmConflictSave} variant="contained" disabled={saving} autoFocus>
+                        {saving ? 'Saving…' : 'Save my version'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             <Snackbar
                 open={!!message}

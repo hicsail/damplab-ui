@@ -1,16 +1,5 @@
 import { gql } from "@apollo/client";
 
-export const CREATE_WORKFLOW = gql`
-    mutation createWorkflow($createWorkflowInput: AddWorkflowInput!) {
-        createWorkflow(createWorkflowInput: $createWorkflowInput) {
-            id
-            nodes {
-                label
-            }
-        }
-    }
-`;
-
 export const CREATE_JOB = gql`
     mutation createJob($createJobInput: CreateJobInput!) {
         createJob(createJobInput: $createJobInput) {
@@ -100,15 +89,6 @@ export const DELETE_TEMPLATE = gql`
 export const DELETE_TEMPLATE_BY_NAME = gql`
     mutation DeleteTemplateByName($name: String!) {
         deleteTemplateByName(name: $name)
-    }
-`;
-
-export const UPDATE_WORKFLOW_STATE = gql`
-    mutation updateWorkflowState($updateWorkflowState: UpdateWorkflowState!) {
-        updateWorkflowState(updateWorkflowState: $updateWorkflowState) {
-            id
-            state
-        }
     }
 `;
 

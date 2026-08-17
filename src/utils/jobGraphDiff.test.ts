@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { diffJobGraphs, pickJobDiffBaseline, currentDiffPair, selectedDiffPair, latestContentVersion, jobStateLabel, jobStateColor, JobVersionLike, SnapshotWorkflow } from './jobGraphDiff';
+import { diffJobGraphs, pickJobDiffBaseline, currentDiffPair, selectedDiffPair, latestContentVersion, latestVersion, jobStateLabel, jobStateColor, jobVersionDisplayLabel, jobVersionChip, JobVersionLike, SnapshotWorkflow } from './jobGraphDiff';
 
 function node(id: string, params: Record<string, any> = {}, over: Record<string, any> = {}) {
   return {
@@ -197,16 +197,72 @@ describe('selectedDiffPair', () => {
     expect(baseline!.versionNumber).toBe(1);
   });
 
+  it('falls back to the previous version when every version is same-role', () => {
+    // Viewing is always set in the editor; without this fallback the picker
+    // shows "Nothing" after a same-party save and deleted nodes have no baseline
+    // to ghost against.
+    const flow = [version(1, 'STAFF'), version(2, 'STAFF')];
+    const { current, baseline } = selectedDiffPair(flow, 2, undefined);
+    expect(current!.versionNumber).toBe(2);
+    expect(baseline!.versionNumber).toBe(1);
+  });
+
   it('honours an explicitly chosen baseline', () => {
     const { current, baseline } = selectedDiffPair(flow, 3, 1);
     expect(current!.versionNumber).toBe(3);
     expect(baseline!.versionNumber).toBe(1);
   });
 
+  it('honours an explicit baseline even before the viewing picker has been touched', () => {
+    // Job view leaves viewing null until the reader opens the version picker,
+    // while still showing the latest version. Compare-to must still stick.
+    const { current, baseline } = selectedDiffPair(flow, null, 1);
+    expect(current!.versionNumber).toBe(3);
+    expect(baseline!.versionNumber).toBe(1);
+  });
+
+  it('honours hide-changes before the viewing picker has been touched', () => {
+    const { current, baseline } = selectedDiffPair(flow, null, null);
+    expect(current!.versionNumber).toBe(3);
+    expect(baseline).toBeNull();
+  });
+
   it('treats a null baseline as "hide changes", not as "no baseline available"', () => {
     const { current, baseline } = selectedDiffPair(flow, 3, null);
     expect(current!.versionNumber).toBe(3);
     expect(baseline).toBeNull();
+  });
+
+  it('survives a state event landing on a job that has only the backfilled v1', () => {
+    // Requesting changes on a never-edited job appends an event version, taking
+    // the history from 1 to 2 and mounting the picker for the first time with an
+    // event as the newest row. Nothing to diff, but it must not blow up.
+    const afterRequestChanges: JobVersionLike[] = [
+      version(1, 'CUSTOMER'),
+      { ...version(2, 'STAFF'), isEvent: true, jobState: 'CHANGES_REQUESTED', note: 'Changes requested' }
+    ];
+    expect(latestContentVersion(afterRequestChanges)!.versionNumber).toBe(1);
+
+    const { current, baseline } = selectedDiffPair(afterRequestChanges, null, undefined);
+    expect(current!.versionNumber).toBe(1);
+    expect(baseline!.versionNumber).toBe(1);
+  });
+
+  it('self-baselines the viewed version when nothing earlier exists', () => {
+    // The editor always sets viewing on load. Without a self-baseline the
+    // canvas diffs against nothing, so unsaved op/param edits stay unhighlighted
+    // until a save creates a previous version.
+    const single = [version(1, 'CUSTOMER')];
+    const { current, baseline } = selectedDiffPair(single, 1, undefined);
+    expect(current!.versionNumber).toBe(1);
+    expect(baseline!.versionNumber).toBe(1);
+  });
+
+  it('self-baselines a single-version job before the viewing picker is set', () => {
+    const single = [version(1, 'STAFF')];
+    const { current, baseline } = selectedDiffPair(single, null, undefined);
+    expect(current!.versionNumber).toBe(1);
+    expect(baseline!.versionNumber).toBe(1);
   });
 
   it('falls back to the automatic pair when the chosen version is gone', () => {
@@ -239,6 +295,35 @@ describe('job state chips', () => {
   });
 });
 
+describe('jobVersionDisplayLabel', () => {
+  it('prints encoded numbers as major.minor', () => {
+    expect(jobVersionDisplayLabel(1000)).toBe('1.0');
+    expect(jobVersionDisplayLabel(2003)).toBe('2.3');
+  });
+
+  it('prints pre-scheme integers as themselves, not as 0.n', () => {
+    expect(jobVersionDisplayLabel(3)).toBe('3');
+  });
+});
+
+describe('jobVersionChip', () => {
+  it('chips an editor save as Draft even when the live job was Submitted', () => {
+    expect(jobVersionChip({ isEvent: false, jobState: 'SUBMITTED', note: 'tweaked PCR' })).toBe('Draft');
+  });
+
+  it('chips the original submission as Submitted', () => {
+    expect(jobVersionChip({ isEvent: false, jobState: 'SUBMITTED', note: 'Original submission' })).toBe('Submitted');
+  });
+
+  it('chips a Request Changes event from jobState', () => {
+    expect(jobVersionChip({ isEvent: true, jobState: 'CHANGES_REQUESTED', note: 'Changes requested' })).toBe('Changes Requested');
+  });
+
+  it('chips a resubmit event as Submitted', () => {
+    expect(jobVersionChip({ isEvent: true, jobState: 'SUBMITTED', note: 'Resubmitted' })).toBe('Submitted');
+  });
+});
+
 describe('event versions', () => {
   // A state change appends a version whose graph is copied verbatim from its
   // predecessor. Every rule below exists so those rows can appear in the history
@@ -267,6 +352,16 @@ describe('event versions', () => {
   it('reports the newest edit, not the newest row', () => {
     const flow = [version(1, 'CUSTOMER'), version(2, 'STAFF'), event(3, 'STAFF')];
     expect(latestContentVersion(flow)!.versionNumber).toBe(2);
+  });
+
+  it('keeps latestVersion on a trailing visible event that latestContentVersion skips', () => {
+    // After Request Changes the customer's filtered list is the original
+    // submission plus the send event. Staff must skip the event so they do not
+    // land on a Closed copy; the customer must not, or View / hydrate would
+    // show the original graph and a save would overwrite live workflows with it.
+    const flow = [version(1000, 'CUSTOMER'), event(2000, 'STAFF')];
+    expect(latestContentVersion(flow)!.versionNumber).toBe(1000);
+    expect(latestVersion(flow)!.versionNumber).toBe(2000);
   });
 
   it('falls back to the newest row when a job somehow has only events', () => {

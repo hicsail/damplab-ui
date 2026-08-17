@@ -77,6 +77,7 @@ export const GET_JOB_BY_ID = gql`
     query JobById($id: ID!) {
         jobById(id: $id) {
             id
+            latestContentVersionNumber
             jobId
             name
             username
@@ -153,6 +154,8 @@ export const GET_JOB_BY_ID = gql`
             versions {
                 id
                 versionNumber
+                displayVersion
+                visibleToCustomer
                 authorRole
                 jobState
                 isEvent
@@ -190,6 +193,7 @@ export const GET_OWN_JOB_BY_ID = gql`
     query ownJobById($id: ID!) {
         ownJobById(id: $id) {
             id
+            latestContentVersionNumber
             jobId
             name
             username
@@ -265,6 +269,8 @@ export const GET_OWN_JOB_BY_ID = gql`
             versions {
                 id
                 versionNumber
+                displayVersion
+                visibleToCustomer
                 authorRole
                 jobState
                 isEvent
@@ -293,23 +299,6 @@ export const GET_OWN_JOB_BY_ID = gql`
                         target
                     }
                 }
-            }
-        }
-    }
-`;
-
-/** Legacy: unpaginated own jobs. Prefer OWN_JOBS (paginated) when backend supports it. */
-export const GET_OWN_JOBS = gql`
-    query ownJobs {
-        ownJobs {
-            id
-            name
-            state
-            submitted
-            sow {
-                id
-                sowNumber
-                status
             }
         }
     }

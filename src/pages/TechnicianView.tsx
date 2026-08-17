@@ -9,7 +9,7 @@ import PictureAsPdfIcon                               from '@mui/icons-material/
 import DescriptionIcon                                from '@mui/icons-material/Description';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID }         from '../gql/queries';
-import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, UPDATE_WORKFLOW_STATE }  from '../gql/mutations';
+import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, latestContentVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -69,7 +69,8 @@ export default function TechnicianView() {
     const [jobNotes, setJobNotes] = useState('');
     const [workflows, setWorklows]            = useState<any[]>([]);
     // Which version of the graph is on screen, and what it is compared against.
-    // Both start unset so the automatic cross-party pair stays the default.
+    // Viewing starts unset and snaps to latest once versions load, matching
+    // the job editor so Compare-to is a live controlled value on first paint.
     const [viewingVersion, setViewingVersion] = useState<number | null>(null);
     const [baselineVersionNumber, setBaselineVersionNumber] = useState<number | null | undefined>(undefined);
     const [attachments, setAttachments] = useState<any[]>([]);
@@ -101,6 +102,8 @@ export default function TechnicianView() {
             setWorkflowName(wfs[0].name ?? '');
             setWorkflowState(wfs[0].state ?? '');
         }
+        const latest = latestContentVersion((job as any)?.versions ?? []);
+        if (latest) setViewingVersion((prev) => prev ?? latest.versionNumber);
     }, [data?.jobById]);
 
     const { data: sowByJobIdResult, loading: sowLoading, refetch: refetchSow } = useQuery(GET_SOW_BY_JOB_ID, {
@@ -120,15 +123,6 @@ export default function TechnicianView() {
     const jobData = data?.jobById ?? null;
     const sowData = jobData?.sow ?? null;
     const sowFullData = sowByJobIdResult?.sowByJobId ?? null;
-
-    const [acceptWorkflowMutation] = useMutation(UPDATE_WORKFLOW_STATE, {
-        onCompleted: (data) => {
-            // Workflow accepted successfully
-        },
-        onError: (error: any) => {
-            // Error handled by error state
-        }
-    });
 
     const [createSowForJob] = useMutation(CREATE_SOW_FOR_JOB);
     const [creatingSow, setCreatingSow] = useState(false);
@@ -152,19 +146,6 @@ export default function TechnicianView() {
     };
 
     const [createInvoice, { loading: creatingInvoice }] = useMutation(CREATE_INVOICE);
-
-    const acceptWorkflow = (workflowId: string) => {
-
-        let updateWorkflowState = {
-            workflowId: workflowId,
-            state: 'APPROVED'
-        }
-
-        acceptWorkflowMutation({
-            variables: { updateWorkflowState: updateWorkflowState }
-        });
-
-    }
 
     const [modalOpen, setModalOpen] = useState(false);
     const [sowModalOpen, setSowModalOpen] = useState(false);
@@ -626,6 +607,7 @@ export default function TechnicianView() {
                 <JobFeedbackModal
                     open={modalOpen}
                     onClose={handleCloseModal}
+                    onSubmitted={refetchJob}
                     id={id}
                     jobName={jobName}
                     jobUsername={jobUsername}

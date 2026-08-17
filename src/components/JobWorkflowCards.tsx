@@ -8,7 +8,7 @@ import HelpOutlineIcon  from '@mui/icons-material/HelpOutline';
 import { diffWordsWithSpace } from 'diff';
 import { resolveParameterName } from '../utils/servicePricing';
 import SowDiffText from './sow/SowDiffText';
-import type { GraphDiff, JobVersionLike } from '../utils/jobGraphDiff';
+import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
 
 /**
  * The per-workflow summary cards shown on both job views.
@@ -142,7 +142,7 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
         const when = currentVersion.createdAt ? new Date(currentVersion.createdAt) : null;
         const author = currentVersion.authorRole === 'STAFF' ? 'the DAMP Lab' : 'the customer';
         const parts = [
-            `Showing what ${author} changed since v${baselineVersion.versionNumber}`,
+            `Showing what ${author} changed since v${jobVersionDisplayLabel(baselineVersion.versionNumber)}`,
             currentVersion.createdByName || null,
             when && !Number.isNaN(when.getTime()) ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : null
         ].filter(Boolean);

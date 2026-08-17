@@ -3,7 +3,6 @@ import { Handle, Position, useReactFlow } from 'reactflow';
 import { Badge, Box, Button, IconButton } from '@mui/material';
 import WarningIcon     from '@mui/icons-material/Warning';
 import CloseIcon       from '@mui/icons-material/Close';
-import LockIcon        from '@mui/icons-material/Lock';
 
 import { CanvasContext } from '../contexts/Canvas';
 import { ImagesServicesDict } from '../assets/icons';
@@ -118,20 +117,6 @@ export default memo((input: Input) => {
     return (
         <div>
             <Box sx={{ position: 'relative', opacity: isGhost ? 0.45 : 1 }}>
-                {/* A node the lab has already started is shown as held rather than deletable. */}
-                {isLocked && !isGhost ? (
-                    <Box
-                        title={`${data.data.label} is already under way and cannot be changed`}
-                        sx={{
-                            position: 'absolute', top: -10, left: -10, zIndex: 5,
-                            width: 20, height: 20, borderRadius: '50%',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            backgroundColor: 'white', border: '1px solid', borderColor: 'divider', boxShadow: 1,
-                        }}
-                    >
-                        <LockIcon sx={{ fontSize: 12, color: 'text.secondary' }} />
-                    </Box>
-                ) : null}
                 {/* Diff state is carried by more than colour, so it survives a greyscale print or colour-blind viewing.
                     Sits bottom-right: the run-count Badge below owns the top-right corner. */}
                 {diffKind || isGhost ? (

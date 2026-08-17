@@ -10,7 +10,7 @@ import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '..
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import { CommentsSection }        from '../components/CommentsSection';
 import ResubmitJobModal          from '../components/ResubmitJobModal';
-import { diffJobGraphs, latestContentVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 import { AppContext } from '../contexts/App';
@@ -36,7 +36,8 @@ export default function Tracking() {
     // The catalogue, for re-attaching parameter definitions to a version snapshot.
     const { services }                                  = useContext(AppContext);
     // Which version of the graph is on screen, and what it is compared against.
-    // Both start unset so the automatic cross-party pair stays the default.
+    // Viewing starts unset and snaps to latest once versions load, matching
+    // the job editor so Compare-to is a live controlled value on first paint.
     const [viewingVersion, setViewingVersion] = useState<number | null>(null);
     const [baselineVersionNumber, setBaselineVersionNumber] = useState<number | null | undefined>(undefined);
     const [sowData, setSowData] = useState<any>(null);
@@ -69,6 +70,8 @@ export default function Tracking() {
             setWorkflowName(wfs[0].name ?? '');
             setWorkflowState(wfs[0].state ?? '');
         }
+        const latest = latestVersion((job as any)?.versions ?? []);
+        if (latest) setViewingVersion((prev) => prev ?? latest.versionNumber);
     }, [data?.ownJobById]);
 
     const { data: sowByJobIdResult } = useQuery(GET_SOW_BY_JOB_ID, {
@@ -138,10 +141,13 @@ export default function Tracking() {
     // The editor is offered only while the lab is waiting on the customer.
     const canEdit = jobState === 'CHANGES_REQUESTED';
 
-    // Paging back shows that version's own graph; the newest one is the live job.
-    const latest = latestContentVersion(versions);
-    const isHistoricVersion = latest != null && viewingVersion != null && viewingVersion !== latest.versionNumber;
-    const cardWorkflows = isHistoricVersion ? versionWorkflowsAsCards(current?.workflows, services ?? []) : workflows;
+    // After the server filter, `current` is the latest allowed version when View
+    // is defaulted — including a visible Request Changes event. Live
+    // `job.workflows` is no longer the customer graph source.
+    const latest = latestVersion(versions);
+    const cardWorkflows = current
+        ? versionWorkflowsAsCards(current.workflows, services ?? [])
+        : workflows;
 
     const workflowCard = (
         <>
@@ -163,7 +169,7 @@ export default function Tracking() {
         </>
     );
 
-    const getParameterFiles = () => getJobParameterFiles(workflows);
+    const getParameterFiles = () => getJobParameterFiles(cardWorkflows);
 
     return (
         <div>

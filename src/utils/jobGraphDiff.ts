@@ -38,6 +38,7 @@ export interface SnapshotWorkflow {
 
 export interface JobVersionLike {
     versionNumber: number;
+    displayVersion?: string | null;
     authorRole: JobVersionAuthorRole;
     workflows?: SnapshotWorkflow[];
     createdAt?: string;
@@ -328,31 +329,52 @@ export function currentDiffPair(versions: JobVersionLike[]): { current: JobVersi
     return { current, baseline: previous ?? current };
 }
 
+const JOB_VERSION_MINOR_WIDTH = 1000;
+
+export function jobVersionDisplayLabel(versionNumber: number): string {
+    if (versionNumber < JOB_VERSION_MINOR_WIDTH) return String(versionNumber);
+    return `${Math.floor(versionNumber / JOB_VERSION_MINOR_WIDTH)}.${versionNumber % JOB_VERSION_MINOR_WIDTH}`;
+}
+
 /** Short label for a version, e.g. "v3 · staff · Aug 13". */
 export function jobVersionLabel(version: JobVersionLike): string {
     const date = version.createdAt ? new Date(version.createdAt) : null;
     const when = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
-    return `v${version.versionNumber} · ${version.authorRole.toLowerCase()}${when ? ` · ${when}` : ''}`;
+    return `v${jobVersionDisplayLabel(version.versionNumber)} · ${version.authorRole.toLowerCase()}${when ? ` · ${when}` : ''}`;
 }
 
 /**
  * The pair to diff when the viewer has picked explicitly.
  *
- * Falls back to the automatic pair when nothing is chosen, so a page that has
- * not wired up the pickers keeps behaving exactly as it did. A baseline of
- * `null` means "compare against nothing" — an explicit choice to hide
- * highlighting, distinct from "no baseline available".
+ * Viewing `null` means the page has not yet recorded a picker choice, so the
+ * latest content version is on screen. An explicit baseline still applies in
+ * that case — otherwise Compare-to is a no-op until the reader also touches
+ * View. A baseline of `null` means "compare against nothing", distinct from
+ * "no baseline available" (`undefined`).
+ *
+ * When automatic comparison finds no earlier version, the baseline is the
+ * version on screen. That is what lets unsaved op/param edits highlight in the
+ * editor before a second version exists.
  */
 export function selectedDiffPair(
     versions: JobVersionLike[],
     viewing: number | null,
     baseline: number | null | undefined
 ): { current: JobVersionLike | null; baseline: JobVersionLike | null } {
-    if (viewing == null) return currentDiffPair(versions);
+    const viewingNumber = viewing ?? latestContentVersion(versions)?.versionNumber ?? null;
+    if (viewingNumber == null) return { current: null, baseline: null };
 
-    const current = versions.find((v) => v.versionNumber === viewing) ?? null;
+    const current = versions.find((v) => v.versionNumber === viewingNumber) ?? null;
     if (!current) return currentDiffPair(versions);
-    if (baseline === undefined) return { current, baseline: versions.find((v) => v.versionNumber === (pickJobDiffBaseline(versions, viewing) ?? -1)) ?? null };
+    if (baseline === undefined) {
+        const auto =
+            pickJobDiffBaseline(versions, viewingNumber) ??
+            versions
+                .filter((v) => v.versionNumber < viewingNumber && v.isEvent !== true)
+                .sort((a, b) => b.versionNumber - a.versionNumber)[0]?.versionNumber ??
+            current.versionNumber;
+        return { current, baseline: versions.find((v) => v.versionNumber === auto) ?? current };
+    }
     if (baseline === null) return { current, baseline: null };
 
     return { current, baseline: versions.find((v) => v.versionNumber === baseline) ?? null };
@@ -374,6 +396,12 @@ export function jobStateLabel(state?: string | null): string | null {
         CLOSED: 'Closed'
     };
     return LABELS[state] ?? state;
+}
+
+export function jobVersionChip(version: Pick<JobVersionLike, 'isEvent' | 'note' | 'jobState'>): string | null {
+    if (version.isEvent) return jobStateLabel(version.jobState);
+    if (version.note === 'Original submission') return 'Submitted';
+    return 'Draft';
 }
 
 /** Chip colour for a job state, matching how the SOW history colours its statuses. */

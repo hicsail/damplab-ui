@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Chip, Divider, ListItemText, MenuItem, Select, Typography } from '@mui/material';
-import { JobVersionLike, jobStateColor, jobStateLabel } from '../utils/jobGraphDiff';
+import { JobVersionLike, jobStateColor, jobVersionChip, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
 
 /**
  * Two pickers over a job's version history: which version is on screen, and
@@ -41,15 +41,23 @@ function subtitle(version: JobVersionLike): string {
     return [when(version.createdAt), version.createdByName, describe(version)].filter(Boolean).join(' · ');
 }
 
+function labelFor(version: JobVersionLike | undefined, fallbackNumber: number): string {
+    return version?.displayVersion || jobVersionDisplayLabel(version?.versionNumber ?? fallbackNumber);
+}
+
 /** The chips for one row: always the author, plus the job state when recorded. */
 function VersionChips({ version }: { version: JobVersionLike }): React.JSX.Element {
-    const state = jobStateLabel(version.jobState);
+    const chip = jobVersionChip(version);
+    const color =
+        chip === 'Draft'
+            ? 'default'
+            : version.isEvent
+              ? jobStateColor(version.jobState)
+              : jobStateColor('SUBMITTED');
     return (
         <>
             <Chip size="small" variant="outlined" label={authorLabel(version)} />
-            {/* Absent on versions written before the field existed, and on the
-                backfilled v1 — those simply show the author chip alone. */}
-            {state && <Chip size="small" label={state} color={jobStateColor(version.jobState)} />}
+            {chip && <Chip size="small" label={chip} color={color} />}
         </>
     );
 }
@@ -59,6 +67,12 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
 
     const ordered = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
     const older = ordered.filter((v) => v.versionNumber < viewing);
+
+    // The automatic baseline collapses onto the viewed version when there is
+    // nothing older to compare against, and that number has no option here.
+    // Render it as "Nothing" rather than letting the Select go blank on a value
+    // it cannot match.
+    const selectableBaseline = older.some((v) => v.versionNumber === baseline) ? baseline : null;
 
     return (
         <Box sx={{ display: 'flex', gap: dense ? 0.75 : 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -71,7 +85,7 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
                     const v = versions.find((x) => x.versionNumber === Number(val));
                     return (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                            <span>Version {String(val)}</span>
+                            <span>Version {labelFor(v, Number(val))}</span>
                             {v && <VersionChips version={v} />}
                         </Box>
                     );
@@ -82,7 +96,7 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
                         <ListItemText
                             primary={
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                    <span>Version {v.versionNumber}</span>
+                                    <span>Version {labelFor(v, v.versionNumber)}</span>
                                     <VersionChips version={v} />
                                 </Box>
                             }
@@ -98,7 +112,7 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
             </Typography>
             <Select
                 size="small"
-                value={baseline ?? ''}
+                value={selectableBaseline ?? ''}
                 displayEmpty
                 sx={{ minWidth: dense ? 170 : 200, backgroundColor: 'background.paper' }}
                 onChange={(e) => onBaselineChange(e.target.value === '' ? null : Number(e.target.value))}
@@ -110,7 +124,7 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
                 </MenuItem>
                 {older.map((v) => (
                     <MenuItem key={v.versionNumber} value={v.versionNumber}>
-                        v{v.versionNumber} · {authorLabel(v).toLowerCase()} · {when(v.createdAt)}
+                        v{labelFor(v, v.versionNumber)} · {authorLabel(v).toLowerCase()} · {when(v.createdAt)}
                     </MenuItem>
                 ))}
             </Select>

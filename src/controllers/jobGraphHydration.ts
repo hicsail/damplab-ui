@@ -2,6 +2,7 @@ import { generateFormDataFromParams, createNodeObject, serviceAllowsMultipleRuns
 import { getWorkflowsFromGraph } from './GraphHelpers';
 import { NodeParameter } from '../types/CanvasTypes';
 import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { applyNodeChanges, NodeChange } from 'reactflow';
 
 /**
  * Rebuilding a submitted job as an editable canvas.
@@ -110,6 +111,21 @@ const nodeIsLocked = (node: any): boolean => {
     const inFlight = state !== undefined && state !== null && state !== 'QUEUED';
     const holdsInventory = Array.isArray(node?.usedInventory) && node.usedInventory.length > 0;
     return inFlight || holdsInventory;
+};
+
+/**
+ * Client-side ids of the job's live nodes that the lab has started or that hold
+ * inventory. Read straight off the live workflows, so a snapshot-hydrated canvas
+ * can still show real locks — the snapshot itself records no node state.
+ */
+export const lockedClientIdsFromJob = (job: any): Set<string> => {
+    const locked = new Set<string>();
+    for (const workflow of job?.workflows ?? []) {
+        for (const node of workflow?.nodes ?? []) {
+            if (node?.id && nodeIsLocked(node)) locked.add(node.id);
+        }
+    }
+    return locked;
 };
 
 /**
@@ -223,15 +239,32 @@ export const versionWorkflowsAsCards = (versionWorkflows: any[] | undefined, ser
     }));
 
 /**
- * Rebuild a stored version snapshot as a read-only canvas.
+ * Rebuild a stored version snapshot as a canvas.
  *
  * Distinct from hydrateJobGraph, which reads the job's *live* workflow documents
  * and carries operational state (node state, locks, workflow ids) that only
- * applies to the present. A snapshot has none of that — it is content only — so
- * the nodes it produces are for looking at, never for saving. Marked
- * `historic: true` and made undraggable to keep that honest.
+ * applies to the present. A snapshot has none of that — it is content only.
+ *
+ * Read-only by default, which is what viewing an older version wants: the nodes
+ * are marked `historic` and made undraggable so a past version cannot be edited
+ * or saved.
+ *
+ * `editable` exists for the customer's editor, which must hydrate from a
+ * snapshot rather than the live documents (those can hold a staff draft the
+ * customer is not meant to see) while still being a working editor. Because the
+ * snapshot carries no node state, in-flight locking cannot be derived from it —
+ * pass `lockedClientIds`, built from the live workflows, or every node comes
+ * back unlocked. The backend re-checks regardless; this is the affordance, not
+ * the guarantee.
  */
-export const hydrateVersionGraph = (versionWorkflows: any[] | undefined, services: any[]): HydratedGraph => {
+interface VersionGraphOptions {
+    editable?: boolean;
+    /** Client-side ids of nodes the lab has started or that hold inventory. */
+    lockedClientIds?: Set<string>;
+}
+
+export const hydrateVersionGraph = (versionWorkflows: any[] | undefined, services: any[], options: VersionGraphOptions = {}): HydratedGraph => {
+    const editable = options.editable === true;
     const allNodes: any[] = [];
     const allEdges: any[] = [];
 
@@ -270,15 +303,16 @@ export const hydrateVersionGraph = (versionWorkflows: any[] | undefined, service
                 serviceId: snapshot.serviceId,
                 pricing: service?.pricing,
                 pricingMode: service?.pricingMode,
-                historic: true,
+                historic: !editable,
                 // Reuses CanvasNode's existing suppression path, so a past
                 // version does not render a live delete button it would ignore.
-                locked: true
+                // When editable, only genuinely in-flight nodes lock.
+                locked: editable ? options.lockedClientIds?.has(snapshot.id) === true : true
             };
 
             const node: any = createNodeObject(snapshot.id, data.label, 'selectorNode', position, data as any);
-            node.draggable = false;
-            node.deletable = false;
+            node.draggable = editable ? !data.locked : false;
+            node.deletable = editable ? !data.locked : false;
             allNodes.push(node);
         }
 
@@ -289,14 +323,137 @@ export const hydrateVersionGraph = (versionWorkflows: any[] | undefined, service
 };
 
 /**
- * Nodes the diff baseline had that the canvas no longer does, rendered as
- * ghosts so a deletion stays visible instead of silently vanishing.
+ * Graphs whose missing nodes should render as ghosts: the version currently
+ * being edited (so an unsaved delete stays on the canvas) unioned with the
+ * highlight baseline (so an already-saved deletion still shows when comparing).
  *
- * Deliberately *derived* from the canvas rather than stored in it. An earlier
- * version appended ghosts to node state from an effect, which raced with
- * hydration: on the mount commit `nodes` is still empty, so every baseline node
- * looked missing and the whole graph was ghosted — unclickable, and duplicated
- * against the real nodes. Deriving makes that unrepresentable.
+ * Viewed nodes win on id collision — a ghost should sit where the editor just
+ * removed it, not where an older snapshot had it.
+ */
+export const unionGhostSources = (viewed: any[] | undefined, baseline: any[] | undefined): any[] | undefined => {
+    if (!viewed?.length && !baseline?.length) return undefined;
+
+    const nodesById = new Map<string, any>();
+    const edges: any[] = [];
+    const seenEdges = new Set<string>();
+
+    for (const source of [viewed, baseline]) {
+        if (!source?.length) continue;
+        for (const workflow of source) {
+            for (const node of workflow?.nodes ?? []) {
+                if (node?.id && !nodesById.has(node.id)) nodesById.set(node.id, node);
+            }
+            for (const edge of workflow?.edges ?? []) {
+                const key = `${edge?.source}->${edge?.target}`;
+                if (seenEdges.has(key)) continue;
+                seenEdges.add(key);
+                edges.push(edge);
+            }
+        }
+    }
+
+    return [{ nodes: [...nodesById.values()], edges }];
+};
+
+const GHOST_EDGE_STYLE = { stroke: '#9e9e9e', strokeDasharray: '6 4' };
+
+/** Mark a live React Flow node as a deletion ghost without changing its id or position. */
+export const markNodeGhost = (node: any): any => ({
+    ...node,
+    draggable: false,
+    deletable: false,
+    selectable: false,
+    data: { ...node.data, ghost: true }
+});
+
+/**
+ * Apply React Flow node changes in the job editor.
+ *
+ * A `remove` of a node that was on the job when the editor opened is converted
+ * into a ghost rather than dropped: React Flow's delete path actually removes
+ * the node, and putting a same-id ghost back on the next render never sticks.
+ * Nodes added in this session are still removed for real.
+ */
+export const applyJobEditorNodeChanges = (changes: NodeChange[], nodes: any[], loadedIds: Set<string>): any[] => {
+    const removes = changes.filter((c) => c.type === 'remove');
+    const rest = changes.filter((c) => c.type !== 'remove');
+    let next = rest.length ? applyNodeChanges(rest, nodes) : nodes;
+
+    for (const rem of removes) {
+        const id = rem.id;
+        const existing = next.find((n: any) => n.id === id);
+        // Comparison ghosts are not in loadedIds. If React Flow sends a remove
+        // for one, keep it — dropping it here and re-inserting in an effect loops.
+        if (existing?.data?.ghost) continue;
+        if (!loadedIds.has(id)) {
+            next = next.filter((n: any) => n.id !== id);
+            continue;
+        }
+        next = next.map((n: any) => (n.id === id ? markNodeGhost(n) : n));
+    }
+
+    return next;
+};
+
+/**
+ * After React Flow strips edges connected to a node it thinks it deleted, put
+ * those edges back (dashed) so a ghost is not left floating. Edges that do not
+ * touch a ghosted node are left as the caller passed them — a user deleting a
+ * connection between two live nodes is not undone.
+ */
+export const restoreGhostEdges = (current: any[], previous: any[], ghostedIds: Set<string>): any[] => {
+    if (!ghostedIds.size) return current;
+
+    const byId = new Map<string, any>((current ?? []).map((e: any) => [e.id, e]));
+    for (const edge of previous ?? []) {
+        if (!ghostedIds.has(edge.source) && !ghostedIds.has(edge.target)) continue;
+        byId.set(edge.id, { ...edge, animated: false, style: GHOST_EDGE_STYLE });
+    }
+    return [...byId.values()];
+};
+
+/**
+ * Fold comparison ghosts into the editor's node state. Session-deleted ghosts
+ * (ids that were on the job when it loaded) stay even if the baseline moves;
+ * ghosts that only exist to show a saved deletion are added and removed with
+ * the baseline. Returns the same array when nothing changed so a useEffect
+ * can call this without looping.
+ */
+export const mergeComparisonGhosts = (nodes: any[], derived: any[], loadedIds: Set<string>): any[] => {
+    const derivedIds = new Set(derived.map((g: any) => g.id));
+    let changed = false;
+    const result: any[] = [];
+    const seen = new Set<string>();
+
+    for (const n of nodes) {
+        if (!n?.data?.ghost) {
+            result.push(n);
+            seen.add(n.id);
+            continue;
+        }
+        if (loadedIds.has(n.id) || derivedIds.has(n.id)) {
+            result.push(n);
+            seen.add(n.id);
+            continue;
+        }
+        changed = true;
+    }
+
+    for (const g of derived) {
+        if (seen.has(g.id)) continue;
+        result.push(g);
+        seen.add(g.id);
+        changed = true;
+    }
+
+    return changed ? result : nodes;
+};
+
+/**
+ * Nodes the diff baseline had that the canvas no longer does. Built as real
+ * React Flow nodes (same id, ghost flag) so the job editor can insert them
+ * into node state — passing them only as extras on the `nodes` prop does not
+ * stick, which is the same failure session-delete had.
  */
 export const deriveGhostNodes = (baselineWorkflows: any[] | undefined, presentNodeIds: Set<string>, services: any[]): any[] => {
     if (!baselineWorkflows?.length) return [];
@@ -323,7 +480,10 @@ export const deriveGhostNodes = (baselineWorkflows: any[] | undefined, presentNo
                 serviceId: snapshot.serviceId,
                 ghost: true
             };
-            const ghost: any = createNodeObject(snapshot.id, data.label, 'selectorNode', snapshot.position ?? { x: 0, y: 0 }, data as any);
+            const raw = snapshot.position;
+            const position =
+                raw && typeof raw.x === 'number' && typeof raw.y === 'number' ? { x: raw.x, y: raw.y } : { x: 0, y: 0 };
+            const ghost: any = createNodeObject(snapshot.id, data.label, 'selectorNode', position, data as any);
             ghost.draggable = false;
             ghost.deletable = false;
             ghost.selectable = false;

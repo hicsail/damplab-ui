@@ -51,7 +51,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         return sourceId;
     }
     
-    const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
+    const position = { x: sourcePosition?.x ?? 0, y: (sourcePosition?.y ?? 0) + 150 };
     const nodeId = Math.random().toString(36).substring(2, 9);  // Sufficient variance?
     const { formData, parameters } = buildNodeParameters(service, nodeId);
 

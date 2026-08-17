@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hydrateJobGraph, mergeSavedFormData, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges } from './jobGraphHydration';
+import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, mergeSavedFormData, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from './jobGraphHydration';
 import { getWorkflowsFromGraph } from './GraphHelpers';
 
 const service = (id: string, parameters: any[] = []) => ({
@@ -176,6 +176,54 @@ describe('hydrateJobGraph', () => {
   });
 });
 
+describe('hydrateVersionGraph', () => {
+  const snapshot = [{ workflowId: 'wf1', name: 'Workflow-1', nodes: [{ id: 'a', serviceId: 's1', label: 'Service s1', formData: [], additionalInstructions: '' }], edges: [] }];
+
+  it('locks everything when viewing an old version, so nothing looks editable', () => {
+    const { nodes } = hydrateVersionGraph(snapshot, [service('s1')]);
+    expect(nodes[0].data.locked).toBe(true);
+    expect(nodes[0].data.historic).toBe(true);
+    expect(nodes[0].deletable).toBe(false);
+  });
+
+  it('leaves nodes unlocked when editable, so the customer keeps a delete button', () => {
+    // The customer's editor hydrates from a snapshot rather than the live
+    // workflows (those can carry a staff draft). Defaulting to locked there hid
+    // the delete X while every other edit still worked.
+    const { nodes } = hydrateVersionGraph(snapshot, [service('s1')], { editable: true, lockedClientIds: new Set() });
+    expect(nodes[0].data.locked).toBe(false);
+    expect(nodes[0].data.historic).toBe(false);
+    expect(nodes[0].deletable).toBe(true);
+  });
+
+  it('still locks an in-flight node when editable', () => {
+    // A snapshot records no node state, so the lock has to come from the live
+    // job. Losing it would offer a delete the backend then refuses.
+    const { nodes } = hydrateVersionGraph(snapshot, [service('s1')], { editable: true, lockedClientIds: new Set(['a']) });
+    expect(nodes[0].data.locked).toBe(true);
+    expect(nodes[0].deletable).toBe(false);
+  });
+});
+
+describe('lockedClientIdsFromJob', () => {
+  it('collects nodes the lab has started or that hold inventory', () => {
+    const job = {
+      workflows: [
+        {
+          id: 'wf1',
+          nodes: [jobNode('queued', 's1'), jobNode('running', 's1', { state: 'IN_PROGRESS' }), jobNode('reserved', 's1', { usedInventory: [{ id: 'i1' }] })],
+          edges: []
+        }
+      ]
+    };
+    expect([...lockedClientIdsFromJob(job)].sort()).toEqual(['reserved', 'running']);
+  });
+
+  it('is empty for a job with no workflows', () => {
+    expect(lockedClientIdsFromJob({}).size).toBe(0);
+  });
+});
+
 describe('buildSaveWorkflowsInput', () => {
   const hydrate = () => {
     const job = {
@@ -220,6 +268,107 @@ describe('buildSaveWorkflowsInput', () => {
     const input = buildSaveWorkflowsInput(nodes, []); // all edges cut
     const wf1Trees = input.filter((w) => w.workflowId === 'wf1');
     expect(wf1Trees.length).toBeGreaterThan(0);
+  });
+});
+
+describe('applyJobEditorNodeChanges', () => {
+  const node = (id: string, over: Record<string, any> = {}) => ({
+    id,
+    position: { x: 10, y: 20 },
+    data: { id, label: id, ghost: false, ...(over.data ?? {}) },
+    ...over
+  });
+
+  it('keeps a loaded node on the canvas as a ghost instead of removing it', () => {
+    // React Flow's delete path actually removes the node; re-inserting a same-id
+    // ghost afterwards never sticks. Convert in place so the node never leaves.
+    const nodes = [node('a'), node('b')];
+    const next = applyJobEditorNodeChanges([{ type: 'remove', id: 'b' }], nodes, new Set(['a', 'b']));
+    expect(next.map((n: any) => n.id)).toEqual(['a', 'b']);
+    expect(next[1].data.ghost).toBe(true);
+    expect(next[1].position).toEqual({ x: 10, y: 20 });
+    expect(next[1].deletable).toBe(false);
+  });
+
+  it('really removes a node that was added in this session', () => {
+    const nodes = [node('a'), node('new')];
+    const next = applyJobEditorNodeChanges([{ type: 'remove', id: 'new' }], nodes, new Set(['a']));
+    expect(next.map((n: any) => n.id)).toEqual(['a']);
+  });
+
+  it('still applies position changes to live nodes', () => {
+    const nodes = [node('a')];
+    const next = applyJobEditorNodeChanges(
+      [{ type: 'position', id: 'a', position: { x: 50, y: 60 } }],
+      nodes,
+      new Set(['a'])
+    );
+    expect(next[0].position).toEqual({ x: 50, y: 60 });
+    expect(next[0].data.ghost).toBe(false);
+  });
+  it('does not drop a comparison ghost when React Flow sends a remove for it', () => {
+    const nodes = [node('a'), node('b', { data: { ghost: true }, deletable: false })];
+    const next = applyJobEditorNodeChanges([{ type: 'remove', id: 'b' }], nodes, new Set(['a']));
+    expect(next.map((n: any) => n.id)).toEqual(['a', 'b']);
+    expect(next[1].data.ghost).toBe(true);
+  });
+});
+
+describe('mergeComparisonGhosts', () => {
+  const live = (id: string) => ({ id, data: { ghost: false }, position: { x: 1, y: 1 } });
+  const ghost = (id: string) => ({ id, data: { ghost: true }, position: { x: 2, y: 2 } });
+
+  it('inserts a baseline node that the current canvas does not have', () => {
+    const nodes = [live('a')];
+    const derived = [ghost('b')];
+    const next = mergeComparisonGhosts(nodes, derived, new Set(['a']));
+    expect(next.map((n: any) => n.id)).toEqual(['a', 'b']);
+    expect(next[1].data.ghost).toBe(true);
+  });
+
+  it('keeps a session-deleted ghost even if the baseline no longer lists it', () => {
+    const nodes = [live('a'), ghost('b')];
+    const next = mergeComparisonGhosts(nodes, [], new Set(['a', 'b']));
+    expect(next.map((n: any) => n.id)).toEqual(['a', 'b']);
+  });
+
+  it('drops a comparison ghost when the baseline no longer includes it', () => {
+    const nodes = [live('a'), ghost('old')];
+    const next = mergeComparisonGhosts(nodes, [], new Set(['a']));
+    expect(next.map((n: any) => n.id)).toEqual(['a']);
+  });
+
+  it('does not duplicate a ghost already on the canvas', () => {
+    const existing = ghost('b');
+    const nodes = [live('a'), existing];
+    const next = mergeComparisonGhosts(nodes, [ghost('b')], new Set(['a']));
+    expect(next.filter((n: any) => n.id === 'b')).toHaveLength(1);
+    expect(next[1]).toBe(existing);
+  });
+
+  it('returns the same array when nothing changed, so an insert effect does not loop', () => {
+    const nodes = [live('a')];
+    expect(mergeComparisonGhosts(nodes, [], new Set(['a']))).toBe(nodes);
+  });
+});
+
+describe('restoreGhostEdges', () => {
+  it('puts back edges React Flow stripped when ghosting a node, and dashes them', () => {
+    const previous = [
+      { id: 'a->b', source: 'a', target: 'b', animated: true },
+      { id: 'b->c', source: 'b', target: 'c', animated: true }
+    ];
+    const afterRfRemove: any[] = [];
+    const next = restoreGhostEdges(afterRfRemove, previous, new Set(['b']));
+    expect(next.map((e: any) => e.id).sort()).toEqual(['a->b', 'b->c']);
+    expect(next[0].style.strokeDasharray).toBeDefined();
+    expect(next[0].animated).toBe(false);
+  });
+
+  it('does not resurrect an edge the user deleted between two live nodes', () => {
+    const previous = [{ id: 'a->c', source: 'a', target: 'c' }];
+    const afterRfRemove: any[] = [];
+    expect(restoreGhostEdges(afterRfRemove, previous, new Set())).toEqual([]);
   });
 });
 
@@ -285,6 +434,67 @@ describe('getWorkflowsFromGraph', () => {
     const groups = getWorkflowsFromGraph(nodes, edges);
     expect(groups).toHaveLength(1);
     expect(groups[0]).toHaveLength(2);
+  });
+});
+
+describe('unionGhostSources', () => {
+  const viewed = [
+    {
+      workflowId: 'wf1',
+      nodes: [
+        { id: 'a', label: 'Keep', serviceId: 's1', position: { x: 0, y: 0 } },
+        { id: 'b', label: 'Just deleted', serviceId: 's1', position: { x: 0, y: 150 } }
+      ],
+      edges: [{ id: 'e1', source: 'a', target: 'b' }]
+    }
+  ];
+  const baseline = [
+    {
+      workflowId: 'wf1',
+      nodes: [
+        { id: 'a', label: 'Keep', serviceId: 's1', position: { x: 0, y: 0 } },
+        { id: 'c', label: 'Gone in a prior save', serviceId: 's1', position: { x: 200, y: 0 } }
+      ],
+      edges: []
+    }
+  ];
+
+  it('ghosts a node deleted from the version being edited even when there is no highlight baseline', () => {
+    // The highlight baseline is often empty (same-party consecutive edits).
+    // Unsaved deletes still have to stay on the canvas as ghosts.
+    const source = unionGhostSources(viewed, undefined);
+    const ghosts = deriveGhostNodes(source, new Set(['a']), [service('s1')]);
+    expect(ghosts.map((g: any) => g.id)).toEqual(['b']);
+    expect(deriveGhostEdges(source, new Set(['b']), new Set(['a', 'b'])).map((e: any) => `${e.source}->${e.target}`)).toEqual(['a->b']);
+  });
+
+  it('also ghosts nodes the compare-against version has that the canvas does not', () => {
+    const source = unionGhostSources(viewed, baseline);
+    const ghosts = deriveGhostNodes(source, new Set(['a']), [service('s1')]);
+    expect(ghosts.map((g: any) => g.id).sort()).toEqual(['b', 'c']);
+  });
+
+  it('does not emit the same node twice when it is in both sources', () => {
+    const source = unionGhostSources(viewed, viewed);
+    const ghosts = deriveGhostNodes(source, new Set(['a']), [service('s1')]);
+    expect(ghosts.map((g: any) => g.id)).toEqual(['b']);
+  });
+
+  it('prefers the viewed copy when both sources have the node, so a ghost sits where it was just deleted from', () => {
+    const moved = [
+      {
+        workflowId: 'wf1',
+        nodes: [{ id: 'b', label: 'Just deleted', serviceId: 's1', position: { x: 99, y: 99 } }],
+        edges: []
+      }
+    ];
+    const source = unionGhostSources(moved, viewed);
+    const ghosts = deriveGhostNodes(source, new Set(), [service('s1')]);
+    expect(ghosts.find((g: any) => g.id === 'b')!.position).toEqual({ x: 99, y: 99 });
+  });
+
+  it('is a no-op when neither source has a graph', () => {
+    expect(unionGhostSources(undefined, undefined)).toBeUndefined();
   });
 });
 

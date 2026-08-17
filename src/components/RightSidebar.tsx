@@ -425,8 +425,8 @@ export default function ContextTestComponent(props: SidebarProps) {
                         ? (activeNode.data.allowedConnections.map((connection: any) => {
                             return (
                                 <NodeButton 
-                                    key                  = {Math.random().toString(36).substring(2, 9)}
-                                    node                 = {getServiceFromId(services, connection.id)}
+                                    key                  = {connection.id ?? connection}
+                                    node                 = {getServiceFromId(services, connection.id ?? connection)}
                                     sourceId             = {val.activeComponentId}
                                     setNodes             = {val.setNodes}
                                     setEdges             = {val.setEdges}
