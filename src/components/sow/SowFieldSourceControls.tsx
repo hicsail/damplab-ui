@@ -86,7 +86,11 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
             <Typography variant="caption" sx={labelSx}>
               Project manager
             </Typography>
-            <Select size="small" fullWidth displayEmpty value={inputs.projectManager ?? ''} disabled={disabled} onChange={(e) => onChange({ projectManager: String(e.target.value) })}>
+            <Select size="small" fullWidth displayEmpty value={inputs.projectManager ?? ''} disabled={disabled} onChange={(e) => {
+              const name = String(e.target.value);
+              const match = staff.find((s) => s.displayName === name);
+              onChange({ projectManager: name, projectManagerId: match?.id ?? undefined });
+            }}>
               <MenuItem value="">
                 <em>Not assigned</em>
               </MenuItem>
@@ -101,7 +105,11 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
             <Typography variant="caption" sx={labelSx}>
               Project lead
             </Typography>
-            <Select size="small" fullWidth displayEmpty value={inputs.projectLead ?? ''} disabled={disabled} onChange={(e) => onChange({ projectLead: String(e.target.value) })}>
+            <Select size="small" fullWidth displayEmpty value={inputs.projectLead ?? ''} disabled={disabled} onChange={(e) => {
+              const name = String(e.target.value);
+              const match = staff.find((s) => s.displayName === name);
+              onChange({ projectLead: name, projectLeadId: match?.id ?? undefined });
+            }}>
               <MenuItem value="">
                 <em>Not assigned</em>
               </MenuItem>
