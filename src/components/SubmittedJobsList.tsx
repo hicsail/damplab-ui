@@ -26,6 +26,7 @@ import FiberNewIcon from '@mui/icons-material/FiberNew';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import { sowStatusLabel } from './sow/sowTypes';
 
 export interface JobListItem {
   id: string;
@@ -318,7 +319,7 @@ export default function SubmittedJobsList({
                       {job.sow && (
                         <Chip
                           icon={<DescriptionIcon sx={{ fontSize: 16 }} />}
-                          label="SOW"
+                          label={`SOW - ${sowStatusLabel(job.sow.status)}`}
                           size="small"
                           color="success"
                           variant="outlined"

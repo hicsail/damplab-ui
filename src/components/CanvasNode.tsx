@@ -39,6 +39,27 @@ export default memo((input: Input) => {
     const isConnectable = input.isConnectable;
     const data = input;
 
+    /**
+     * Job-editor decoration. These three flags are set by JobEditor and never
+     * exist on the ordinary canvas, so a node with none of them renders exactly
+     * as it always has.
+     *
+     *   diffKind — 'added' | 'changed', relative to the diff baseline
+     *   ghost    — deleted in this session, kept visible so the removal is legible
+     *   locked   — work already under way; not the editor's to change
+     */
+    const diffKind: string | undefined = data.data.diffKind;
+    const isGhost = !!data.data.ghost;
+    const isLocked = !!data.data.locked;
+
+    const outline = isGhost
+        ? { border: '2px dashed #9e9e9e' }
+        : diffKind === 'added'
+        ? { border: '2px solid #2e7d32' }
+        : diffKind === 'changed'
+        ? { border: '2px solid #ed6c02' }
+        : {};
+
     const handleOpen = () => {
         setActiveComponentId(data.data.id);
     };
@@ -95,9 +116,39 @@ export default memo((input: Input) => {
 
     return (
         <div>
-            <Box sx={{ position: 'relative' }}>
+            <Box sx={{ position: 'relative', opacity: isGhost ? 0.45 : 1 }}>
+                {/* Diff state is carried by more than colour, so it survives a greyscale print or colour-blind viewing.
+                    Sits bottom-right: the run-count Badge below owns the top-right corner. */}
+                {diffKind || isGhost ? (
+                    <Box
+                        sx={{
+                            position: 'absolute', bottom: -12, right: -6, zIndex: 5,
+                            px: 0.6, borderRadius: 1, fontSize: 10, fontWeight: 700, lineHeight: '16px',
+                            color: 'white',
+                            backgroundColor: isGhost ? '#757575' : diffKind === 'added' ? '#2e7d32' : '#ed6c02',
+                        }}
+                    >
+                        {isGhost ? 'Deleted' : diffKind === 'added' ? 'New' : 'Edited'}
+                    </Box>
+                ) : null}
+                {/* Incomplete parameters are flagged in the bottom-left corner rather than
+                    inside the button: as an in-flow flex child the icon stole width from the
+                    label, so a node's text re-wrapped the moment it became complete. */}
+                {allFilled || isGhost ? null : (
+                    <Box
+                        title={`${data.data.label} is missing required parameters`}
+                        sx={{
+                            position: 'absolute', bottom: -10, left: -10, zIndex: 5,
+                            width: 20, height: 20, borderRadius: '50%',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: 'white', border: '1px solid', borderColor: 'divider', boxShadow: 1,
+                        }}
+                    >
+                        <WarningIcon sx={{ fontSize: 13, color: 'red' }} />
+                    </Box>
+                )}
                 {/* nodrag keeps a click from starting a canvas drag instead of deleting. */}
-                {input.readOnly ? null : <IconButton
+                {input.readOnly || isLocked || isGhost ? null : <IconButton
                     className="nodrag"
                     size="small"
                     title={`Delete ${data.data.label}`}
@@ -129,19 +180,16 @@ export default memo((input: Input) => {
                     sx={{ '& .MuiBadge-badge': { fontSize: 10, fontWeight: 'bold', minWidth: 20, height: 20 } }}
                 >
                     <Button variant="outlined" title={data.data.label} onClick={handleOpen} sx={{boxShadow: 2}}
-                    style={{ width: 250, display: 'flex', justifyContent: 'space-around', background : background }}>
+                    style={{ width: 250, display: 'flex', justifyContent: 'space-around', background : background, ...outline }}>
                         <div>
                             {/* URL (e.g. to Google Drive) from the DB... */}
                             {/* <img src={data.data.icon} alt=" " style={{ width: 30 }} /> */}
                             {/* Local files in src/assets/icons folder... */}
                             <img src={ImagesServicesDict[data.data.label]} alt=" " style={{ width: 30 }} />
                         </div>
-                        <p style={{ fontSize: 12, marginLeft: 5, marginRight: 5 }}>
+                        <p style={{ fontSize: 12, marginLeft: 5, marginRight: 5, textDecoration: isGhost ? 'line-through' : 'none' }}>
                             {data.data.label}
                         </p>
-                        <div>
-                            { allFilled ? null : <WarningIcon style={{ color: 'red' }} />}
-                        </div>
                     </Button>
                 </Badge>
                 <Handle type="target" position={Position.Top} isConnectable={isConnectable} style={{width: 10, height: 10}}/>

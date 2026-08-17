@@ -7,7 +7,7 @@ import 'reactflow/dist/style.css';
 import { Button } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 
-import { generateFormDataFromParams, createNodeObject } from '../controllers/ReactFlowEvents';
+import { buildNodeParameters, createNodeObject } from '../controllers/ReactFlowEvents';
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
 import { addNodesAndEdgesFromServiceIdsAlt }            from '../controllers/ResubmissionHelpers';
 import Sidebar        from '../components/Sidebar';
@@ -104,7 +104,7 @@ export default function MainFlow() {
         const nodeId = Math.random().toString(36).substring(2, 9);
         setActiveComponentId(nodeId);
 
-        const formData: NodeParameter[] = generateFormDataFromParams(type.parameters, nodeId);
+        const { formData, parameters } = buildNodeParameters(type, nodeId);
         const data: NodeData = {
             id: nodeId,
             label: name,
@@ -118,7 +118,7 @@ export default function MainFlow() {
             pricingMode: type.pricingMode,
             description: type.description,
             allowedConnections: type.allowedConnections,
-            icon: type.icon, parameters: type.parameters, additionalInstructions: "", formData: formData, serviceId: serviceId, paramGroups: type.paramGroups };
+            icon: type.icon, parameters: parameters, additionalInstructions: "", formData: formData, serviceId: serviceId, paramGroups: type.paramGroups };
         const newNode = createNodeObject(nodeId, name, type.type, position, data);
 
         setNodes((nds: any) => nds.concat(newNode));

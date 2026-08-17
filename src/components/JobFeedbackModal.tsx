@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useMutation } from '@apollo/client';
-import { Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography, Checkbox } from "@mui/material";
+import { Alert, Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import { styled } from "@mui/system";
 
 import { MUTATE_JOB_STATE, CREATE_COMMENT } from '../gql/mutations';
@@ -29,23 +29,28 @@ const FeedbackField = styled(TextField)`
 
 
 export default function JobFeedbackModal(props: any) {
-  const { onClose, id, jobName, jobUsername, jobEmail, jobInstitution, jobTime, jobState } = props;
-  
-  const [feedbackType,      setFeedbackType]      = useState("");
-  const [feedbackMessage,   setFeedbackMessage]   = useState("");
-  const [sendAsComment,     setSendAsComment]     = useState(true);
-  const [mutationCompleted, setMutationCompleted] = useState(false);
+  const { open, onClose, onSubmitted, id, jobName, jobUsername, jobEmail, jobInstitution, jobTime, jobState } = props;
+
+  const [feedbackType,    setFeedbackType]    = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [submitting,      setSubmitting]      = useState(false);
+  const [submitError,     setSubmitError]     = useState<string | null>(null);
 
   const [mutateJobState] = useMutation(MUTATE_JOB_STATE);
   const [createComment]  = useMutation(CREATE_COMMENT);
   const userContext      = useContext(UserContext);
 
+  // TechnicianView keeps this modal mounted and only toggles `open`, so nothing
+  // clears the form between openings. The page reload used to do it by
+  // accident; reopening Review would otherwise show the last decision, its
+  // message, and any stale error still filled in.
   useEffect(() => {
-    if (mutationCompleted) {
-      onClose(); // Close the modal when the mutation is completed
-      setMutationCompleted(false)
+    if (open) {
+      setFeedbackType('');
+      setFeedbackMessage('');
+      setSubmitError(null);
     }
-  }, [mutationCompleted, onClose]);
+  }, [open]);
 
   const handleFeedbackTypeChange = (event: any) => {
     setFeedbackType(event.target.value);
@@ -71,24 +76,26 @@ export default function JobFeedbackModal(props: any) {
         updatedState = jobState || "SUBMITTED";
     }
 
+    setSubmitting(true);
+    setSubmitError(null);
     try {
-      await mutateJobState({
-        variables: { ID: id, State: updatedState },
-        onError: (error: any) => {
-          console.log(error.networkError?.result?.errors);
-        },
-        onCompleted: () => {
-          setMutationCompleted(true);
-        }
-      });
-  
-      if (sendAsComment && feedbackMessage.trim()) {
+      await mutateJobState({ variables: { ID: id, State: updatedState } });
+
+      // Always posted — the customer cannot act on feedback they never see.
+      if (feedbackMessage.trim()) {
         const email = userContext.userProps?.idTokenParsed?.email ?? 'technician@bu.edu';
+        // Requesting changes hands the customer the editor; the link is what
+        // turns the request into something they can actually do.
+        const editorLink = `[Open the workflow editor](/job_editor/${id})`;
+        const content = updatedState === 'CHANGES_REQUESTED'
+          ? `${feedbackMessage.trim()}\n\n${editorLink}`
+          : feedbackMessage.trim();
+
         await createComment({
           variables: {
             input: {
               jobId: id,
-              content: feedbackMessage.trim(),
+              content,
               author: email,
               authorType: 'STAFF',
               isInternal: false,
@@ -97,15 +104,26 @@ export default function JobFeedbackModal(props: any) {
         });
       }
 
-      window.location.reload();
-    } catch (error) {
-      console.log(error);
+      // Pull the job (and its versions) fresh rather than reloading the page.
+      // The old `window.location.reload()` fired while this handler's own state
+      // updates were still settling — a teardown race that is the leading
+      // suspect for the dev-mode "Application Error" seen right after a
+      // decision, and unnecessary regardless: the job query is what changed.
+      await onSubmitted?.();
+      onClose();
+    } catch (error: any) {
+      // Previously swallowed into console.log and then hidden by the reload, so
+      // a decision that never reached the server still looked like it landed.
+      console.error(error);
+      setSubmitError(error?.message ?? 'Could not record the decision. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
-  };  
+  };
   
   
   return (
-    <CenteredModal open={props.open} onClose={props.onClose}>
+    <CenteredModal open={open} onClose={onClose}>
       <ModalBox>
         <Typography variant="h6" sx={{ mb: 1 }}>Review Job</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -139,7 +157,7 @@ export default function JobFeedbackModal(props: any) {
 
             <FormControlLabel control={<Radio />} value="looks-good"    label="Accept job (ready to proceed)" />
 
-            <FormControlLabel control={<Radio />} value="minor-changes" label="Request minor changes" />
+            <FormControlLabel control={<Radio />} value="minor-changes" label="Request clarification" />
               {feedbackType === "minor-changes" && (
                 <FeedbackField
                   fullWidth
@@ -147,12 +165,12 @@ export default function JobFeedbackModal(props: any) {
                   minRows={3}
                   onChange={handleFeedbackMessageChange}
                   value={feedbackMessage}
-                  label="Describe the minor changes needed"
+                  label="What needs clarifying?"
                   required
                 />
               )}
 
-            <FormControlLabel control={<Radio />} value="major-changes" label="Request major changes / redesign"/>
+            <FormControlLabel control={<Radio />} value="major-changes" label="Request design edits"/>
               {feedbackType === "major-changes" && (
                 <FeedbackField
                   fullWidth
@@ -168,30 +186,34 @@ export default function JobFeedbackModal(props: any) {
           </RadioGroup>
 
           <Box sx={{ mt: 1, mb: 2 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={sendAsComment}
-                  onChange={(e) => setSendAsComment(e.target.checked)}
-                />
-              }
-              label="Post this feedback as a visible comment to the client"
-            />
+            <Typography variant="body2" color="text.secondary">
+              {feedbackType && feedbackType !== 'looks-good'
+                ? 'This will be posted to the client as a comment, with a link to the workflow editor.'
+                : 'Your decision will be posted to the client as a comment.'}
+            </Typography>
           </Box>
 
+          {submitError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {submitError}
+            </Alert>
+          )}
+
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-            <Button onClick={onClose} color="inherit">
+            <Button onClick={onClose} color="inherit" disabled={submitting}>
               Cancel
             </Button>
             <Button
               variant="contained"
               color="primary"
               onClick={handleSubmit}
-              disabled={!feedbackType || (feedbackType !== 'looks-good' && !feedbackMessage.trim())}
+              disabled={submitting || !feedbackType || (feedbackType !== 'looks-good' && !feedbackMessage.trim())}
             >
-              {feedbackType === "looks-good"
-                ? "Accept Job"
-                : "Submit Decision"}
+              {submitting
+                ? "Saving…"
+                : feedbackType === "looks-good"
+                  ? "Accept Job"
+                  : "Submit Decision"}
             </Button>
           </Box>
           

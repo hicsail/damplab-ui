@@ -5,6 +5,8 @@ import {
   Button,
   Checkbox,
   FormControl,
+  FormControlLabel,
+  FormHelperText,
   IconButton,
   InputLabel,
   ListItemText,
@@ -56,6 +58,7 @@ export default function AdminEditService() {
   const [serviceCategoryName, setServiceCategoryName] = useState('');
   const [unit, setUnit] = useState('');
   const [pricingMode, setPricingMode] = useState<'SERVICE' | 'PARAMETER'>('SERVICE');
+  const [allowMultipleRuns, setAllowMultipleRuns] = useState(false);
   const [internalPrice, setInternalPrice] = useState('');
   const [externalAcademicPrice, setExternalAcademicPrice] = useState('');
   const [externalMarketPrice, setExternalMarketPrice] = useState('');
@@ -94,6 +97,7 @@ export default function AdminEditService() {
     setServiceCategoryName(row.serviceCategoryName ?? '');
     setUnit(row.unit ?? '');
     setPricingMode(row.pricingMode ?? 'SERVICE');
+    setAllowMultipleRuns(row.allowMultipleRuns === true);
     setInternalPrice(
       pricing.internal != null ? String(pricing.internal) : row.internalPrice != null ? String(row.internalPrice) : ''
     );
@@ -234,6 +238,7 @@ export default function AdminEditService() {
         legacy
       },
       pricingMode,
+      allowMultipleRuns,
       parameters: row.parameters ?? [],
       paramGroups: row.paramGroups ?? [],
       allowedConnections: allowedConnectionIds,
@@ -448,6 +453,15 @@ export default function AdminEditService() {
           <MenuItem value="PARAMETER">Based on selected options</MenuItem>
         </Select>
       </FormControl>
+
+      <FormControlLabel
+        control={<Checkbox checked={allowMultipleRuns} onChange={(event) => setAllowMultipleRuns(event.target.checked)} />}
+        label="Allow multiple runs"
+      />
+      <FormHelperText sx={{ mt: -1.5, ml: 4 }}>
+        Adds a &ldquo;Number of runs&rdquo; count to this service&rsquo;s canvas nodes and multiplies the price by it. Leave off for
+        operations that only ever run once. Jobs already submitted keep the run count they were priced with either way.
+      </FormHelperText>
 
       <Box
         sx={{

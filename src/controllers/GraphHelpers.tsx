@@ -1,20 +1,6 @@
-import { createNodeObject, generateFormDataFromParams } from './ReactFlowEvents';
+import { createNodeObject, buildNodeParameters } from './ReactFlowEvents';
 
-import { NodeParameter } from '../types/CanvasTypes';
-import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 import { services as legacyServices } from '../data/services';
-
-const RUN_COUNT_PARAM_DEF = {
-    id              : RUN_COUNT_PARAM_ID,
-    name            : 'Number of runs',
-    type            : 'number',
-    required        : false,
-    description     : 'Price = base price × this number.',
-    paramType       : 'input',
-    isPriceMultiplier: true,
-    options         : null,
-    allowMultipleValues: false,
-};
 
 
 export const getServiceFromId = (services: any, id: string) => {
@@ -65,14 +51,9 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         return sourceId;
     }
     
-    const position = { x: sourcePosition.x, y: sourcePosition.y + 150 };
+    const position = { x: sourcePosition?.x ?? 0, y: (sourcePosition?.y ?? 0) + 150 };
     const nodeId = Math.random().toString(36).substring(2, 9);  // Sufficient variance?
-    const formData: NodeParameter[] = generateFormDataFromParams(service.parameters ?? [], nodeId);
-    
-    const serviceParams = service.parameters ?? [];
-    const parametersWithRunCount = serviceParams.some((p: any) => p?.id === RUN_COUNT_PARAM_ID)
-        ? serviceParams
-        : [...serviceParams, RUN_COUNT_PARAM_DEF];
+    const { formData, parameters } = buildNodeParameters(service, nodeId);
 
     const nodeData = {
         id                    : nodeId,
@@ -88,7 +69,7 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
         description           : service.description,
         allowedConnections    : service.allowedConnections,
         icon                  : service.icon,
-        parameters            : parametersWithRunCount,
+        parameters            : parameters,
         additionalInstructions: "",
         formData              : formData,
         serviceId             : service.id,
@@ -119,58 +100,86 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
     return nodeId;
 }
 
+/**
+ * Split the canvas into workflows — one per connected group of nodes.
+ *
+ * Connectivity is treated as undirected, so a branch, a merge and a diamond
+ * each stay a single workflow. (The previous implementation walked forward from
+ * every node with an outgoing edge that nobody pointed at, which meant a node
+ * with two children was emitted as a root twice and each walk followed only one
+ * branch — a branching canvas came out as duplicated, truncated workflows.)
+ *
+ * Each group is returned root-first: callers name a workflow after element 0
+ * (`canvasJobSubmission.ts`) and list nodes in array order, both of which assume
+ * the first element is where the tree starts.
+ */
 export const getWorkflowsFromGraph = (nodes: any, edges: any) => {
 
-    if (nodes.length === 0) return [];
-    // loop over edges and identify start nodes
-    let startNodes: any = [];
-    // if edge.source is not in edges.target, then it is a start node
-    edges.forEach((edge: any) => {
-        let isStartNode = true;
-        edges.forEach((e: any) => {
-            if (edge.source === e.target) {
-                isStartNode = false;
-            }
-        });
-        if (isStartNode) {
-            startNodes.push(edge.source);
+    if (!nodes || nodes.length === 0) return [];
+
+    const nodeById = new Map<string, any>(nodes.map((node: any) => [node.id, node]));
+    const realEdges = (edges ?? []).filter((edge: any) => nodeById.has(edge.source) && nodeById.has(edge.target));
+
+    // Union-find over the undirected graph.
+    const parent = new Map<string, string>(nodes.map((node: any) => [node.id, node.id]));
+    const find = (id: string): string => {
+        let root = id;
+        while (parent.get(root) !== root) root = parent.get(root)!;
+        // Path compression, so repeated lookups stay cheap on long chains.
+        let cursor = id;
+        while (parent.get(cursor) !== root) {
+            const next = parent.get(cursor)!;
+            parent.set(cursor, root);
+            cursor = next;
         }
+        return root;
+    };
+    realEdges.forEach((edge: any) => {
+        const a = find(edge.source);
+        const b = find(edge.target);
+        if (a !== b) parent.set(a, b);
     });
 
-    // add start nodes that are not in edges.source or destination
+    const groups = new Map<string, any[]>();
     nodes.forEach((node: any) => {
-        let isStartNode = true;
-        edges.forEach((e: any) => {
-            if (node.id === e.source || node.id === e.target) {
-                isStartNode = false;
-            }
-        });
-        if (isStartNode) {
-            startNodes.push(node.id);
-        }
+        const root = find(node.id);
+        if (!groups.has(root)) groups.set(root, []);
+        groups.get(root)!.push(node);
     });
 
-    // loop over start nodes and create workflows
-    let workflows: any = [];
-    startNodes.forEach((startNode: any) => {
-        let workflow: any = [];
-        let node = nodes.find((n: any) => n.id === startNode);
-        workflow.push(node);
-        let i = 0;
-        while (i < edges.length) {
-            let edge = edges[i];
-            if (edge.source === node.id) {
-                node = nodes.find((n: any) => n.id === edge.target);
-                workflow.push(node);
-                i = 0;
-            } else {
-                i++;
+    const childrenOf = new Map<string, string[]>();
+    const hasParent = new Set<string>();
+    realEdges.forEach((edge: any) => {
+        if (!childrenOf.has(edge.source)) childrenOf.set(edge.source, []);
+        childrenOf.get(edge.source)!.push(edge.target);
+        hasParent.add(edge.target);
+    });
+
+    // Breadth-first from the group's roots, so element 0 is a start node and the
+    // rest follow in flow order. A cycle (no in-degree-zero node) falls back to
+    // the group's first member so it still comes out whole.
+    return [...groups.values()].map((group) => {
+        const memberIds = new Set(group.map((node: any) => node.id));
+        const roots = group.filter((node: any) => !hasParent.has(node.id)).map((node: any) => node.id);
+        const queue = roots.length ? [...roots] : [group[0].id];
+
+        const seen = new Set<string>(queue);
+        const ordered: any[] = [];
+        while (queue.length) {
+            const id = queue.shift()!;
+            ordered.push(nodeById.get(id));
+            for (const child of childrenOf.get(id) ?? []) {
+                if (!memberIds.has(child) || seen.has(child)) continue;
+                seen.add(child);
+                queue.push(child);
             }
         }
-        workflows.push(workflow);
+        // Anything unreachable from a root (only possible inside a cycle).
+        for (const node of group) {
+            if (!seen.has(node.id)) ordered.push(node);
+        }
+        return ordered;
     });
-    
-    return workflows;
 }
 
 export const transformNodesToGQL = (nodes: any) => {
@@ -191,6 +200,15 @@ export const transformNodesToGQL = (nodes: any) => {
         delete gqlNode.pricingMode;
         // Backend `AddNodeInput` does not accept pricing breakdown fields on nodes.
         // It computes final node pricing server-side, with optional `price` as a fallback.
+        // Editor-only flags set by the job editor (jobGraphHydration / JobEditor).
+        // The backend's saveJobWorkflows writes named fields only, so these can
+        // never persist — but checkout spreads node.data wholesale, so they are
+        // dropped here too rather than being sent and ignored.
+        delete gqlNode.workflowId;
+        delete gqlNode.nodeState;
+        delete gqlNode.locked;
+        delete gqlNode.ghost;
+        delete gqlNode.diffKind;
         delete gqlNode.internalPrice;
         delete gqlNode.externalPrice;
         delete gqlNode.externalAcademicPrice;
