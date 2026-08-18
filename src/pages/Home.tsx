@@ -23,6 +23,7 @@ import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import PlaceIcon from '@mui/icons-material/Place';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
+import { useEffectiveUser } from "../hooks/useEffectiveUser";
 import AnnouncementBox from '../components/AnnouncementBox';
 import { JOBS_FEED_STATUS } from '../gql/queries';
 import { MARK_JOBS_FEED_VIEWED } from '../gql/mutations';
@@ -64,7 +65,8 @@ export default function Home() {
   const apolloClient = useApolloClient();
   const navigate = useNavigate();
   const userContext: UserContextProps = useContext(UserContext);
-  const userProps: UserProps = userContext.userProps;
+  const { userProps: effectiveUserProps } = useEffectiveUser();
+  const userProps: UserProps = effectiveUserProps;
   const isStaff = Boolean(userProps?.isDamplabStaff);
   const { data: jobsFeedData } = useQuery(JOBS_FEED_STATUS, {
     skip: !isStaff,

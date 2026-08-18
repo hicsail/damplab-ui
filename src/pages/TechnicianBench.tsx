@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import {
   Accordion,
@@ -22,7 +22,8 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import { Link as RouterLink } from 'react-router';
 import { GET_ASSIGNED_OPERATIONS } from '../gql/queries';
 import { MUTATE_NODE_STATUS, SET_WORKFLOW_NODE_COMPLETED_STEPS } from '../gql/mutations';
-import { UserContext, UserContextProps } from '../contexts/UserContext';
+import { UserContextProps } from '../contexts/UserContext';
+import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import ProtocolViewer from '../components/ProtocolViewer';
 import { CommentsSection } from '../components/CommentsSection';
 
@@ -69,7 +70,7 @@ function formatValue(value: any): string {
 }
 
 export default function TechnicianBench() {
-  const userContext = useContext(UserContext) as UserContextProps;
+  const userContext = useEffectiveUser() as UserContextProps;
   const email = userContext.userProps?.idTokenParsed?.email ?? '';
   const isStaff = !!userContext.userProps?.isDamplabStaff;
 

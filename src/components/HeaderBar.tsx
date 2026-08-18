@@ -1,11 +1,15 @@
 import { useState, useEffect, useContext, useCallback } from 'react'
 import { Link, useLocation, useMatch, useNavigate } from "react-router";
-import { AppBar, Button, IconButton, Toolbar, Alert } from '@mui/material';
+import { AppBar, Button, IconButton, Toolbar, Alert, Tooltip } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import Snackbar from '@mui/material/Snackbar';
 import { CanvasContext } from '../contexts/Canvas';
 import { UserContext } from '../contexts/UserContext';
+import { ViewModeContext } from '../contexts/ViewModeContext';
+import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import LoadCanvasButton from './LoadCanvasButton';
 import SaveCanvasButton from './SaveCanvasButton';
 import "../styles/resubmit.css";
@@ -25,7 +29,10 @@ export default function HeaderBar() {
     const [snackbarMessage, setSnackbarMessage] = useState("");
 
     const { setNodes, setEdges, nodes, edges } = useContext(CanvasContext);
-    const { userProps } = useContext(UserContext);
+    const { userProps: realUserProps } = useContext(UserContext);
+    const { userProps } = useEffectiveUser();
+    const { isClientView, toggleViewMode } = useContext(ViewModeContext);
+    const isActualStaff = Boolean(realUserProps?.isDamplabStaff);
     const isStaff = Boolean(userProps?.isDamplabStaff);
     const windowLocation = useLocation();
 
@@ -145,7 +152,27 @@ export default function HeaderBar() {
                         </span>
                     </Button>
 
-                    <div style={{ marginLeft: 'auto', marginRight: 10 }}>
+                    <div style={{ marginLeft: 'auto', marginRight: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+
+                        {isActualStaff && (
+                            <Tooltip title={isClientView ? 'Switch to Staff View' : 'Switch to Client View'}>
+                                <Button
+                                    onClick={toggleViewMode}
+                                    variant="outlined"
+                                    size="small"
+                                    startIcon={isClientView ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                    sx={{
+                                        color: isClientView ? '#ffa726' : 'white',
+                                        borderColor: isClientView ? '#ffa726' : 'rgba(255,255,255,0.5)',
+                                        textTransform: 'none',
+                                        fontSize: 12,
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {isClientView ? 'Client View' : 'Staff View'}
+                                </Button>
+                            </Tooltip>
+                        )}
 
                         { isJobEditing ? null : <>
                         <LoadCanvasButton

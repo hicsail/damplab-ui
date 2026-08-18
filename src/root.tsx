@@ -54,6 +54,7 @@ import { AppContext } from "./contexts/App";
 import { GET_BUNDLES, GET_SERVICES } from "./gql/queries";
 import { UserContext } from "./contexts/UserContext";
 import HeaderBar from "./components/HeaderBar";
+import { ViewModeProvider } from "./contexts/ViewModeContext";
 import './root.css';
 import { CircularProgress } from "@mui/material";
 import { ThemeProvider } from '@mui/material/styles';
@@ -214,6 +215,7 @@ export default function Root() {
   return (
     <ApolloProvider client={client}>
       <ThemeProvider theme={theme}>
+        <ViewModeProvider>
         <AppContext
           value={{ services: services, bundles: bundles, hazards: hazards, refreshCatalog }}
         >
@@ -235,6 +237,7 @@ export default function Root() {
             </div>
           </CanvasContext>
         </AppContext>
+        </ViewModeProvider>
       </ThemeProvider>
     </ApolloProvider>
   );
