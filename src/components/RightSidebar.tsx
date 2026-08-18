@@ -18,10 +18,12 @@ import { RecState } from '../types/Types';
 
 interface SidebarProps {
     noMouseEvents?: boolean;
+    /** Parameter ids edited relative to the job editor's diff baseline, keyed by node id. Only the job editor passes this. */
+    changedParamIdsByNode?: Map<string, Set<string>>;
 }
 
 export default function ContextTestComponent(props: SidebarProps) {
-    const {noMouseEvents} = props;
+    const {noMouseEvents, changedParamIdsByNode} = props;
 
     const api_url = import.meta.env.VITE_MPI_API || '';
     
@@ -342,6 +344,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                             <Params
                                 activeNode={activeNodeForParams}
                                 onFormDataChange={() => setPricingTick((t) => t + 1)}
+                                changedParamIds={changedParamIdsByNode?.get(activeNode?.id)}
                             />
                         </div>
                     )
@@ -422,8 +425,8 @@ export default function ContextTestComponent(props: SidebarProps) {
                         ? (activeNode.data.allowedConnections.map((connection: any) => {
                             return (
                                 <NodeButton 
-                                    key                  = {Math.random().toString(36).substring(2, 9)}
-                                    node                 = {getServiceFromId(services, connection.id)}
+                                    key                  = {connection.id ?? connection}
+                                    node                 = {getServiceFromId(services, connection.id ?? connection)}
                                     sourceId             = {val.activeComponentId}
                                     setNodes             = {val.setNodes}
                                     setEdges             = {val.setEdges}

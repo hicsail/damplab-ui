@@ -22,6 +22,7 @@ export const GET_SERVICES = gql`
                 legacy
             }
             pricingMode
+            allowMultipleRuns
             icon
             parameters
             description
@@ -92,6 +93,7 @@ export const GET_JOB_BY_ID = gql`
     query JobById($id: ID!) {
         jobById(id: $id) {
             id
+            latestContentVersionNumber
             jobId
             name
             username
@@ -139,6 +141,7 @@ export const GET_JOB_BY_ID = gql`
                             legacy
                         }
                         pricingMode
+                        allowMultipleRuns
                         icon
                         parameters
                         deliverables
@@ -150,13 +153,51 @@ export const GET_JOB_BY_ID = gql`
                     formData
                     state
                     additionalInstructions
+                    usedInventory
+                    reactNode
                 }
                 edges {
+                    id
+                    reactEdge
                     source {
                         id
                     }
                     target {
                         id
+                    }
+                }
+            }
+            versions {
+                id
+                versionNumber
+                displayVersion
+                visibleToCustomer
+                authorRole
+                jobState
+                isEvent
+                createdAt
+                createdByName
+                note
+                workflows {
+                    workflowId
+                    name
+                    nodes {
+                        id
+                        label
+                        serviceId
+                        serviceName
+                        formData
+                        additionalInstructions
+                        price
+                        position {
+                            x
+                            y
+                        }
+                    }
+                    edges {
+                        id
+                        source
+                        target
                     }
                 }
             }
@@ -168,6 +209,7 @@ export const GET_OWN_JOB_BY_ID = gql`
     query ownJobById($id: ID!) {
         ownJobById(id: $id) {
             id
+            latestContentVersionNumber
             jobId
             name
             username
@@ -215,6 +257,7 @@ export const GET_OWN_JOB_BY_ID = gql`
                             legacy
                         }
                         pricingMode
+                        allowMultipleRuns
                         icon
                         parameters
                         allowedConnections {
@@ -225,8 +268,12 @@ export const GET_OWN_JOB_BY_ID = gql`
                     formData
                     state
                     additionalInstructions
+                    usedInventory
+                    reactNode
                 }
                 edges {
+                    id
+                    reactEdge
                     source {
                         id
                     }
@@ -235,22 +282,39 @@ export const GET_OWN_JOB_BY_ID = gql`
                     }
                 }
             }
-        }
-    }
-`;
-
-/** Legacy: unpaginated own jobs. Prefer OWN_JOBS (paginated) when backend supports it. */
-export const GET_OWN_JOBS = gql`
-    query ownJobs {
-        ownJobs {
-            id
-            name
-            state
-            submitted
-            sow {
+            versions {
                 id
-                sowNumber
-                status
+                versionNumber
+                displayVersion
+                visibleToCustomer
+                authorRole
+                jobState
+                isEvent
+                createdAt
+                createdByName
+                note
+                workflows {
+                    workflowId
+                    name
+                    nodes {
+                        id
+                        label
+                        serviceId
+                        serviceName
+                        formData
+                        additionalInstructions
+                        price
+                        position {
+                            x
+                            y
+                        }
+                    }
+                    edges {
+                        id
+                        source
+                        target
+                    }
+                }
             }
         }
     }
@@ -569,6 +633,7 @@ export const UPDATE_SERVICE = gql`
         legacy
       }
       pricingMode
+      allowMultipleRuns
       icon
       deliverables
       notes
@@ -597,6 +662,7 @@ export const CREATE_SERVICE = gql`
         legacy
       }
       pricingMode
+      allowMultipleRuns
       icon
       parameters
       description
@@ -1327,4 +1393,80 @@ export const GET_BACKLOG_CARD = gql`
       }
     }
   }
+`;
+
+/* ---------------------------------------------------------------------------
+ * Versioned SOW document
+ * ------------------------------------------------------------------------ */
+
+export const SOW_VERSION_FIELDS = gql`
+    fragment SowVersionFields on SowVersion {
+        id
+        versionNumber
+        displayVersion
+        status
+        visibleToCustomer
+        sentToCustomerAt
+        note
+        createdByName
+        createdAt
+        clientSignature { name signedAt consentedGroups sectionInitials { key label initials } legacySignatureDataUrl }
+        staffSignature { name signedAt sectionInitials { key label initials } legacySignatureDataUrl }
+        fields {
+            key
+            label
+            kind
+            order
+            value
+            calculatedValue
+            isOverridden
+            isEnabled
+            allowsTextOverride
+            allowsEmpty
+            requiresInitials
+        }
+        inputs {
+            projectManager
+            projectManagerId
+            projectLead
+            projectLeadId
+            sowTitle
+            scopeOfWork
+            deliverables
+            baseCost
+            totalCost
+            customerCategory
+            periods { startDate durationDays label }
+            services { serviceId name description cost runCount }
+            adjustments { type description amount reason }
+        }
+    }
+`;
+
+/** Everything the SOW editor needs in one round trip. */
+export const GET_SOW_EDITOR_STATE = gql`
+    ${SOW_VERSION_FIELDS}
+    query GetSowEditorState($jobId: ID!) {
+        sowByJobId(jobId: $jobId) {
+            id
+            sowNumber
+            currentVersionNumber
+            activeVersionNumber
+            documentStale
+            liveCustomerCategory
+            liveServices { serviceId name description cost runCount }
+            currentVersion { ...SowVersionFields }
+            activeVersion { versionNumber displayVersion status }
+            versions { ...SowVersionFields }
+        }
+    }
+`;
+
+export const SOW_FIELD_PREVIEW = gql`
+    query SowFieldPreview($sowId: ID!, $inputs: SowInputsInput!) {
+        sowFieldPreview(sowId: $sowId, inputs: $inputs) {
+            key
+            calculatedValue
+        }
+    }
 `;

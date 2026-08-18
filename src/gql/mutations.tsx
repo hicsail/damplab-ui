@@ -1,16 +1,5 @@
 import { gql } from "@apollo/client";
 
-export const CREATE_WORKFLOW = gql`
-    mutation createWorkflow($createWorkflowInput: AddWorkflowInput!) {
-        createWorkflow(createWorkflowInput: $createWorkflowInput) {
-            id
-            nodes {
-                label
-            }
-        }
-    }
-`;
-
 export const CREATE_JOB = gql`
     mutation createJob($createJobInput: CreateJobInput!) {
         createJob(createJobInput: $createJobInput) {
@@ -103,15 +92,6 @@ export const DELETE_TEMPLATE_BY_NAME = gql`
     }
 `;
 
-export const UPDATE_WORKFLOW_STATE = gql`
-    mutation updateWorkflowState($updateWorkflowState: UpdateWorkflowState!) {
-        updateWorkflowState(updateWorkflowState: $updateWorkflowState) {
-            id
-            state
-        }
-    }
-`;
-
 export const MUTATE_WORKFLOW_STATE = gql`
     mutation updateWorkflowState($ID: ID!, $State: WorkflowState!) {
         changeWorkflowState(
@@ -181,6 +161,15 @@ export const MUTATE_JOB_STATE = gql`
             job: $ID,
             newState: $State
         ) {
+            id
+            state
+        }
+    }
+`;
+
+export const SAVE_JOB_WORKFLOWS = gql`
+    mutation SaveJobWorkflows($input: SaveJobWorkflowsInput!) {
+        saveJobWorkflows(input: $input) {
             id
             state
         }
@@ -618,4 +607,72 @@ export const ADD_BACKLOG_COMMENT = gql`
       createdAt
     }
   }
+`;
+
+/* ---------------------------------------------------------------------------
+ * Versioned SOW document
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Creates the job's first SOW, built server-side from the job's workflows.
+ * Returns the existing SOW unchanged if the job already has one.
+ */
+export const CREATE_SOW_FOR_JOB = gql`
+    mutation CreateSowForJob($jobId: ID!) {
+        createSowForJob(jobId: $jobId) {
+            id
+            sowNumber
+            status
+        }
+    }
+`;
+
+export const SAVE_SOW_VERSION = gql`
+    mutation SaveSowVersion($sowId: ID!, $input: SaveSowVersionInput!) {
+        saveSowVersion(sowId: $sowId, input: $input) {
+            id
+            versionNumber
+            displayVersion
+            status
+        }
+    }
+`;
+
+export const SEND_SOW_TO_CUSTOMER = gql`
+    mutation SendSowToCustomer($sowId: ID!) {
+        sendSowToCustomer(sowId: $sowId) { id versionNumber displayVersion status }
+    }
+`;
+
+export const FINALIZE_SOW = gql`
+    mutation FinalizeSow($sowId: ID!, $name: String!) {
+        finalizeSow(sowId: $sowId, name: $name) { id versionNumber displayVersion status }
+    }
+`;
+
+export const DISCARD_SOW_DRAFT = gql`
+    mutation DiscardSowDraft($sowId: ID!, $versionNumber: Int!) {
+        discardSowDraft(sowId: $sowId, versionNumber: $versionNumber) {
+            id
+            currentVersionNumber
+            activeVersionNumber
+        }
+    }
+`;
+
+export const CANCEL_SOW = gql`
+    mutation CancelSow($sowId: ID!, $note: String) {
+        cancelSow(sowId: $sowId, note: $note) { id versionNumber status }
+    }
+`;
+
+export const SIGN_SOW = gql`
+    mutation SignSow($sowId: ID!, $input: SignSowInput!) {
+        signSow(sowId: $sowId, input: $input) {
+            id
+            versionNumber
+            status
+            clientSignature { name signedAt consentedGroups sectionInitials { key label initials } }
+        }
+    }
 `;

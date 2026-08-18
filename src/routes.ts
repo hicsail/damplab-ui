@@ -19,6 +19,9 @@ export default [
         route("/bugs", "./pages/Bugs.tsx"),
         route("/backlog", "./pages/Backlog.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
+        // Both roles use the same editor; the page itself picks jobById vs
+        // ownJobById and the server enforces who may save.
+        route("/job_editor/:id", "./pages/JobEditor.tsx"),
         route("/final_checkout", "./pages/FinalCheckout.tsx"),
         route("/staff_submit", "./pages/StaffJobSubmit.tsx"),
         route("/checkout", "./pages/Checkout.tsx"),

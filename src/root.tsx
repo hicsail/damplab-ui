@@ -144,7 +144,18 @@ export default function Root() {
   const client = useMemo(() => {
     return new ApolloClient({
       link: logLink.concat(authLink.concat(httpLink)),
-      cache: new InMemoryCache(),
+      cache: new InMemoryCache({
+        typePolicies: {
+          // A job version is an immutable snapshot, and the objects inside it are
+          // values owned by that snapshot — not entities. They carry the canvas's
+          // client-side `id`, which Apollo would otherwise normalize on, collapsing
+          // node "abc123" from *every* version into a single cache entry. The diff
+          // then compares a version against itself and reports no changes.
+          JobVersionNode: { keyFields: false },
+          JobVersionEdge: { keyFields: false },
+          JobVersionWorkflow: { keyFields: false }
+        }
+      }),
     });
   }, [authLink, httpLink]);
 
