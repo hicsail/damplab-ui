@@ -1427,7 +1427,9 @@ export const SOW_VERSION_FIELDS = gql`
         }
         inputs {
             projectManager
+            projectManagerId
             projectLead
+            projectLeadId
             sowTitle
             scopeOfWork
             deliverables

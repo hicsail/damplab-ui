@@ -85,7 +85,9 @@ export interface SowVersionAdjustment {
 
 export interface SowVersionInputs {
   projectManager: string;
+  projectManagerId?: string;
   projectLead: string;
+  projectLeadId?: string;
   sowTitle?: string | null;
   scopeOfWork: string[];
   deliverables: string[];
@@ -168,7 +170,9 @@ export function isCustomField(key: string): boolean {
 export function toInputsPayload(inputs: SowVersionInputs): Record<string, unknown> {
   return {
     projectManager: inputs.projectManager ?? '',
+    projectManagerId: inputs.projectManagerId ?? undefined,
     projectLead: inputs.projectLead ?? '',
+    projectLeadId: inputs.projectLeadId ?? undefined,
     sowTitle: inputs.sowTitle ?? '',
     scopeOfWork: inputs.scopeOfWork ?? [],
     deliverables: inputs.deliverables ?? [],
