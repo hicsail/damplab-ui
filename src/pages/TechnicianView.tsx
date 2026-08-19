@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { Box, Button, Card, CardContent, Typography, Alert, Chip, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Divider, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Checkbox, FormControlLabel } from '@mui/material';
@@ -8,8 +8,8 @@ import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIc
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 
-import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID }         from '../gql/queries';
-import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE }  from '../gql/mutations';
+import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
+import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, latestContentVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -24,6 +24,7 @@ import SowStatusCard              from '../components/sow/SowStatusCard';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
+import { CUSTOMER_CATEGORY_OPTIONS } from '../components/sow/sowTypes';
 
 const stripTypename = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stripTypename);
@@ -54,6 +55,7 @@ export default function TechnicianView() {
 
     const { id }                              = useParams();
     const navigate                            = useNavigate();
+    const apolloClient                        = useApolloClient();
     const userContext                         = useContext(UserContext);
     // The catalogue, for re-attaching parameter definitions to a version snapshot.
     const { services }                        = useContext(AppContext);
@@ -128,6 +130,7 @@ export default function TechnicianView() {
     const [creatingSow, setCreatingSow] = useState(false);
     const [sowCreateError, setSowCreateError] = useState<string | null>(null);
 
+    const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
 
     const handleCloseJob = async () => {
@@ -330,9 +333,33 @@ export default function TechnicianView() {
                     />
                 </Box>
             )}
-            <JobWorkflowCards workflows={cardWorkflows} fallbackName={workflowName} diff={graphDiff} currentVersion={currentVersion} baselineVersion={baselineVersion} />
+            <JobWorkflowCards
+                workflows={cardWorkflows}
+                fallbackName={workflowName}
+                diff={graphDiff}
+                currentVersion={currentVersion}
+                baselineVersion={baselineVersion}
+            />
         </>
     );
+
+    const currentCustomerCategory = jobData?.customerCategory ?? 'EXTERNAL_CUSTOMER_MARKET';
+
+    const handleCustomerCategoryChange = async (nextCategory: string) => {
+        if (!id) return;
+        try {
+            await changeJobCustomerCategory({
+                variables: { jobId: id as string, customerCategory: nextCategory },
+            });
+            await Promise.all([
+                refetchJob(),
+                refetchSow(),
+                apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] }),
+            ]);
+        } catch (e) {
+            console.error('Failed to update job customer category:', e);
+        }
+    };
 
     return (
         <div>
@@ -349,6 +376,24 @@ export default function TechnicianView() {
                         {sowData && (
                             <Chip label="SOW generated" color="success" size="small" sx={{ ml: 1.5, fontWeight: 600 }} />
                         )}
+                    </Typography>
+                    <FormControl size="small" sx={{ minWidth: 260 }} disabled={categoryUpdating || !jobData}>
+                        <InputLabel id="pricing-category-label">Pricing category</InputLabel>
+                        <Select
+                            labelId="pricing-category-label"
+                            value={currentCustomerCategory}
+                            label="Pricing category"
+                            onChange={(e) => handleCustomerCategoryChange(String(e.target.value))}
+                        >
+                            {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
+                                <MenuItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 200 }}>
+                        Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
                     </Typography>
                     <Box sx={{ flexGrow: 1 }} />
                     <Button color='primary' sx={{alignContent: 'right', mr: 1}}>

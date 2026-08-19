@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Box, Checkbox, Chip, Collapse, FormControlLabel, IconButton, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Checkbox, Chip, Collapse, FormControlLabel, IconButton, TextField, Tooltip, Typography } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -39,7 +39,6 @@ interface Props {
   stale?: boolean;
   onRecalculate?: () => void;
   liveCustomerCategory?: string | null;
-  onChangeCustomerCategory?: (category: string) => void;
 }
 
 const DIFF_CHIP: Record<string, string> = {
@@ -55,7 +54,7 @@ function firstLine(text: string): string {
   return line.replace(/^-\s*/, '');
 }
 
-function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, diff, stale, onRecalculate, liveCustomerCategory, onChangeCustomerCategory }: Props): React.JSX.Element {
+function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, diff, stale, onRecalculate, liveCustomerCategory }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const key = field.key;
 
@@ -190,6 +189,11 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
 
           {hasSourceControls && (
             <Box sx={{ mb: 2 }}>
+              {field.key === 'feeSchedule' && stale && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  The pricing category or service costs no longer match the job. Refresh the Fee Schedule to update this snapshot — it will not change on its own.
+                </Alert>
+              )}
               <SowFieldSourceControls
                 fieldKey={field.key}
                 inputs={inputs}
@@ -197,7 +201,6 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
                 disabled={readOnly}
                 onChange={onChangeInputs}
                 liveCustomerCategory={liveCustomerCategory}
-                onChangeCustomerCategory={onChangeCustomerCategory}
               />
             </Box>
           )}

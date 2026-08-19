@@ -9,7 +9,7 @@ import { v4 as uuid } from 'uuid';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_LAB_MONITOR_STAFF_LIST } from '../../gql/queries';
-import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW, DISCARD_SOW_DRAFT, CHANGE_JOB_CUSTOMER_CATEGORY } from '../../gql/mutations';
+import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW, DISCARD_SOW_DRAFT } from '../../gql/mutations';
 import SowFieldRow from './SowFieldRow';
 import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
@@ -129,7 +129,6 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const [sendToCustomer] = useMutation(SEND_SOW_TO_CUSTOMER);
   const [finalizeSow] = useMutation(FINALIZE_SOW);
   const [discardDraft] = useMutation(DISCARD_SOW_DRAFT);
-  const [changeCustomerCategory] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
 
   // What the server actually holds for this version — dirty and Reset both
   // compare against this rather than a boolean flag, so undoing a change (by
@@ -298,9 +297,9 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const feeScheduleStale = useMemo(() => (inputs ? feeScheduleIsStale(inputs, sow) : false), [inputs, sow]);
 
   // Pulls the job's live service costs (and category) into the local draft.
-  // Adjustments are left alone — they were never auto-calculated. Both
-  // Recalculate and a category change (which is a recalculate staff asked
-  // for explicitly) go through here.
+  // Adjustments are left alone — they were never auto-calculated. Recalculate
+  // is the only path that applies this; changing the job's pricing category
+  // elsewhere leaves the Fee Schedule snapshot alone until staff refresh it.
   const applyLiveFeeSchedule = useCallback(
     (liveServices: SowEditorState['liveServices'], liveCustomerCategory?: string | null) => {
       if (!inputs || !liveServices) return;
@@ -312,25 +311,6 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const handleRecalculateFeeSchedule = useCallback(() => {
     applyLiveFeeSchedule(sow?.liveServices, sow?.liveCustomerCategory);
   }, [applyLiveFeeSchedule, sow?.liveServices, sow?.liveCustomerCategory]);
-
-  const handleChangeCustomerCategory = useCallback(
-    async (next: string) => {
-      if (!jobId) return;
-      setBusy(true);
-      setBanner(null);
-      try {
-        await changeCustomerCategory({ variables: { jobId, customerCategory: next } });
-        const res = await refetch();
-        const freshSow: SowEditorState | null = res.data?.sowByJobId ?? null;
-        applyLiveFeeSchedule(freshSow?.liveServices, freshSow?.liveCustomerCategory);
-      } catch (e: any) {
-        setBanner({ severity: 'error', text: e?.message ?? 'Could not change the pricing category.' });
-      } finally {
-        setBusy(false);
-      }
-    },
-    [jobId, changeCustomerCategory, refetch, applyLiveFeeSchedule]
-  );
 
   /* ----------------------------------------------------------------- edits */
 
@@ -543,7 +523,6 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                     stale={f.key === 'feeSchedule' ? feeScheduleStale : false}
                     onRecalculate={f.key === 'feeSchedule' ? handleRecalculateFeeSchedule : undefined}
                     liveCustomerCategory={sow.liveCustomerCategory}
-                    onChangeCustomerCategory={handleChangeCustomerCategory}
                   />
                 ))}
               </Box>
