@@ -1,5 +1,6 @@
 import { diffWordsWithSpace, Change } from 'diff';
 import { SowField, SowStatus, SowVersion } from '../components/sow/sowTypes';
+import { formatSOWInstant } from './sowDateUtils';
 
 /**
  * Comparing two versions of a SOW.
@@ -117,6 +118,6 @@ export function previousCustomerVersion(versions: SowVersion[], currentVersionNu
 /** Short human label for a version in a picker: "v3 · signed · Aug 9". */
 export function versionLabel(v: SowVersion): string {
   const date = new Date(v.createdAt);
-  const when = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const when = Number.isNaN(date.getTime()) ? '' : formatSOWInstant(date, 'compact');
   return `v${v.versionNumber} · ${v.status.toLowerCase()}${when ? ` · ${when}` : ''}`;
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { consentSummaryLabels, SowConsent } from './sowTypes';
+import { formatSOWInstant } from '../../utils/sowDateUtils';
 
 /**
  * What a signature actually covers: the groups agreed to and any per-section
@@ -16,7 +17,7 @@ interface Props {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return formatSOWInstant(iso);
 }
 
 export default function SowSignaturesSummary({ clientSignature, staffSignature }: Props): React.JSX.Element | null {

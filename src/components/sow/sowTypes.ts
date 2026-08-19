@@ -34,6 +34,10 @@ export interface SowPeriod {
   startDate: string;
   durationDays: number;
   label?: string | null;
+  /** Client-only. A stable identity for the reorder list, since periods have no
+   *  server id and their array index is the thing being changed. Stripped by
+   *  toInputsPayload, so it reaches neither the mutation nor the dirty check. */
+  _dragKey?: string;
 }
 
 export interface SowVersionService {
@@ -148,6 +152,18 @@ export interface SowEditorState {
 }
 
 export const CUSTOM_KEY_PREFIX = 'custom-';
+
+export const newPeriodDragKey = (): string =>
+  typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `period-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+/**
+ * Give every period a drag key, keeping any it already has — a draft reloaded
+ * from localStorage carries its keys, and reissuing them would remount each row
+ * for no reason.
+ */
+export function withPeriodDragKeys(inputs: SowVersionInputs): SowVersionInputs {
+  return { ...inputs, periods: (inputs.periods ?? []).map((p) => (p._dragKey ? p : { ...p, _dragKey: newPeriodDragKey() })) };
+}
 
 /** Shared labels for job / SOW pricing-category selects and read-only displays. */
 export const CUSTOMER_CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
@@ -298,9 +314,19 @@ export function feeScheduleIsStale(
  * and adjustments left untouched — they were never auto-calculated to begin with.
  */
 export function feeScheduleLivePatch(inputs: SowVersionInputs, liveServices: SowVersionService[], liveCustomerCategory?: string | null): Partial<SowVersionInputs> {
-  const baseCost = liveServices.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
-  const totalCost = (inputs.adjustments ?? []).reduce((sum, a) => sum + (a.type === 'DISCOUNT' ? -Math.abs(a.amount) : Math.abs(a.amount)), baseCost);
-  return { services: liveServices, baseCost, totalCost, customerCategory: liveCustomerCategory ?? inputs.customerCategory };
+  return { services: liveServices, ...sowTotals(liveServices, inputs.adjustments), customerCategory: liveCustomerCategory ?? inputs.customerCategory };
+}
+
+/**
+ * What the Fee Schedule currently adds up to, derived the same way the server
+ * derives it on save (sow-version.service.ts). The editor recomputes this on
+ * every price or adjustment edit, so the figure on screen is never a saved
+ * number waiting to catch up with the boxes above it.
+ */
+export function sowTotals(services?: SowVersionService[] | null, adjustments?: SowVersionAdjustment[] | null): { baseCost: number; totalCost: number } {
+  const baseCost = (services ?? []).reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
+  const totalCost = (adjustments ?? []).reduce((sum, a) => sum + (a.type === 'DISCOUNT' ? -Math.abs(a.amount) : Math.abs(a.amount)), baseCost);
+  return { baseCost, totalCost };
 }
 
 /** "× 10", not "× 10.00" — but a multiplier is not always a whole number. */

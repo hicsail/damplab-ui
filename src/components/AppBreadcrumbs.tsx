@@ -58,6 +58,8 @@ function dynamicTrail(path: string): Crumb[] | null {
   if ((m = path.match(/^\/edit\/bundles\/([^/]+)$/))) return [EDIT, { label: 'Edit Bundle' }];
   if ((m = path.match(/^\/edit\/inventory\/new$/))) return [EDIT, { label: 'New Inventory Item' }];
   if ((m = path.match(/^\/edit\/inventory\/([^/]+)$/))) return [EDIT, { label: 'Edit Inventory Item' }];
+  // Section keys are camelCase ("invoiceProcedures"); the dash makes pretty() split them.
+  if ((m = path.match(/^\/edit\/sow-sections\/([^/]+)$/))) return [EDIT, { label: pretty(m[1].replace(/([A-Z])/g, '-$1')) }];
   if ((m = path.match(/^\/lab-monitor\/([^/]+)$/))) return [{ label: 'Lab Monitor' }, { label: pretty(m[1]) }];
   if ((m = path.match(/^\/technician_view\/([^/]+)$/))) return [{ label: 'Jobs Dashboard', to: '/dashboard' }, { label: 'Technician View' }];
   if ((m = path.match(/^\/jobs\/([^/]+)$/))) return [{ label: 'My Jobs', to: '/my_jobs' }, { label: 'Job' }];

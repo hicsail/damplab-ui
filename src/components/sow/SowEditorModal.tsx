@@ -8,13 +8,14 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { v4 as uuid } from 'uuid';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_LAB_MONITOR_STAFF_LIST } from '../../gql/queries';
+import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_LAB_MONITOR_STAFF_LIST, GET_SOW_TEXT_PRESETS } from '../../gql/queries';
 import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW, DISCARD_SOW_DRAFT } from '../../gql/mutations';
 import SowFieldRow from './SowFieldRow';
+import { SowTextPresetOption } from './SowPresetPicker';
 import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
 import { diffVersions, pickDiffBaseline } from '../../utils/sowDiff';
-import { CUSTOM_KEY_PREFIX, SowEditorState, SowField, SowVersionInputs, feeScheduleIsStale, feeScheduleLivePatch, sowStatusLabel, statusColor, toInputsPayload, versionDisplayLabel } from './sowTypes';
+import { CUSTOM_KEY_PREFIX, SowEditorState, SowField, SowVersionInputs, feeScheduleIsStale, feeScheduleLivePatch, sowStatusLabel, statusColor, toInputsPayload, versionDisplayLabel, withPeriodDragKeys } from './sowTypes';
 
 /**
  * Staff editor for the SOW document.
@@ -105,6 +106,18 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const { data: staffData } = useQuery(GET_LAB_MONITOR_STAFF_LIST, { skip: !open });
   const staff = staffData?.getLabMonitorStaffList ?? [];
 
+  // The whole library in one round-trip rather than one query per prose section.
+  const { data: presetData } = useQuery(GET_SOW_TEXT_PRESETS, { skip: !open });
+  const presetsBySection = useMemo(() => {
+    const grouped = new Map<string, SowTextPresetOption[]>();
+    for (const preset of (presetData?.sowTextPresets ?? []) as SowTextPresetOption[]) {
+      const list = grouped.get(preset.sectionKey);
+      if (list) list.push(preset);
+      else grouped.set(preset.sectionKey, [preset]);
+    }
+    return grouped;
+  }, [presetData]);
+
   const sow: SowEditorState | null = data?.sowByJobId ?? null;
   const history = useMemo(() => sow?.versions ?? [], [sow?.versions]);
 
@@ -143,7 +156,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   useEffect(() => {
     if (!version) return;
     const loadedFields = [...version.fields].sort((a, b) => a.order - b.order);
-    const loadedInputs = { ...version.inputs, periods: version.inputs.periods ?? [], services: version.inputs.services ?? [], adjustments: version.inputs.adjustments ?? [] };
+    const loadedInputs = withPeriodDragKeys({ ...version.inputs, periods: version.inputs.periods ?? [], services: version.inputs.services ?? [], adjustments: version.inputs.adjustments ?? [] });
     snapshotRef.current = { fields: loadedFields, inputs: loadedInputs };
     setBaseVersion(version.versionNumber);
 
@@ -151,7 +164,8 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     const stored = key ? readLocalDraft(key) : null;
     if (stored) {
       setFields(mergeDraftOntoFresh(stored.fields, loadedFields));
-      setInputs(stored.inputs);
+      const draftInputs = withPeriodDragKeys(stored.inputs);
+      setInputs(draftInputs);
       setNote(stored.note);
       // Regenerate against the draft's own inputs before anything is rendered
       // from them. mergeDraftOntoFresh takes `fresh.calculatedValue` for any
@@ -162,7 +176,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
       // reads as empty, takes back its red "Required" chip and blocks Send, with
       // the staff visibly selected the whole time. Nothing else runs a preview on
       // load; without this the only way out is to touch a source control again.
-      void runPreview(stored.inputs);
+      void runPreview(draftInputs);
     } else {
       setFields(loadedFields);
       setInputs(loadedInputs);
@@ -519,6 +533,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                     onChangeField={patchField}
                     onChangeInputs={patchInputs}
                     onRenameCustom={renameCustomField}
+                    presets={presetsBySection.get(f.key)}
                     diff={diffByKey.get(f.key)}
                     stale={f.key === 'feeSchedule' ? feeScheduleStale : false}
                     onRecalculate={f.key === 'feeSchedule' ? handleRecalculateFeeSchedule : undefined}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceLineCost, serviceMultiplier, serviceUnitCost, toInputsPayload, SowVersionInputs } from './sowTypes';
+import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceLineCost, serviceMultiplier, serviceUnitCost, toInputsPayload, SowVersionInputs, sowTotals} from './sowTypes';
 
 describe('consentSummaryLabels', () => {
   it('reads the two boilerplate groups back as a single agreement', () => {
@@ -210,5 +210,29 @@ describe('toInputsPayload', () => {
   it('sends a null unit price for a line that has none, so the server writes the total through as before', () => {
     const payload = toInputsPayload(inputs([{ serviceId: 's1', name: 'PCR', description: '', cost: 350 }]));
     expect((payload.services as any[])[0].unitCost).toBeNull();
+  });
+});
+
+describe('sowTotals', () => {
+  const services = [
+    { serviceId: 'a', name: 'NGS', cost: 350 },
+    { serviceId: 'b', name: 'Prep', cost: 125.5 }
+  ];
+
+  it('adds the service lines', () => {
+    expect(sowTotals(services, [])).toEqual({ baseCost: 475.5, totalCost: 475.5 });
+  });
+
+  it('subtracts a discount and adds a cost, whatever sign was typed', () => {
+    const adjustments = [
+      { type: 'DISCOUNT' as const, description: 'Academic', amount: 75 },
+      { type: 'ADDITIONAL_COST' as const, description: 'Rush', amount: -50 }
+    ];
+    expect(sowTotals(services, adjustments).totalCost).toBe(450.5);
+  });
+
+  it('treats missing lists as nothing rather than NaN', () => {
+    expect(sowTotals(null, null)).toEqual({ baseCost: 0, totalCost: 0 });
+    expect(sowTotals(undefined, undefined)).toEqual({ baseCost: 0, totalCost: 0 });
   });
 });
