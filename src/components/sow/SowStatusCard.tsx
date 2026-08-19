@@ -54,7 +54,7 @@ export default function SowStatusCard({ jobId, onOpenEditor }: Props): React.JSX
 
           {sow.documentStale && (
             <Alert severity="warning" sx={{ mb: 1.5 }}>
-              The job&apos;s services changed after this document was written. Open the editor to bring the Fee Schedule up to date.
+              The job&apos;s pricing or services changed after this document was written. Open the editor and refresh the Fee Schedule to bring it up to date.
             </Alert>
           )}
 

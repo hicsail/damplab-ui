@@ -1437,7 +1437,7 @@ export const SOW_VERSION_FIELDS = gql`
             totalCost
             customerCategory
             periods { startDate durationDays label }
-            services { serviceId name description cost runCount }
+            services { serviceId name description cost unitCost multiplier runCount }
             adjustments { type description amount reason }
         }
     }
@@ -1454,7 +1454,7 @@ export const GET_SOW_EDITOR_STATE = gql`
             activeVersionNumber
             documentStale
             liveCustomerCategory
-            liveServices { serviceId name description cost runCount }
+            liveServices { serviceId name description cost unitCost multiplier runCount }
             currentVersion { ...SowVersionFields }
             activeVersion { versionNumber displayVersion status }
             versions { ...SowVersionFields }

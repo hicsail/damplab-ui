@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, SowVersionInputs } from './sowTypes';
+import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceLineCost, serviceMultiplier, serviceUnitCost, toInputsPayload, SowVersionInputs } from './sowTypes';
 
 describe('consentSummaryLabels', () => {
   it('reads the two boilerplate groups back as a single agreement', () => {
@@ -81,6 +81,33 @@ describe('feeScheduleIsStale', () => {
     expect(feeScheduleIsStale({ services: live }, null)).toBe(false);
     expect(feeScheduleIsStale({ services: live }, { liveServices: undefined })).toBe(false);
   });
+
+  it('is true when only the base price behind an unchanged total moved', () => {
+    // Same line total, split differently — a re-priced service on a line whose
+    // multiplier changed to compensate. Keying on cost alone would miss it and
+    // leave the Fee Schedule quoting a base the job no longer charges.
+    const documented = [{ serviceId: 's1', name: 'PCR', description: '', cost: 100, unitCost: 10, multiplier: 10 }];
+    const relive = [{ serviceId: 's1', name: 'PCR', description: '', cost: 100, unitCost: 20, multiplier: 5 }];
+    expect(feeScheduleIsStale({ services: documented }, { liveServices: relive })).toBe(true);
+  });
+
+  it('is true when documented category differs from the job category even if costs match', () => {
+    expect(
+      feeScheduleIsStale(
+        { services: live, customerCategory: 'INTERNAL_CUSTOMERS' },
+        { liveServices: live, liveCustomerCategory: 'EXTERNAL_CUSTOMER_MARKET' }
+      )
+    ).toBe(true);
+  });
+
+  it('is false when documented and live categories match and costs match', () => {
+    expect(
+      feeScheduleIsStale(
+        { services: live, customerCategory: 'EXTERNAL_CUSTOMER_MARKET' },
+        { liveServices: live, liveCustomerCategory: 'EXTERNAL_CUSTOMER_MARKET' }
+      )
+    ).toBe(false);
+  });
 });
 
 describe('feeScheduleLivePatch', () => {
@@ -126,5 +153,62 @@ describe('feeScheduleLivePatch', () => {
     const withAdjustments = inputs({ adjustments: [{ type: 'DISCOUNT', description: 'Loyalty', amount: 10 }] });
     const patch = feeScheduleLivePatch(withAdjustments, [], 'INTERNAL_CUSTOMERS');
     expect(patch.adjustments).toBeUndefined();
+  });
+});
+
+describe('fee schedule line arithmetic', () => {
+  it('reads the unit price off a line that has one', () => {
+    expect(serviceUnitCost({ unitCost: 5, cost: 350 })).toBe(5);
+  });
+
+  it('falls back to the line total on a document written before unit prices existed', () => {
+    expect(serviceUnitCost({ cost: 350 })).toBe(350);
+    expect(serviceUnitCost({ unitCost: null, cost: 350 })).toBe(350);
+  });
+
+  it('keeps a legitimate zero unit price rather than falling back to the total', () => {
+    expect(serviceUnitCost({ unitCost: 0, cost: 0 })).toBe(0);
+  });
+
+  it('treats an absent, zero or negative multiplier as 1', () => {
+    expect(serviceMultiplier({})).toBe(1);
+    expect(serviceMultiplier({ multiplier: null })).toBe(1);
+    expect(serviceMultiplier({ multiplier: 0 })).toBe(1);
+    expect(serviceMultiplier({ multiplier: -3 })).toBe(1);
+    expect(serviceMultiplier({ multiplier: 70 })).toBe(70);
+  });
+
+  it('rounds the line total to the cent, matching the server', () => {
+    expect(serviceLineCost(3.3, 3)).toBe(9.9);
+    expect(serviceLineCost(5, 70)).toBe(350);
+  });
+
+  it('writes a multiplier without trailing zeros', () => {
+    expect(formatMultiplier(10)).toBe('10');
+    expect(formatMultiplier(2.5)).toBe('2.5');
+  });
+});
+
+describe('toInputsPayload', () => {
+  function inputs(services: any[]): SowVersionInputs {
+    return {
+      projectManager: '',
+      projectLead: '',
+      scopeOfWork: [],
+      deliverables: [],
+      periods: [],
+      services,
+      adjustments: []
+    } as unknown as SowVersionInputs;
+  }
+
+  it('sends the unit price so the server can derive the total from the multiplier', () => {
+    const payload = toInputsPayload(inputs([{ serviceId: 's1', name: 'PCR', description: '', cost: 350, unitCost: 5, multiplier: 70 }]));
+    expect((payload.services as any[])[0]).toMatchObject({ serviceId: 's1', cost: 350, unitCost: 5 });
+  });
+
+  it('sends a null unit price for a line that has none, so the server writes the total through as before', () => {
+    const payload = toInputsPayload(inputs([{ serviceId: 's1', name: 'PCR', description: '', cost: 350 }]));
+    expect((payload.services as any[])[0].unitCost).toBeNull();
   });
 });

@@ -64,11 +64,10 @@ interface CommentsSectionProps {
   /** 'comments' (default) = full job comment thread; 'notes' = per-operation bench notes (staff-only, no internal toggle). */
   variant?: 'comments' | 'notes';
   /** Rendered in the section header, right-aligned. Used by the client view for "Resubmit job". */
-  headerAction?: React.ReactNode;
 }
 
 
-export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, currentUser, nodeId, variant = 'comments', headerAction }) => {
+export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, currentUser, nodeId, variant = 'comments' }) => {
   const isNotes = variant === 'notes' || !!nodeId;
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
@@ -256,12 +255,9 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ jobId, current
   return (
     <Card sx={{ mt: 3 }}>
       <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-          <Typography variant="h6" gutterBottom>
-            {isNotes ? 'Notes & files' : 'Comments'}
-          </Typography>
-          {headerAction}
-        </Box>
+        <Typography variant="h6" gutterBottom>
+          {isNotes ? 'Notes & files' : 'Comments'}
+        </Typography>
         <Divider sx={{ mb: 2 }} />
 
         {/* Comments List */}

@@ -17,6 +17,7 @@ import { AppContext } from '../contexts/App';
 import { UserContext }            from '../contexts/UserContext';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import SendIcon from '@mui/icons-material/Send';
 
 export default function Tracking() {
 
@@ -109,7 +110,7 @@ export default function Tracking() {
         const createText = "Your job is currently being created. Once the job is created, you will see the updated state over here.";
         const acceptText = "Your job has been reviewed by the DAMP lab and has been accepted. You will receive a SOW to review and sign here once it has been generated.";
         const rejectText = "Your job has been reviewed by the DAMP lab and has been accepted. Please complete any necessary modifications and resubmit your job.";
-        const changesText = "The DAMP Lab has asked for changes to this job. Open the workflow editor from the comment below, make your edits, then resubmit.";
+        const changesText = "The DAMP Lab has asked for changes to this job. Use Edit Job above to make your edits, then resubmit it to the lab.";
         const defaultText = "Invalid Case";
 
         switch (jobState) {
@@ -181,14 +182,25 @@ export default function Tracking() {
                     </Alert>
                 )}
                 {canEdit && (
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+                    /* Both halves of "make your edits, then hand it back" sit together at
+                       the top: the Resubmit button used to live in the comments header,
+                       far enough down the page to be missed. */
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1 }}>
                         <Button
-                            variant="contained"
+                            variant="outlined"
                             startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
                             onClick={() => navigate(`/job_editor/${id}`)}
                             sx={{ textTransform: 'none' }}
                         >
                             Edit Job
+                        </Button>
+                        <Button
+                            variant="contained"
+                            startIcon={<SendIcon />}
+                            onClick={() => setResubmitOpen(true)}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            Resubmit job
                         </Button>
                     </Box>
                 )}
@@ -319,11 +331,6 @@ export default function Tracking() {
                         email: workflowEmail,
                         isStaff: false
                     }}
-                    headerAction={canEdit ? (
-                        <Button variant="contained" size="small" onClick={() => setResubmitOpen(true)} sx={{ textTransform: 'none' }}>
-                            Resubmit job
-                        </Button>
-                    ) : undefined}
                 />
                 <ResubmitJobModal
                     open={resubmitOpen}

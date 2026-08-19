@@ -3,7 +3,7 @@ import { Box, Button, IconButton, MenuItem, Select, TextField, Typography, Input
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { SowVersionInputs, SowVersionAdjustment, formatCurrency } from './sowTypes';
+import { SowVersionInputs, SowVersionAdjustment, formatCurrency, formatMultiplier, customerCategoryLabel, serviceLineCost, serviceMultiplier, serviceUnitCost } from './sowTypes';
 
 /**
  * The structured inputs behind each generated section, rendered inside the
@@ -23,17 +23,9 @@ interface Props {
   staff: StaffOption[];
   disabled?: boolean;
   onChange: (patch: Partial<SowVersionInputs>) => void;
-  /** feeSchedule only: the job's actual pricing category, and how to change it. */
+  /** feeSchedule only: the job's current pricing category (read-only context). */
   liveCustomerCategory?: string | null;
-  onChangeCustomerCategory?: (category: string) => void;
 }
-
-const CUSTOMER_CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'INTERNAL_CUSTOMERS', label: 'Internal customers' },
-  { value: 'EXTERNAL_CUSTOMER_ACADEMIC', label: 'External (Academic)' },
-  { value: 'EXTERNAL_CUSTOMER_MARKET', label: 'External (Market)' },
-  { value: 'EXTERNAL_CUSTOMER_NO_SALARY', label: 'External (No salary)' }
-];
 
 const labelSx = { display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 500 } as const;
 
@@ -67,7 +59,7 @@ function StringListEditor({ items, onChange, disabled, addLabel }: { items: stri
   );
 }
 
-export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabled, onChange, liveCustomerCategory, onChangeCustomerCategory }: Props): React.JSX.Element | null {
+export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabled, onChange, liveCustomerCategory }: Props): React.JSX.Element | null {
   switch (fieldKey) {
     case 'sowTitle':
       return (
@@ -210,51 +202,50 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
       return (
         <Box>
           <Typography variant="caption" sx={labelSx}>
-            Pricing category — not shown to the customer, but drives what every line below costs.
+            Pricing category — set on the job screen; this Fee Schedule is a snapshot until you refresh it.
           </Typography>
-          <Select
-            size="small"
-            sx={{ mb: 2, minWidth: 260 }}
-            value={liveCustomerCategory ?? ''}
-            disabled={disabled || !onChangeCustomerCategory}
-            displayEmpty
-            onChange={(e) => onChangeCustomerCategory?.(String(e.target.value))}
-          >
-            {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </Select>
+          <Typography variant="body2" sx={{ mb: 0.5 }}>
+            Documented: {customerCategoryLabel(inputs.customerCategory)}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Job: {customerCategoryLabel(liveCustomerCategory)}
+          </Typography>
 
           <Typography variant="caption" sx={labelSx}>
             Service costs — these are what invoices bill from, so this section has no free-text edit.
           </Typography>
-          {(inputs.services ?? []).map((s, i) => (
-            <Box key={s.serviceId || i} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-              <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap title={s.name}>
-                {s.name}
-              </Typography>
-              {typeof s.runCount === 'number' && s.runCount !== 1 && (
-                <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                  × {s.runCount} runs
+          {(inputs.services ?? []).map((s, i) => {
+            const multiplier = serviceMultiplier(s);
+            const unitCost = serviceUnitCost(s);
+            return (
+              <Box key={s.serviceId || i} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap title={s.name}>
+                  {s.name}
                 </Typography>
-              )}
-              <TextField
-                size="small"
-                type="number"
-                sx={{ width: 150 }}
-                disabled={disabled}
-                value={s.cost}
-                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                onChange={(e) => {
-                  const next = [...inputs.services];
-                  next[i] = { ...s, cost: Math.max(0, Number(e.target.value) || 0) };
-                  onChange({ services: next });
-                }}
-              />
-            </Box>
-          ))}
+                {/* The box holds the base price, so the multiplier and the total
+                    it produces have to be on screen beside it — otherwise staff
+                    can no longer see what the line actually bills. */}
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Base price"
+                  sx={{ width: 150 }}
+                  disabled={disabled}
+                  value={unitCost}
+                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+                  onChange={(e) => {
+                    const nextUnit = Math.max(0, Number(e.target.value) || 0);
+                    const next = [...inputs.services];
+                    next[i] = { ...s, unitCost: nextUnit, multiplier, cost: serviceLineCost(nextUnit, multiplier) };
+                    onChange({ services: next });
+                  }}
+                />
+                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', minWidth: 120, textAlign: 'right' }}>
+                  {multiplier === 1 ? formatCurrency(s.cost) : `× ${formatMultiplier(multiplier)} = ${formatCurrency(s.cost)}`}
+                </Typography>
+              </Box>
+            );
+          })}
 
           <Divider sx={{ my: 1.5 }} />
 

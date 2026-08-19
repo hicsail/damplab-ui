@@ -20,17 +20,19 @@ interface SidebarProps {
     noMouseEvents?: boolean;
     /** Parameter ids edited relative to the job editor's diff baseline, keyed by node id. Only the job editor passes this. */
     changedParamIdsByNode?: Map<string, Set<string>>;
+    /** When set (job editor), price using the job owner's category rather than the logged-in user's. */
+    customerCategory?: string | null;
 }
 
 export default function ContextTestComponent(props: SidebarProps) {
-    const {noMouseEvents, changedParamIdsByNode} = props;
+    const {noMouseEvents, changedParamIdsByNode, customerCategory: customerCategoryProp} = props;
 
     const api_url = import.meta.env.VITE_MPI_API || '';
     
     const val                   = useContext(CanvasContext);
     const { services, hazards } = useContext(AppContext);
     const userContext: UserContextProps = useContext(UserContext);
-    const customerCategory = userContext.userProps?.customerCategory;
+    const customerCategory = customerCategoryProp ?? userContext.userProps?.customerCategory;
 
     const [ID, setID]                 = useState('');
     const activeNode                  = val.nodes.find((node: any) => node.id === val.activeComponentId);

@@ -114,6 +114,16 @@ export default function JobEditor() {
      *  before we snap the picker cannot flash the canvas into historic mode. */
     const isHistoric = !saving && latest != null && viewing != null && viewing !== latest.versionNumber;
 
+    /** The job is back with the lab, so it is not the customer's to change.
+     *  Mirrors the server rule in job.resolver.saveJobWorkflows exactly: without
+     *  it, a customer who follows the editor link in an old comment after
+     *  resubmitting gets a fully editable canvas and a Forbidden error on save. */
+    const lockedToLab = !isStaff && job != null && job.state !== 'CHANGES_REQUESTED';
+
+    /** Nothing on the canvas may be changed — either a past version is on
+     *  screen, or the job is not editable by this reader right now. */
+    const readOnly = isHistoric || lockedToLab;
+
     const { baseline: baselineVersion } = useMemo(() => selectedDiffPair(versions, viewing, baseline), [versions, viewing, baseline]);
 
     const viewedWorkflows: SnapshotWorkflow[] | undefined = useMemo(() => {
@@ -191,7 +201,7 @@ export default function JobEditor() {
             // removes the delete button while leaving other edits working.
             ({ nodes: nextNodes, edges: nextEdges } = snapshot
                 ? hydrateVersionGraph(snapshot.workflows, services, {
-                      editable: !isHistoric,
+                      editable: !readOnly,
                       lockedClientIds: lockedClientIdsFromJob(job)
                   })
                 : { nodes: [], edges: [] });
@@ -209,7 +219,7 @@ export default function JobEditor() {
         loadedIdsRef.current = new Set(nextNodes.map((n: any) => n.id));
         setActiveComponentId('');
         setHydrated(true);
-    }, [job, services, isStaff, isHistoric, versions, viewing, id, latest]);
+    }, [job, services, isStaff, isHistoric, readOnly, versions, viewing, id, latest]);
 
     useEffect(() => {
         resetToSavedJob();
@@ -269,7 +279,7 @@ export default function JobEditor() {
     // needs to click a node to inspect its parameters.
     const onNodesChange = useCallback(
         (changes: NodeChange[]) => {
-            const allowed = isHistoric ? changes.filter((c) => c.type === 'select' || c.type === 'dimensions' || c.type === 'position') : changes;
+            const allowed = readOnly ? changes.filter((c) => c.type === 'select' || c.type === 'dimensions' || c.type === 'position') : changes;
             if (!allowed.length) return;
             // flatMap rather than filter+map: only the 'remove' variant of the
             // NodeChange union carries an id, and TypeScript cannot carry that
@@ -280,23 +290,23 @@ export default function JobEditor() {
                 setEdges((eds: any) => restoreGhostEdges(eds, edges, ghosted));
             }
         },
-        [isHistoric, edges]
+        [readOnly, edges]
     );
     const onEdgesChange = useCallback(
         (changes: EdgeChange[]) => {
-            if (isHistoric) return;
+            if (readOnly) return;
             setEdges((eds: any) => applyEdgeChanges(changes, eds));
         },
-        [isHistoric]
+        [readOnly]
     );
     const onConnect = useCallback((connection: Connection) => {
-        if (isHistoric) return;
+        if (readOnly) return;
         const customConnection: any = connection;
         if (isValidConnection(services, nodes, customConnection.source, customConnection.target)) {
             customConnection.style = { stroke: 'green' };
         }
         setEdges((eds: any) => addEdge(customConnection, eds));
-    }, [services, nodes, isHistoric]);
+    }, [services, nodes, readOnly]);
 
     const onDragOver = useCallback((event: any) => {
         event.preventDefault();
@@ -308,7 +318,7 @@ export default function JobEditor() {
     // purely by its absence from the baseline.
     const onDrop = useCallback((event: any) => {
         event.preventDefault();
-        if (isHistoric) return;
+        if (readOnly) return;
         const rawType = event.dataTransfer.getData('application/reactflow');
         if (!rawType) return;
 
@@ -354,7 +364,7 @@ export default function JobEditor() {
             paramGroups: type.paramGroups
         };
         setNodes((nds: any) => nds.concat(createNodeObject(nodeId, type.name, type.type, position, nodeData)));
-    }, [reactFlowInstance, services, isHistoric]);
+    }, [reactFlowInstance, services, readOnly]);
 
     const peekJob = async () => {
         // no-cache so a concurrent save is visible without writing over this
@@ -391,7 +401,7 @@ export default function JobEditor() {
     };
 
     const handleSave = async () => {
-        if (isHistoric) return;
+        if (readOnly) return;
         setSaving(true);
         try {
             const peekedJob = await peekJob();
@@ -528,6 +538,13 @@ export default function JobEditor() {
                                     <Alert severity="info" sx={{ py: 0.25, fontSize: 12 }}>
                                         Viewing version {jobVersionDisplayLabel(viewing!)} — read only. Switch back to version {jobVersionDisplayLabel(latest!.versionNumber)} to edit.
                                     </Alert>
+                                ) : lockedToLab ? (
+                                    /* Deliberately not the historic message: telling a
+                                       customer to switch versions is advice they cannot act
+                                       on, because no version of this job is theirs to edit. */
+                                    <Alert severity="info" sx={{ py: 0.25, fontSize: 12 }}>
+                                        This job is with the DAMP Lab for review — read only. You can edit it again if the lab requests further changes.
+                                    </Alert>
                                 ) : (
                                 <>
                                 {/* The note describes this save, not the job, and is shown
@@ -564,7 +581,7 @@ export default function JobEditor() {
                                 )}
                             </Panel>
 
-                            {!isHistoric && (
+                            {!readOnly && (
                                 <Panel position="bottom-left" style={{ marginLeft: 8, marginBottom: 8 }}>
                                     <Button
                                         variant="outlined"
@@ -584,7 +601,11 @@ export default function JobEditor() {
                         <div style={{ minWidth: '10%', width: 850, borderLeft: 'solid 1px' }}>
                             {/* A past version's parameters are readable but not editable —
                                 the same treatment CanvasPreview already uses. */}
-                            <RightSidebar changedParamIdsByNode={changedParamIdsByNode} noMouseEvents={isHistoric} />
+                            <RightSidebar
+                                changedParamIdsByNode={changedParamIdsByNode}
+                                noMouseEvents={readOnly}
+                                customerCategory={job?.customerCategory ?? undefined}
+                            />
                         </div>
 
                     </div>

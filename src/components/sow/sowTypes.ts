@@ -40,9 +40,38 @@ export interface SowVersionService {
   serviceId: string;
   name: string;
   description?: string | null;
+  /** What the line bills: `unitCost` x `multiplier`. Invoices read this. */
   cost: number;
-  /** Run-count multiplier baked into cost, if the underlying node has one. Informational only. */
+  /** Price of a single run, before the multiplier. Absent on lines written
+   *  before unit prices were recorded — treat `cost` as the whole story there. */
+  unitCost?: number | null;
+  /** Everything baked into cost on top of `unitCost` — the run count and any
+   *  other multiplier parameter. Comes from the workflow; not editable here. */
+  multiplier?: number | null;
+  /** The run count alone. Superseded by `multiplier`; still returned for older documents. */
   runCount?: number | null;
+}
+
+/** The multiplier a line actually applies, defaulting to 1 on anything unset or nonsensical. */
+export function serviceMultiplier(s: Pick<SowVersionService, 'multiplier'>): number {
+  const m = Number(s.multiplier);
+  return Number.isFinite(m) && m > 0 ? m : 1;
+}
+
+/** What the box in the Fee Schedule editor shows: the unit price, falling back
+ *  to the line total on a document that predates unit prices. */
+export function serviceUnitCost(s: Pick<SowVersionService, 'unitCost' | 'cost'>): number {
+  // `== null` rather than a truthiness or Number() check: the server sends null
+  // for a line that predates unit prices, and Number(null) is a perfectly finite
+  // 0 — which would quietly present every legacy line as free.
+  if (s.unitCost == null) return Number(s.cost) || 0;
+  const u = Number(s.unitCost);
+  return Number.isFinite(u) ? u : Number(s.cost) || 0;
+}
+
+/** A unit price times its multiplier, to the cent. Mirrors the server's round2. */
+export function serviceLineCost(unitCost: number, multiplier: number): number {
+  return Math.round(unitCost * multiplier * 100) / 100;
 }
 
 export type SowAdjustmentType = 'DISCOUNT' | 'ADDITIONAL_COST';
@@ -120,6 +149,19 @@ export interface SowEditorState {
 
 export const CUSTOM_KEY_PREFIX = 'custom-';
 
+/** Shared labels for job / SOW pricing-category selects and read-only displays. */
+export const CUSTOMER_CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'INTERNAL_CUSTOMERS', label: 'Internal customers' },
+  { value: 'EXTERNAL_CUSTOMER_ACADEMIC', label: 'External (Academic)' },
+  { value: 'EXTERNAL_CUSTOMER_MARKET', label: 'External (Market)' },
+  { value: 'EXTERNAL_CUSTOMER_NO_SALARY', label: 'External (No salary)' }
+];
+
+export function customerCategoryLabel(value?: string | null): string {
+  if (!value) return '—';
+  return CUSTOMER_CATEGORY_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
 export function isCustomField(key: string): boolean {
   return key.startsWith(CUSTOM_KEY_PREFIX);
 }
@@ -143,7 +185,10 @@ export function toInputsPayload(inputs: SowVersionInputs): Record<string, unknow
       serviceId: s.serviceId,
       name: s.name,
       description: s.description ?? '',
-      cost: Number(s.cost) || 0
+      cost: Number(s.cost) || 0,
+      // The server derives the total from this and the workflow's multiplier;
+      // `cost` above is only read for a line that has no unit price yet.
+      unitCost: s.unitCost == null ? null : Number(s.unitCost) || 0
     })),
     adjustments: (inputs.adjustments ?? []).map((a) => ({
       type: a.type,
@@ -227,28 +272,40 @@ export function consentSummaryLabels(groups: SowFieldKind[] | null | undefined):
 }
 
 /**
- * True when the local draft's service costs no longer match what the job
- * currently prices them at. Deliberately ignores adjustments — those are
- * always staff-authored, never auto-calculated, so editing one must never
- * trip this. Backs the Fee Schedule "Stale" chip.
+ * True when the local draft's Fee Schedule snapshot no longer matches the
+ * job — either service costs drifted, or the documented pricing category
+ * differs from the job's current category. Deliberately ignores adjustments —
+ * those are always staff-authored, never auto-calculated, so editing one must
+ * never trip this. Backs the Fee Schedule "Stale" chip.
  */
-export function feeScheduleIsStale(inputs: Pick<SowVersionInputs, 'services'>, sow?: { liveServices?: SowVersionService[] | null } | null): boolean {
+export function feeScheduleIsStale(
+  inputs: Pick<SowVersionInputs, 'services' | 'customerCategory'>,
+  sow?: { liveServices?: SowVersionService[] | null; liveCustomerCategory?: string | null } | null
+): boolean {
   const live = sow?.liveServices;
   if (!live) return false;
-  const key = (list: SowVersionService[]) => list.map((s) => `${s.serviceId}:${Number(s.cost).toFixed(2)}`).join('|');
+  const documented = inputs.customerCategory ?? null;
+  const liveCategory = sow?.liveCustomerCategory ?? null;
+  if (documented != null && liveCategory != null && documented !== liveCategory) return true;
+  const key = (list: SowVersionService[]) =>
+    list.map((s) => `${s.serviceId}:${Number(s.cost).toFixed(2)}:${s.unitCost == null ? '' : Number(s.unitCost).toFixed(2)}:${s.multiplier ?? ''}`).join('|');
   return key(inputs.services ?? []) !== key(live);
 }
 
 /**
- * The inputs patch "Recalculate" (and a category change, which is a
- * recalculate) applies: fresh service costs, baseCost/totalCost rederived
- * from them the same way the server does (sow-version.service.ts), and
- * adjustments left untouched — they were never auto-calculated to begin with.
+ * The inputs patch Recalculate applies: fresh service costs, baseCost/totalCost
+ * rederived from them the same way the server does (sow-version.service.ts),
+ * and adjustments left untouched — they were never auto-calculated to begin with.
  */
 export function feeScheduleLivePatch(inputs: SowVersionInputs, liveServices: SowVersionService[], liveCustomerCategory?: string | null): Partial<SowVersionInputs> {
   const baseCost = liveServices.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
   const totalCost = (inputs.adjustments ?? []).reduce((sum, a) => sum + (a.type === 'DISCOUNT' ? -Math.abs(a.amount) : Math.abs(a.amount)), baseCost);
   return { services: liveServices, baseCost, totalCost, customerCategory: liveCustomerCategory ?? inputs.customerCategory };
+}
+
+/** "× 10", not "× 10.00" — but a multiplier is not always a whole number. */
+export function formatMultiplier(value: number): string {
+  return String(Number(Number(value).toFixed(4)));
 }
 
 export function formatCurrency(amount: number): string {
