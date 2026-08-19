@@ -2,8 +2,13 @@ import React from 'react';
 import { Box, Button, IconButton, MenuItem, Select, TextField, Typography, InputAdornment, Divider } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { SowVersionInputs, SowVersionAdjustment, formatCurrency, formatMultiplier, customerCategoryLabel, serviceLineCost, serviceMultiplier, serviceUnitCost } from './sowTypes';
+import { DndContext, DragEndEvent, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { SowVersionInputs, SowVersionAdjustment, SowPeriod, formatCurrency, formatMultiplier, customerCategoryLabel, serviceLineCost, serviceMultiplier, serviceUnitCost, newPeriodDragKey, sowTotals } from './sowTypes';
+import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate } from '../../utils/sowDateUtils';
 
 /**
  * The structured inputs behind each generated section, rendered inside the
@@ -28,6 +33,8 @@ interface Props {
 }
 
 const labelSx = { display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 500 } as const;
+const rawTextNoteSx = { display: 'block', mt: 1, color: 'text.secondary', fontStyle: 'italic' } as const;
+
 
 /** Inline add/remove list. Kept local rather than reusing DeliverablesEditor, which opens its own dialog. */
 function StringListEditor({ items, onChange, disabled, addLabel }: { items: string[]; onChange: (next: string[]) => void; disabled?: boolean; addLabel: string }): React.JSX.Element {
@@ -54,6 +61,148 @@ function StringListEditor({ items, onChange, disabled, addLabel }: { items: stri
       ))}
       <Button size="small" startIcon={<AddIcon />} disabled={disabled} onClick={() => onChange([...items, ''])}>
         {addLabel}
+      </Button>
+    </Box>
+  );
+}
+
+/** Identity for the reorder list, falling back to the index for a draft written
+ *  before periods carried drag keys. */
+function periodDragId(p: SowPeriod, i: number): string {
+  return p._dragKey ?? `period-index-${i}`;
+}
+
+function SortablePeriodRow({
+  id,
+  period,
+  index,
+  disabled,
+  onPatch,
+  onRemove
+}: {
+  id: string;
+  period: SowPeriod;
+  index: number;
+  disabled?: boolean;
+  onPatch: (patch: Partial<SowPeriod>) => void;
+  onRemove: () => void;
+}): React.JSX.Element {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled });
+  return (
+    <Box
+      ref={setNodeRef}
+      sx={{
+        display: 'flex',
+        gap: 1,
+        alignItems: 'center',
+        mb: 1,
+        flexWrap: 'wrap',
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+        bgcolor: isDragging ? 'action.hover' : undefined,
+        borderRadius: 1
+      }}
+    >
+      {/* The handle is the only listener surface, so the inputs beside it keep
+          their own pointer behaviour (text selection, the picker popup). */}
+      <Box
+        {...attributes}
+        {...listeners}
+        aria-label={`Drag to reorder period ${index + 1}`}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          color: disabled ? 'text.disabled' : 'text.secondary',
+          cursor: disabled ? 'default' : 'grab',
+          touchAction: 'none',
+          '&:active': { cursor: disabled ? 'default' : 'grabbing' }
+        }}
+      >
+        <DragIndicatorIcon fontSize="small" />
+      </Box>
+      <DatePicker
+        label="Start"
+        value={sowDateToPickerValue(period.startDate)}
+        disabled={disabled}
+        slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
+        onChange={(d) => {
+          if (!d || Number.isNaN(d.getTime())) return;
+          onPatch({ startDate: pickerValueToSowDate(d) });
+        }}
+      />
+      <TextField
+        label="Duration"
+        size="small"
+        type="number"
+        sx={{ width: 130 }}
+        disabled={disabled}
+        value={period.durationDays}
+        InputProps={{ endAdornment: <InputAdornment position="end">days</InputAdornment> }}
+        onChange={(e) => onPatch({ durationDays: Math.max(0, Number(e.target.value) || 0) })}
+      />
+      <TextField
+        label="Label"
+        size="small"
+        sx={{ width: 180 }}
+        disabled={disabled}
+        placeholder={`Period ${index + 1}`}
+        value={period.label ?? ''}
+        onChange={(e) => onPatch({ label: e.target.value })}
+      />
+      <IconButton size="small" aria-label={`Remove period ${index + 1}`} disabled={disabled} onClick={onRemove}>
+        <DeleteOutlineIcon fontSize="small" />
+      </IconButton>
+    </Box>
+  );
+}
+
+/**
+ * The period rows, reorderable by handle. Order is not cosmetic: an unlabelled
+ * period is printed as "Period <n>" by its index in the generated prose.
+ *
+ * Its own component because useSensors is a hook and the parent is a switch.
+ */
+function PeriodListEditor({ periods, disabled, onChange }: { periods: SowPeriod[]; disabled?: boolean; onChange: (next: SowPeriod[]) => void }): React.JSX.Element {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  const ids = periods.map(periodDragId);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from < 0 || to < 0) return;
+    onChange(arrayMove(periods, from, to));
+  };
+
+  return (
+    <Box>
+      <Typography variant="caption" sx={labelSx}>
+        Periods — add more than one for work that pauses and resumes. Past dates are allowed. Drag a row by its handle to reorder.
+      </Typography>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+          {periods.map((p, i) => (
+            <SortablePeriodRow
+              key={ids[i]}
+              id={ids[i]}
+              period={p}
+              index={i}
+              disabled={disabled}
+              onPatch={(patch) => onChange(periods.map((entry, idx) => (idx === i ? { ...entry, ...patch } : entry)))}
+              onRemove={() => onChange(periods.filter((_, idx) => idx !== i))}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
+      <Button
+        size="small"
+        startIcon={<AddIcon />}
+        disabled={disabled}
+        onClick={() => onChange([...periods, { startDate: todaySowDate(), durationDays: 14, label: '', _dragKey: newPeriodDragKey() }])}
+      >
+        Add period
       </Button>
     </Box>
   );
@@ -112,71 +261,14 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
               ))}
             </Select>
           </Box>
+          <Typography variant="caption" sx={rawTextNoteSx}>
+            Editing this section’s raw text changes only what the document says — it does not reassign anyone. Use these dropdowns to set the assignees.
+          </Typography>
         </Box>
       );
 
     case 'periodOfPerformance':
-      return (
-        <Box>
-          <Typography variant="caption" sx={labelSx}>
-            Periods — add more than one for work that pauses and resumes. Past dates are allowed.
-          </Typography>
-          {(inputs.periods ?? []).map((p, i) => (
-            <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
-              <DatePicker
-                label="Start"
-                value={p.startDate ? new Date(p.startDate) : null}
-                disabled={disabled}
-                slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
-                onChange={(d) => {
-                  if (!d || Number.isNaN(d.getTime())) return;
-                  const next = [...inputs.periods];
-                  next[i] = { ...p, startDate: new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString() };
-                  onChange({ periods: next });
-                }}
-              />
-              <TextField
-                label="Duration"
-                size="small"
-                type="number"
-                sx={{ width: 130 }}
-                disabled={disabled}
-                value={p.durationDays}
-                InputProps={{ endAdornment: <InputAdornment position="end">days</InputAdornment> }}
-                onChange={(e) => {
-                  const next = [...inputs.periods];
-                  next[i] = { ...p, durationDays: Math.max(0, Number(e.target.value) || 0) };
-                  onChange({ periods: next });
-                }}
-              />
-              <TextField
-                label="Label"
-                size="small"
-                sx={{ width: 180 }}
-                disabled={disabled}
-                placeholder={`Period ${i + 1}`}
-                value={p.label ?? ''}
-                onChange={(e) => {
-                  const next = [...inputs.periods];
-                  next[i] = { ...p, label: e.target.value };
-                  onChange({ periods: next });
-                }}
-              />
-              <IconButton size="small" aria-label={`Remove period ${i + 1}`} disabled={disabled} onClick={() => onChange({ periods: inputs.periods.filter((_, idx) => idx !== i) })}>
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          ))}
-          <Button
-            size="small"
-            startIcon={<AddIcon />}
-            disabled={disabled}
-            onClick={() => onChange({ periods: [...(inputs.periods ?? []), { startDate: new Date().toISOString(), durationDays: 14, label: '' }] })}
-          >
-            Add period
-          </Button>
-        </Box>
-      );
+      return <PeriodListEditor periods={inputs.periods ?? []} disabled={disabled} onChange={(periods) => onChange({ periods })} />;
 
     case 'scopeOfWork':
       return (
@@ -185,6 +277,9 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
             Scope items
           </Typography>
           <StringListEditor items={inputs.scopeOfWork ?? []} disabled={disabled} addLabel="Add scope item" onChange={(scopeOfWork) => onChange({ scopeOfWork })} />
+          <Typography variant="caption" sx={rawTextNoteSx}>
+            Editing this section’s raw text changes only what the document says — it does not add or remove operations from the workflow.
+          </Typography>
         </Box>
       );
 
@@ -237,7 +332,7 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
                     const nextUnit = Math.max(0, Number(e.target.value) || 0);
                     const next = [...inputs.services];
                     next[i] = { ...s, unitCost: nextUnit, multiplier, cost: serviceLineCost(nextUnit, multiplier) };
-                    onChange({ services: next });
+                    onChange({ services: next, ...sowTotals(next, inputs.adjustments) });
                   }}
                 />
                 <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', minWidth: 120, textAlign: 'right' }}>
@@ -262,7 +357,7 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
                 onChange={(e) => {
                   const next = [...inputs.adjustments];
                   next[i] = { ...a, type: e.target.value as SowVersionAdjustment['type'] };
-                  onChange({ adjustments: next });
+                  onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
                 }}
               >
                 <MenuItem value="ADDITIONAL_COST">Additional cost</MenuItem>
@@ -291,7 +386,7 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
                 onChange={(e) => {
                   const next = [...inputs.adjustments];
                   next[i] = { ...a, amount: Math.max(0, Number(e.target.value) || 0) };
-                  onChange({ adjustments: next });
+                  onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
                 }}
               />
               <TextField
@@ -306,7 +401,15 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
                   onChange({ adjustments: next });
                 }}
               />
-              <IconButton size="small" aria-label={`Remove adjustment ${i + 1}`} disabled={disabled} onClick={() => onChange({ adjustments: inputs.adjustments.filter((_, idx) => idx !== i) })}>
+              <IconButton
+                size="small"
+                aria-label={`Remove adjustment ${i + 1}`}
+                disabled={disabled}
+                onClick={() => {
+                  const next = inputs.adjustments.filter((_, idx) => idx !== i);
+                  onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
+                }}
+              >
                 <DeleteOutlineIcon fontSize="small" />
               </IconButton>
             </Box>
@@ -316,12 +419,15 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
               size="small"
               startIcon={<AddIcon />}
               disabled={disabled}
-              onClick={() => onChange({ adjustments: [...(inputs.adjustments ?? []), { type: 'ADDITIONAL_COST', description: '', amount: 0 }] })}
+              onClick={() => {
+                const next: SowVersionAdjustment[] = [...(inputs.adjustments ?? []), { type: 'ADDITIONAL_COST', description: '', amount: 0 }];
+                onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
+              }}
             >
               Add adjustment
             </Button>
             <Typography variant="body2" color="text.secondary">
-              Total {formatCurrency(inputs.totalCost ?? 0)}
+              Total {formatCurrency(sowTotals(inputs.services, inputs.adjustments).totalCost)}
             </Typography>
           </Box>
         </Box>

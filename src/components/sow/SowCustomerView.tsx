@@ -12,6 +12,7 @@ import SowPdfDocument from './SowPdfDocument';
 import SowSignaturesSummary from './SowSignaturesSummary';
 import { diffVersions, previousCustomerVersion } from '../../utils/sowDiff';
 import { GROUP_ORDER, SowEditorState, SowField, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
+import { formatSOWInstant } from '../../utils/sowDateUtils';
 
 /**
  * The customer's view of a Statement of Work.
@@ -161,7 +162,7 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
               {signedName && (
                 <Alert severity="success" icon={<CheckCircleOutlineIcon />} sx={{ mb: 2 }}>
                   Signed by {signedName}
-                  {version.clientSignature?.signedAt ? ` on ${new Date(version.clientSignature.signedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` : ''}.
+                  {version.clientSignature?.signedAt ? ` on ${formatSOWInstant(version.clientSignature.signedAt)}` : ''}.
                   {version.staffSignature?.name ? ` Countersigned by ${version.staffSignature.name}.` : ''}
                 </Alert>
               )}

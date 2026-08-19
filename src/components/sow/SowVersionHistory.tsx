@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Chip, Divider, ListItemText, MenuItem, Select, Typography } from '@mui/material';
 import { SowVersion, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
+import { formatSOWInstant } from '../../utils/sowDateUtils';
 
 /**
  * Two pickers over the same history: which version is on screen, and which one it
@@ -26,7 +27,7 @@ function describe(v: SowVersion): string {
 
 function when(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return Number.isNaN(d.getTime()) ? '' : formatSOWInstant(d, 'short');
 }
 
 export default function SowVersionHistory({ versions, viewing, baseline, onViewingChange, onBaselineChange, lockBaseline }: Props): React.JSX.Element {

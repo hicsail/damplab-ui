@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Box, Checkbox, Chip, Collapse, FormControlLabel, IconButton, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, Chip, Collapse, FormControlLabel, IconButton, TextField, Tooltip, Typography } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -116,20 +116,20 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
         </Box>
 
         {canEditText && (
-          <Tooltip title={editing ? 'Done editing' : 'Edit this text'}>
-            <span>
-              <IconButton
-                size="small"
-                color={editing ? 'primary' : 'default'}
-                aria-label={`Edit ${field.label}`}
-                onClick={() => {
-                  if (!expanded) toggleExpand();
-                  setEditing((v) => !v);
-                }}
-              >
-                <EditOutlinedIcon fontSize="small" />
-              </IconButton>
-            </span>
+          <Tooltip title={editing ? 'Done editing' : 'Type this section’s text yourself instead of generating it'}>
+            <Button
+              size="small"
+              variant={editing ? 'contained' : 'text'}
+              startIcon={<EditOutlinedIcon fontSize="small" />}
+              sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+              aria-label={`Edit ${field.label}`}
+              onClick={() => {
+                if (!expanded) toggleExpand();
+                setEditing((v) => !v);
+              }}
+            >
+              Use/Edit Raw Text
+            </Button>
           </Tooltip>
         )}
 
@@ -150,7 +150,7 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
                 size="small"
                 color={stale ? 'warning' : 'default'}
                 disabled={readOnly}
-                aria-label={`Recalculate ${field.label} from the job's current figures`}
+                aria-label={`Refresh ${field.label} from the job's current figures`}
                 onClick={onRecalculate}
               >
                 <RefreshIcon fontSize="small" />
@@ -159,20 +159,25 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
           </Tooltip>
         )}
 
-        {canEditText && field.isOverridden && (
-          <Tooltip title="Revert to the generated text">
-            <span>
-              <IconButton
-                size="small"
-                aria-label={`Revert ${field.label} to calculated value`}
-                onClick={() => {
-                  changeField({ isOverridden: false, value: field.calculatedValue ?? '' });
-                  setEditing(false);
-                }}
-              >
-                <RestartAltIcon fontSize="small" />
-              </IconButton>
-            </span>
+        {/* Reachable while the pencil is on, not only once the text differs:
+            the pencil greys out the source controls, and revert is what brings
+            them back — so it has to be there before anything is typed.
+            Gated on there being something generated to go back to: a custom
+            section has no calculatedValue, and reverting one would just blank it. */}
+        {canEditText && field.calculatedValue != null && (field.isOverridden || editing) && (
+          <Tooltip title="Discard your edits and go back to the generated text">
+            <Button
+              size="small"
+              startIcon={<RestartAltIcon fontSize="small" />}
+              sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+              aria-label={`Revert ${field.label} to calculated value`}
+              onClick={() => {
+                changeField({ isOverridden: false, value: field.calculatedValue ?? '' });
+                setEditing(false);
+              }}
+            >
+              Recalculate
+            </Button>
           </Tooltip>
         )}
 
@@ -194,11 +199,16 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
                   The pricing category or service costs no longer match the job. Refresh the Fee Schedule to update this snapshot — it will not change on its own.
                 </Alert>
               )}
+              {editing && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  You’re editing this section’s text by hand — these controls are paused until you revert.
+                </Typography>
+              )}
               <SowFieldSourceControls
                 fieldKey={field.key}
                 inputs={inputs}
                 staff={staff}
-                disabled={readOnly}
+                disabled={readOnly || editing}
                 onChange={onChangeInputs}
                 liveCustomerCategory={liveCustomerCategory}
               />

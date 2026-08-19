@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { SowVersion, sowStatusLabel, versionDisplayLabel } from './sowTypes';
+import { formatSOWInstant } from '../../utils/sowDateUtils';
 
 /**
  * PDF rendering of a SOW version.
@@ -34,11 +35,8 @@ const styles = StyleSheet.create({
   footer: { position: 'absolute', bottom: 24, left: 36, right: 36, fontSize: 8, color: '#888', textAlign: 'center' }
 });
 
-function formatDate(value?: string | null): string {
-  if (!value) return '';
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-}
+/** Signature timestamps are instants, so they read in the lab's timezone. */
+const formatDate = (value?: string | null): string => formatSOWInstant(value, 'long');
 
 /** Renders one stored field value, honouring the "- " bullet convention. */
 function Body({ value }: { value: string }): React.JSX.Element {
@@ -125,7 +123,7 @@ export default function SowPdfDocument({ version, sowNumber, logoUrl = '/Damplab
           </View>
 
           <View style={styles.signatureBox}>
-            <Text style={styles.signatureLabel}>Trustees of Boston University</Text>
+            <Text style={styles.signatureLabel}>DAMP Lab</Text>
             {staff ? (
               <View>
                 {staff.legacySignatureDataUrl?.startsWith('data:') && <Image src={staff.legacySignatureDataUrl} style={styles.signatureImage} />}
