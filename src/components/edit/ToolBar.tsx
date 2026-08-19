@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction } from 'react';
 import { Select, FormControl, Stack, MenuItem, TextField } from '@mui/material';
 
-type EditTypes = 'Services' | 'Categories' | 'Bundles' | 'Inventory';
+type EditTypes = 'Services' | 'Categories' | 'Bundles' | 'Inventory' | 'SOWs';
 
 
 export interface ToolBarProps {
@@ -22,6 +22,7 @@ export const ToolBar: React.FC<ToolBarProps> = (props) => {
           <MenuItem value={'Categories'}>Categories</MenuItem>
           <MenuItem value={'Bundles'}>Bundles</MenuItem>
           <MenuItem value={'Inventory'}>Inventory</MenuItem>
+        <MenuItem value={'SOWs'}>SOWs</MenuItem>
         </Select>
 
         {/* Name based filtering */}

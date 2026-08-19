@@ -676,3 +676,47 @@ export const SIGN_SOW = gql`
         }
     }
 `;
+
+/* SOW text blocks — see GET_SOW_TEXT_PRESETS in queries.tsx. */
+
+export const CREATE_SOW_TEXT_PRESET = gql`
+    mutation createSowTextPreset($preset: CreateSowTextPresetInput!) {
+        createSowTextPreset(preset: $preset) {
+            id
+            sectionKey
+            name
+            text
+            order
+            updatedAt
+            updatedByName
+        }
+    }
+`;
+
+export const UPDATE_SOW_TEXT_PRESET = gql`
+    mutation updateSowTextPreset($id: ID!, $changes: UpdateSowTextPresetInput!) {
+        updateSowTextPreset(id: $id, changes: $changes) {
+            id
+            name
+            text
+            updatedAt
+            updatedByName
+        }
+    }
+`;
+
+export const DELETE_SOW_TEXT_PRESET = gql`
+    mutation deleteSowTextPreset($id: ID!) {
+        deleteSowTextPreset(id: $id)
+    }
+`;
+
+export const REORDER_SOW_TEXT_PRESETS = gql`
+    mutation reorderSowTextPresets($order: ReorderSowTextPresetsInput!) {
+        reorderSowTextPresets(order: $order) {
+            id
+            name
+            order
+        }
+    }
+`;

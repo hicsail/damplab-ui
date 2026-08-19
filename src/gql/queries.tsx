@@ -1470,3 +1470,32 @@ export const SOW_FIELD_PREVIEW = gql`
         }
     }
 `;
+
+/* SOW text blocks — the staff-managed prose library behind each SOW section. */
+
+export const GET_SOW_PRESET_SECTIONS = gql`
+    query sowPresetSections {
+        sowPresetSections {
+            key
+            label
+            presetCount
+            defaultName
+            updatedAt
+            updatedByName
+        }
+    }
+`;
+
+export const GET_SOW_TEXT_PRESETS = gql`
+    query sowTextPresets($sectionKey: String) {
+        sowTextPresets(sectionKey: $sectionKey) {
+            id
+            sectionKey
+            name
+            text
+            order
+            updatedAt
+            updatedByName
+        }
+    }
+`;

@@ -6,6 +6,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SowFieldSourceControls from './SowFieldSourceControls';
+import SowPresetPicker, { SowTextPresetOption, presetSelectionPatch } from './SowPresetPicker';
 import SowDiffText from './SowDiffText';
 import type { FieldDiff } from '../../utils/sowDiff';
 import { SowField, SowVersionInputs, isCustomField } from './sowTypes';
@@ -35,6 +36,8 @@ interface Props {
   onRenameCustom?: (key: string, label: string) => void;
   /** How this section differs from the version being compared against, if any. */
   diff?: FieldDiff;
+  /** Prose sections only: the standard text blocks staff can choose from. */
+  presets?: SowTextPresetOption[];
   /** feeSchedule only: local service costs no longer match the job's live figures. */
   stale?: boolean;
   onRecalculate?: () => void;
@@ -54,7 +57,7 @@ function firstLine(text: string): string {
   return line.replace(/^-\s*/, '');
 }
 
-function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, diff, stale, onRecalculate, liveCustomerCategory }: Props): React.JSX.Element {
+function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, stale, onRecalculate, liveCustomerCategory }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const key = field.key;
 
@@ -190,6 +193,18 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
         <Box sx={{ px: 6, pb: 2 }}>
           {isCustomField(field.key) && (
             <TextField size="small" label="Section heading" sx={{ mb: 2, width: 320 }} value={field.label} disabled={readOnly} onChange={(e) => onRenameCustom?.(key, e.target.value)} />
+          )}
+
+          {/* Prose sections are generated from a text block rather than from
+              structured inputs, so the block list is their source control. */}
+          {field.kind === 'PROSE' && !editing && (
+            <SowPresetPicker
+              presets={presets ?? []}
+              value={field.value}
+              baseline={field.calculatedValue ?? undefined}
+              disabled={readOnly}
+              onSelect={(text) => changeField(presetSelectionPatch(text, field.calculatedValue))}
+            />
           )}
 
           {hasSourceControls && (

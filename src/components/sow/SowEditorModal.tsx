@@ -8,9 +8,10 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { v4 as uuid } from 'uuid';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_LAB_MONITOR_STAFF_LIST } from '../../gql/queries';
+import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_LAB_MONITOR_STAFF_LIST, GET_SOW_TEXT_PRESETS } from '../../gql/queries';
 import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW, DISCARD_SOW_DRAFT } from '../../gql/mutations';
 import SowFieldRow from './SowFieldRow';
+import { SowTextPresetOption } from './SowPresetPicker';
 import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
 import { diffVersions, pickDiffBaseline } from '../../utils/sowDiff';
@@ -104,6 +105,18 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   });
   const { data: staffData } = useQuery(GET_LAB_MONITOR_STAFF_LIST, { skip: !open });
   const staff = staffData?.getLabMonitorStaffList ?? [];
+
+  // The whole library in one round-trip rather than one query per prose section.
+  const { data: presetData } = useQuery(GET_SOW_TEXT_PRESETS, { skip: !open });
+  const presetsBySection = useMemo(() => {
+    const grouped = new Map<string, SowTextPresetOption[]>();
+    for (const preset of (presetData?.sowTextPresets ?? []) as SowTextPresetOption[]) {
+      const list = grouped.get(preset.sectionKey);
+      if (list) list.push(preset);
+      else grouped.set(preset.sectionKey, [preset]);
+    }
+    return grouped;
+  }, [presetData]);
 
   const sow: SowEditorState | null = data?.sowByJobId ?? null;
   const history = useMemo(() => sow?.versions ?? [], [sow?.versions]);
@@ -520,6 +533,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                     onChangeField={patchField}
                     onChangeInputs={patchInputs}
                     onRenameCustom={renameCustomField}
+                    presets={presetsBySection.get(f.key)}
                     diff={diffByKey.get(f.key)}
                     stale={f.key === 'feeSchedule' ? feeScheduleStale : false}
                     onRecalculate={f.key === 'feeSchedule' ? handleRecalculateFeeSchedule : undefined}

@@ -55,6 +55,7 @@ export default [
         route("/edit/services/:serviceId", "./pages/AdminEditService.tsx"),
         route("/edit/bundles/new", "./pages/AdminNewBundle.tsx"),
         route("/edit/bundles/:bundleId", "./pages/AdminEditBundle.tsx"),
+        route("/edit/sow-sections/:sectionKey", "./pages/AdminEditSowSection.tsx"),
         route("/edit/inventory/new", "./pages/AdminNewInventoryItem.tsx"),
         route("/edit/inventory/:id", "./pages/AdminEditInventoryItem.tsx"),
         route("/inventory", "./pages/Inventory.tsx"),
