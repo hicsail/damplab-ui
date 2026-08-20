@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, formatSOWDate, formatSOWInstant } from './sowDateUtils';
+import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, formatSOWDate, formatSOWInstant, periodOfPerformanceDays } from './sowDateUtils';
 
 /**
  * A SOW period date is stored as UTC midnight but edited in a local-time date
@@ -66,6 +66,11 @@ describe.each([
     expect(formatSOWInstant('2026-08-20T00:30:00.000Z')).toBe('August 19, 2026');
     expect(formatSOWInstant('2026-08-20T00:30:00.000Z', 'short')).toBe('Aug 19, 2026');
     expect(formatSOWInstant('2026-08-20T00:30:00.000Z', 'compact')).toBe('Aug 19');
+    // 00:30 UTC is 8:30 PM the previous day in ET (EDT). Staff versions are
+    // distinguished by time-of-day, so the dropdown needs the clock, not just the date.
+    expect(formatSOWInstant('2026-08-20T00:30:00.000Z', 'datetime')).toBe('Aug 19, 2026, 8:30 PM ET');
+    // EST (UTC−5): 00:30 UTC is 7:30 PM the previous day.
+    expect(formatSOWInstant('2026-01-20T00:30:00.000Z', 'datetime')).toBe('Jan 19, 2026, 7:30 PM ET');
   });
 
   it('does not confuse a calendar day with an instant', () => {
@@ -87,5 +92,50 @@ describe('unparseable input', () => {
   it('falls back to the raw string when formatting', () => {
     expect(formatSOWDate('not a date')).toBe('not a date');
     expect(formatSOWDate(null)).toBe('');
+  });
+});
+
+
+/**
+ * Mirrors periodOfPerformanceSpan on the backend (sow-field-calculator.ts): the
+ * calendar span the Period of Performance section actually promises, which is
+ * not the sum of each period's duration. A single period cannot tell the two
+ * apart — every case below therefore uses gapped or overlapping periods.
+ */
+describe('periodOfPerformanceDays', () => {
+  it('spans from the earliest start to the latest end, gaps included', () => {
+    // Aug 1–7, then Aug 20–24: 14 days of work, but a 24-day span.
+    const periods = [
+      { startDate: '2026-08-01T00:00:00.000Z', durationDays: 7 },
+      { startDate: '2026-08-20T00:00:00.000Z', durationDays: 5 }
+    ];
+    expect(periodOfPerformanceDays(periods)).toBe(24);
+  });
+
+  it('does not double-count overlapping periods', () => {
+    const periods = [
+      { startDate: '2026-08-01T00:00:00.000Z', durationDays: 10 },
+      { startDate: '2026-08-05T00:00:00.000Z', durationDays: 10 }
+    ];
+    expect(periodOfPerformanceDays(periods)).toBe(14);
+  });
+
+  it('counts a single-day period as one day, not zero', () => {
+    expect(periodOfPerformanceDays([{ startDate: '2026-08-01T00:00:00.000Z', durationDays: 1 }])).toBe(1);
+  });
+
+  it('reads the stored dates as calendar days, so the answer does not shift by timezone', () => {
+    const periods = [{ startDate: '2026-08-01T00:00:00.000Z', durationDays: 14 }];
+    process.env.TZ = 'America/New_York';
+    expect(periodOfPerformanceDays(periods)).toBe(14);
+    process.env.TZ = 'Pacific/Auckland';
+    expect(periodOfPerformanceDays(periods)).toBe(14);
+    process.env.TZ = ORIGINAL_TZ;
+  });
+
+  it('is zero when there is nothing scheduled', () => {
+    expect(periodOfPerformanceDays([])).toBe(0);
+    expect(periodOfPerformanceDays(null)).toBe(0);
+    expect(periodOfPerformanceDays(undefined)).toBe(0);
   });
 });

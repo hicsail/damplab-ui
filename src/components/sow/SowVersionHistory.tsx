@@ -1,7 +1,8 @@
 import React from 'react';
-import { Box, Chip, Divider, ListItemText, MenuItem, Select, Typography } from '@mui/material';
+import { Box, Button, Chip, Divider, ListItemText, MenuItem, Select, Tooltip, Typography } from '@mui/material';
 import { SowVersion, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 import { formatSOWInstant } from '../../utils/sowDateUtils';
+import { compareToVersions, revertIsEnabled, SowViewing, UNSAVED_VIEW } from './sowEditorView';
 
 /**
  * Two pickers over the same history: which version is on screen, and which one it
@@ -13,12 +14,19 @@ import { formatSOWInstant } from '../../utils/sowDateUtils';
 
 interface Props {
   versions: SowVersion[];
-  viewing: number;
+  viewing: SowViewing;
   baseline: number | null;
-  onViewingChange: (versionNumber: number) => void;
+  onViewingChange: (viewing: SowViewing) => void;
   onBaselineChange: (versionNumber: number | null) => void;
   /** Customers compare against the last version they were sent; no choice offered. */
   lockBaseline?: boolean;
+  /** Staff working copy — listed in Version when there are unsaved edits. */
+  unsaved?: boolean;
+  unsavedBasedOn?: string;
+  onRevert?: () => void;
+  onReset?: () => void;
+  resetDisabled?: boolean;
+  busy?: boolean;
 }
 
 function describe(v: SowVersion): string {
@@ -27,22 +35,47 @@ function describe(v: SowVersion): string {
 
 function when(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : formatSOWInstant(d, 'short');
+  return Number.isNaN(d.getTime()) ? '' : formatSOWInstant(d, 'datetime');
 }
 
-export default function SowVersionHistory({ versions, viewing, baseline, onViewingChange, onBaselineChange, lockBaseline }: Props): React.JSX.Element {
+export default function SowVersionHistory({
+  versions,
+  viewing,
+  baseline,
+  onViewingChange,
+  onBaselineChange,
+  lockBaseline,
+  unsaved,
+  unsavedBasedOn,
+  onRevert,
+  onReset,
+  resetDisabled,
+  busy
+}: Props): React.JSX.Element {
   const ordered = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
-  const older = ordered.filter((v) => v.versionNumber < viewing);
   const baselineVersion = baseline != null ? versions.find((v) => v.versionNumber === baseline) : null;
+  const compareOptions = compareToVersions(versions, viewing);
+  const revertDisabled = busy || !revertIsEnabled(viewing);
 
   return (
     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
       <Select
         size="small"
-        value={viewing}
-        onChange={(e) => onViewingChange(Number(e.target.value))}
+        value={viewing === UNSAVED_VIEW ? UNSAVED_VIEW : String(viewing)}
+        onChange={(e) => {
+          const val = e.target.value;
+          onViewingChange(val === UNSAVED_VIEW ? UNSAVED_VIEW : Number(val));
+        }}
         sx={{ minWidth: 200 }}
         renderValue={(val) => {
+          if (val === UNSAVED_VIEW) {
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>Unsaved</span>
+                <Chip size="small" label="Unsaved" color="warning" />
+              </Box>
+            );
+          }
           const v = versions.find((x) => x.versionNumber === Number(val));
           return (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -52,8 +85,21 @@ export default function SowVersionHistory({ versions, viewing, baseline, onViewi
           );
         }}
       >
+        {unsaved && (
+          <MenuItem value={UNSAVED_VIEW}>
+            <ListItemText
+              primary={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <span>Unsaved</span>
+                  <Chip size="small" label="Unsaved" color="warning" />
+                </Box>
+              }
+              secondary={unsavedBasedOn ? `Based on version ${unsavedBasedOn} · not saved yet` : 'Not saved yet'}
+            />
+          </MenuItem>
+        )}
         {ordered.map((v) => (
-          <MenuItem key={v.versionNumber} value={v.versionNumber}>
+          <MenuItem key={v.versionNumber} value={String(v.versionNumber)}>
             <ListItemText
               primary={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -67,6 +113,26 @@ export default function SowVersionHistory({ versions, viewing, baseline, onViewi
         ))}
       </Select>
 
+      {onRevert && (
+        <Tooltip title={revertDisabled ? 'Select a saved version to revert to.' : 'Replace Unsaved with this version.'}>
+          <span>
+            <Button size="small" variant="outlined" disabled={revertDisabled} onClick={onRevert}>
+              Revert
+            </Button>
+          </span>
+        </Tooltip>
+      )}
+
+      {onReset && (
+        <Tooltip title={resetDisabled ? 'No unsaved edits to discard.' : 'Discard unsaved edits and restore the last saved version.'}>
+          <span>
+            <Button size="small" color="inherit" disabled={resetDisabled} onClick={onReset}>
+              Reset
+            </Button>
+          </span>
+        </Tooltip>
+      )}
+
       {lockBaseline ? (
         baselineVersion && (
           <Typography variant="body2" color="text.secondary">
@@ -79,13 +145,37 @@ export default function SowVersionHistory({ versions, viewing, baseline, onViewi
           <Typography variant="body2" color="text.secondary">
             Compare to
           </Typography>
-          <Select size="small" value={baseline ?? ''} displayEmpty sx={{ minWidth: 190 }} onChange={(e) => onBaselineChange(e.target.value === '' ? null : Number(e.target.value))}>
+          <Select
+            size="small"
+            value={baseline == null ? '' : String(baseline)}
+            displayEmpty
+            sx={{ minWidth: 200 }}
+            onChange={(e) => onBaselineChange(e.target.value === '' ? null : Number(e.target.value))}
+            renderValue={(val) => {
+              if (val === '' || val == null) return <em>Nothing</em>;
+              const v = versions.find((x) => x.versionNumber === Number(val));
+              return (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <span>{v ? versionDisplayLabel(v) : String(val)}</span>
+                  {v && <Chip size="small" label={sowStatusLabel(v.status)} color={statusColor(v.status)} />}
+                </Box>
+              );
+            }}
+          >
             <MenuItem value="">
-              <em>Nothing — hide changes</em>
+              <em>Nothing</em>
             </MenuItem>
-            {older.map((v) => (
-              <MenuItem key={v.versionNumber} value={v.versionNumber}>
-                {versionDisplayLabel(v)} · {sowStatusLabel(v.status).toLowerCase()} · {when(v.createdAt)}
+            {compareOptions.map((v) => (
+              <MenuItem key={v.versionNumber} value={String(v.versionNumber)}>
+                <ListItemText
+                  primary={
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <span>Version {versionDisplayLabel(v)}</span>
+                      <Chip size="small" label={sowStatusLabel(v.status)} color={statusColor(v.status)} />
+                    </Box>
+                  }
+                  secondary={`${when(v.createdAt)} · ${v.createdByName} · ${describe(v)}`}
+                />
               </MenuItem>
             ))}
           </Select>
