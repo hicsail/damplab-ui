@@ -6,11 +6,9 @@ import DoneIcon         from '@mui/icons-material/Done';
 import HelpOutlineIcon  from '@mui/icons-material/HelpOutline';
 
 import { diffWordsWithSpace } from 'diff';
-import { calculateServiceCost, resolveParameterName, type CustomerCategory } from '../utils/servicePricing';
+import { resolveParameterName } from '../utils/servicePricing';
 import SowDiffText from './sow/SowDiffText';
 import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
-
-const formatPrice = (value: number) => (Number.isFinite(value) ? `$${value.toFixed(2)}` : '[Price Pending Review]');
 
 /**
  * The per-workflow summary cards shown on both job views.
@@ -124,11 +122,9 @@ interface Props {
     /** The two versions `diff` was computed from, used to caption it. */
     currentVersion?: JobVersionLike | null;
     baselineVersion?: JobVersionLike | null;
-    /** When set, each node shows a live catalogue price for this pricing category. */
-    customerCategory?: CustomerCategory | string | null;
 }
 
-export default function JobWorkflowCards({ workflows, fallbackName, diff, currentVersion, baselineVersion, customerCategory }: Props): React.JSX.Element {
+export default function JobWorkflowCards({ workflows, fallbackName, diff, currentVersion, baselineVersion }: Props): React.JSX.Element {
     /**
      * Nodes the baseline had that no longer exist anywhere on the job. They have
      * no workflow to sit under any more, so they are appended to the first card
@@ -182,15 +178,6 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                 const nodeDiff = diff?.byNodeId.get(node.id);
                                 const kind = nodeDiff?.kind;
                                 const changedParamIds = new Set((nodeDiff?.paramDiffs ?? []).map((p) => p.id));
-                                const servicePrice = customerCategory
-                                    ? calculateServiceCost(
-                                        node.service ?? {},
-                                        node.formData ?? [],
-                                        node?.service?.price ?? null,
-                                        customerCategory as CustomerCategory
-                                    )
-                                    : null;
-
                                 return (
                                     <Box
                                         key={`${node.id || nodeIndex}`}
@@ -208,11 +195,6 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                                 {kind === 'changed' && <Chip size="small" label="Edited" sx={{ height: 18, fontSize: 10, backgroundColor: '#ed6c02', color: 'white' }} />}
                                                 {nodeDiff?.serviceChanged && <Chip size="small" variant="outlined" label="Service changed" sx={{ height: 18, fontSize: 10 }} />}
                                             </Box>
-                                            {servicePrice != null && (
-                                                <Typography variant='body2' color='text.secondary'>
-                                                    {formatPrice(servicePrice)}
-                                                </Typography>
-                                            )}
                                         </Box>
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
                                             {normalizeFormEntries(node?.formData).map((entry: any) => {

@@ -52,6 +52,13 @@ export default function JobFeedbackModal(props: any) {
     }
   }, [open]);
 
+  // Re-accepting an already-accepted job is the same decision, taken again: it
+  // re-stamps the billing fingerprint the SOW send gate compares against, which
+  // is what releases a send that a later job edit locked. Staff reach it here
+  // rather than from the SOW card, so that "send it back to the customer" stays
+  // an equally available choice at the same moment.
+  const isReview = jobState === 'ACCEPTED';
+
   const handleFeedbackTypeChange = (event: any) => {
     setFeedbackType(event.target.value);
   };
@@ -155,7 +162,17 @@ export default function JobFeedbackModal(props: any) {
 
           <RadioGroup onChange = {handleFeedbackTypeChange} value = {feedbackType} name = "feedback-type" aria-label = "feedback-type">
 
-            <FormControlLabel control={<Radio />} value="looks-good"    label="Accept job (ready to proceed)" />
+            <FormControlLabel
+              control={<Radio />}
+              value="looks-good"
+              label={isReview ? "Re-accept on the customer's behalf (ready to proceed)" : 'Accept job (ready to proceed)'}
+            />
+            {isReview && feedbackType === 'looks-good' && (
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 4, mb: 1 }}>
+                Confirms the job as it now stands, without asking the customer again. This unlocks sending the Statement of
+                Work. If the change should be the customer&apos;s call, request edits below instead.
+              </Typography>
+            )}
 
             <FormControlLabel control={<Radio />} value="minor-changes" label="Request clarification" />
               {feedbackType === "minor-changes" && (
@@ -212,7 +229,9 @@ export default function JobFeedbackModal(props: any) {
               {submitting
                 ? "Saving…"
                 : feedbackType === "looks-good"
-                  ? "Accept Job"
+                  ? isReview
+                    ? 'Re-accept'
+                    : 'Accept Job'
                   : "Submit Decision"}
             </Button>
           </Box>

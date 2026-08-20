@@ -38,10 +38,13 @@ interface Props {
   diff?: FieldDiff;
   /** Prose sections only: the standard text blocks staff can choose from. */
   presets?: SowTextPresetOption[];
-  /** feeSchedule only: local service costs no longer match the job's live figures. */
-  stale?: boolean;
-  onRecalculate?: () => void;
   liveCustomerCategory?: string | null;
+  /** feeSchedule only: what the job prices these lines at now, shown beside the document's own figures. */
+  liveServices?: SowVersionInputs['services'] | null;
+  /** feeSchedule only: the document's figures no longer match the job's. */
+  stale?: boolean;
+  /** feeSchedule only: adopt the job's current figures into this draft. */
+  onRecalculate?: () => void;
 }
 
 const DIFF_CHIP: Record<string, string> = {
@@ -57,7 +60,7 @@ function firstLine(text: string): string {
   return line.replace(/^-\s*/, '');
 }
 
-function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, stale, onRecalculate, liveCustomerCategory }: Props): React.JSX.Element {
+function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, liveCustomerCategory, liveServices, stale, onRecalculate }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const key = field.key;
 
@@ -147,13 +150,13 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
         )}
 
         {onRecalculate && (
-          <Tooltip title="Pull the job's current service costs and pricing category back in — any adjustments you've added stay as they are.">
+          <Tooltip title="Pull in the job's current service costs and pricing category. They become part of the record when you save; adjustments you've added stay as they are.">
             <span>
               <IconButton
                 size="small"
                 color={stale ? 'warning' : 'default'}
                 disabled={readOnly}
-                aria-label={`Refresh ${field.label} from the job's current figures`}
+                aria-label={`Recalculate ${field.label} from the job's current figures`}
                 onClick={onRecalculate}
               >
                 <RefreshIcon fontSize="small" />
@@ -211,7 +214,9 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
             <Box sx={{ mb: 2 }}>
               {field.key === 'feeSchedule' && stale && (
                 <Alert severity="warning" sx={{ mb: 2 }}>
-                  The pricing category or service costs no longer match the job. Refresh the Fee Schedule to update this snapshot — it will not change on its own.
+                  The job&apos;s services or pricing category changed after this document was written. The figures below are
+                  what this document says — they will not move on their own. Recalculate to adopt the job&apos;s current
+                  figures, then save to make them part of the record.
                 </Alert>
               )}
               {editing && (
@@ -226,6 +231,7 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
                 disabled={readOnly || editing}
                 onChange={onChangeInputs}
                 liveCustomerCategory={liveCustomerCategory}
+                liveServices={liveServices}
               />
             </Box>
           )}

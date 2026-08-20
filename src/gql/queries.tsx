@@ -1455,6 +1455,7 @@ export const GET_SOW_EDITOR_STATE = gql`
             documentStale
             liveCustomerCategory
             liveServices { serviceId name description cost unitCost multiplier runCount }
+            actionGate { canSend sendBlockers canCountersign countersignBlockers missingFields }
             currentVersion { ...SowVersionFields }
             activeVersion { versionNumber displayVersion status }
             versions { ...SowVersionFields }

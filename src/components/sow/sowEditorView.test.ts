@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import type { SowNextAction } from './sowEditorView';
 import {
+  nextSowAction,
   UNSAVED_VIEW,
   isShowingWorkingCopy,
   editorIsReadOnly,
@@ -179,5 +181,142 @@ describe('cloneVersionDocument', () => {
     expect(source.fields[0].value).toBe('old wording');
     expect(source.inputs.projectManager).toBe('Ada');
     expect(copy.fields[0].value).toBe('mutated');
+  });
+});
+
+/**
+ * The single action button.
+ *
+ * Save, Send and Countersign are one pipeline with exactly one legal step at a
+ * time. These cases are that pipeline written out; the ordering between them is
+ * the behaviour, not an implementation detail.
+ */
+describe('nextSowAction', () => {
+  /** Narrows the union so the reason is readable, and asserts the kind on the way. */
+  const blockedReason = (action: SowNextAction): string => {
+    expect(action.kind).toBe('blocked');
+    return action.kind === 'blocked' ? action.reason ?? '' : '';
+  };
+
+  const clearGate = { canSend: true, sendBlockers: [], canCountersign: true, countersignBlockers: [], missingFields: [] } as any;
+  const base = { dirty: false, status: 'DRAFT' as const, activeStatus: null, gate: clearGate, missingRequired: [] };
+
+  it('offers Save while there are unsaved changes, whatever else is true', () => {
+    expect(nextSowAction({ ...base, dirty: true })).toMatchObject({ kind: 'save' });
+    expect(nextSowAction({ ...base, dirty: true, activeStatus: 'SIGNED' })).toMatchObject({ kind: 'save' });
+  });
+
+  it('offers Send once the draft is clean and nothing blocks it', () => {
+    expect(nextSowAction(base)).toMatchObject({ kind: 'send', label: 'Send to customer' });
+  });
+
+  it('blocks the send and names the first blocker as the next step', () => {
+    const gate = { ...clearGate, canSend: false, sendBlockers: ['NOT_ACCEPTED', 'DOCUMENT_STALE'] };
+    expect(blockedReason(nextSowAction({ ...base, gate }))).toContain('Review Job');
+  });
+
+  it('blocks the send on a required section the server has not seen yet', () => {
+    expect(blockedReason(nextSowAction({ ...base, missingRequired: ['Engagement Resources'] }))).toContain('Engagement Resources');
+  });
+
+  it('waits while the customer holds a sent version', () => {
+    expect(nextSowAction({ ...base, status: 'SENT' })).toMatchObject({ kind: 'blocked', label: 'Awaiting customer' });
+  });
+
+  it('offers Countersign once the customer has signed and no draft is outstanding', () => {
+    expect(nextSowAction({ ...base, status: 'SIGNED', activeStatus: 'SIGNED' })).toMatchObject({ kind: 'countersign' });
+  });
+
+  /**
+   * UNSENT_DRAFT is never surfaced as a blocked countersignature in the UI: a
+   * draft above the signed version means Send is the live stage, so the button
+   * offers it. The backend blocker still exists because finalize enforces it
+   * against direct callers.
+   */
+  it('routes a revision past the signed version to Send rather than a blocked Countersign', () => {
+    const gate = { ...clearGate, canCountersign: false, countersignBlockers: ['UNSENT_DRAFT'] };
+
+    expect(nextSowAction({ ...base, status: 'DRAFT', activeStatus: 'SIGNED', gate }).kind).toBe('send');
+  });
+
+  it('blocks the countersignature when the document no longer matches the job', () => {
+    const gate = { ...clearGate, canSend: false, sendBlockers: ['DOCUMENT_STALE'], canCountersign: false, countersignBlockers: ['DOCUMENT_STALE'] };
+    expect(blockedReason(nextSowAction({ ...base, status: 'SIGNED', activeStatus: 'SIGNED', gate }))).toContain('Recalculate');
+  });
+
+  it('never offers an outward-facing action before the draft is saved', () => {
+    const kinds = (['DRAFT', 'SENT', 'SIGNED'] as const).map(
+      (activeStatus) => nextSowAction({ ...base, dirty: true, activeStatus }).kind
+    );
+
+    expect(kinds).toEqual(['save', 'save', 'save']);
+  });
+
+  /**
+   * The revise-after-signature loop, walked end to end.
+   *
+   * The bug this guards: testing the signature stage before the draft stage
+   * offered a permanently blocked "Countersign and finalize" whose own tooltip
+   * told staff to send the revision it was refusing to offer.
+   */
+  it('offers Send, not a blocked Countersign, once a signed SOW has been revised', () => {
+    // Customer has signed v2.0; staff have since saved a revised draft v2.1.
+    const gate = { ...clearGate, canCountersign: false, countersignBlockers: ['UNSENT_DRAFT'] };
+    const action = nextSowAction({ ...base, status: 'DRAFT', activeStatus: 'SIGNED', gate });
+
+    expect(action).toMatchObject({ kind: 'send', label: 'Send to customer' });
+  });
+
+  it('walks the whole revise-after-signature loop without getting stuck', () => {
+    const signedGate = { ...clearGate, canCountersign: false, countersignBlockers: ['UNSENT_DRAFT'] };
+    const staleGate = { ...clearGate, canSend: false, sendBlockers: ['DOCUMENT_STALE'], canCountersign: false, countersignBlockers: ['DOCUMENT_STALE'] };
+
+    // 1. Signed and settled → countersign is the live stage.
+    expect(nextSowAction({ ...base, status: 'SIGNED', activeStatus: 'SIGNED' }).kind).toBe('countersign');
+    // 2. Job edited → stale blocks it.
+    expect(nextSowAction({ ...base, status: 'SIGNED', activeStatus: 'SIGNED', gate: staleGate }).kind).toBe('blocked');
+    // 3. Staff edit the document → Save.
+    expect(nextSowAction({ ...base, dirty: true, status: 'SIGNED', activeStatus: 'SIGNED', gate: staleGate }).kind).toBe('save');
+    // 4. Saved: a draft now sits above the signed version → Send it.
+    expect(nextSowAction({ ...base, status: 'DRAFT', activeStatus: 'SIGNED', gate: signedGate }).kind).toBe('send');
+    // 5. Sent, awaiting the customer's re-signature.
+    expect(nextSowAction({ ...base, status: 'SENT', activeStatus: 'SENT', gate: signedGate })).toMatchObject({ kind: 'blocked', label: 'Awaiting customer' });
+    // 6. Re-signed → countersign again.
+    expect(nextSowAction({ ...base, status: 'SIGNED', activeStatus: 'SIGNED' }).kind).toBe('countersign');
+  });
+
+  /**
+   * Terminal states. The fallthrough used to claim the lab was waiting on a
+   * customer who had already signed *and* been countersigned.
+   */
+  it('reports a countersigned SOW as complete, not as awaiting the customer', () => {
+    const action = nextSowAction({ ...base, status: 'FINAL', activeStatus: 'FINAL' });
+
+    expect(action).toMatchObject({ kind: 'blocked', label: 'Countersigned' });
+    expect(blockedReason(action)).not.toContain('has not signed');
+  });
+
+  it('reports a cancelled SOW as cancelled rather than as history', () => {
+    // readOnly is true for a cancelled SOW, so this has to win over it.
+    const action = nextSowAction({ ...base, status: 'CANCELLED', activeStatus: 'CANCELLED', readOnly: true });
+
+    expect(action).toMatchObject({ kind: 'blocked', label: 'Cancelled' });
+  });
+
+  it('still offers Send on a draft saved above a countersigned version', () => {
+    expect(nextSowAction({ ...base, status: 'DRAFT', activeStatus: 'FINAL' }).kind).toBe('send');
+  });
+
+  it('offers nothing while a historic version is on screen', () => {
+    // Every action operates on the current version, not the one being viewed.
+    const viewing = { ...base, readOnly: true };
+    expect(nextSowAction(viewing)).toMatchObject({ kind: 'blocked', label: 'Viewing history' });
+    expect(nextSowAction({ ...viewing, dirty: true }).kind).toBe('blocked');
+    expect(nextSowAction({ ...viewing, activeStatus: 'SIGNED' }).kind).toBe('blocked');
+  });
+
+  it('treats a missing gate as blocking rather than permitting', () => {
+    expect(nextSowAction({ ...base, gate: null }).kind).toBe('blocked');
+    expect(nextSowAction({ ...base, status: 'SIGNED', activeStatus: 'SIGNED', gate: null }).kind).toBe('blocked');
   });
 });

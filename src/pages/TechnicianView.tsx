@@ -476,11 +476,15 @@ export default function TechnicianView() {
                     >
                         Edit Job
                     </Button>
+                    {/* Reachable after acceptance too, not just at intake: it is
+                        where staff re-accept a job whose spec has changed (which
+                        releases the SOW send) and, equally, where they can hand it
+                        back to the customer instead. */}
                     <Button 
                         variant="contained"
                         color="error"
                         onClick={handleOpenModal}
-                        disabled={jobState !== 'SUBMITTED'}
+                        disabled={!['SUBMITTED', 'CHANGES_REQUESTED', 'ACCEPTED'].includes(jobState ?? '')}
                     >
                         Review Job
                     </Button>
