@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceLineCost, serviceMultiplier, serviceUnitCost, toInputsPayload, SowVersionInputs, sowTotals} from './sowTypes';
+import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceLineCost, serviceMultiplier, serviceUnitCost, toInputsPayload, SowVersionInputs, sowTotals, signingAgreementText, customerDocumentFields, DEFAULT_SIGNATURES_TEXT, SowField } from './sowTypes';
 
 describe('consentSummaryLabels', () => {
   it('reads the two boilerplate groups back as a single agreement', () => {
@@ -21,6 +21,46 @@ describe('consentSummaryLabels', () => {
     expect(consentSummaryLabels([])).toEqual([]);
     expect(consentSummaryLabels(null)).toEqual([]);
     expect(consentSummaryLabels(undefined)).toEqual([]);
+  });
+});
+
+function field(key: string, value: string, over: Partial<SowField> = {}): SowField {
+  return {
+    key,
+    label: key,
+    kind: 'PROSE',
+    order: 10,
+    value,
+    calculatedValue: value,
+    isOverridden: false,
+    isEnabled: true,
+    allowsTextOverride: true,
+    allowsEmpty: true,
+    requiresInitials: false,
+    ...over
+  };
+}
+
+describe('signingAgreementText', () => {
+  it('uses the Signatures section the staff set on this document', () => {
+    expect(signingAgreementText([field('scopeOfWork', 'Do the work'), field('signatures', 'We agree to the terms as written.')])).toBe('We agree to the terms as written.');
+  });
+
+  it('falls back to the catalogue default when a legacy SOW has no Signatures text', () => {
+    expect(signingAgreementText([field('scopeOfWork', 'Do the work')])).toBe(DEFAULT_SIGNATURES_TEXT);
+    expect(signingAgreementText([field('signatures', '   ')])).toBe(DEFAULT_SIGNATURES_TEXT);
+    expect(signingAgreementText([])).toBe(DEFAULT_SIGNATURES_TEXT);
+  });
+});
+
+describe('customerDocumentFields', () => {
+  it('omits Signatures from the document body so the clause is not shown twice', () => {
+    const fields = [field('scopeOfWork', 'Do the work', { order: 20 }), field('signatures', 'Witness.', { order: 180 }), field('feeSchedule', 'Costs', { order: 10 })];
+    expect(customerDocumentFields(fields).map((f) => f.key)).toEqual(['feeSchedule', 'scopeOfWork']);
+  });
+
+  it('still hides sections the staff turned off', () => {
+    expect(customerDocumentFields([field('scopeOfWork', 'Do the work', { isEnabled: false })]).map((f) => f.key)).toEqual([]);
   });
 });
 

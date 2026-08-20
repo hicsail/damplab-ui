@@ -11,7 +11,7 @@ import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
 import SowSignaturesSummary from './SowSignaturesSummary';
 import { diffVersions, previousCustomerVersion } from '../../utils/sowDiff';
-import { GROUP_ORDER, SowEditorState, SowField, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
+import { GROUP_ORDER, SowEditorState, SowField, customerDocumentFields, signingAgreementText, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 import { formatSOWInstant } from '../../utils/sowDateUtils';
 
 /**
@@ -59,7 +59,8 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   }, [history, version, baseline]);
   const diffByKey = useMemo(() => new Map((diff?.fields ?? []).map((f) => [f.key, f])), [diff]);
 
-  const visible: SowField[] = useMemo(() => (version?.fields ?? []).filter((f) => f.isEnabled).sort((a, b) => a.order - b.order), [version]);
+  const visible: SowField[] = useMemo(() => customerDocumentFields(version?.fields), [version]);
+  const agreementText = useMemo(() => signingAgreementText(version?.fields), [version]);
 
   // Only present in the single consent statement if the document actually
   // contains that kind of section — sent to the server as consentedGroups.
@@ -149,7 +150,16 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
             <>
               {history.length > 1 && (
                 <Box sx={{ mb: 2 }}>
-                  <SowVersionHistory versions={history} viewing={version.versionNumber} baseline={baseline} onViewingChange={setViewing} onBaselineChange={() => undefined} lockBaseline />
+                  <SowVersionHistory
+                    versions={history}
+                    viewing={version.versionNumber}
+                    baseline={baseline}
+                    onViewingChange={(v) => {
+                      if (typeof v === 'number') setViewing(v);
+                    }}
+                    onBaselineChange={() => undefined}
+                    lockBaseline
+                  />
                 </Box>
               )}
 
@@ -214,37 +224,53 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                 })}
               </Box>
 
+              {!awaitingSignature && !version.clientSignature && (
+                <Typography variant="body2" sx={{ mt: 3, whiteSpace: 'pre-wrap' }} data-verbatim-text>
+                  {agreementText}
+                </Typography>
+              )}
+
               {/* Signing */}
               {awaitingSignature && !signedName && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                     Signing
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    Confirm the document{sectionsNeedingInitials.length > 0 ? ' — including the sections above asking for your initials —' : ''} then type your full name.
-                  </Typography>
+                  {sectionsNeedingInitials.length > 0 && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                      Initial the flagged sections above, then agree and type your full name.
+                    </Typography>
+                  )}
 
-                  <FormControlLabel
-                    control={<Checkbox checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />}
-                    label="I agree to all terms above, including scope of work, costs, and any client responsibilities."
-                  />
-
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 2, flexWrap: 'wrap' }}>
-                    <TextField size="small" label="Your full name" value={name} onChange={(e) => setName(e.target.value)} sx={{ minWidth: 260 }} disabled={busy} />
-                    <Button variant="contained" onClick={handleSign} disabled={!canSign}>
-                      Sign
-                    </Button>
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <FormControlLabel
+                      sx={{ flex: '1 1 280px', alignItems: 'flex-start', mr: 0 }}
+                      control={<Checkbox checked={agreed} onChange={(e) => setAgreed(e.target.checked)} sx={{ pt: 0.25 }} />}
+                      label={
+                        <Typography variant="body2" data-verbatim-text>
+                          {agreementText}
+                        </Typography>
+                      }
+                    />
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <TextField size="small" label="Your full name" value={name} onChange={(e) => setName(e.target.value)} sx={{ minWidth: 220 }} disabled={busy} />
+                      <Button variant="contained" onClick={handleSign} disabled={!canSign}>
+                        Sign
+                      </Button>
+                    </Box>
                   </Box>
                   {!agreed && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Confirm the checkbox above to enable signing.</Typography>}
                   {agreed && !allInitialed && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Initial every flagged section above to enable signing.</Typography>}
                 </Box>
               )}
 
-              {/* Signatures */}
               {version.clientSignature && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                     Signatures
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1.5, whiteSpace: 'pre-wrap' }} data-verbatim-text>
+                    {agreementText}
                   </Typography>
                   <SowSignaturesSummary clientSignature={version.clientSignature} staffSignature={version.staffSignature} />
                 </Box>

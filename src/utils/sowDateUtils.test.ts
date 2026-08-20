@@ -66,6 +66,11 @@ describe.each([
     expect(formatSOWInstant('2026-08-20T00:30:00.000Z')).toBe('August 19, 2026');
     expect(formatSOWInstant('2026-08-20T00:30:00.000Z', 'short')).toBe('Aug 19, 2026');
     expect(formatSOWInstant('2026-08-20T00:30:00.000Z', 'compact')).toBe('Aug 19');
+    // 00:30 UTC is 8:30 PM the previous day in ET (EDT). Staff versions are
+    // distinguished by time-of-day, so the dropdown needs the clock, not just the date.
+    expect(formatSOWInstant('2026-08-20T00:30:00.000Z', 'datetime')).toBe('Aug 19, 2026, 8:30 PM ET');
+    // EST (UTC−5): 00:30 UTC is 7:30 PM the previous day.
+    expect(formatSOWInstant('2026-01-20T00:30:00.000Z', 'datetime')).toBe('Jan 19, 2026, 7:30 PM ET');
   });
 
   it('does not confuse a calendar day with an instant', () => {

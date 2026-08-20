@@ -107,7 +107,7 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
             {needsAttention && <Chip size="small" label="Required" color="error" />}
             {stale && <Chip size="small" label="Stale" color="warning" />}
             {diffKind && <Chip size="small" label={DIFF_CHIP[diffKind]} color="info" variant="outlined" />}
-            {field.isOverridden && <Chip size="small" label="Edited" color="warning" variant="outlined" />}
+            {field.isOverridden && <Chip size="small" label="Raw Text Edited" color="warning" variant="outlined" />}
             {!field.isEnabled && <Chip size="small" label="Hidden from customer" variant="outlined" />}
             {field.requiresInitials && <Chip size="small" label="Requires initials" color="secondary" variant="outlined" />}
           </Box>
@@ -163,10 +163,10 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
         )}
 
         {/* Reachable while the pencil is on, not only once the text differs:
-            the pencil greys out the source controls, and revert is what brings
+            the pencil greys out the source controls, and Recalculate is what brings
             them back — so it has to be there before anything is typed.
             Gated on there being something generated to go back to: a custom
-            section has no calculatedValue, and reverting one would just blank it. */}
+            section has no calculatedValue, and recalculating one would just blank it. */}
         {canEditText && field.calculatedValue != null && (field.isOverridden || editing) && (
           <Tooltip title="Discard your edits and go back to the generated text">
             <Button
@@ -278,7 +278,7 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
 
           {field.isOverridden && field.calculatedValue != null && !editing && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-              Edited by hand. The generated version is available through the revert button.
+              Edited by hand. The generated version is available through the Recalculate button.
             </Typography>
           )}
         </Box>

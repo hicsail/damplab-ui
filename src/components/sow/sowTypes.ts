@@ -287,6 +287,29 @@ export function consentSummaryLabels(groups: SowFieldKind[] | null | undefined):
   return labels;
 }
 
+/** Catalogue default — same string the backend seeds (sow-field-defaults.ts). */
+export const SIGNATURES_FIELD_KEY = 'signatures';
+export const DEFAULT_SIGNATURES_TEXT =
+  'IN WITNESS WHEREOF, the parties hereto have caused this SOW to be effective as of the day, month and year first written above.';
+
+/**
+ * Agreement copy shown next to the customer's name field.
+ *
+ * Prefers the Signatures section stored on this version. A blank or missing
+ * section (legacy documents) falls back to the catalogue default so signing
+ * never loses its clause.
+ */
+export function signingAgreementText(fields: SowField[] | null | undefined): string {
+  const value = (fields ?? []).find((f) => f.key === SIGNATURES_FIELD_KEY)?.value?.trim();
+  return value || DEFAULT_SIGNATURES_TEXT;
+}
+
+/** Enabled sections the customer reads as the document, excluding Signatures —
+ *  that clause lives in the signing block so it is not shown twice. */
+export function customerDocumentFields(fields: SowField[] | null | undefined): SowField[] {
+  return [...(fields ?? [])].filter((f) => f.isEnabled && f.key !== SIGNATURES_FIELD_KEY).sort((a, b) => a.order - b.order);
+}
+
 /**
  * True when the local draft's Fee Schedule snapshot no longer matches the
  * job — either service costs drifted, or the documented pricing category
