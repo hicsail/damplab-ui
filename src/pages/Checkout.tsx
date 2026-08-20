@@ -713,7 +713,7 @@ export default function Checkout() {
         <Alert
           severity="info" color="error" sx={{ mb: 3, borderRadius: 2}}
         >
-          *This cost is subject to lab review. Final pricing is likely to vary.
+          *Provisional. The lab reviews every request, and your final pricing is set in the Statement of Work you&apos;ll be asked to approve before any work begins.
         </Alert>
 
         <Button

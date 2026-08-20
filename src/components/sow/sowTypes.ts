@@ -73,11 +73,6 @@ export function serviceUnitCost(s: Pick<SowVersionService, 'unitCost' | 'cost'>)
   return Number.isFinite(u) ? u : Number(s.cost) || 0;
 }
 
-/** A unit price times its multiplier, to the cent. Mirrors the server's round2. */
-export function serviceLineCost(unitCost: number, multiplier: number): number {
-  return Math.round(unitCost * multiplier * 100) / 100;
-}
-
 export type SowAdjustmentType = 'DISCOUNT' | 'ADDITIONAL_COST';
 
 /** What the adjustment is charging for. Absent on adjustments written before categories existed. */
@@ -186,6 +181,57 @@ export interface SowVersion {
   inputs: SowVersionInputs;
 }
 
+/**
+ * Why a SOW cannot move to its next lifecycle stage, in the order staff should
+ * clear them. The order is the point: these are steps in one repair sequence,
+ * not competing alarms.
+ */
+export type DocumentBlocker =
+  | 'NOT_ACCEPTED'
+  | 'JOB_CHANGED_SINCE_ACCEPTANCE'
+  | 'DOCUMENT_STALE'
+  | 'DRAFT_INCOMPLETE'
+  | 'NO_DRAFT_TO_SEND'
+  | 'UNSENT_DRAFT'
+  | 'AWAITING_CUSTOMER_SIGNATURE';
+
+/**
+ * Blockers that describe a settled document rather than something staff can fix.
+ * They belong in a button's tooltip, never in a "here is what to do" checklist.
+ */
+export const SETTLED_BLOCKERS: readonly DocumentBlocker[] = ['NO_DRAFT_TO_SEND', 'AWAITING_CUSTOMER_SIGNATURE'];
+
+/**
+ * The step text for a blocker, with a fallback.
+ *
+ * The map is keyed by a hand-written union rather than by the backend enum, so a
+ * blocker added server-side arrives here unmapped until the union catches up.
+ * Indexing directly returned `undefined` and rendered a numbered bullet with
+ * nothing in it; this at least says something true.
+ */
+export function blockerStep(blocker: DocumentBlocker): string {
+  return BLOCKER_STEP[blocker] ?? 'This SOW is not ready to move on yet.';
+}
+
+export interface SowActionGate {
+  canSend: boolean;
+  sendBlockers: DocumentBlocker[];
+  canCountersign: boolean;
+  countersignBlockers: DocumentBlocker[];
+  missingFields: string[];
+}
+
+/** What each blocker asks staff to do, in the words the banner and button use. */
+export const BLOCKER_STEP: Record<DocumentBlocker, string> = {
+  NOT_ACCEPTED: 'Use Review Job to accept it, so the spec these prices come from is agreed before the customer sees them.',
+  JOB_CHANGED_SINCE_ACCEPTANCE: 'The job changed after it was accepted. Use Review Job to re-accept it, or to hand it back to the customer.',
+  DOCUMENT_STALE: "Recalculate the Fee Schedule and save — this document still bills the job's earlier figures.",
+  DRAFT_INCOMPLETE: 'Fill in the required sections.',
+  NO_DRAFT_TO_SEND: 'This version has already been issued. Edit the document to start a new draft.',
+  UNSENT_DRAFT: 'Send the revised version and have the customer sign it.',
+  AWAITING_CUSTOMER_SIGNATURE: 'Waiting for the customer to sign.'
+};
+
 export interface SowEditorState {
   id: string;
   sowNumber: string;
@@ -197,6 +243,8 @@ export interface SowEditorState {
   liveServices?: SowVersionService[];
   /** The job's current pricing category — may differ from a stale local draft's. */
   liveCustomerCategory?: string | null;
+  /** Which lifecycle actions this SOW permits, and what is in the way of each. Enforced server-side too. */
+  actionGate?: SowActionGate | null;
   currentVersion?: SowVersion | null;
   activeVersion?: { versionNumber: number; displayVersion?: string | null; status: SowStatus } | null;
   versions?: SowVersion[];
@@ -233,9 +281,16 @@ export function isCustomField(key: string): boolean {
   return key.startsWith(CUSTOM_KEY_PREFIX);
 }
 
-/** Only these reach the server; everything else is derived there. */
-export function toInputsPayload(inputs: SowVersionInputs): Record<string, unknown> {
+/**
+ * Only these reach the server; everything else is derived there.
+ *
+ * `refreshFeeSchedule` is an intent, not a figure: it tells the server to adopt
+ * the job's current pricing instead of carrying this document's forward. The
+ * numbers themselves are never sent, which is what keeps prices calculated.
+ */
+export function toInputsPayload(inputs: SowVersionInputs, refreshFeeSchedule = false): Record<string, unknown> {
   return {
+    refreshFeeSchedule,
     projectManager: inputs.projectManager ?? '',
     projectManagerId: inputs.projectManagerId ?? undefined,
     projectLead: inputs.projectLead ?? '',
@@ -248,15 +303,10 @@ export function toInputsPayload(inputs: SowVersionInputs): Record<string, unknow
       durationDays: Number(p.durationDays) || 0,
       label: p.label || null
     })),
-    services: (inputs.services ?? []).map((s) => ({
-      serviceId: s.serviceId,
-      name: s.name,
-      description: s.description ?? '',
-      cost: Number(s.cost) || 0,
-      // The server derives the total from this and the workflow's multiplier;
-      // `cost` above is only read for a line that has no unit price yet.
-      unitCost: s.unitCost == null ? null : Number(s.unitCost) || 0
-    })),
+    // `services` is deliberately not sent. Service lines belong to the job spec;
+    // the server reads them off the SOW on save (sow-version.service.ts
+    // deriveInputs), so anything sent from here would be ignored at best and
+    // stale at worst.
     adjustments: (inputs.adjustments ?? []).map((a) => ({
       type: a.type,
       description: a.description ?? '',
@@ -367,11 +417,12 @@ export function customerDocumentFields(fields: SowField[] | null | undefined): S
 }
 
 /**
- * True when the local draft's Fee Schedule snapshot no longer matches the
- * job — either service costs drifted, or the documented pricing category
- * differs from the job's current category. Deliberately ignores adjustments —
- * those are always staff-authored, never auto-calculated, so editing one must
- * never trip this. Backs the Fee Schedule "Stale" chip.
+ * True when the version on screen no longer prices the job the way the job
+ * currently prices itself.
+ *
+ * The document is a static record, so this is expected and not an error — it is
+ * simply the signal that a Recalculate is available. Deliberately ignores
+ * adjustments: those are staff-authored on the document and are never drift.
  */
 export function feeScheduleIsStale(
   inputs: Pick<SowVersionInputs, 'services' | 'customerCategory'>,
@@ -382,15 +433,18 @@ export function feeScheduleIsStale(
   const documented = inputs.customerCategory ?? null;
   const liveCategory = sow?.liveCustomerCategory ?? null;
   if (documented != null && liveCategory != null && documented !== liveCategory) return true;
-  const key = (list: SowVersionService[]) =>
+  const key = (list: SowVersionService[]): string =>
     list.map((s) => `${s.serviceId}:${Number(s.cost).toFixed(2)}:${s.unitCost == null ? '' : Number(s.unitCost).toFixed(2)}:${s.multiplier ?? ''}`).join('|');
   return key(inputs.services ?? []) !== key(live);
 }
 
 /**
- * The inputs patch Recalculate applies: fresh service costs, baseCost/totalCost
- * rederived from them the same way the server does (sow-version.service.ts),
- * and adjustments left untouched — they were never auto-calculated to begin with.
+ * The local patch Recalculate applies: the job's figures, with totals rederived
+ * the same way the server does, and adjustments left alone.
+ *
+ * Local only. The figures become the record when staff save, and the save sends
+ * `refreshFeeSchedule: true` rather than these numbers — the server derives them
+ * again from the job. This is why the editor can never author a price.
  */
 export function feeScheduleLivePatch(inputs: SowVersionInputs, liveServices: SowVersionService[], liveCustomerCategory?: string | null): Partial<SowVersionInputs> {
   return { services: liveServices, ...sowTotals(liveServices, inputs.adjustments), customerCategory: liveCustomerCategory ?? inputs.customerCategory };

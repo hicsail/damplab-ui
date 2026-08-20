@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceLineCost, serviceMultiplier, serviceUnitCost, adjustmentDescriptionText, adjustmentLineAmount, adjustmentMultiplier, adjustmentUnitAmount, toInputsPayload, SowVersionInputs, sowTotals, signingAgreementText, customerDocumentFields, DEFAULT_SIGNATURES_TEXT, SowField } from './sowTypes';
+import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceMultiplier, serviceUnitCost, adjustmentDescriptionText, adjustmentLineAmount, adjustmentMultiplier, adjustmentUnitAmount, toInputsPayload, SowVersionInputs, sowTotals, signingAgreementText, customerDocumentFields, DEFAULT_SIGNATURES_TEXT, SowField } from './sowTypes';
 
 describe('consentSummaryLabels', () => {
   it('reads the two boilerplate groups back as a single agreement', () => {
@@ -95,104 +95,60 @@ describe('versionDisplayLabel', () => {
   });
 });
 
+/**
+ * The document keeps its own figures; this is the signal that the job's have
+ * moved on and a Recalculate is available. Not an error state — a static record
+ * disagreeing with a changed job is the expected condition.
+ */
 describe('feeScheduleIsStale', () => {
-  const live = [{ serviceId: 's1', name: 'PCR', description: '', cost: 100 }];
+  const live = [{ serviceId: 's1', name: 'PCR', cost: 350, unitCost: 5, multiplier: 70 }] as any;
 
-  it('is false when the local services match the live figures', () => {
-    expect(feeScheduleIsStale({ services: live }, { liveServices: live })).toBe(false);
+  it('is false when the document already matches the job', () => {
+    expect(feeScheduleIsStale({ services: live } as any, { liveServices: live })).toBe(false);
   });
 
-  it('is true when a local cost no longer matches the live figure', () => {
-    const local = [{ serviceId: 's1', name: 'PCR', description: '', cost: 50 }];
-    expect(feeScheduleIsStale({ services: local }, { liveServices: live })).toBe(true);
+  it('is true when the job repriced a line', () => {
+    const documented = [{ ...live[0], cost: 420, unitCost: 6 }];
+    expect(feeScheduleIsStale({ services: documented } as any, { liveServices: live })).toBe(true);
   });
 
-  it('is true when a service line was added or removed', () => {
-    expect(feeScheduleIsStale({ services: [] }, { liveServices: live })).toBe(true);
+  it('is true when the job added a line the document does not have', () => {
+    expect(feeScheduleIsStale({ services: [] } as any, { liveServices: live })).toBe(true);
   });
 
-  it('ignores adjustments entirely — only services drive it', () => {
-    // No adjustments field even exists on the Pick<...> the function takes; this
-    // just documents that comparing services is the whole story.
-    expect(feeScheduleIsStale({ services: live }, { liveServices: live })).toBe(false);
-  });
-
-  it('is false when there is nothing live to compare against yet', () => {
-    expect(feeScheduleIsStale({ services: live }, null)).toBe(false);
-    expect(feeScheduleIsStale({ services: live }, { liveServices: undefined })).toBe(false);
-  });
-
-  it('is true when only the base price behind an unchanged total moved', () => {
-    // Same line total, split differently — a re-priced service on a line whose
-    // multiplier changed to compensate. Keying on cost alone would miss it and
-    // leave the Fee Schedule quoting a base the job no longer charges.
-    const documented = [{ serviceId: 's1', name: 'PCR', description: '', cost: 100, unitCost: 10, multiplier: 10 }];
-    const relive = [{ serviceId: 's1', name: 'PCR', description: '', cost: 100, unitCost: 20, multiplier: 5 }];
-    expect(feeScheduleIsStale({ services: documented }, { liveServices: relive })).toBe(true);
-  });
-
-  it('is true when documented category differs from the job category even if costs match', () => {
+  it('is true when only the pricing category moved', () => {
     expect(
-      feeScheduleIsStale(
-        { services: live, customerCategory: 'INTERNAL_CUSTOMERS' },
-        { liveServices: live, liveCustomerCategory: 'EXTERNAL_CUSTOMER_MARKET' }
-      )
+      feeScheduleIsStale({ services: live, customerCategory: 'INTERNAL_CUSTOMERS' } as any, { liveServices: live, liveCustomerCategory: 'EXTERNAL_CUSTOMER_MARKET' })
     ).toBe(true);
   });
 
-  it('is false when documented and live categories match and costs match', () => {
-    expect(
-      feeScheduleIsStale(
-        { services: live, customerCategory: 'EXTERNAL_CUSTOMER_MARKET' },
-        { liveServices: live, liveCustomerCategory: 'EXTERNAL_CUSTOMER_MARKET' }
-      )
-    ).toBe(false);
+  it('ignores adjustments entirely — those are staff-authored, never drift', () => {
+    const withAdjustments = { services: live, adjustments: [{ type: 'DISCOUNT', amount: 50 }] } as any;
+    expect(feeScheduleIsStale(withAdjustments, { liveServices: live })).toBe(false);
+  });
+
+  it('reports nothing when the job figures have not loaded', () => {
+    expect(feeScheduleIsStale({ services: live } as any, null)).toBe(false);
+    expect(feeScheduleIsStale({ services: live } as any, { liveServices: undefined })).toBe(false);
   });
 });
 
 describe('feeScheduleLivePatch', () => {
-  function inputs(over: Partial<SowVersionInputs> = {}): SowVersionInputs {
-    return {
-      projectManager: '',
-      projectLead: '',
-      scopeOfWork: [],
-      deliverables: [],
-      periods: [],
-      services: [],
-      adjustments: [],
-      ...over
-    };
-  }
+  const live = [{ serviceId: 's1', name: 'PCR', cost: 420 }] as any;
+  const inputs = { services: [{ serviceId: 's1', name: 'PCR', cost: 350 }], adjustments: [], customerCategory: 'INTERNAL_CUSTOMERS' } as any;
 
-  it('sums live service costs into baseCost and totalCost when there are no adjustments', () => {
-    const live = [
-      { serviceId: 's1', name: 'PCR', description: '', cost: 100 },
-      { serviceId: 's2', name: 'Gel', description: '', cost: 25 }
-    ];
-    const patch = feeScheduleLivePatch(inputs(), live, 'EXTERNAL_CUSTOMER_MARKET');
-    expect(patch.services).toBe(live);
-    expect(patch.baseCost).toBe(125);
-    expect(patch.totalCost).toBe(125);
+  it('adopts the job figures and rederives the totals', () => {
+    const patch = feeScheduleLivePatch(inputs, live, 'EXTERNAL_CUSTOMER_MARKET');
+    expect(patch.services).toEqual(live);
+    expect(patch.baseCost).toBe(420);
     expect(patch.customerCategory).toBe('EXTERNAL_CUSTOMER_MARKET');
   });
 
-  it('applies existing adjustments on top of the fresh baseCost, discount and additional cost alike', () => {
-    const live = [{ serviceId: 's1', name: 'PCR', description: '', cost: 100 }];
-    const withAdjustments = inputs({
-      adjustments: [
-        { type: 'DISCOUNT', description: 'Loyalty', amount: 10 },
-        { type: 'ADDITIONAL_COST', description: 'Rush', amount: 20 }
-      ]
-    });
-    const patch = feeScheduleLivePatch(withAdjustments, live, 'INTERNAL_CUSTOMERS');
-    expect(patch.baseCost).toBe(100);
-    expect(patch.totalCost).toBe(110); // 100 - 10 + 20
-  });
-
-  it('leaves adjustments themselves untouched — the patch never mentions them', () => {
-    const withAdjustments = inputs({ adjustments: [{ type: 'DISCOUNT', description: 'Loyalty', amount: 10 }] });
-    const patch = feeScheduleLivePatch(withAdjustments, [], 'INTERNAL_CUSTOMERS');
+  it('leaves adjustments alone and folds them into the new total', () => {
+    const withDiscount = { ...inputs, adjustments: [{ type: 'DISCOUNT', amount: 20 }] } as any;
+    const patch = feeScheduleLivePatch(withDiscount, live, 'INTERNAL_CUSTOMERS');
     expect(patch.adjustments).toBeUndefined();
+    expect(patch.totalCost).toBe(400);
   });
 });
 
@@ -216,11 +172,6 @@ describe('fee schedule line arithmetic', () => {
     expect(serviceMultiplier({ multiplier: 0 })).toBe(1);
     expect(serviceMultiplier({ multiplier: -3 })).toBe(1);
     expect(serviceMultiplier({ multiplier: 70 })).toBe(70);
-  });
-
-  it('rounds the line total to the cent, matching the server', () => {
-    expect(serviceLineCost(3.3, 3)).toBe(9.9);
-    expect(serviceLineCost(5, 70)).toBe(350);
   });
 
   it('writes a multiplier without trailing zeros', () => {
@@ -280,14 +231,14 @@ describe('toInputsPayload', () => {
     } as unknown as SowVersionInputs;
   }
 
-  it('sends the unit price so the server can derive the total from the multiplier', () => {
+  it('never sends service lines — figures are derived server-side, never named by the client', () => {
     const payload = toInputsPayload(inputs([{ serviceId: 's1', name: 'PCR', description: '', cost: 350, unitCost: 5, multiplier: 70 }]));
-    expect((payload.services as any[])[0]).toMatchObject({ serviceId: 's1', cost: 350, unitCost: 5 });
+    expect(payload.services).toBeUndefined();
   });
 
-  it('sends a null unit price for a line that has none, so the server writes the total through as before', () => {
-    const payload = toInputsPayload(inputs([{ serviceId: 's1', name: 'PCR', description: '', cost: 350 }]));
-    expect((payload.services as any[])[0].unitCost).toBeNull();
+  it('sends the refresh intent rather than the refreshed figures', () => {
+    expect(toInputsPayload(inputs([]), true).refreshFeeSchedule).toBe(true);
+    expect(toInputsPayload(inputs([])).refreshFeeSchedule).toBe(false);
   });
 
   it('sends the adjustment unit amount, multiplier and category so the server can derive the figure', () => {

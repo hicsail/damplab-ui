@@ -323,6 +323,12 @@ export default function ContextTestComponent(props: SidebarProps) {
                                     Pricing for: {pricingCategoryLabel}
                                 </p>
                             ) : null}
+                            {/* This panel is the pricing surface on both the pre-submission
+                                canvas and the post-submission job editor, so the one note
+                                covers both places a customer sees a per-operation figure. */}
+                            <p style={{ margin: '6px 0 0 0', fontSize: 12, color: 'rgba(0,0,0,0.6)', fontStyle: 'italic' }}>
+                                Provisional — final pricing is set in your Statement of Work.
+                            </p>
                             {pricingNotes.length > 0 ? (
                                 <div style={{ marginTop: 6 }}>
                                     <b>Pricing notes</b>

@@ -62,6 +62,12 @@ import theme from './styles/themes';
 
 const CANVAS_AUTOSAVE_KEY = "canvas:autosave";
 
+function faviconHref(): string {
+  if (import.meta.env.DEV) return "/favicon-local.ico";
+  if (import.meta.env.VITE_APP_ENV === "staging") return "/favicon-staging.ico";
+  return "/favicon.ico?v=5";
+}
+
 export function HydrateFallback() {
     return <CircularProgress />;
 }
@@ -73,7 +79,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
-        <link rel="icon" href="/favicon.ico?v=5" />
+        <link rel="icon" href={faviconHref()} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#000000" />
         <title>DAMPLab Canvas</title>

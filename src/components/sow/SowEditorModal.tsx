@@ -21,6 +21,7 @@ import {
   displayedVersion,
   editorDiff,
   editorIsReadOnly,
+  nextSowAction,
   pdfSourceVersion,
   viewingAfterDirtyChange
 } from './sowEditorView';
@@ -191,6 +192,21 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     }
   }, [currentVersion?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A version is a static record: its figures stay put until staff choose to
+  // adopt the job's current ones. This flag is that choice, and it is what the
+  // save sends — never a price. The server rederives the figures itself.
+  const [refreshFeeSchedule, setRefreshFeeSchedule] = useState(false);
+  // Send and Countersign share a click target with Save, so both confirm first:
+  // a stray second click after saving must not reach the customer.
+  const [confirming, setConfirming] = useState<'send' | 'countersign' | null>(null);
+  const [countersignName, setCountersignName] = useState('');
+  // The preview is debounced, so it reads the intent through a ref rather than
+  // capturing whatever the flag was when the closure was built.
+  const refreshRef = useRef(false);
+  useEffect(() => {
+    refreshRef.current = refreshFeeSchedule;
+  }, [refreshFeeSchedule]);
+
   // True whenever the in-progress document differs from what the server holds
   // for this version — recomputed from the actual state (via the same
   // projection Save sends, so a refreshed calculatedValue from the live
@@ -199,8 +215,9 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const dirty = useMemo(() => {
     const snap = snapshotRef.current;
     if (!snap || !inputs) return false;
+    if (refreshFeeSchedule) return true;
     return fieldsFingerprint(fields) !== fieldsFingerprint(snap.fields) || JSON.stringify(toInputsPayload(inputs)) !== JSON.stringify(toInputsPayload(snap.inputs));
-  }, [fields, inputs]);
+  }, [fields, inputs, refreshFeeSchedule]);
 
   // Debounced so typing doesn't hit localStorage on every keystroke. Cleared
   // instead of written once there is nothing unsaved to remember.
@@ -274,7 +291,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
       try {
         const res = await client.query({
           query: SOW_FIELD_PREVIEW,
-          variables: { sowId: sow.id, inputs: toInputsPayload(nextInputs) },
+          variables: { sowId: sow.id, inputs: toInputsPayload(nextInputs, refreshRef.current) },
           fetchPolicy: 'network-only'
         });
         const byKey = new Map<string, string>((res.data?.sowFieldPreview ?? []).map((v: { key: string; calculatedValue: string }) => [v.key, v.calculatedValue]));
@@ -319,28 +336,17 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
 
   /* ------------------------------------------------------------ fee schedule */
 
-  // Whether the local draft's service costs have drifted from what the job
-  // currently prices them at — drives the Fee Schedule "Stale" chip.
+
   const feeScheduleStale = useMemo(() => {
     const shown = onScreen?.inputs ?? inputs;
     return shown ? feeScheduleIsStale(shown, sow) : false;
   }, [onScreen, inputs, sow]);
 
-  // Pulls the job's live service costs (and category) into the local draft.
-  // Adjustments are left alone — they were never auto-calculated. Recalculate
-  // is the only path that applies this; changing the job's pricing category
-  // elsewhere leaves the Fee Schedule snapshot alone until staff refresh it.
-  const applyLiveFeeSchedule = useCallback(
-    (liveServices: SowEditorState['liveServices'], liveCustomerCategory?: string | null) => {
-      if (!inputs || !liveServices) return;
-      patchInputs(feeScheduleLivePatch(inputs, liveServices, liveCustomerCategory));
-    },
-    [inputs, patchInputs]
-  );
-
   const handleRecalculateFeeSchedule = useCallback(() => {
-    applyLiveFeeSchedule(sow?.liveServices, sow?.liveCustomerCategory);
-  }, [applyLiveFeeSchedule, sow?.liveServices, sow?.liveCustomerCategory]);
+    if (!inputs || !sow?.liveServices) return;
+    patchInputs(feeScheduleLivePatch(inputs, sow.liveServices, sow.liveCustomerCategory));
+    setRefreshFeeSchedule(true);
+  }, [inputs, patchInputs, sow?.liveServices, sow?.liveCustomerCategory]);
 
   /* ----------------------------------------------------------------- edits */
 
@@ -405,6 +411,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
           input: {
             baseVersionNumber: baseVersion,
             note: note.trim(),
+            refreshFeeSchedule,
             fields: fields.map((f) => ({ key: f.key, label: f.label, value: f.value, isEnabled: f.isEnabled, requiresInitials: f.requiresInitials })),
             inputs: toInputsPayload(inputs)
           }
@@ -412,6 +419,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
       });
       const v = res.data?.saveSowVersion;
       if (draftKey) window.localStorage.removeItem(draftKey);
+      setRefreshFeeSchedule(false);
       await refetch();
       setBanner({ severity: 'success', text: `Saved as version ${versionDisplayLabel(v)}.` });
     });
@@ -420,25 +428,43 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     withBusy(async () => {
       if (!sow?.id) return;
       const res = await sendToCustomer({ variables: { sowId: sow.id } });
+      setConfirming(null);
       await refetch();
       setBanner({ severity: 'success', text: `Sent to the customer as version ${versionDisplayLabel(res.data?.sendSowToCustomer)}.` });
     });
 
   const handleFinalize = (): Promise<void> =>
     withBusy(async () => {
-      if (!sow?.id) return;
-      const name = window.prompt('Countersign as (your full name):');
-      if (!name?.trim()) return;
-      const res = await finalizeSow({ variables: { sowId: sow.id, name: name.trim() } });
+      if (!sow?.id || !countersignName.trim()) return;
+      const res = await finalizeSow({ variables: { sowId: sow.id, name: countersignName.trim() } });
+      setConfirming(null);
+      setCountersignName('');
       await refetch();
       setBanner({ severity: 'success', text: `Finalized as version ${versionDisplayLabel(res.data?.finalizeSow)}.` });
     });
+
 
   const enabledCount = useMemo(() => fields.filter((f) => f.isEnabled).length, [fields]);
 
   // Mirrors the backend's sendToCustomer check, so staff see why Send is blocked
   // before they click it rather than after a round trip.
   const missingRequired = useMemo(() => fields.filter((f) => !f.allowsEmpty && (!f.isEnabled || !f.value?.trim())).map((f) => f.label), [fields]);
+
+  const nextAction = useMemo(
+    () => nextSowAction({ dirty, status, activeStatus, gate: sow?.actionGate, missingRequired, readOnly }),
+    [dirty, status, activeStatus, sow?.actionGate, missingRequired, readOnly]
+  );
+  /**
+   * The merged button's click. Save fires directly — it is routine, repeatable
+   * and reversible. The two that leave the building open a confirmation first.
+   */
+  const handleNextAction = (): void => {
+    if (nextAction.kind === 'save') {
+      void handleSave();
+    } else if (nextAction.kind === 'send' || nextAction.kind === 'countersign') {
+      setConfirming(nextAction.kind);
+    }
+  };
 
   // react-pdf lays out and rasterizes the whole document to build the download
   // blob, which is not cheap — PDFDownloadLink redoes it whenever its `document`
@@ -572,9 +598,10 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                     onRenameCustom={renameCustomField}
                     presets={presetsBySection.get(f.key)}
                     diff={diffByKey.get(f.key)}
+                    liveCustomerCategory={sow.liveCustomerCategory}
+                    liveServices={sow.liveServices}
                     stale={f.key === 'feeSchedule' ? feeScheduleStale : false}
                     onRecalculate={f.key === 'feeSchedule' ? handleRecalculateFeeSchedule : undefined}
-                    liveCustomerCategory={sow.liveCustomerCategory}
                   />
                 ))}
               </Box>
@@ -603,36 +630,20 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
               sx={{ flex: 1, minWidth: 180 }}
               disabled={busy || !sow}
             />
-            <Tooltip title={dirty && !note.trim() ? 'Describe what you changed before saving.' : ''}>
-              <span>
-                <Button onClick={handleSave} variant="outlined" disabled={busy || !sow || !dirty || !note.trim()}>
-                  Save
-                </Button>
-              </span>
-            </Tooltip>
           </Box>
 
-          <Tooltip
-            title={
-              status !== 'DRAFT'
-                ? 'Save your changes first — only a draft can be sent.'
-                : missingRequired.length > 0
-                  ? `Complete before sending: ${missingRequired.join(', ')}.`
-                  : ''
-            }
-          >
+          <Tooltip title={nextAction.kind === 'blocked' ? nextAction.reason ?? '' : dirty && !note.trim() ? 'Describe what you changed before saving.' : ''}>
             <span>
-              <Button onClick={handleSend} variant="contained" disabled={busy || !sow || dirty || status !== 'DRAFT' || missingRequired.length > 0}>
-                Send to customer
+              <Button
+                onClick={handleNextAction}
+                variant="contained"
+                color={nextAction.kind === 'countersign' ? 'success' : 'primary'}
+                disabled={busy || !sow || nextAction.kind === 'blocked' || (nextAction.kind === 'save' && !note.trim())}
+              >
+                {nextAction.label}
               </Button>
             </span>
           </Tooltip>
-
-          {activeStatus === 'SIGNED' && (
-            <Button onClick={handleFinalize} variant="contained" color="success" disabled={busy}>
-              Countersign and finalize
-            </Button>
-          )}
 
           {pdfVersion && pdfDocument && (
             <PDFDownloadLink
@@ -651,6 +662,48 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
               )}
             </PDFDownloadLink>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* The speed bump between a routine click and an outward-facing one. */}
+      <Dialog open={confirming != null} onClose={() => (busy ? undefined : setConfirming(null))} maxWidth="xs" fullWidth>
+        <DialogTitle>{confirming === 'send' ? 'Send to customer?' : 'Countersign and finalize?'}</DialogTitle>
+        <DialogContent>
+          {confirming === 'send' ? (
+            <Typography variant="body2">
+              {sow?.sowNumber} version {versionDisplayLabel(currentVersion)} will be sent to the customer for signature. They will be asked to review and
+              sign this exact document.
+            </Typography>
+          ) : (
+            <>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                This closes out {sow?.sowNumber} version {versionDisplayLabel(sow?.activeVersion)} — the version the customer signed. Type your full name to
+                countersign on behalf of the lab.
+              </Typography>
+              <TextField
+                size="small"
+                fullWidth
+                autoFocus
+                label="Countersign as"
+                value={countersignName}
+                onChange={(e) => setCountersignName(e.target.value)}
+                disabled={busy}
+              />
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirming(null)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color={confirming === 'countersign' ? 'success' : 'primary'}
+            disabled={busy || (confirming === 'countersign' && !countersignName.trim())}
+            onClick={() => void (confirming === 'send' ? handleSend() : handleFinalize())}
+          >
+            {confirming === 'send' ? 'Send' : 'Countersign'}
+          </Button>
         </DialogActions>
       </Dialog>
     </LocalizationProvider>

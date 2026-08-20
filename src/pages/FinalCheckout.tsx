@@ -396,7 +396,7 @@ const handleSubmitJob = async () => {
         <Alert
           severity="info" sx={{ mb: 3, borderRadius: 2}}
         >
-          *Please note: The final price and payment details, along with other relevant information, will be sent to your email.
+          *Provisional. Once the lab has reviewed your request we&apos;ll send you a Statement of Work with the final pricing and payment details, for you to approve before any work begins.
         </Alert>
 
         <Button

@@ -16,7 +16,6 @@ import {
   formatCurrency,
   formatMultiplier,
   customerCategoryLabel,
-  serviceLineCost,
   serviceMultiplier,
   serviceUnitCost,
   adjustmentDescriptionText,
@@ -48,6 +47,8 @@ interface Props {
   onChange: (patch: Partial<SowVersionInputs>) => void;
   /** feeSchedule only: the job's current pricing category (read-only context). */
   liveCustomerCategory?: string | null;
+  /** feeSchedule only: what the job prices these lines at now, for the "Job now" comparison caption. */
+  liveServices?: SowVersionInputs['services'] | null;
 }
 
 const labelSx = { display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 500 } as const;
@@ -226,7 +227,13 @@ function PeriodListEditor({ periods, disabled, onChange }: { periods: SowPeriod[
   );
 }
 
-export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabled, onChange, liveCustomerCategory }: Props): React.JSX.Element | null {
+export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabled, onChange, liveCustomerCategory, liveServices }: Props): React.JSX.Element | null {
+  // The document's own figures, not the job's. A version is a static record:
+  // these move only when staff hit Recalculate, which patches them locally and
+  // marks the save as a refresh.
+  const feeServices = inputs.services ?? [];
+  const liveCategoryDiffers =
+    liveCustomerCategory != null && inputs.customerCategory != null && liveCustomerCategory !== inputs.customerCategory;
   switch (fieldKey) {
     case 'sowTitle':
       return (
@@ -315,47 +322,41 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
       return (
         <Box>
           <Typography variant="caption" sx={labelSx}>
-            Pricing category — set on the job screen; this Fee Schedule is a snapshot until you refresh it.
+            Pricing category
           </Typography>
-          <Typography variant="body2" sx={{ mb: 0.5 }}>
-            Documented: {customerCategoryLabel(inputs.customerCategory)}
+          <Typography variant="body2" sx={{ mb: liveCategoryDiffers ? 0 : 2 }}>
+            {customerCategoryLabel(inputs.customerCategory)}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Job: {customerCategoryLabel(liveCustomerCategory)}
-          </Typography>
+          {liveCategoryDiffers && (
+            <Typography variant="body2" color="warning.main" sx={{ mb: 2 }}>
+              Job now: {customerCategoryLabel(liveCustomerCategory)}
+            </Typography>
+          )}
 
           <Typography variant="caption" sx={labelSx}>
-            Service costs — these are what invoices bill from, so this section has no free-text edit.
+            Service costs — calculated from the job spec, never typed. This document keeps the figures it was written
+            with; Recalculate above pulls in the job&apos;s current ones. To change what it bills without touching the
+            job, add an adjustment below.
           </Typography>
-          {(inputs.services ?? []).map((s, i) => {
+          {feeServices.map((s, i) => {
             const multiplier = serviceMultiplier(s);
             const unitCost = serviceUnitCost(s);
+            const live = (liveServices ?? [])[i];
             return (
               <Box key={s.serviceId || i} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
                 <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap title={s.name}>
                   {s.name}
                 </Typography>
-                {/* The box holds the base price, so the multiplier and the total
-                    it produces have to be on screen beside it — otherwise staff
-                    can no longer see what the line actually bills. */}
-                <TextField
-                  size="small"
-                  type="number"
-                  label="Base price"
-                  sx={{ width: 150 }}
-                  disabled={disabled}
-                  value={unitCost}
-                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                  onChange={(e) => {
-                    const nextUnit = Math.max(0, Number(e.target.value) || 0);
-                    const next = [...inputs.services];
-                    next[i] = { ...s, unitCost: nextUnit, multiplier, cost: serviceLineCost(nextUnit, multiplier) };
-                    onChange({ services: next, ...sowTotals(next, inputs.adjustments) });
-                  }}
-                />
-                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', minWidth: 120, textAlign: 'right' }}>
-                  {multiplier === 1 ? formatCurrency(s.cost) : `× ${formatMultiplier(multiplier)} = ${formatCurrency(s.cost)}`}
-                </Typography>
+                <Box sx={{ textAlign: 'right', minWidth: 180 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                    {multiplier === 1 ? formatCurrency(s.cost) : `${formatCurrency(unitCost)} × ${formatMultiplier(multiplier)} = ${formatCurrency(s.cost)}`}
+                  </Typography>
+                  {live && Number(live.cost) !== Number(s.cost) && (
+                    <Typography variant="caption" color="warning.main" sx={{ whiteSpace: 'nowrap' }}>
+                      Job now: {formatCurrency(Number(live.cost))}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
             );
           })}
@@ -373,7 +374,7 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
             const patchLine = (patch: Partial<SowVersionAdjustment>, unit = adjUnit, multiplier = adjMultiplier): void => {
               const next = [...inputs.adjustments];
               next[i] = { ...a, ...patch, unitAmount: unit, multiplier, amount: adjustmentLineAmount(unit, multiplier) };
-              onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
+              onChange({ adjustments: next, ...sowTotals(feeServices, next) });
             };
             return (
               <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
@@ -460,7 +461,7 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
                   disabled={disabled}
                   onClick={() => {
                     const next = inputs.adjustments.filter((_, idx) => idx !== i);
-                    onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
+                    onChange({ adjustments: next, ...sowTotals(feeServices, next) });
                   }}
                 >
                   <DeleteOutlineIcon fontSize="small" />
@@ -478,13 +479,13 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
                   ...(inputs.adjustments ?? []),
                   { type: 'ADDITIONAL_COST', description: '', amount: 0, unitAmount: 0, multiplier: 1, category: 'SERVICE' }
                 ];
-                onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
+                onChange({ adjustments: next, ...sowTotals(feeServices, next) });
               }}
             >
               Add adjustment
             </Button>
             <Typography variant="body2" color="text.secondary">
-              Total {formatCurrency(sowTotals(inputs.services, inputs.adjustments).totalCost)}
+              Total {formatCurrency(sowTotals(feeServices, inputs.adjustments).totalCost)}
             </Typography>
           </Box>
         </Box>
