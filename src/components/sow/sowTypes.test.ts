@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceLineCost, serviceMultiplier, serviceUnitCost, toInputsPayload, SowVersionInputs, sowTotals, signingAgreementText, customerDocumentFields, DEFAULT_SIGNATURES_TEXT, SowField } from './sowTypes';
+import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceLineCost, serviceMultiplier, serviceUnitCost, adjustmentDescriptionText, adjustmentLineAmount, adjustmentMultiplier, adjustmentUnitAmount, toInputsPayload, SowVersionInputs, sowTotals, signingAgreementText, customerDocumentFields, DEFAULT_SIGNATURES_TEXT, SowField } from './sowTypes';
 
 describe('consentSummaryLabels', () => {
   it('reads the two boilerplate groups back as a single agreement', () => {
@@ -229,6 +229,44 @@ describe('fee schedule line arithmetic', () => {
   });
 });
 
+describe('adjustment line arithmetic', () => {
+  it('reads the unit amount off an adjustment that has one', () => {
+    expect(adjustmentUnitAmount({ unitAmount: 120, amount: 1680 })).toBe(120);
+  });
+
+  it('falls back to the stored figure on an adjustment written before unit amounts existed', () => {
+    expect(adjustmentUnitAmount({ amount: 500 })).toBe(500);
+    expect(adjustmentUnitAmount({ unitAmount: null, amount: 500 })).toBe(500);
+  });
+
+  it('keeps a legitimate zero unit amount rather than falling back to the figure', () => {
+    expect(adjustmentUnitAmount({ unitAmount: 0, amount: 0 })).toBe(0);
+  });
+
+  it('treats an absent, zero or negative multiplier as 1', () => {
+    expect(adjustmentMultiplier({})).toBe(1);
+    expect(adjustmentMultiplier({ multiplier: null })).toBe(1);
+    expect(adjustmentMultiplier({ multiplier: 0 })).toBe(1);
+    expect(adjustmentMultiplier({ multiplier: -4 })).toBe(1);
+    expect(adjustmentMultiplier({ multiplier: 14 })).toBe(14);
+  });
+
+  it('reads an adjustment written before the reason box was folded in as the one line the document quotes', () => {
+    expect(adjustmentDescriptionText({ description: 'Academic discount', reason: 'grant' })).toBe('Academic discount — grant');
+  });
+
+  it('adds no dash when only one of the two was ever filled in', () => {
+    expect(adjustmentDescriptionText({ description: 'Rush handling', reason: null })).toBe('Rush handling');
+    expect(adjustmentDescriptionText({ description: '', reason: 'grant' })).toBe('grant');
+    expect(adjustmentDescriptionText({ description: '', reason: null })).toBe('');
+  });
+
+  it('rounds the line figure to the cent, matching the server', () => {
+    expect(adjustmentLineAmount(120, 14)).toBe(1680);
+    expect(adjustmentLineAmount(3.3, 3)).toBe(9.9);
+  });
+});
+
 describe('toInputsPayload', () => {
   function inputs(services: any[]): SowVersionInputs {
     return {
@@ -251,6 +289,20 @@ describe('toInputsPayload', () => {
     const payload = toInputsPayload(inputs([{ serviceId: 's1', name: 'PCR', description: '', cost: 350 }]));
     expect((payload.services as any[])[0].unitCost).toBeNull();
   });
+
+  it('sends the adjustment unit amount, multiplier and category so the server can derive the figure', () => {
+    const withAdjustments = { ...inputs([]), adjustments: [{ type: 'ADDITIONAL_COST', description: 'Staff time', amount: 1680, unitAmount: 120, multiplier: 14, category: 'DAYS' }] } as unknown as SowVersionInputs;
+    expect((toInputsPayload(withAdjustments).adjustments as any[])[0]).toMatchObject({ amount: 1680, unitAmount: 120, multiplier: 14, category: 'DAYS' });
+  });
+
+  it('sends nulls for an adjustment written before unit amounts and categories existed, so its stored figure is written through as before', () => {
+    const legacy = { ...inputs([]), adjustments: [{ type: 'DISCOUNT', description: 'Academic', amount: 500 }] } as unknown as SowVersionInputs;
+    const adj = (toInputsPayload(legacy).adjustments as any[])[0];
+    expect(adj).toMatchObject({ amount: 500 });
+    expect(adj.unitAmount).toBeNull();
+    expect(adj.multiplier).toBeNull();
+    expect(adj.category).toBeNull();
+  });
 });
 
 describe('sowTotals', () => {
@@ -269,6 +321,10 @@ describe('sowTotals', () => {
       { type: 'ADDITIONAL_COST' as const, description: 'Rush', amount: -50 }
     ];
     expect(sowTotals(services, adjustments).totalCost).toBe(450.5);
+  });
+
+  it('still totals a legacy adjustment from its stored figure, with no unit amount or multiplier on it', () => {
+    expect(sowTotals(services, [{ type: 'DISCOUNT' as const, description: 'Academic', amount: 75 }]).totalCost).toBe(400.5);
   });
 
   it('treats missing lists as nothing rather than NaN', () => {

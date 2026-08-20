@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Tooltip, Typography } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { v4 as uuid } from 'uuid';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_LAB_MONITOR_STAFF_LIST, GET_SOW_TEXT_PRESETS } from '../../gql/queries';
@@ -26,7 +24,7 @@ import {
   pdfSourceVersion,
   viewingAfterDirtyChange
 } from './sowEditorView';
-import { CUSTOM_KEY_PREFIX, SowEditorState, SowField, SowVersionInputs, feeScheduleIsStale, feeScheduleLivePatch, sowStatusLabel, statusColor, toInputsPayload, versionDisplayLabel, withPeriodDragKeys } from './sowTypes';
+import { SowEditorState, SowField, SowVersionInputs, feeScheduleIsStale, feeScheduleLivePatch, sowStatusLabel, statusColor, toInputsPayload, versionDisplayLabel, withPeriodDragKeys } from './sowTypes';
 
 /**
  * Staff editor for the SOW document.
@@ -358,16 +356,6 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   // the PDF preview changed — see toggleExpand below and React.memo on SowFieldRow.
   const toggleExpand = useCallback((key: string) => setExpandedKey((k) => (k === key ? null : key)), []);
 
-  const addCustomField = useCallback(() => {
-    const key = `${CUSTOM_KEY_PREFIX}${uuid()}`;
-    setFields((prev) => [
-      ...prev,
-      { key, label: 'New section', kind: 'CUSTOM', order: 1000 + prev.filter((f) => f.key.startsWith(CUSTOM_KEY_PREFIX)).length, value: '', calculatedValue: null, isOverridden: false, isEnabled: true, allowsTextOverride: true, allowsEmpty: true, requiresInitials: false }
-    ]);
-    setExpandedKey(key);
-    setViewing((v) => (v == null || !currentVersion ? v : viewingAfterDirtyChange(v, currentVersion.versionNumber, true)));
-  }, [currentVersion]);
-
   /* --------------------------------------------------------------- actions */
 
   const withBusy = async (fn: () => Promise<void>): Promise<void> => {
@@ -592,10 +580,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
               </Box>
 
               <Box sx={{ p: 2 }}>
-                <Button size="small" startIcon={<AddIcon />} onClick={addCustomField} disabled={readOnly}>
-                  Add a section
-                </Button>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
                   {enabledCount} of {fields.length} sections will be shown to the customer.
                 </Typography>
               </Box>

@@ -80,11 +80,62 @@ export function serviceLineCost(unitCost: number, multiplier: number): number {
 
 export type SowAdjustmentType = 'DISCOUNT' | 'ADDITIONAL_COST';
 
+/** What the adjustment is charging for. Absent on adjustments written before categories existed. */
+export type SowAdjustmentCategory = 'SERVICE' | 'CONSUMABLE' | 'STAFF' | 'DAYS' | 'SAMPLES';
+
+export const SOW_ADJUSTMENT_CATEGORIES: { value: SowAdjustmentCategory; label: string }[] = [
+  { value: 'SERVICE', label: 'Service' },
+  { value: 'CONSUMABLE', label: 'Consumable' },
+  { value: 'STAFF', label: 'Staff' },
+  { value: 'DAYS', label: 'Days' },
+  { value: 'SAMPLES', label: 'Samples' }
+];
+
 export interface SowVersionAdjustment {
   type: SowAdjustmentType;
   description: string;
+  /** What the adjustment moves: `unitAmount` x `multiplier`. Invoices read this. */
   amount: number;
+  /** Amount for a single unit, before the multiplier. Absent on adjustments
+   *  written before unit amounts existed — treat `amount` as the whole story there. */
+  unitAmount?: number | null;
+  /** How many units the unit amount is charged for. Absent means 1. */
+  multiplier?: number | null;
+  category?: SowAdjustmentCategory | null;
   reason?: string | null;
+}
+
+/** The multiplier an adjustment applies, defaulting to 1 on anything unset or nonsensical. */
+export function adjustmentMultiplier(a: Pick<SowVersionAdjustment, 'multiplier'>): number {
+  const m = Number(a.multiplier);
+  return Number.isFinite(m) && m > 0 ? m : 1;
+}
+
+/** What the amount box shows: the unit amount, falling back to the stored total
+ *  on an adjustment that predates unit amounts. The `== null` check is the same
+ *  one serviceUnitCost makes, for the same reason — Number(null) is a finite 0,
+ *  which would present every legacy adjustment as $0. */
+export function adjustmentUnitAmount(a: Pick<SowVersionAdjustment, 'unitAmount' | 'amount'>): number {
+  if (a.unitAmount == null) return Number(a.amount) || 0;
+  const u = Number(a.unitAmount);
+  return Number.isFinite(u) ? u : Number(a.amount) || 0;
+}
+
+/**
+ * The one line of wording an adjustment carries.
+ *
+ * Description and reason were separate boxes, and the Fee Schedule joins them
+ * with this same dash (see buildFeeSchedule) — so an adjustment written back
+ * then reads here exactly as it reads in the document, and folding the reason
+ * into the description leaves the generated text unchanged.
+ */
+export function adjustmentDescriptionText(a: Pick<SowVersionAdjustment, 'description' | 'reason'>): string {
+  return [(a.description || '').trim(), (a.reason || '').trim()].filter(Boolean).join(' — ');
+}
+
+/** A unit amount times its multiplier, to the cent. Mirrors the server's round2. */
+export function adjustmentLineAmount(unitAmount: number, multiplier: number): number {
+  return Math.round(unitAmount * multiplier * 100) / 100;
 }
 
 export interface SowVersionInputs {
@@ -209,7 +260,12 @@ export function toInputsPayload(inputs: SowVersionInputs): Record<string, unknow
     adjustments: (inputs.adjustments ?? []).map((a) => ({
       type: a.type,
       description: a.description ?? '',
+      // The server derives the figure from the unit amount and multiplier;
+      // `amount` above is only read for an adjustment that has no unit amount yet.
       amount: Number(a.amount) || 0,
+      unitAmount: a.unitAmount == null ? null : Number(a.unitAmount) || 0,
+      multiplier: a.multiplier == null ? null : Number(a.multiplier) || 1,
+      category: a.category ?? null,
       reason: a.reason || null
     }))
   };

@@ -7,8 +7,26 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { DndContext, DragEndEvent, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { SowVersionInputs, SowVersionAdjustment, SowPeriod, formatCurrency, formatMultiplier, customerCategoryLabel, serviceLineCost, serviceMultiplier, serviceUnitCost, newPeriodDragKey, sowTotals } from './sowTypes';
-import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate } from '../../utils/sowDateUtils';
+import {
+  SowVersionInputs,
+  SowVersionAdjustment,
+  SowAdjustmentCategory,
+  SOW_ADJUSTMENT_CATEGORIES,
+  SowPeriod,
+  formatCurrency,
+  formatMultiplier,
+  customerCategoryLabel,
+  serviceLineCost,
+  serviceMultiplier,
+  serviceUnitCost,
+  adjustmentDescriptionText,
+  adjustmentLineAmount,
+  adjustmentMultiplier,
+  adjustmentUnitAmount,
+  newPeriodDragKey,
+  sowTotals
+} from './sowTypes';
+import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays } from '../../utils/sowDateUtils';
 
 /**
  * The structured inputs behind each generated section, rendered inside the
@@ -347,80 +365,119 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
           <Typography variant="caption" sx={labelSx}>
             Adjustments
           </Typography>
-          {(inputs.adjustments ?? []).map((a, i) => (
-            <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
-              <Select
-                size="small"
-                sx={{ width: 160 }}
-                value={a.type}
-                disabled={disabled}
-                onChange={(e) => {
-                  const next = [...inputs.adjustments];
-                  next[i] = { ...a, type: e.target.value as SowVersionAdjustment['type'] };
-                  onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
-                }}
-              >
-                <MenuItem value="ADDITIONAL_COST">Additional cost</MenuItem>
-                <MenuItem value="DISCOUNT">Discount</MenuItem>
-              </Select>
-              <TextField
-                size="small"
-                sx={{ flex: 1, minWidth: 160 }}
-                label="Description"
-                disabled={disabled}
-                value={a.description}
-                onChange={(e) => {
-                  const next = [...inputs.adjustments];
-                  next[i] = { ...a, description: e.target.value };
-                  onChange({ adjustments: next });
-                }}
-              />
-              <TextField
-                size="small"
-                sx={{ width: 130 }}
-                label="Amount"
-                type="number"
-                disabled={disabled}
-                value={a.amount}
-                InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
-                onChange={(e) => {
-                  const next = [...inputs.adjustments];
-                  next[i] = { ...a, amount: Math.max(0, Number(e.target.value) || 0) };
-                  onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
-                }}
-              />
-              <TextField
-                size="small"
-                sx={{ width: 160 }}
-                label="Reason"
-                disabled={disabled}
-                value={a.reason ?? ''}
-                onChange={(e) => {
-                  const next = [...inputs.adjustments];
-                  next[i] = { ...a, reason: e.target.value };
-                  onChange({ adjustments: next });
-                }}
-              />
-              <IconButton
-                size="small"
-                aria-label={`Remove adjustment ${i + 1}`}
-                disabled={disabled}
-                onClick={() => {
-                  const next = inputs.adjustments.filter((_, idx) => idx !== i);
-                  onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
-                }}
-              >
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          ))}
+          {(inputs.adjustments ?? []).map((a, i) => {
+            const adjMultiplier = adjustmentMultiplier(a);
+            const adjUnit = adjustmentUnitAmount(a);
+            const signedAmount = a.type === 'DISCOUNT' ? -Math.abs(a.amount) : Math.abs(a.amount);
+            /** Every edit rewrites the whole line: `amount` is what invoices bill from, so it can never lag the boxes that produce it. */
+            const patchLine = (patch: Partial<SowVersionAdjustment>, unit = adjUnit, multiplier = adjMultiplier): void => {
+              const next = [...inputs.adjustments];
+              next[i] = { ...a, ...patch, unitAmount: unit, multiplier, amount: adjustmentLineAmount(unit, multiplier) };
+              onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
+            };
+            return (
+              <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
+                <TextField
+                  size="small"
+                  sx={{ flex: 1, minWidth: 140 }}
+                  label="Description/Reason"
+                  disabled={disabled}
+                  value={adjustmentDescriptionText(a)}
+                  // Typing folds a legacy reason into the description. The document
+                  // joins the two with the same dash, so its wording is unchanged —
+                  // it just becomes one editable string instead of two boxes.
+                  onChange={(e) => patchLine({ description: e.target.value, reason: null })}
+                />
+                {/* Collapsed to its sign so it reads as part of the amount beside
+                    it; the menu still spells both options out. */}
+                <Select
+                  size="small"
+                  sx={{ width: 72 }}
+                  value={a.type}
+                  disabled={disabled}
+                  inputProps={{ 'aria-label': `Adjustment ${i + 1}: additional cost or discount` }}
+                  renderValue={(v) => (v === 'DISCOUNT' ? '−' : '+')}
+                  onChange={(e) => patchLine({ type: e.target.value as SowVersionAdjustment['type'] })}
+                >
+                  <MenuItem value="ADDITIONAL_COST">Additional cost</MenuItem>
+                  <MenuItem value="DISCOUNT">Discount</MenuItem>
+                </Select>
+                <TextField
+                  size="small"
+                  sx={{ width: 104 }}
+                  label="Amount"
+                  type="number"
+                  disabled={disabled}
+                  value={adjUnit}
+                  InputProps={{ startAdornment: <InputAdornment position="start">$</InputAdornment> }}
+                  onChange={(e) => patchLine({}, Math.max(0, Number(e.target.value) || 0))}
+                />
+                <TextField
+                  size="small"
+                  sx={{ width: 92 }}
+                  label="Multiplier"
+                  type="number"
+                  disabled={disabled}
+                  value={adjMultiplier}
+                  inputProps={{ min: 0, step: 'any' }}
+                  onChange={(e) => {
+                    const raw = Number(e.target.value);
+                    patchLine({}, adjUnit, Number.isFinite(raw) && raw > 0 ? raw : 1);
+                  }}
+                />
+                <Select
+                  size="small"
+                  sx={{ width: 176 }}
+                  displayEmpty
+                  value={a.category ?? ''}
+                  disabled={disabled}
+                  renderValue={(v) => SOW_ADJUSTMENT_CATEGORIES.find((c) => c.value === v)?.label ?? 'Category'}
+                  onChange={(e) => {
+                    const category = (e.target.value || null) as SowAdjustmentCategory | null;
+                    // Days seeds the multiplier from the period of performance, the
+                    // same figure that section quotes. It is only a starting point —
+                    // staff can type over it, and later period edits leave it alone.
+                    const seeded = category === 'DAYS' ? Math.max(1, periodOfPerformanceDays(inputs.periods)) : adjMultiplier;
+                    patchLine({ category }, adjUnit, seeded);
+                  }}
+                >
+                  {SOW_ADJUSTMENT_CATEGORIES.map((c) => (
+                    <MenuItem key={c.value} value={c.value}>
+                      {c.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {/* Signed, like the figure this line puts in the document. The
+                    boxes to the left are the working, so only the result is
+                    restated here — unlike a service line, whose multiplier comes
+                    from the workflow and appears nowhere else on the row. */}
+                <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', minWidth: 96, textAlign: 'right' }}>
+                  {formatCurrency(signedAmount)}
+                </Typography>
+                <IconButton
+                  size="small"
+                  aria-label={`Remove adjustment ${i + 1}`}
+                  disabled={disabled}
+                  onClick={() => {
+                    const next = inputs.adjustments.filter((_, idx) => idx !== i);
+                    onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
+                  }}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            );
+          })}
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
             <Button
               size="small"
               startIcon={<AddIcon />}
               disabled={disabled}
               onClick={() => {
-                const next: SowVersionAdjustment[] = [...(inputs.adjustments ?? []), { type: 'ADDITIONAL_COST', description: '', amount: 0 }];
+                const next: SowVersionAdjustment[] = [
+                  ...(inputs.adjustments ?? []),
+                  { type: 'ADDITIONAL_COST', description: '', amount: 0, unitAmount: 0, multiplier: 1, category: 'SERVICE' }
+                ];
                 onChange({ adjustments: next, ...sowTotals(inputs.services, next) });
               }}
             >

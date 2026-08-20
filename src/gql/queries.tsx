@@ -1438,7 +1438,7 @@ export const SOW_VERSION_FIELDS = gql`
             customerCategory
             periods { startDate durationDays label }
             services { serviceId name description cost unitCost multiplier runCount }
-            adjustments { type description amount reason }
+            adjustments { type description amount unitAmount multiplier category reason }
         }
     }
 `;

@@ -27,6 +27,8 @@ import { format } from 'date-fns';
  */
 export const LAB_TIME_ZONE = 'America/New_York';
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 /**
  * An instant, in the lab's timezone — "August 20, 2026" / "Aug 20, 2026" /
  * "Aug 20, 2026, 8:30 PM ET". For calendar days (period starts) use formatSOWDate instead.
@@ -79,4 +81,36 @@ export function formatSOWDateShort(value: string | Date | null | undefined): str
   const d = sowDateToPickerValue(value);
   if (!d) return typeof value === 'string' ? value.slice(0, 10) : '';
   return format(d, 'MMM d, yyyy');
+}
+
+/**
+ * The overall period of performance, in days — the span from the earliest start
+ * date to the latest end date, inclusive of both.
+ *
+ * Mirrors `periodOfPerformanceSpan` in damplab-backend/src/sow/sow-field-calculator.ts,
+ * which is what the Period of Performance section actually says ("estimated to be
+ * N days"). Deliberately not the sum of each period's duration: that overcounts
+ * gapped periods and undercounts overlapping ones, so it is a different number
+ * from the one the document promises.
+ *
+ * Walks UTC calendar fields, matching how a period date is stored (see the note
+ * at the top of this file) — reading the dates as instants would slip a day for
+ * every reader west of Greenwich.
+ */
+export function periodOfPerformanceDays(periods: { startDate: string | Date; durationDays: number }[] | null | undefined): number {
+  const list = (periods ?? []).filter((p) => p && p.startDate);
+  if (list.length === 0) return 0;
+
+  const bounds = list.map((p) => {
+    const d = p.startDate instanceof Date ? p.startDate : new Date(p.startDate);
+    const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    // A 1-day period starts and ends the same day, so advance by duration - 1.
+    const duration = Number.isFinite(Number(p.durationDays)) ? Number(p.durationDays) : 0;
+    const end = start + Math.max(0, duration - 1) * MS_PER_DAY;
+    return { start, end };
+  });
+
+  const start = Math.min(...bounds.map((b) => b.start));
+  const end = Math.max(...bounds.map((b) => b.end));
+  return Math.round((end - start) / MS_PER_DAY) + 1;
 }
