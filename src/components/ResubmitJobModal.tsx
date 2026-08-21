@@ -22,9 +22,44 @@ interface Props {
     onClose: () => void;
     jobId: string;
     onResubmitted?: () => void;
+    /**
+     * Approving the lab's edits rather than handing back edits of your own.
+     *
+     * The same two writes in the same order — say something, then give the job
+     * back — so it shares this component rather than forking a near-identical
+     * one. Only the wording and the recorded history note differ, because what
+     * the customer did differs.
+     */
+    mode?: 'resubmit' | 'approve';
 }
 
-export default function ResubmitJobModal({ open, onClose, jobId, onResubmitted }: Props): React.JSX.Element {
+const COPY = {
+    resubmit: {
+        title: 'Resubmit job',
+        blurb:
+            'Send your updated workflow back to the DAMP Lab for review. Any edits you saved in the workflow editor are already recorded; add a note to explain what you changed.',
+        field: 'Note to the technician (optional)',
+        submit: 'Resubmit updated job to technician',
+        pending: 'Resubmitting…',
+        historyNote: 'Resubmitted',
+        defaultComment: 'Resubmitted to the DAMP Lab.',
+        failure: 'Could not resubmit the job.'
+    },
+    approve: {
+        title: 'Approve the lab’s edits',
+        blurb:
+            'Confirm that the workflow as it now stands is what you want the DAMP Lab to run. This hands the job back to the lab; you can add a note if anything still needs saying.',
+        field: 'Note to the technician (optional)',
+        submit: 'Approve and return to the lab',
+        pending: 'Approving…',
+        historyNote: 'Approved by customer',
+        defaultComment: 'The client approved the job.',
+        failure: 'Could not approve the job.'
+    }
+} as const;
+
+export default function ResubmitJobModal({ open, onClose, jobId, onResubmitted, mode = 'resubmit' }: Props): React.JSX.Element {
+    const copy = COPY[mode];
     const [message, setMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -37,27 +72,28 @@ export default function ResubmitJobModal({ open, onClose, jobId, onResubmitted }
         setSubmitting(true);
         setError(null);
         try {
-            if (message.trim()) {
-                await createComment({
-                    variables: {
-                        input: {
-                            jobId,
-                            content: message.trim(),
-                            author: userProps?.idTokenParsed?.email ?? '',
-                            authorType: 'CLIENT',
-                            isInternal: false
-                        }
+            // Always posted. An approval with no note is still the customer
+            // saying yes, and that has to be on the record the same way a staff
+            // decision is.
+            await createComment({
+                variables: {
+                    input: {
+                        jobId,
+                        content: message.trim() || copy.defaultComment,
+                        author: userProps?.idTokenParsed?.email ?? '',
+                        authorType: 'CLIENT',
+                        isInternal: false
                     }
-                });
-            }
+                }
+            });
 
-            await mutateJobState({ variables: { ID: jobId, State: 'SUBMITTED' } });
+            await mutateJobState({ variables: { ID: jobId, State: 'SUBMITTED', Note: copy.historyNote } });
 
             setMessage('');
             onClose();
             onResubmitted?.();
         } catch (err: any) {
-            setError(err?.message ?? 'Could not resubmit the job.');
+            setError(err?.message ?? copy.failure);
         } finally {
             setSubmitting(false);
         }
@@ -65,17 +101,16 @@ export default function ResubmitJobModal({ open, onClose, jobId, onResubmitted }
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Resubmit job</DialogTitle>
+            <DialogTitle>{copy.title}</DialogTitle>
             <DialogContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Send your updated workflow back to the DAMP Lab for review. Any edits you saved in the
-                    workflow editor are already recorded; add a note to explain what you changed.
+                    {copy.blurb}
                 </Typography>
                 <TextField
                     fullWidth
                     multiline
                     minRows={3}
-                    label="Note to the technician (optional)"
+                    label={copy.field}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                 />
@@ -85,7 +120,7 @@ export default function ResubmitJobModal({ open, onClose, jobId, onResubmitted }
                 <Box sx={{ display: 'flex', gap: 1, px: 1, pb: 1 }}>
                     <Button onClick={onClose} color="inherit" disabled={submitting}>Cancel</Button>
                     <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
-                        {submitting ? 'Resubmitting…' : 'Resubmit updated job to technician'}
+                        {submitting ? copy.pending : copy.submit}
                     </Button>
                 </Box>
             </DialogActions>

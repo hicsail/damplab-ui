@@ -102,6 +102,7 @@ export const GET_JOB_BY_ID = gql`
             email
             customerCategory
             state
+            customerEditingEnabled
             submitted
             notes
             attachments {
@@ -218,6 +219,7 @@ export const GET_OWN_JOB_BY_ID = gql`
             email
             customerCategory
             state
+            customerEditingEnabled
             submitted
             notes
             attachments {

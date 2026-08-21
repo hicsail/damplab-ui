@@ -73,7 +73,7 @@ export default function CanvasPreview(props: CanvasPreviewProps) {
                     </ReactFlowProvider>
                   
                     <div style={{width: '30%', minWidth:'500px'}}>
-                        <RightSidebar noMouseEvents/>
+                        <RightSidebar readOnly/>
                     </div>
                 </DialogContent>
             </Dialog>

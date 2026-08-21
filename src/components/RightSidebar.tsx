@@ -17,7 +17,16 @@ import { calculateServiceCost } from '../utils/servicePricing';
 import { RecState } from '../types/Types';
 
 interface SidebarProps {
-    noMouseEvents?: boolean;
+    /**
+     * Show the node's parameters without letting them be changed.
+     *
+     * The `pointer-events: none` wrapper below is a backstop, not the mechanism:
+     * MUI sets `pointer-events: auto` on a shrunk outlined InputLabel, so on its
+     * own it left every filled-in field editable by clicking its label to focus
+     * the input and then typing. The real enforcement is the matching prop on
+     * Params.
+     */
+    readOnly?: boolean;
     /** Parameter ids edited relative to the job editor's diff baseline, keyed by node id. Only the job editor passes this. */
     changedParamIdsByNode?: Map<string, Set<string>>;
     /** When set (job editor), price using the job owner's category rather than the logged-in user's. */
@@ -25,7 +34,7 @@ interface SidebarProps {
 }
 
 export default function ContextTestComponent(props: SidebarProps) {
-    const {noMouseEvents, changedParamIdsByNode, customerCategory: customerCategoryProp} = props;
+    const {readOnly, changedParamIdsByNode, customerCategory: customerCategoryProp} = props;
 
     const api_url = import.meta.env.VITE_MPI_API || '';
     
@@ -287,7 +296,7 @@ export default function ContextTestComponent(props: SidebarProps) {
 
     return (
         <div style={{ wordWrap: 'break-word', paddingLeft: 20, paddingRight: 20, overflow: 'scroll', height: '80vh', textAlign: 'left' }}>
-            <div style={{pointerEvents: noMouseEvents ? 'none' : 'auto'}}>
+            <div style={{pointerEvents: readOnly ? 'none' : 'auto'}}>
                 <div>
                     {
                         hazards.includes(activeNode?.data.label) 
@@ -353,6 +362,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                                 activeNode={activeNodeForParams}
                                 onFormDataChange={() => setPricingTick((t) => t + 1)}
                                 changedParamIds={changedParamIdsByNode?.get(activeNode?.id)}
+                                readOnly={readOnly}
                             />
                         </div>
                     )

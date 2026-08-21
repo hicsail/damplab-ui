@@ -155,11 +155,22 @@ export const UPDATE_WORKFLOW_NODE_ESTIMATED_TIME = gql`
     }
 `;
 
+/** Staff-only: open or close the customer's ability to edit a job's workflow graph. */
+export const SET_JOB_CUSTOMER_EDITING = gql`
+    mutation setJobCustomerEditing($jobId: ID!, $enabled: Boolean!) {
+        setJobCustomerEditing(jobId: $jobId, enabled: $enabled) {
+            id
+            customerEditingEnabled
+        }
+    }
+`;
+
 export const MUTATE_JOB_STATE = gql`
-    mutation changeJobState($ID: ID!, $State: JobState!) {
+    mutation changeJobState($ID: ID!, $State: JobState!, $Note: String) {
         changeJobState(
             job: $ID,
-            newState: $State
+            newState: $State,
+            note: $Note
         ) {
             id
             state
