@@ -18,6 +18,9 @@ import { UserContext }            from '../contexts/UserContext';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SendIcon from '@mui/icons-material/Send';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ThumbUpIcon from '@mui/icons-material/ThumbUpAltOutlined';
+import { customerMayEdit, awaitingCustomerApproval } from '../utils/jobEditing';
 
 export default function Tracking() {
 
@@ -105,12 +108,20 @@ export default function Tracking() {
     }
     if (data && !data.ownJobById) return <p>Job not found. You may not have access to this job.</p>;
 
+    // Editing is a staff-set flag now, not a state: the lab can hand the job
+    // back for approval without handing over the canvas.
+    const jobFacts = { state: jobState, customerEditingEnabled: (data?.ownJobById as any)?.customerEditingEnabled };
+    const canEdit = customerMayEdit(jobFacts);
+    const needsApproval = awaitingCustomerApproval(jobFacts);
+
     const jobStatus = () => {
         const submitText = "Your job has been submitted to the DAMP lab and is awaiting review. Once the review is done, you will see the updated state over here.";
         const createText = "Your job is currently being created. Once the job is created, you will see the updated state over here.";
         const acceptText = "Your job has been reviewed by the DAMP lab and has been accepted. You will receive a SOW to review and sign here once it has been generated.";
         const rejectText = "Your job has been reviewed by the DAMP lab and has been accepted. Please complete any necessary modifications and resubmit your job.";
-        const changesText = "The DAMP Lab has asked for changes to this job. Use Edit Job above to make your edits, then resubmit it to the lab.";
+        const changesText = canEdit
+            ? "The DAMP Lab has asked for changes to this job. Use Edit Job above to make your edits, then resubmit it to the lab."
+            : "The DAMP Lab has edited this job and is asking you to approve it. Use View workflow above to see what changed, then approve it. See the comments below for what they changed and why.";
         const defaultText = "Invalid Case";
 
         switch (jobState) {
@@ -139,8 +150,6 @@ export default function Tracking() {
     const { current, baseline } = selectedDiffPair(versions, viewingVersion, baselineVersionNumber);
     const graphDiff = current && baseline && current !== baseline ? diffJobGraphs(baseline.workflows, current.workflows) : undefined;
 
-    // The editor is offered only while the lab is waiting on the customer.
-    const canEdit = jobState === 'CHANGES_REQUESTED';
 
     // After the server filter, `current` is the latest allowed version when View
     // is defaulted — including a visible Request Changes event. Live
@@ -181,29 +190,53 @@ export default function Tracking() {
                         <strong>Statement of Work available.</strong> A Statement of Work has been generated for this job. View and download it in the section below.
                     </Alert>
                 )}
-                {canEdit && (
-                    /* Both halves of "make your edits, then hand it back" sit together at
-                       the top: the Resubmit button used to live in the comments header,
-                       far enough down the page to be missed. */
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1 }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
-                            onClick={() => navigate(`/job_editor/${id}`)}
-                            sx={{ textTransform: 'none' }}
-                        >
-                            Edit Job
-                        </Button>
+                {/* View is permanent — the canvas is what a customer submitted, and
+                    there is no state in which they should have to take the lab's word
+                    for what it says. Edit and Resubmit join it only while the job is
+                    theirs to change; the Resubmit button used to live in the comments
+                    header, far enough down the page to be missed. */}
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1 }}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => navigate(`/job_editor/${id}`)}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        View workflow
+                    </Button>
+                    {canEdit && (
+                        <>
+                            <Button
+                                variant="outlined"
+                                startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
+                                onClick={() => navigate(`/job_editor/${id}`)}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Edit Job
+                            </Button>
+                            <Button
+                                variant="contained"
+                                startIcon={<SendIcon />}
+                                onClick={() => setResubmitOpen(true)}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Resubmit job
+                            </Button>
+                        </>
+                    )}
+                    {/* The job is theirs to act on but not to change: the only
+                        thing left to do with it is say yes. */}
+                    {needsApproval && (
                         <Button
                             variant="contained"
-                            startIcon={<SendIcon />}
+                            startIcon={<ThumbUpIcon />}
                             onClick={() => setResubmitOpen(true)}
                             sx={{ textTransform: 'none' }}
                         >
-                            Resubmit job
+                            Approve edits
                         </Button>
-                    </Box>
-                )}
+                    )}
+                </Box>
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}
                 </Typography>
@@ -333,6 +366,7 @@ export default function Tracking() {
                     }}
                 />
                 <ResubmitJobModal
+                    mode={needsApproval ? 'approve' : 'resubmit'}
                     open={resubmitOpen}
                     onClose={() => setResubmitOpen(false)}
                     jobId={id || ''}

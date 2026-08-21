@@ -10,6 +10,7 @@ import { buildNodeParameters, createNodeObject } from '../controllers/ReactFlowE
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
 import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from '../controllers/jobGraphHydration';
 import { diffJobGraphs, latestContentVersion, latestVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
+import { customerMayEdit, editingBlockedMessage } from '../utils/jobEditing';
 import { missedContentVersion, missedUnfilteredContent, pickersAfterSave, seedLoadedVersionNumber } from '../utils/jobEditorSave';
 import JobVersionHistory from '../components/JobVersionHistory';
 import Sidebar        from '../components/Sidebar';
@@ -114,11 +115,27 @@ export default function JobEditor() {
      *  before we snap the picker cannot flash the canvas into historic mode. */
     const isHistoric = !saving && latest != null && viewing != null && viewing !== latest.versionNumber;
 
-    /** The job is back with the lab, so it is not the customer's to change.
-     *  Mirrors the server rule in job.resolver.saveJobWorkflows exactly: without
-     *  it, a customer who follows the editor link in an old comment after
-     *  resubmitting gets a fully editable canvas and a Forbidden error on save. */
-    const lockedToLab = !isStaff && job != null && job.state !== 'CHANGES_REQUESTED';
+    /** Not the customer's to change right now.
+     *  Mirrors the server rule in job.resolver.saveJobWorkflows exactly, so the
+     *  canvas is never editable in a way the save would reject. Keyed on the
+     *  editing flag rather than the state: a job can sit with the customer for
+     *  approval without being theirs to edit, and the flag is cleared server-side
+     *  the moment they hand it back (see editingClosedByTransition), so following
+     *  the editor link in an old comment after resubmitting lands read only. */
+    const lockedToLab = !isStaff && job != null && !customerMayEdit(job);
+
+    /** What to show when a save is refused.
+     *  A customer whose job was accepted while they had the editor open needs to
+     *  be told *that*, not handed Apollo's wrapper text. The job this tab loaded
+     *  cannot answer the question — it is precisely the thing that went stale —
+     *  so the fresh copy decides, and only genuine failures echo the error. */
+    const saveErrorText = async (err: any): Promise<string> => {
+        if (!isStaff) {
+            const fresh = await peekJob().catch(() => null);
+            if (fresh && !customerMayEdit(fresh)) return editingBlockedMessage(fresh);
+        }
+        return err?.message ?? 'Could not save changes.';
+    };
 
     /** Nothing on the canvas may be changed — either a past version is on
      *  screen, or the job is not editable by this reader right now. */
@@ -405,6 +422,16 @@ export default function JobEditor() {
         setSaving(true);
         try {
             const peekedJob = await peekJob();
+
+            // The lab may have taken the job back while this canvas sat open —
+            // accepting closes editing. Caught here rather than left to the
+            // server's rejection so the customer is told what happened to their
+            // job, not that their save failed.
+            if (!isStaff && !customerMayEdit(peekedJob)) {
+                setMessage({ text: editingBlockedMessage(peekedJob), severity: 'error' });
+                return;
+            }
+
             const peekedVersions: JobVersionLike[] = peekedJob?.versions ?? [];
             const missed = isStaff
                 ? missedContentVersion(peekedVersions, loadedVersionNumber)
@@ -423,7 +450,7 @@ export default function JobEditor() {
             }
             await persistCanvas(null);
         } catch (err: any) {
-            setMessage({ text: err?.message ?? 'Could not save changes.', severity: 'error' });
+            setMessage({ text: await saveErrorText(err), severity: 'error' });
         } finally {
             setSaving(false);
         }
@@ -436,7 +463,7 @@ export default function JobEditor() {
         try {
             await persistCanvas(missedVersionNumber);
         } catch (err: any) {
-            setMessage({ text: err?.message ?? 'Could not save changes.', severity: 'error' });
+            setMessage({ text: await saveErrorText(err), severity: 'error' });
         } finally {
             setSaving(false);
         }
@@ -501,7 +528,7 @@ export default function JobEditor() {
                                     Back to job
                                 </Button>
                                 <Typography variant="caption" sx={{ display: 'block', mt: 0.5, backgroundColor: 'white', px: 0.75, borderRadius: 1, width: 'fit-content' }}>
-                                    Editing <strong>{job.name}</strong>{job.jobId ? ` (#${job.jobId})` : ''}
+                                    {readOnly ? 'Viewing' : 'Editing'} <strong>{job.name}</strong>{job.jobId ? ` (#${job.jobId})` : ''}
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
                                     <Chip size="small" label="New" sx={{ height: 18, fontSize: 10, backgroundColor: '#2e7d32', color: 'white', fontWeight: 700 }} />
@@ -541,9 +568,13 @@ export default function JobEditor() {
                                 ) : lockedToLab ? (
                                     /* Deliberately not the historic message: telling a
                                        customer to switch versions is advice they cannot act
-                                       on, because no version of this job is theirs to edit. */
+                                       on, because no version of this job is theirs to edit.
+                                       Phrased for arrival by the job view's View button too,
+                                       which reaches finished jobs no lab review is pending
+                                       on — hence no claim about what happens next beyond the
+                                       one condition that does reopen editing. */
                                     <Alert severity="info" sx={{ py: 0.25, fontSize: 12 }}>
-                                        This job is with the DAMP Lab for review — read only. You can edit it again if the lab requests further changes.
+                                        {editingBlockedMessage(job)}
                                     </Alert>
                                 ) : (
                                 <>
@@ -603,7 +634,7 @@ export default function JobEditor() {
                                 the same treatment CanvasPreview already uses. */}
                             <RightSidebar
                                 changedParamIdsByNode={changedParamIdsByNode}
-                                noMouseEvents={readOnly}
+                                readOnly={readOnly}
                                 customerCategory={job?.customerCategory ?? undefined}
                             />
                         </div>
