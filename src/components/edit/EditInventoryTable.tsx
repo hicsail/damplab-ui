@@ -1,11 +1,15 @@
 import { useApolloClient, useQuery } from '@apollo/client';
 import { DataGrid, GridActionsCellItem, GridColDef, GridRowId, GridRowModesModel, GridSlots } from '@mui/x-data-grid';
-import { Alert, Chip, Snackbar, Stack } from '@mui/material';
+import { Alert, Box, Button, Chip, Snackbar, Stack } from '@mui/material';
 import { Delete, Edit } from '@mui/icons-material';
-import { useEffect, useMemo, useState } from 'react';
+import UploadIcon from '@mui/icons-material/Upload';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { GridToolBar } from './GridToolBar';
 import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS } from '../../gql/queries';
+import { validateFileType } from '../data-translation/utils';
+import { parseInventoryFile, ParsedInventoryRow, UploadSummary } from './inventoryUploadUtils';
+import { InventoryUploadPreview } from './InventoryUploadPreview';
 
 export interface EditInventoryTableProps {
   searchString?: string;
@@ -21,6 +25,8 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
   const [rows, setRows] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [, setRowModesModel] = useState<GridRowModesModel>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewRows, setPreviewRows] = useState<ParsedInventoryRow[] | null>(null);
 
   useEffect(() => {
     setRows(data?.inventoryItems ?? []);
@@ -44,6 +50,38 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     } catch (_error) {
       setErrorMessage('Unable to delete inventory item. Please try again.');
     }
+  };
+
+  const handleUploadFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = '';
+
+    if (!validateFileType(file.name)) {
+      setErrorMessage('Please upload an .xlsx or .xls file.');
+      return;
+    }
+
+    try {
+      const { rows: parsed } = await parseInventoryFile(file);
+      if (parsed.length === 0) {
+        setErrorMessage('No valid rows found in the spreadsheet.');
+        return;
+      }
+      setPreviewRows(parsed);
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : 'Failed to parse file.');
+    }
+  };
+
+  const handleUploadComplete = (summary: UploadSummary) => {
+    setPreviewRows(null);
+    refetch();
+    const parts = [];
+    if (summary.created > 0) parts.push(`${summary.created} created`);
+    if (summary.updated > 0) parts.push(`${summary.updated} updated`);
+    if (summary.errors.length > 0) parts.push(`${summary.errors.length} failed`);
+    setErrorMessage(`Import complete: ${parts.join(', ')}.`);
   };
 
   const columns: GridColDef[] = [
@@ -98,6 +136,20 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
 
   return (
     <Stack spacing={1}>
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>
+          Upload inventory
+        </Button>
+        <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
+      </Box>
+      {previewRows && (
+        <InventoryUploadPreview
+          rows={previewRows}
+          open={!!previewRows}
+          onClose={() => setPreviewRows(null)}
+          onComplete={handleUploadComplete}
+        />
+      )}
       <DataGrid
         rows={filteredRows}
         columns={columns}
@@ -117,7 +169,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         onClose={() => setErrorMessage(null)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setErrorMessage(null)} severity='error' sx={{ width: '100%' }}>
+        <Alert onClose={() => setErrorMessage(null)} severity={errorMessage?.startsWith('Import complete') ? 'success' : 'error'} sx={{ width: '100%' }}>
           {errorMessage}
         </Alert>
       </Snackbar>
