@@ -1,6 +1,7 @@
 import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Checkbox,
@@ -12,6 +13,7 @@ import {
   FormControlLabel,
   LinearProgress,
   Stack,
+  TextField,
   Typography
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
@@ -28,9 +30,12 @@ import {
   matchExistingItems,
   ParsedInventoryRow,
   resolveStations,
+  SUGGESTED_TYPES,
   UPLOAD_COLUMNS,
   UploadColumnKey,
-  UploadSummary
+  UploadSummary,
+  validateUploadRows,
+  ValidationSummary
 } from './inventoryUploadUtils';
 
 interface InventoryUploadPreviewProps {
@@ -88,6 +93,9 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
     )
   ];
 
+  // Run pre-upload validation
+  const validation: ValidationSummary = validateUploadRows(rows);
+
   const warningRows = rows.filter((r) => r.warnings.length > 0);
 
   const columns: GridColDef[] = [
@@ -95,8 +103,27 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
     {
       field: 'type',
       headerName: 'Type',
-      width: 120,
-      renderCell: (params) => <Chip size='small' label={params.value} />
+      width: 180,
+      renderCell: (params) => {
+        const val = params.value as string;
+        const isUnknown = val && !SUGGESTED_TYPES.includes(val.toUpperCase());
+        if (isUnknown) {
+          return (
+            <Autocomplete
+              size='small'
+              freeSolo
+              options={SUGGESTED_TYPES}
+              value={val}
+              onChange={(_, newVal) => {
+                if (newVal) (rows[params.row.id as number] as ParsedInventoryRow).type = newVal;
+              }}
+              renderInput={(inputParams) => <TextField {...inputParams} variant='standard' sx={{ minWidth: 120 }} />}
+              disableClearable
+            />
+          );
+        }
+        return <Chip size='small' label={val || '—'} />;
+      }
     },
     { field: 'tag', headerName: 'Tag', width: 160 },
     { field: 'stationName', headerName: 'Station', width: 150 },
@@ -235,9 +262,12 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
             </Alert>
           )}
 
-          {warningRows.length > 0 && (
-            <Alert severity='warning'>
-              {warningRows.length} row{warningRows.length > 1 ? 's have' : ' has'} warnings. Review the table below.
+          {(validation.errors > 0 || validation.warnings > 0) && (
+            <Alert severity={validation.errors > 0 ? 'error' : 'warning'}>
+              Validation: {validation.errors > 0 && `${validation.errors} error${validation.errors > 1 ? 's' : ''}`}
+              {validation.errors > 0 && validation.warnings > 0 && ', '}
+              {validation.warnings > 0 && `${validation.warnings} warning${validation.warnings > 1 ? 's' : ''}`}.
+              Review the table below.
             </Alert>
           )}
 

@@ -31,7 +31,14 @@ export interface UploadSummary {
   errors: string[];
 }
 
-const VALID_TYPES = new Set(['EQUIPMENT', 'HOOD', 'STORAGE', 'CONSUMABLE']);
+export const SUGGESTED_TYPES = ['EQUIPMENT', 'HOOD', 'STORAGE', 'CONSUMABLE'];
+const VALID_TYPES = new Set(SUGGESTED_TYPES);
+
+export const TAG_SUGGESTIONS = [
+  'Analytical Equipment', 'CLIA Equipment', 'Centrifuge', 'Cold Storage',
+  'General Equipment', 'Imaging', 'Incubator', 'Liquid Handler', 'Sequencer', 'Vortexer'
+];
+const VALID_TAGS = new Set(TAG_SUGGESTIONS.map((t) => t.toLowerCase()));
 
 /** Normalize a header string for flexible matching. */
 const norm = (s: unknown): string => String(s ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -79,8 +86,8 @@ function cellStr(row: unknown[], idx: number | undefined): string {
 function parseType(raw: string): { type: string; warning?: string } {
   const upper = raw.toUpperCase().trim();
   if (VALID_TYPES.has(upper)) return { type: upper };
-  if (!raw) return { type: 'EQUIPMENT' };
-  return { type: 'EQUIPMENT', warning: `Unknown type "${raw}", defaulting to EQUIPMENT` };
+  if (!raw) return { type: '' };
+  return { type: raw.trim(), warning: `Unknown type "${raw}" — not in predefined list.` };
 }
 
 function parseBool(raw: string): boolean {
@@ -203,6 +210,55 @@ export function matchExistingItems(
       row.matchedIsDeleted = !!existing.isDeleted;
     }
   }
+}
+
+export interface ValidationSummary {
+  errors: number;
+  warnings: number;
+}
+
+/**
+ * Run pre-upload validation checks on parsed rows. Mutates rows in-place (adds warnings).
+ * Checks: unknown types, unknown tags, duplicate uniqueIds, blank quantities.
+ */
+export function validateUploadRows(rows: ParsedInventoryRow[], rawQuantities?: string[]): ValidationSummary {
+  let errors = 0;
+  let warnings = 0;
+
+  // Duplicate uniqueId detection
+  const idFreq = new Map<string, number[]>();
+  for (let i = 0; i < rows.length; i++) {
+    const uid = rows[i].uniqueId?.trim().toLowerCase();
+    if (!uid) continue;
+    if (!idFreq.has(uid)) idFreq.set(uid, []);
+    idFreq.get(uid)!.push(i);
+  }
+  for (const [uid, indices] of idFreq) {
+    if (indices.length > 1) {
+      for (const idx of indices) {
+        rows[idx].warnings.push(`Duplicate uniqueId "${uid}" found in ${indices.length} rows.`);
+        errors += 1;
+      }
+    }
+  }
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+
+    // Tag validation
+    if (row.tag && !VALID_TAGS.has(row.tag.toLowerCase())) {
+      row.warnings.push(`Tag "${row.tag}" is not in the predefined list.`);
+      warnings += 1;
+    }
+
+    // Blank quantity
+    if (rawQuantities && (!rawQuantities[i] || rawQuantities[i].trim() === '')) {
+      row.warnings.push('Quantity blank — defaulting to 1.');
+      warnings += 1;
+    }
+  }
+
+  return { errors, warnings };
 }
 
 /** Selectable columns for the upload preview. "name" is always included (not optional). */

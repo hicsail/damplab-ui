@@ -26,12 +26,7 @@ import { useNavigate, useParams } from 'react-router';
 import { GET_INVENTORY_ITEMS, GET_STATIONS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, pricingToRateForm, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
 
-const TYPE_OPTIONS = [
-  { value: 'EQUIPMENT', label: 'Equipment' },
-  { value: 'HOOD', label: 'Hood' },
-  { value: 'STORAGE', label: 'Storage' },
-  { value: 'CONSUMABLE', label: 'Consumable' }
-];
+const SUGGESTED_TYPES = ['EQUIPMENT', 'HOOD', 'STORAGE', 'CONSUMABLE'];
 
 const TAG_SUGGESTIONS = [
   'Analytical Equipment', 'CLIA Equipment', 'Centrifuge', 'Cold Storage',
@@ -221,14 +216,14 @@ export default function AdminEditInventoryItem() {
 
       <TextField label='Name' value={name} onChange={(e) => setName(e.target.value)} required />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <FormControl>
-          <InputLabel id='inventory-type-label'>Type</InputLabel>
-          <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
-            {TYPE_OPTIONS.map((o) => (
-              <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Autocomplete
+          freeSolo
+          options={SUGGESTED_TYPES}
+          value={type}
+          onChange={(_, newVal) => setType(typeof newVal === 'string' ? newVal : '')}
+          onInputChange={(_, newVal) => setType(newVal)}
+          renderInput={(params) => <TextField {...params} label='Type' />}
+        />
         <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} />
       </Box>
 
