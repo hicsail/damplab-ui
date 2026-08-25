@@ -3,10 +3,14 @@ import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Card, CardContent, Typography, Alert, Chip, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Divider, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Checkbox, FormControlLabel } from '@mui/material';
-import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
+import { Box, Button, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
+import RateReviewIcon                                 from '@mui/icons-material/RateReview';
+import UndoIcon                                       from '@mui/icons-material/Undo';
+import CancelIcon                                     from '@mui/icons-material/Cancel';
+import ReceiptLongIcon                                from '@mui/icons-material/ReceiptLong';
+import RefreshIcon                                    from '@mui/icons-material/Refresh';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
@@ -18,16 +22,17 @@ import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import { technicianCustomerActionCopy } from '../utils/jobEditing';
-import { refreshReviewSurfaces } from '../utils/jobReview';
 import JobPDFDocument             from '../components/JobPDFDocument';
 import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SowEditorModal             from '../components/sow/SowEditorModal';
-import SowStatusCard              from '../components/sow/SowStatusCard';
+import { SowPdfDownloadButton, SowStatusDetails, SowStatusSummary, useSowStaffStatus } from '../components/sow/SowStatusCard';
+import ProcessCard                from '../components/technician/ProcessCard';
 import ReasonDialog               from '../components/ReasonDialog';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
-import { CUSTOMER_CATEGORY_OPTIONS } from '../components/sow/sowTypes';
+import { CUSTOMER_CATEGORY_OPTIONS, statusColor } from '../components/sow/sowTypes';
+import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
 
 const stripTypename = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stripTypename);
@@ -123,6 +128,7 @@ export default function TechnicianView() {
         fetchPolicy: 'network-only',
     });
     const invoices = invoicesResult?.invoicesByJobId ?? [];
+    const sowStatus = useSowStaffStatus(id || '');
 
     // Derive from Apollo cache so refetches (e.g. after SOW upsert) update without a full page reload.
     const jobData = data?.jobById ?? null;
@@ -187,7 +193,7 @@ export default function TechnicianView() {
         if (!ok) return;
         try {
             await changeJobStateMutation({ variables: { ID: id, State: 'CLOSED' } });
-            await refetchJob();
+            await refreshJobPage();
         } catch (e) {
             console.error('Failed to close job:', e);
             window.alert('Could not close the job. Please try again.');
@@ -207,12 +213,18 @@ export default function TechnicianView() {
         setModalOpen(false);
     };
 
-    const handleReviewSubmitted = () =>
-        refreshReviewSurfaces({
-            refetchJob,
-            refetchSow,
-            refetchSowEditorState: () => apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] })
-        });
+    const [refreshing, setRefreshing] = useState(false);
+
+    const refreshJobPage = async () => {
+        await Promise.all([
+            refetchJob(),
+            refetchSow(),
+            refetchInvoices(),
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] })
+        ]);
+    };
+
+    const handleReviewSubmitted = () => refreshJobPage();
 
     /**
      * "Generate SOW" on a job that has none creates it first, then opens the
@@ -248,6 +260,7 @@ export default function TechnicianView() {
 
     const handleCloseSOWModal = () => {
         setSowModalOpen(false);
+        void refreshJobPage();
     };
 
     const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
@@ -308,24 +321,23 @@ export default function TechnicianView() {
         const defaultText = "Invalid Case";
         switch (jobState) {
             case 'SUBMITTED':
-                return ['rgba(256, 256, 0, 0.5)', <Publish />, submitText]
+                return ['rgba(256, 256, 0, 0.5)', submitText]
             case 'CREATING':
-                return ['rgba(256, 256, 0, 0.5)', <AccessTime />, createText]
+                return ['rgba(256, 256, 0, 0.5)', createText]
             case 'ACCEPTED':
-                return ['rgb(0, 256, 0, 0.5)', <Check />, acceptText];
+                return ['rgb(0, 256, 0, 0.5)', acceptText];
             case 'REJECTED':
-                return ['rgb(256, 0, 0, 0.5)', <NotInterested />, rejectText];
+                return ['rgb(256, 0, 0, 0.5)', rejectText];
             case 'CLOSED':
-                return ['rgba(120, 120, 120, 0.35)', <Check />, closedText];
+                return ['rgba(120, 120, 120, 0.35)', closedText];
             case 'CHANGES_REQUESTED':
-                return ['rgba(255, 152, 0, 0.4)', <Publish />, changesText];
+                return ['rgba(255, 152, 0, 0.4)', changesText];
             default:
-                return ['rgb(0, 0, 0, 0)', <NotInterested />, defaultText];
+                return ['rgb(0, 0, 0, 0)', defaultText];
         }
     }
     const jobStatusColor = jobStatus()[0];
-    const jobStatusIcon = jobStatus()[1];
-    const jobStatusText = jobStatus()[2];
+    const jobStatusText = jobStatus()[1];
 
     const handleExportJobJson = () => {
         if (!id || !jobData) return;
@@ -397,6 +409,22 @@ export default function TechnicianView() {
     );
 
     const currentCustomerCategory = jobData?.customerCategory ?? 'EXTERNAL_CUSTOMER_MARKET';
+    const jobParties = jobPartyStatus(jobState);
+    const sowParties = sowPartyStatus({
+        currentStatus: sowStatus.current?.status,
+        activeStatus: sowStatus.active?.status ?? sowStatus.sow?.activeVersion?.status
+    });
+    const jobCustomerVersion = partyVersionLabel(latestCustomerVisibleJobVersion(versions));
+    const jobStaffVersion = partyVersionLabel(latestStaffVisibleJobVersion(versions));
+    const sowCustomerVersion = sowPartyVersionLabel(latestCustomerVisibleSowVersion(sowStatus.sow?.versions ?? []));
+    const sowStaffVersion = sowPartyVersionLabel(latestStaffVisibleSowVersion(sowStatus.sow?.versions ?? []));
+    const invoiceLabel = invoiceVersionLabel(invoices);
+    const sowStatusPaneColor = chipStatusBackground(
+        sowStatus.sow ? statusColor(sowStatus.active?.status ?? sowStatus.current?.status) : 'default'
+    );
+    const invoiceStatusPaneColor = chipStatusBackground(invoices.length ? 'info' : 'default');
+    const jobStatusPaneColor = jobData ? jobStatusColor : chipStatusBackground('default');
+    const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
     const handleCustomerCategoryChange = async (nextCategory: string) => {
         if (!id) return;
@@ -418,17 +446,9 @@ export default function TechnicianView() {
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
-                {sowData && (
-                    <Alert severity="success" sx={{ mb: 2 }} icon={<CheckCircleIcon />}>
-                        <strong>Statement of Work generated.</strong> This job has an SOW. You can view, edit, or regenerate it below.
-                    </Alert>
-                )}
                 <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1 }}>
                     <Typography variant="h5" fontWeight="bold">
                         {jobName}
-                        {sowData && (
-                            <Chip label="SOW generated" color="success" size="small" sx={{ ml: 1.5, fontWeight: 600 }} />
-                        )}
                     </Typography>
                     <FormControl size="small" sx={{ minWidth: 260 }} disabled={categoryUpdating || !jobData}>
                         <InputLabel id="pricing-category-label">Pricing category</InputLabel>
@@ -445,114 +465,26 @@ export default function TechnicianView() {
                             ))}
                         </Select>
                     </FormControl>
-                    <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 200 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 250 }}>
                         Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
                     </Typography>
                     <Box sx={{ flexGrow: 1 }} />
-                    <Button color='primary' sx={{alignContent: 'right', mr: 1}}>
-                        <PictureAsPdfIcon/>&nbsp;
-                        {id ? (
-                            <PDFDownloadLink
-                                document={
-                                    <JobPDFDocument
-                                        jobId={id}
-                                        jobName={jobName}
-                                        jobUsername={jobUsername}
-                                        jobEmail={jobEmail}
-                                        jobInstitution={jobInstitution}
-                                        jobNotes={jobNotes}
-                                        jobTime={jobTime}
-                                        workflows={workflows}
-                                    />
-                                }
-                                fileName={`DAMP-Order-${id}.pdf`}
-                            >
-                                {({ loading }) => (loading ? 'Loading document...' : 'Download Summary')}
-                            </PDFDownloadLink>
-                        ) : (
-                            'Download Summary'
-                        )}
-                    </Button>
-                    <Button 
-                        color={sowData ? 'primary' : 'secondary'}
-                        variant='contained'
-                        startIcon={<DescriptionIcon />}
-                        onClick={handleOpenSOWModal}
-                        disabled={!jobData || creatingSow}
-                        sx={{ mr: 1 }}
-                    >
-                        {creatingSow ? 'Generating…' : sowData ? 'Edit SOW' : 'Generate SOW'}
-                    </Button>
                     <Button
-                        color={sowFullData ? 'primary' : 'secondary'}
-                        variant="contained"
-                        startIcon={<PictureAsPdfIcon />}
-                        sx={{ mr: 1 }}
-                        disabled={!sowFullData || sowLoading}
-                        onClick={openInvoiceDialog}
-                    >
-                        Create Invoice
-                    </Button>
-                    <Button
-                        color={invoices?.length ? 'primary' : 'secondary'}
                         variant="outlined"
-                        startIcon={<PictureAsPdfIcon />}
-                        sx={{ mr: 1 }}
-                        disabled={!invoices?.length || invoicesLoading || !sowFullData}
-                    >
-                        {invoices?.length && id && sowFullData ? (
-                            <PDFDownloadLink
-                                document={
-                                    <JobInvoiceDocument
-                                        jobId={id}
-                                        jobDisplayId={jobData?.jobId ?? null}
-                                        jobName={jobName}
-                                        customerCategory={jobData?.customerCategory ?? undefined}
-                                        sow={sowFullData}
-                                        invoice={invoices[0]}
-                                    />
-                                }
-                                fileName={`Invoice-${(invoices[0]?.invoiceNumber ?? id) || id}.pdf`}
-                            >
-                                {({ loading }) => (loading ? 'Loading invoice...' : 'Download Latest Invoice')}
-                            </PDFDownloadLink>
-                        ) : (
-                            'Download Latest Invoice'
-                        )}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
-                        onClick={() => navigate(`/job_editor/${id}`)}
-                        disabled={jobState === 'CLOSED'}
+                        startIcon={<RefreshIcon />}
+                        onClick={async () => {
+                            setRefreshing(true);
+                            try {
+                                await refreshJobPage();
+                            } finally {
+                                setRefreshing(false);
+                            }
+                        }}
+                        disabled={!id || refreshing}
                         sx={{ textTransform: 'none' }}
                     >
-                        Edit Job
+                        {refreshing ? 'Refreshing…' : 'Refresh Job'}
                     </Button>
-                    {/* Reachable after acceptance too, not just at intake: it is
-                        where staff re-accept a job whose spec has changed (which
-                        releases the SOW send) and, equally, where they can hand it
-                        back to the customer instead. */}
-                    <Button 
-                        variant="contained"
-                        color="error"
-                        onClick={handleOpenModal}
-                        disabled={!['SUBMITTED', 'CHANGES_REQUESTED', 'ACCEPTED'].includes(jobState ?? '')}
-                    >
-                        Review Job
-                    </Button>
-                    {/* Editing is exclusive now: to change a job the customer holds,
-                        or one whose spec is agreed, staff take it back first. */}
-                    {jobState === 'CHANGES_REQUESTED' && (
-                        <Button variant="outlined" color="warning" onClick={() => setWithdrawKind('customer')} disabled={withdrawing} sx={{ textTransform: 'none' }}>
-                            {withdrawing ? 'Withdrawing…' : 'Withdraw from customer'}
-                        </Button>
-                    )}
-                    {jobState === 'ACCEPTED' && (
-                        <Button variant="outlined" color="warning" onClick={() => setWithdrawKind('acceptance')} disabled={withdrawing} sx={{ textTransform: 'none' }}>
-                            {withdrawing ? 'Withdrawing…' : 'Withdraw acceptance'}
-                        </Button>
-                    )}
                     <Button
                         variant="outlined"
                         onClick={handleExportJobJson}
@@ -571,145 +503,355 @@ export default function TechnicianView() {
                         {jobState === 'CLOSED' ? 'Job closed' : closingJob ? 'Closing…' : 'Close job'}
                     </Button>
                 </Box>
-                <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', ml: -0.5 }}>
-                        <Typography>
-                            {jobStatusIcon}
-                        </Typography>
-                        <Typography style={{textAlign: 'right'}}>
-                            <b>Job ID:</b> {id}
-                        </Typography>
-                    </Box>
-                    <Typography>
-                        <b>{jobState}</b>
-                    </Typography>
-                    <Typography sx={{ fontSize: 13, mt: 1 }}>
-                        <i>{jobStatusText}</i>
-                    </Typography>
-                </Box>
-                <Box sx={{ mx: 3, fontSize: 13 }}>
+                <Box sx={{ mx: 3, fontSize: 13, mb: 2 }}>
                     <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
                     <p><b>User:</b> {jobUsername} ({jobEmail})</p>
                     <p><b>Organization:</b> {jobInstitution}</p>
                 </Box>
-                {attachments.length > 0 && (
-                    <Box sx={{ mx: 3, my: 2 }}>
-                        <Typography variant="h6" sx={{ mb: 1 }}>Attachments</Typography>
-                        <List dense>
-                            {attachments.map((att, idx) => (
-                                <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
-                                    <ListItemText
-                                        primary={
-                                            att.url ? (
-                                                <MuiLink href={att.url} target="_blank" rel="noopener noreferrer">
-                                                    {att.filename}
-                                                </MuiLink>
-                                            ) : (
-                                                att.filename
-                                            )
-                                        }
-                                        secondary={
-                                            att.uploadedAt
-                                                ? new Date(att.uploadedAt).toLocaleString()
-                                                : undefined
-                                        }
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    </Box>
-                )}
-                {getParameterFiles().length > 0 && (
-                    <Box sx={{ mx: 3, my: 2 }}>
-                        <Typography variant="h6" sx={{ mb: 1 }}>Parameter Files</Typography>
-                        <List dense>
-                            {getParameterFiles().map((f, idx) => (
-                                <ListItem key={`${f.label}-${f.filename}-${idx}`} sx={{ pl: 0 }}>
-                                    <ListItemText
-                                        primary={
-                                            f.url ? (
-                                                <MuiLink href={f.url} target="_blank" rel="noopener noreferrer">
-                                                    {f.filename}
-                                                </MuiLink>
-                                            ) : (
-                                                f.filename
-                                            )
-                                        }
-                                        secondary={f.label}
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    </Box>
-                )}
 
                 {sowCreateError && (
-                    <Box sx={{ mx: 3, my: 2 }}>
+                    <Box sx={{ mb: 2 }}>
                         <Alert severity="error" onClose={() => setSowCreateError(null)}>
                             {sowCreateError}
                         </Alert>
                     </Box>
                 )}
 
-                {/* SOW Status Indicator */}
-                {sowData && (
-                    <SowStatusCard jobId={id || ''} onOpenEditor={handleOpenSOWModal} />
-                )}
-
-                {/* Invoices */}
-                <Box sx={{ mx: 3, my: 2 }}>
-                    <Typography variant="h6" sx={{ mb: 1 }}>Invoices</Typography>
-                    {!invoices?.length ? (
-                        <Typography variant="body2" color="text.secondary">
-                            No invoices have been generated for this job yet.
-                        </Typography>
-                    ) : (
-                        <List dense>
-                            {invoices.map((inv: any, idx: number) => (
-                                <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
-                                    <ListItemText
-                                        primary={
-                                            id && sowFullData ? (
-                                                <PDFDownloadLink
-                                                    document={
-                                                        <JobInvoiceDocument
-                                                            jobId={id}
-                                                            jobDisplayId={jobData?.jobId ?? null}
-                                                            jobName={jobName}
-                                                            customerCategory={jobData?.customerCategory ?? undefined}
-                                                            sow={sowFullData}
-                                                            invoice={inv}
-                                                        />
+                <ProcessCard
+                    title="Job"
+                    defaultExpanded={!isJobProcessSettled(jobState)}
+                    customerBadge={jobParties.customer}
+                    staffBadge={jobParties.staff}
+                    customerVersion={jobCustomerVersion}
+                    staffVersion={jobStaffVersion}
+                    statusPaneSx={{ bgcolor: jobStatusPaneColor as string }}
+                    statusPane={
+                        jobData ? (
+                        <>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                                <Typography variant="subtitle1" fontWeight={600}>{jobState}</Typography>
+                                <Typography variant="body2"><b>Job ID:</b> {id}</Typography>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{jobStatusText}</Typography>
+                        </>
+                        ) : (
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight={600}>Job not loaded</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    This job could not be loaded. Check the ID or try again.
+                                </Typography>
+                            </Box>
+                        )
+                    }
+                    actions={
+                        <>
+                            <Button
+                                variant="contained"
+                                size="small"
+                                startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
+                                onClick={() => navigate(`/job_editor/${id}`)}
+                                disabled={jobState === 'CLOSED'}
+                                sx={railBtnSx}
+                            >
+                                Edit Job
+                            </Button>
+                            <Button
+                                variant="contained"
+                                size="small"
+                                color="error"
+                                startIcon={<RateReviewIcon />}
+                                onClick={handleOpenModal}
+                                disabled={!['SUBMITTED', 'CHANGES_REQUESTED', 'ACCEPTED'].includes(jobState ?? '')}
+                                sx={railBtnSx}
+                            >
+                                Review Job
+                            </Button>
+                            {jobState === 'CHANGES_REQUESTED' && (
+                                <Button variant="contained" size="small" color="warning" startIcon={<UndoIcon />} onClick={() => setWithdrawKind('customer')} disabled={withdrawing} sx={railBtnSx}>
+                                    {withdrawing ? 'Withdrawing…' : 'Withdraw from customer'}
+                                </Button>
+                            )}
+                            {jobState === 'ACCEPTED' && (
+                                <Button variant="contained" size="small" color="warning" startIcon={<UndoIcon />} onClick={() => setWithdrawKind('acceptance')} disabled={withdrawing} sx={railBtnSx}>
+                                    {withdrawing ? 'Withdrawing…' : 'Withdraw acceptance'}
+                                </Button>
+                            )}
+                            {id ? (
+                                <PDFDownloadLink
+                                    document={
+                                        <JobPDFDocument
+                                            jobId={id}
+                                            jobName={jobName}
+                                            jobUsername={jobUsername}
+                                            jobEmail={jobEmail}
+                                            jobInstitution={jobInstitution}
+                                            jobNotes={jobNotes}
+                                            jobTime={jobTime}
+                                            workflows={workflows}
+                                        />
+                                    }
+                                    fileName={`DAMP-Order-${id}.pdf`}
+                                    style={{ textDecoration: 'none', width: '100%' }}
+                                >
+                                    {({ loading }) => (
+                                        <Button color="primary" size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} sx={railBtnSx}>
+                                            {loading ? 'Loading document...' : 'Download Summary'}
+                                        </Button>
+                                    )}
+                                </PDFDownloadLink>
+                            ) : (
+                                <Button color="primary" size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} disabled sx={railBtnSx}>
+                                    Download Summary
+                                </Button>
+                            )}
+                        </>
+                    }
+                    details={
+                        <>
+                            {attachments.length > 0 && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Attachments</Typography>
+                                    <List dense>
+                                        {attachments.map((att, idx) => (
+                                            <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
+                                                <ListItemText
+                                                    primary={
+                                                        att.url ? (
+                                                            <MuiLink href={att.url} target="_blank" rel="noopener noreferrer">
+                                                                {att.filename}
+                                                            </MuiLink>
+                                                        ) : (
+                                                            att.filename
+                                                        )
                                                     }
-                                                    fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
-                                                >
-                                                    {({ loading }) =>
-                                                        loading
-                                                            ? 'Loading...'
-                                                            : `Invoice ${inv.invoiceNumber || ''}`.trim()
+                                                    secondary={
+                                                        att.uploadedAt
+                                                            ? new Date(att.uploadedAt).toLocaleString()
+                                                            : undefined
                                                     }
-                                                </PDFDownloadLink>
-                                            ) : (
-                                                `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
-                                            )
-                                        }
-                                        secondary={
-                                            `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
-                                        }
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    )}
-                </Box>
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                </Box>
+                            )}
+                            {getParameterFiles().length > 0 && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Parameter Files</Typography>
+                                    <List dense>
+                                        {getParameterFiles().map((f, idx) => (
+                                            <ListItem key={`${f.label}-${f.filename}-${idx}`} sx={{ pl: 0 }}>
+                                                <ListItemText
+                                                    primary={
+                                                        f.url ? (
+                                                            <MuiLink href={f.url} target="_blank" rel="noopener noreferrer">
+                                                                {f.filename}
+                                                            </MuiLink>
+                                                        ) : (
+                                                            f.filename
+                                                        )
+                                                    }
+                                                    secondary={f.label}
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                </Box>
+                            )}
+                            {attachments.length === 0 && getParameterFiles().length === 0 && cardWorkflows.length === 0 && (
+                                <Typography variant="body2" color="text.secondary">
+                                    No workflow details to show yet.
+                                </Typography>
+                            )}
+                            {workflowCard}
+                        </>
+                    }
+                />
 
-                <Box>
-                    <Box sx={{ flexDirection: 'column', pt: 1 }}>
-                        {workflowCard}
-                    </Box>
-                </Box>
+                <ProcessCard
+                    title="Statement of Work"
+                    defaultExpanded={!isSowProcessSettled(sowStatus.active?.status ?? sowStatus.current?.status)}
+                    customerBadge={sowParties.customer}
+                    staffBadge={sowParties.staff}
+                    customerVersion={sowCustomerVersion}
+                    staffVersion={sowStaffVersion}
+                    statusPaneSx={{ bgcolor: sowStatusPaneColor }}
+                    statusPane={
+                        <SowStatusSummary
+                            sow={sowStatus.sow}
+                            active={sowStatus.active}
+                            current={sowStatus.current}
+                            hasUnsentDraft={sowStatus.hasUnsentDraft}
+                        />
+                    }
+                    actions={
+                        <>
+                            <Button
+                                color={sowData ? 'primary' : 'secondary'}
+                                variant="contained"
+                                size="small"
+                                startIcon={<DescriptionIcon />}
+                                onClick={handleOpenSOWModal}
+                                disabled={!jobData || creatingSow || sowStatus.outWithCustomer}
+                                sx={railBtnSx}
+                            >
+                                {creatingSow ? 'Generating…' : sowData ? 'Manage SOW' : 'Generate SOW'}
+                            </Button>
+                            {sowStatus.outWithCustomer && (
+                                <Button variant="contained" size="small" color="warning" startIcon={<UndoIcon />} onClick={sowStatus.requestWithdraw} disabled={sowStatus.busy} sx={railBtnSx}>
+                                    Withdraw from client
+                                </Button>
+                            )}
+                            {sowStatus.everIssued && !sowStatus.alreadyCancelled && (
+                                <Button variant="contained" size="small" color="error" startIcon={<CancelIcon />} onClick={sowStatus.requestCancel} disabled={sowStatus.busy} sx={railBtnSx}>
+                                    Cancel SOW
+                                </Button>
+                            )}
+                            {sowStatus.sow && sowStatus.forPdf && (
+                                <SowPdfDownloadButton
+                                    sowNumber={sowStatus.sow.sowNumber}
+                                    version={sowStatus.forPdf}
+                                    button={(label, loading) => (
+                                        <Button variant="outlined" size="small" startIcon={<PictureAsPdfIcon />} disabled={loading} sx={railBtnSx}>
+                                            {label}
+                                        </Button>
+                                    )}
+                                />
+                            )}
+                        </>
+                    }
+                    details={
+                        sowStatus.sow ? (
+                            <SowStatusDetails
+                                repair={sowStatus.repair}
+                                missingFields={sowStatus.missingFields}
+                                active={sowStatus.active}
+                            />
+                        ) : (
+                            <Typography variant="body2" color="text.secondary">
+                                No Statement of Work has been generated for this job yet.
+                            </Typography>
+                        )
+                    }
+                />
 
-                {/* Comments Section */}
+                <ProcessCard
+                    title="Invoices"
+                    defaultExpanded
+                    customerBadge={null}
+                    staffBadge={null}
+                    customerVersion={invoiceLabel}
+                    staffVersion={invoiceLabel}
+                    statusPaneSx={{ bgcolor: invoiceStatusPaneColor }}
+                    statusPane={
+                        invoices.length ? (
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight={600}>
+                                    {invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Latest {invoiceLabel}
+                                    {invoices[invoices.length - 1]?.totalCost != null
+                                        ? ` · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
+                                        : ''}
+                                </Typography>
+                            </Box>
+                        ) : (
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight={600}>No invoices yet</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Create an invoice from the Statement of Work services when you are ready to bill.
+                                </Typography>
+                            </Box>
+                        )
+                    }
+                    actions={
+                        <>
+                            <Button
+                                color={sowFullData ? 'primary' : 'secondary'}
+                                variant="contained"
+                                size="small"
+                                startIcon={<ReceiptLongIcon />}
+                                disabled={!sowFullData || sowLoading}
+                                onClick={openInvoiceDialog}
+                                sx={railBtnSx}
+                            >
+                                Create Invoice
+                            </Button>
+                            {invoices?.length && id && sowFullData ? (
+                                <PDFDownloadLink
+                                    document={
+                                        <JobInvoiceDocument
+                                            jobId={id}
+                                            jobDisplayId={jobData?.jobId ?? null}
+                                            jobName={jobName}
+                                            customerCategory={jobData?.customerCategory ?? undefined}
+                                            sow={sowFullData}
+                                            invoice={invoices[invoices.length - 1]}
+                                        />
+                                    }
+                                    fileName={`Invoice-${(invoices[invoices.length - 1]?.invoiceNumber ?? id) || id}.pdf`}
+                                    style={{ textDecoration: 'none', width: '100%' }}
+                                >
+                                    {({ loading }) => (
+                                        <Button color="primary" size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} sx={railBtnSx}>
+                                            {loading ? 'Loading invoice...' : 'Download Latest Invoice'}
+                                        </Button>
+                                    )}
+                                </PDFDownloadLink>
+                            ) : (
+                                <Button color="secondary" size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} disabled sx={railBtnSx}>
+                                    Download Latest Invoice
+                                </Button>
+                            )}
+                        </>
+                    }
+                    details={
+                        !invoices?.length ? (
+                            <Typography variant="body2" color="text.secondary">
+                                No invoices have been generated for this job yet.
+                            </Typography>
+                        ) : (
+                            <List dense>
+                                {invoices.map((inv: any, idx: number) => (
+                                    <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
+                                        <ListItemText
+                                            primary={
+                                                id && sowFullData ? (
+                                                    <PDFDownloadLink
+                                                        document={
+                                                            <JobInvoiceDocument
+                                                                jobId={id}
+                                                                jobDisplayId={jobData?.jobId ?? null}
+                                                                jobName={jobName}
+                                                                customerCategory={jobData?.customerCategory ?? undefined}
+                                                                sow={sowFullData}
+                                                                invoice={inv}
+                                                            />
+                                                        }
+                                                        fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
+                                                    >
+                                                        {({ loading }) =>
+                                                            loading
+                                                                ? 'Loading...'
+                                                                : `Invoice ${inv.invoiceNumber || ''}`.trim()
+                                                        }
+                                                    </PDFDownloadLink>
+                                                ) : (
+                                                    `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
+                                                )
+                                            }
+                                            secondary={
+                                                `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
+                                            }
+                                        />
+                                    </ListItem>
+                                ))}
+                            </List>
+                        )
+                    }
+                />
+
                 <CommentsSection 
                     jobId={id || ''}
                     currentUser={{
@@ -718,6 +860,7 @@ export default function TechnicianView() {
                     }}
                 />
 
+                {sowStatus.dialog}
                 {withdrawKind && (
                     <ReasonDialog
                         open

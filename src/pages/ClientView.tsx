@@ -1,12 +1,13 @@
 import React, { useState, useContext, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router';
 import { useQuery } from '@apollo/client';
-import { Box, Button, Card, CardContent, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, Divider } from '@mui/material';
+import { Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
 import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '../gql/queries';
 import SowCustomerView            from '../components/sow/SowCustomerView';
+import CollapsibleStatusCard      from '../components/CollapsibleStatusCard';
 import { CommentsSection }        from '../components/CommentsSection';
 import ResubmitJobModal          from '../components/ResubmitJobModal';
 import { diffJobGraphs, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -21,6 +22,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import ThumbUpIcon from '@mui/icons-material/ThumbUpAltOutlined';
 import { deriveCustomerLifecycle, validResponseAction } from '../utils/customerLifecycle';
 import type { CustomerActionRequired } from '../utils/jobReview';
+import { chipStatusBackground, invoiceVersionLabel } from '../utils/technicianProcessStatus';
 
 export default function Tracking() {
 
@@ -233,129 +235,162 @@ export default function Tracking() {
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}
                 </Typography>
-                <Alert severity={lifecycle.primaryAction ? 'warning' : 'info'} sx={{ my: 2 }}>
-                    {/* The derived prose says what to do; the raw state is what
-                        the customer quotes back to the lab when they call about
-                        this job, so it stays visible alongside it. */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                        <Typography fontWeight={700}>{lifecycle.title}</Typography>
-                        {job?.state && <Chip label={job.state} size="small" variant="outlined" />}
-                    </Box>
-                    <Typography variant="body2">{lifecycle.body}</Typography>
-                    <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>{id}</Typography>
-                </Alert>
-                <Box sx={{ mx: 3, fontSize: 13 }}>
+                <Box sx={{ mx: 3, fontSize: 13, mb: 2 }}>
                     <p><b>Time:</b>         {jobTime.slice(0, 16).replace('T', ' ')}</p>
                     <p><b>User:</b>         {workflowUsername} ({workflowEmail})</p>
                     <p><b>Organization:</b> {workflowInstitution}</p>
                 </Box>
-                {attachments.length > 0 && (
-                    <Box sx={{ mx: 3, my: 2 }}>
-                        <Typography variant="h6" sx={{ mb: 1 }}>Attachments</Typography>
-                        <List dense>
-                            {attachments.map((att, idx) => (
-                                <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
-                                    <ListItemText
-                                        primary={
-                                            att.url ? (
-                                                <MuiLink href={att.url} target="_blank" rel="noopener noreferrer">
-                                                    {att.filename}
-                                                </MuiLink>
-                                            ) : (
-                                                att.filename
-                                            )
-                                        }
-                                        secondary={
-                                            att.uploadedAt
-                                                ? new Date(att.uploadedAt).toLocaleString()
-                                                : undefined
-                                        }
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    </Box>
-                )}
-                {getParameterFiles().length > 0 && (
-                    <Box sx={{ mx: 3, my: 2 }}>
-                        <Typography variant="h6" sx={{ mb: 1 }}>Parameter Files</Typography>
-                        <List dense>
-                            {getParameterFiles().map((f, idx) => (
-                                <ListItem key={`${f.label}-${f.filename}-${idx}`} sx={{ pl: 0 }}>
-                                    <ListItemText
-                                        primary={
-                                            f.url ? (
-                                                <MuiLink href={f.url} target="_blank" rel="noopener noreferrer">
-                                                    {f.filename}
-                                                </MuiLink>
-                                            ) : (
-                                                f.filename
-                                            )
-                                        }
-                                        secondary={f.label}
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    </Box>
-                )}
-                <Box>
-                    <Box sx={{ flexDirection: 'column', pt: 1 }}>
-                        {workflowCard}
-                    </Box>
-                </Box>
 
-                {/* SOW Status Indicator and Viewer */}
+                <CollapsibleStatusCard
+                    title="Job"
+                    defaultExpanded
+                    titleExtra={id ? <Typography variant="body2" color="text.secondary">{id}</Typography> : undefined}
+                    statusPaneSx={{
+                        bgcolor: lifecycle.primaryAction
+                            ? 'rgba(255, 152, 0, 0.4)'
+                            : chipStatusBackground(job?.state === 'REJECTED' ? 'error' : 'info')
+                    }}
+                    statusPane={
+                        <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                <Typography variant="subtitle1" fontWeight={600}>{lifecycle.title}</Typography>
+                                {job?.state && <Chip label={job.state} size="small" variant="outlined" />}
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{lifecycle.body}</Typography>
+                        </Box>
+                    }
+                    details={
+                        <>
+                            {attachments.length > 0 && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Attachments</Typography>
+                                    <List dense>
+                                        {attachments.map((att, idx) => (
+                                            <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
+                                                <ListItemText
+                                                    primary={
+                                                        att.url ? (
+                                                            <MuiLink href={att.url} target="_blank" rel="noopener noreferrer">
+                                                                {att.filename}
+                                                            </MuiLink>
+                                                        ) : (
+                                                            att.filename
+                                                        )
+                                                    }
+                                                    secondary={
+                                                        att.uploadedAt
+                                                            ? new Date(att.uploadedAt).toLocaleString()
+                                                            : undefined
+                                                    }
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                </Box>
+                            )}
+                            {getParameterFiles().length > 0 && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Parameter Files</Typography>
+                                    <List dense>
+                                        {getParameterFiles().map((f, idx) => (
+                                            <ListItem key={`${f.label}-${f.filename}-${idx}`} sx={{ pl: 0 }}>
+                                                <ListItemText
+                                                    primary={
+                                                        f.url ? (
+                                                            <MuiLink href={f.url} target="_blank" rel="noopener noreferrer">
+                                                                {f.filename}
+                                                            </MuiLink>
+                                                        ) : (
+                                                            f.filename
+                                                        )
+                                                    }
+                                                    secondary={f.label}
+                                                />
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                </Box>
+                            )}
+                            {workflowCard}
+                        </>
+                    }
+                />
+
                 {visibleActiveSow && (
                     <Box ref={sowSectionRef} tabIndex={-1} sx={{ outline: 'none' }}>
                         <SowCustomerView jobId={id || ''} />
                     </Box>
                 )}
 
-                {/* Invoices */}
-                <Box sx={{ mx: 3, my: 2 }}>
-                    <Typography variant="h6" sx={{ mb: 1 }}>Invoices</Typography>
-                    {!invoices?.length ? (
-                        <Typography variant="body2" color="text.secondary">
-                            No invoices have been generated for this job yet.
-                        </Typography>
-                    ) : (
-                        <List dense>
-                            {invoices.map((inv: any, idx: number) => (
-                                <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
-                                    <ListItemText
-                                        primary={
-                                            id && sowFullData ? (
-                                                <PDFDownloadLink
-                                                    document={
-                                                        <JobInvoiceDocument
-                                                            jobId={id}
-                                                            jobDisplayId={data?.ownJobById?.jobId ?? null}
-                                                            jobName={jobName}
-                                                            customerCategory={data?.ownJobById?.customerCategory ?? undefined}
-                                                            sow={sowFullData}
-                                                            invoice={inv}
-                                                        />
-                                                    }
-                                                    fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
-                                                >
-                                                    {({ loading }) =>
-                                                        loading ? 'Loading...' : `Invoice ${inv.invoiceNumber || ''}`.trim()
-                                                    }
-                                                </PDFDownloadLink>
-                                            ) : (
-                                                `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
-                                            )
-                                        }
-                                        secondary={
-                                            `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
-                                        }
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    )}
-                </Box>
+                <CollapsibleStatusCard
+                    title="Invoices"
+                    defaultExpanded={invoices.length > 0}
+                    statusPaneSx={{ bgcolor: chipStatusBackground(invoices.length ? 'info' : 'default') }}
+                    statusPane={
+                        invoices.length ? (
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight={600}>
+                                    {invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    Latest {invoiceVersionLabel(invoices)}
+                                    {invoices[invoices.length - 1]?.totalCost != null
+                                        ? ` · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
+                                        : ''}
+                                </Typography>
+                            </Box>
+                        ) : (
+                            <Box>
+                                <Typography variant="subtitle1" fontWeight={600}>No invoices yet</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    No invoices have been generated for this job yet.
+                                </Typography>
+                            </Box>
+                        )
+                    }
+                    details={
+                        invoices.length ? (
+                            <List dense>
+                                {invoices.map((inv: any, idx: number) => (
+                                    <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
+                                        <ListItemText
+                                            primary={
+                                                id && sowFullData ? (
+                                                    <PDFDownloadLink
+                                                        document={
+                                                            <JobInvoiceDocument
+                                                                jobId={id}
+                                                                jobDisplayId={data?.ownJobById?.jobId ?? null}
+                                                                jobName={jobName}
+                                                                customerCategory={data?.ownJobById?.customerCategory ?? undefined}
+                                                                sow={sowFullData}
+                                                                invoice={inv}
+                                                            />
+                                                        }
+                                                        fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
+                                                    >
+                                                        {({ loading }) =>
+                                                            loading ? 'Loading...' : `Invoice ${inv.invoiceNumber || ''}`.trim()
+                                                        }
+                                                    </PDFDownloadLink>
+                                                ) : (
+                                                    `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
+                                                )
+                                            }
+                                            secondary={
+                                                `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
+                                            }
+                                        />
+                                    </ListItem>
+                                ))}
+                            </List>
+                        ) : (
+                            <Typography variant="body2" color="text.secondary">
+                                Invoices will appear here when the lab issues them.
+                            </Typography>
+                        )
+                    }
+                />
 
                 {/* Comments Section */}
                 <CommentsSection

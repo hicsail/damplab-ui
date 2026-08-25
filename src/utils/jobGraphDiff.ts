@@ -48,6 +48,8 @@ export interface JobVersionLike {
     jobState?: string | null;
     /** True for a state-change record rather than a graph edit; its graph is a copy of its predecessor's. */
     isEvent?: boolean | null;
+    /** False on staff-only drafts; omitted or true once the customer can see it. */
+    visibleToCustomer?: boolean | null;
 }
 
 export interface ParamDiff {
