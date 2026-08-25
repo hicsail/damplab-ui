@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext, useCallback } from 'react'
 import { Link, useLocation, useMatch, useNavigate } from "react-router";
-import { AppBar, Button, IconButton, Toolbar, Alert, Tooltip } from '@mui/material';
+import { AppBar, Button, Toolbar, Alert, Tooltip } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -145,7 +145,7 @@ export default function HeaderBar() {
                     <Button onClick={() => navigate("/")} style={{ textDecoration: 'none', color: 'white', textTransform: 'none'}}>
                         <img src="damp-white-text.svg" style={{height: '45px'}} alt="DAMP Logo"/>
                         <span style={{marginLeft: '15px', fontSize: 21, fontWeight: 'bold', color: '#8fb5ba', marginBottom: '-2px'}}>  {/*cyan: #8fb5ba, pink: #e04462*/}
-                            WORKFLOW<span style={{fontWeight: '200'}}>designer</span>
+                            Canvas
                         </span>
                         <span style={{fontSize: 15, marginLeft: '10px', marginBottom: '-7px'}}>
                             v1.0
@@ -187,18 +187,22 @@ export default function HeaderBar() {
 
                         { isResubmitting
                         ? <Link to={isStaff ? "/staff_submit" : "/checkout"} className="a a--hover a--active">Resubmit...</Link>
-                        : <IconButton
+                        : <Button
                             onClick={() => navigate(isStaff ? "/staff_submit" : "/checkout")}
-                            title={isStaff ? "Staff: submit job for client (skip checkout review)" : "Checkout page"}
-                            aria-controls='menu-appbar'
-                            aria-haspopup='true'
+                            title={isStaff ? "Staff: submit job for client (skip checkout review)" : "Checkout"}
+                            variant="outlined"
+                            size="small"
+                            startIcon={isStaff ? <SupervisorAccountOutlinedIcon /> : <ShoppingCartOutlinedIcon />}
+                            sx={{
+                                color: 'white',
+                                borderColor: 'rgba(255,255,255,0.5)',
+                                textTransform: 'none',
+                                fontSize: 12,
+                                whiteSpace: 'nowrap',
+                            }}
                           >
-                            {isStaff ? (
-                              <SupervisorAccountOutlinedIcon style={{color: 'white'}}/>
-                            ) : (
-                              <ShoppingCartOutlinedIcon style={{color: 'white'}}/>
-                            )}
-                          </IconButton>}
+                            Checkout
+                          </Button>}
                         </>}
 
                     </div>
