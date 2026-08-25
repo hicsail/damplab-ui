@@ -33,53 +33,22 @@ describe('reviewDecisions', () => {
     expect(reviewDecisions('SUBMITTED').map((d) => d.value)).toEqual(['accept', 'clarify', 'edits', 'approval']);
   });
 
-  it('gives every decision a plain-text header — comments are not markdown', () => {
-    for (const d of reviewDecisions('SUBMITTED')) {
-      expect(d.commentHeader.length).toBeGreaterThan(0);
-      expect(d.commentHeader).not.toMatch(/[*_#`]/);
-    }
-  });
-
-  it('routes accept to ACCEPTED and every request back to the customer', () => {
+  it('maps every choice directly to the backend decision literal', () => {
     const byValue = Object.fromEntries(reviewDecisions('SUBMITTED').map((d) => [d.value, d]));
-    expect(byValue.accept.nextState).toBe('ACCEPTED');
-    expect(byValue.clarify.nextState).toBe('CHANGES_REQUESTED');
-    expect(byValue.edits.nextState).toBe('CHANGES_REQUESTED');
-    expect(byValue.approval.nextState).toBe('CHANGES_REQUESTED');
+    expect(byValue.accept.decision).toBe('ACCEPT');
+    expect(byValue.clarify.decision).toBe('REQUEST_CLARIFICATION');
+    expect(byValue.edits.decision).toBe('REQUEST_EDITS');
+    expect(byValue.approval.decision).toBe('REQUEST_APPROVAL');
   });
 
-  it('enables editing only where the customer is being asked to change the design', () => {
+  it('states each deterministic customer action without exposing an editing choice', () => {
     const byValue = Object.fromEntries(reviewDecisions('SUBMITTED').map((d) => [d.value, d]));
-    expect(byValue.edits.defaultEditingEnabled).toBe(true);
-    expect(byValue.accept.defaultEditingEnabled).toBe(false);
-    expect(byValue.clarify.defaultEditingEnabled).toBe(false);
-    expect(byValue.approval.defaultEditingEnabled).toBe(false);
-  });
-
-  it('hides the editing control under accept, locks it on for design edits, and leaves it free otherwise', () => {
-    const byValue = Object.fromEntries(reviewDecisions('SUBMITTED').map((d) => [d.value, d]));
-    expect(byValue.accept.editingControl).toBe('hidden');
-    expect(byValue.edits.editingControl).toBe('locked');
-    expect(byValue.clarify.editingControl).toBe('choice');
-    expect(byValue.approval.editingControl).toBe('choice');
-  });
-
-  it('cannot request design edits without granting editing', () => {
-    const edits = reviewDecision('edits', 'SUBMITTED');
-    expect(edits.editingControl).toBe('locked');
-    expect(edits.defaultEditingEnabled).toBe(true);
-  });
-
-  it('never shows an editing control that the transition would immediately undo', () => {
-    for (const d of reviewDecisions('SUBMITTED')) {
-      if (d.nextState !== 'CHANGES_REQUESTED') expect(d.editingControl).toBe('hidden');
-    }
-  });
-
-  it('locks the control only in the on position — a locked-off box would just be a hidden one', () => {
-    for (const d of reviewDecisions('SUBMITTED')) {
-      if (d.editingControl === 'locked') expect(d.defaultEditingEnabled).toBe(true);
-      if (d.editingControl === 'hidden') expect(d.defaultEditingEnabled).toBe(false);
+    expect(byValue.clarify.note).toMatch(/reply.*cannot edit/i);
+    expect(byValue.edits.note).toMatch(/edit.*submit/i);
+    expect(byValue.approval.note).toMatch(/approve.*cannot edit/i);
+    for (const decision of Object.values(byValue)) {
+      expect(decision).not.toHaveProperty('editingControl');
+      expect(decision).not.toHaveProperty('defaultEditingEnabled');
     }
   });
 
@@ -91,29 +60,10 @@ describe('reviewDecisions', () => {
     expect(byValue.approval.messageRequired).toBe(true);
   });
 
-  it('leaves no decision silent: it either requires a message or stands on its header', () => {
-    for (const state of ['SUBMITTED', 'CHANGES_REQUESTED', 'ACCEPTED']) {
-      for (const d of reviewDecisions(state)) {
-        expect(d.messageRequired || d.commentHeader.trim().length > 0).toBe(true);
-      }
-    }
-  });
-
-  it('carries no canned message — an unwritten decision is its header alone', () => {
-    for (const d of reviewDecisions('SUBMITTED')) {
-      expect(d).not.toHaveProperty('defaultMessage');
-    }
-  });
-
   it('carries the accept wording through from jobReviewLabels', () => {
     const accept = reviewDecision('accept', 'ACCEPTED');
     expect(accept.optionLabel).toBe(jobReviewLabels('ACCEPTED').acceptOption);
     expect(accept.buttonLabel).toBe('Re-accept');
-  });
-
-  it('names an approval request distinctly in the version history', () => {
-    expect(reviewDecision('approval', 'SUBMITTED').historyNote).toBe('Approval requested');
-    expect(reviewDecision('edits', 'SUBMITTED').historyNote).toBe('Changes requested');
   });
 
   it('exposes the decision values as a stable list', () => {

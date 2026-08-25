@@ -1,3 +1,5 @@
+import type { CustomerActionRequired } from './jobReview';
+
 /**
  * Client mirror of the backend's job-editing gate (see job-editing.ts there).
  *
@@ -6,14 +8,17 @@
  * locked. The server is the enforcement; this only decides what to offer, and
  * offering an editor that the save will reject is the worse failure.
  */
+export type { CustomerActionRequired } from './jobReview';
+
 export interface JobEditingFacts {
     state?: string | null;
     customerEditingEnabled?: boolean | null;
+    customerActionRequired?: CustomerActionRequired | null;
 }
 
 /** Whether the job's owner may currently change its workflow graph. */
 export function customerMayEdit(job: JobEditingFacts | null | undefined): boolean {
-    return job?.customerEditingEnabled === true;
+    return job?.state === 'CHANGES_REQUESTED' && job.customerEditingEnabled === true;
 }
 
 /** Whether the job is sitting with the customer rather than the lab. */
@@ -21,12 +26,35 @@ export function jobIsWithCustomer(job: JobEditingFacts | null | undefined): bool
     return job?.state === 'CHANGES_REQUESTED';
 }
 
+function needsAction(job: JobEditingFacts | null | undefined, action: CustomerActionRequired): boolean {
+    return jobIsWithCustomer(job) && job?.customerActionRequired === action;
+}
+
+export function needsReply(job: JobEditingFacts | null | undefined): boolean {
+    return needsAction(job, 'REPLY');
+}
+
+export function needsWorkflowEdit(job: JobEditingFacts | null | undefined): boolean {
+    return needsAction(job, 'EDIT_WORKFLOW');
+}
+
+export function needsWorkflowApproval(job: JobEditingFacts | null | undefined): boolean {
+    return needsAction(job, 'APPROVE_WORKFLOW');
+}
+
 /**
  * The customer is being asked to sign off on the lab's edits, rather than to
  * make edits of their own: the job is theirs to act on but not to change.
  */
 export function awaitingCustomerApproval(job: JobEditingFacts | null | undefined): boolean {
-    return jobIsWithCustomer(job) && !customerMayEdit(job);
+    return needsWorkflowApproval(job);
+}
+
+export function technicianCustomerActionCopy(job: JobEditingFacts | null | undefined): string {
+    if (needsReply(job)) return 'Waiting for the customer to reply to the lab.';
+    if (needsWorkflowEdit(job)) return 'The customer can edit the workflow and resubmit it.';
+    if (needsWorkflowApproval(job)) return 'Waiting for the customer’s workflow approval.';
+    return 'The requested customer action is unavailable. Review this legacy job before continuing.';
 }
 
 /**
@@ -43,7 +71,10 @@ export function editingBlockedMessage(job: JobEditingFacts | null | undefined): 
         case 'ACCEPTED':
             return `This job has been accepted by the DAMP Lab and can no longer be edited. ${seeComments}`;
         case 'CHANGES_REQUESTED':
-            return `Editing is not enabled for this job — the lab has asked you to approve it rather than change it. ${seeComments}`;
+            if (needsReply(job)) return `Editing is not enabled for this job — the lab is waiting for your reply. ${seeComments}`;
+            if (needsWorkflowApproval(job)) return `Editing is not enabled for this job — the lab has asked you to approve it rather than change it. ${seeComments}`;
+            if (needsWorkflowEdit(job)) return `The lab asked you to edit this job, but editing is not currently enabled. Reload the job or contact the lab. ${seeComments}`;
+            return `Editing is not enabled for this job. ${seeComments}`;
         case 'CLOSED':
             return `This job is closed and can no longer be edited. ${seeComments}`;
         default:

@@ -17,7 +17,8 @@ import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
-import { customerMayEdit } from '../utils/jobEditing';
+import { technicianCustomerActionCopy } from '../utils/jobEditing';
+import { refreshReviewSurfaces } from '../utils/jobReview';
 import JobPDFDocument             from '../components/JobPDFDocument';
 import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SowEditorModal             from '../components/sow/SowEditorModal';
@@ -162,6 +163,13 @@ export default function TechnicianView() {
         setModalOpen(false);
     };
 
+    const handleReviewSubmitted = () =>
+        refreshReviewSurfaces({
+            refetchJob,
+            refetchSow,
+            refetchSowEditorState: () => apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] })
+        });
+
     /**
      * "Generate SOW" on a job that has none creates it first, then opens the
      * editor on it — the editor edits an existing document and has nothing to
@@ -252,11 +260,7 @@ export default function TechnicianView() {
         const acceptText = "The job was accepted by the DAMP Lab. The client will be asked to sign and return the SOW.";
         const rejectText=  "The job was rejected by the DAMP Lab. The client will be asked to resubmit the job with changes.";
         const closedText = "This job has been closed out. It is no longer active in the lab monitor.";
-        // CHANGES_REQUESTED now covers two different asks, told apart by whether
-        // the client can actually change anything.
-        const changesText = customerMayEdit(jobData)
-            ? "Changes were requested from the client. They can edit the workflow and resubmit."
-            : "The job is with the client for approval. They can view and approve it, but not edit it.";
+        const changesText = technicianCustomerActionCopy(jobData);
         const defaultText = "Invalid Case";
         switch (jobState) {
             case 'SUBMITTED':
@@ -661,7 +665,7 @@ export default function TechnicianView() {
                 <JobFeedbackModal
                     open={modalOpen}
                     onClose={handleCloseModal}
-                    onSubmitted={refetchJob}
+                    onSubmitted={handleReviewSubmitted}
                     id={id}
                     jobName={jobName}
                     jobUsername={jobUsername}

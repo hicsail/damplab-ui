@@ -175,6 +175,8 @@ export interface SowVersion {
   note?: string | null;
   createdByName: string;
   createdAt: string;
+  sourceJobVersionNumber?: number | null;
+  sourceContractFingerprint?: string | null;
   clientSignature?: SowConsent | null;
   staffSignature?: SowConsent | null;
   fields: SowField[];
@@ -188,11 +190,15 @@ export interface SowVersion {
  */
 export type DocumentBlocker =
   | 'NOT_ACCEPTED'
+  | 'ACCEPTED_SOURCE_UNAVAILABLE'
   | 'JOB_CHANGED_SINCE_ACCEPTANCE'
+  | 'SOW_SOURCE_MISMATCH'
   | 'DOCUMENT_STALE'
   | 'DRAFT_INCOMPLETE'
   | 'NO_DRAFT_TO_SEND'
   | 'UNSENT_DRAFT'
+  | 'STALE_SIGN_VERSION'
+  | 'AWAITING_SENT_VERSION'
   | 'AWAITING_CUSTOMER_SIGNATURE';
 
 /**
@@ -200,6 +206,14 @@ export type DocumentBlocker =
  * They belong in a button's tooltip, never in a "here is what to do" checklist.
  */
 export const SETTLED_BLOCKERS: readonly DocumentBlocker[] = ['NO_DRAFT_TO_SEND', 'AWAITING_CUSTOMER_SIGNATURE'];
+
+export function isSettledBlocker(blocker: DocumentBlocker): boolean {
+  return SETTLED_BLOCKERS.includes(blocker);
+}
+
+export function repairBlockers(blockers: readonly DocumentBlocker[]): DocumentBlocker[] {
+  return blockers.filter((blocker) => !isSettledBlocker(blocker));
+}
 
 /**
  * The step text for a blocker, with a fallback.
@@ -213,9 +227,46 @@ export function blockerStep(blocker: DocumentBlocker): string {
   return BLOCKER_STEP[blocker] ?? 'This SOW is not ready to move on yet.';
 }
 
+const CUSTOMER_BLOCKER_MESSAGE: Record<DocumentBlocker, string> = {
+  NOT_ACCEPTED: 'The lab is still preparing this Statement of Work.',
+  ACCEPTED_SOURCE_UNAVAILABLE: 'The lab must issue an updated Statement of Work before you can sign.',
+  JOB_CHANGED_SINCE_ACCEPTANCE: 'The lab must issue an updated Statement of Work before you can sign.',
+  SOW_SOURCE_MISMATCH: 'The lab must issue an updated Statement of Work before you can sign.',
+  DOCUMENT_STALE: 'The lab must update this Statement of Work before you can sign.',
+  DRAFT_INCOMPLETE: 'The lab is still completing this Statement of Work.',
+  NO_DRAFT_TO_SEND: 'This Statement of Work is not available to sign.',
+  UNSENT_DRAFT: 'The lab is preparing a revised Statement of Work.',
+  STALE_SIGN_VERSION: 'A newer Statement of Work is available. Reload this job to continue.',
+  AWAITING_SENT_VERSION: 'The lab is preparing a revised Statement of Work.',
+  AWAITING_CUSTOMER_SIGNATURE: 'This Statement of Work is waiting for your signature.'
+};
+
+/** Customer-safe copy: never exposes the staff-only repair checklist. */
+export function customerBlockerMessage(blocker: DocumentBlocker): string {
+  return CUSTOMER_BLOCKER_MESSAGE[blocker] ?? 'This Statement of Work is not available to sign right now.';
+}
+
+export function customerSigningState(input: {
+  isActive: boolean;
+  status?: SowStatus | null;
+  canSign?: boolean | null;
+  signBlockers?: readonly DocumentBlocker[] | null;
+}): { enabled: boolean; blockerMessage: string | null } {
+  const isSignableVersion = input.isActive && input.status === 'SENT';
+  const blockersLoaded = Array.isArray(input.signBlockers);
+  const enabled = isSignableVersion && input.canSign === true && blockersLoaded && input.signBlockers!.length === 0;
+  const firstBlocker = isSignableVersion && blockersLoaded ? input.signBlockers![0] : undefined;
+  return {
+    enabled,
+    blockerMessage: firstBlocker ? customerBlockerMessage(firstBlocker) : null
+  };
+}
+
 export interface SowActionGate {
   canSend: boolean;
   sendBlockers: DocumentBlocker[];
+  canSign: boolean;
+  signBlockers: DocumentBlocker[];
   canCountersign: boolean;
   countersignBlockers: DocumentBlocker[];
   missingFields: string[];
@@ -224,11 +275,15 @@ export interface SowActionGate {
 /** What each blocker asks staff to do, in the words the banner and button use. */
 export const BLOCKER_STEP: Record<DocumentBlocker, string> = {
   NOT_ACCEPTED: 'Use Review Job to accept it, so the spec these prices come from is agreed before the customer sees them.',
-  JOB_CHANGED_SINCE_ACCEPTANCE: 'The job changed after it was accepted. Use Review Job to re-accept it, or to hand it back to the customer.',
+  ACCEPTED_SOURCE_UNAVAILABLE: 'Use Review Job to re-accept it, save a fresh draft, and reissue it.',
+  JOB_CHANGED_SINCE_ACCEPTANCE: 'The job changed after it was accepted. Use Review Job to re-accept it, save a fresh draft, and reissue it.',
+  SOW_SOURCE_MISMATCH: 'This SOW does not match the accepted job version. Re-accept the job, save a fresh draft, and reissue it.',
   DOCUMENT_STALE: "Recalculate the Fee Schedule and save — this document still bills the job's earlier figures.",
   DRAFT_INCOMPLETE: 'Fill in the required sections.',
   NO_DRAFT_TO_SEND: 'This version has already been issued. Edit the document to start a new draft.',
   UNSENT_DRAFT: 'Send the revised version and have the customer sign it.',
+  STALE_SIGN_VERSION: 'Reload the latest version before signing.',
+  AWAITING_SENT_VERSION: 'Wait for the lab to reissue the sent document.',
   AWAITING_CUSTOMER_SIGNATURE: 'Waiting for the customer to sign.'
 };
 
@@ -246,7 +301,7 @@ export interface SowEditorState {
   /** Which lifecycle actions this SOW permits, and what is in the way of each. Enforced server-side too. */
   actionGate?: SowActionGate | null;
   currentVersion?: SowVersion | null;
-  activeVersion?: { versionNumber: number; displayVersion?: string | null; status: SowStatus } | null;
+  activeVersion?: Pick<SowVersion, 'versionNumber' | 'displayVersion' | 'status' | 'visibleToCustomer' | 'sourceJobVersionNumber' | 'sourceContractFingerprint'> | null;
   versions?: SowVersion[];
 }
 

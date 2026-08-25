@@ -116,12 +116,9 @@ export default function JobEditor() {
     const isHistoric = !saving && latest != null && viewing != null && viewing !== latest.versionNumber;
 
     /** Not the customer's to change right now.
-     *  Mirrors the server rule in job.resolver.saveJobWorkflows exactly, so the
-     *  canvas is never editable in a way the save would reject. Keyed on the
-     *  editing flag rather than the state: a job can sit with the customer for
-     *  approval without being theirs to edit, and the flag is cleared server-side
-     *  the moment they hand it back (see editingClosedByTransition), so following
-     *  the editor link in an old comment after resubmitting lands read only. */
+     *  Mirrors the server gate exactly: both CHANGES_REQUESTED and the explicit
+     *  editing grant are required. A stale true flag in any other lifecycle state
+     *  therefore remains read-only. */
     const lockedToLab = !isStaff && job != null && !customerMayEdit(job);
 
     /** What to show when a save is refused.

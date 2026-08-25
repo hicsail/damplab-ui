@@ -1,5 +1,5 @@
 import { diffVersions, VersionDiff } from '../../utils/sowDiff';
-import { blockerStep, SowActionGate, SowField, SowStatus, SowVersion, SowVersionInputs } from './sowTypes';
+import { blockerStep, repairBlockers, SowActionGate, SowField, SowStatus, SowVersion, SowVersionInputs, type DocumentBlocker } from './sowTypes';
 
 /** Client-only working copy — never persisted as a version number. */
 export const UNSAVED_VIEW = 'unsaved' as const;
@@ -115,6 +115,32 @@ export type SowNextAction =
   | { kind: 'send'; label: string }
   | { kind: 'countersign'; label: string }
   | { kind: 'blocked'; label: string; reason?: string };
+
+export function statusCardRepair(input: {
+  currentStatus?: SowStatus | null;
+  activeStatus?: SowStatus | null;
+  hasUnsentDraft: boolean;
+  gate?: SowActionGate | null;
+}): { title: string; blockers: DocumentBlocker[] } | null {
+  let title: string;
+  let blockers: readonly DocumentBlocker[];
+
+  if (input.hasUnsentDraft && input.currentStatus === 'DRAFT') {
+    title = 'Not ready to send';
+    blockers = input.gate?.sendBlockers ?? [];
+  } else if (input.activeStatus === 'SENT') {
+    title = 'Customer cannot sign';
+    blockers = input.gate?.signBlockers ?? [];
+  } else if (!input.hasUnsentDraft && input.activeStatus === 'SIGNED') {
+    title = 'Not ready to countersign';
+    blockers = input.gate?.countersignBlockers ?? [];
+  } else {
+    return null;
+  }
+
+  const repair = repairBlockers(blockers);
+  return repair.length > 0 ? { title, blockers: repair } : null;
+}
 
 /**
  * The one thing staff can do next.

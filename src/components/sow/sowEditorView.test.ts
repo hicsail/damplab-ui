@@ -12,7 +12,8 @@ import {
   editorDiff,
   pdfSourceVersion,
   revertIsEnabled,
-  cloneVersionDocument
+  cloneVersionDocument,
+  statusCardRepair
 } from './sowEditorView';
 import { SowField, SowStatus, SowVersion, SowVersionInputs } from './sowTypes';
 
@@ -318,5 +319,39 @@ describe('nextSowAction', () => {
   it('treats a missing gate as blocking rather than permitting', () => {
     expect(nextSowAction({ ...base, gate: null }).kind).toBe('blocked');
     expect(nextSowAction({ ...base, status: 'SIGNED', activeStatus: 'SIGNED', gate: null }).kind).toBe('blocked');
+  });
+});
+
+describe('statusCardRepair', () => {
+  const gate = {
+    canSend: false,
+    sendBlockers: ['DRAFT_INCOMPLETE'],
+    canSign: false,
+    signBlockers: ['SOW_SOURCE_MISMATCH'],
+    canCountersign: false,
+    countersignBlockers: ['JOB_CHANGED_SINCE_ACCEPTANCE'],
+    missingFields: []
+  } as any;
+
+  it('uses send blockers for an unsent current draft', () => {
+    expect(statusCardRepair({ currentStatus: 'DRAFT', activeStatus: 'SENT', hasUnsentDraft: true, gate })).toEqual({
+      title: 'Not ready to send',
+      blockers: ['DRAFT_INCOMPLETE']
+    });
+  });
+
+  it('uses sign blockers when the active sent version cannot be signed', () => {
+    expect(statusCardRepair({ currentStatus: 'SENT', activeStatus: 'SENT', hasUnsentDraft: false, gate })).toEqual({
+      title: 'Customer cannot sign',
+      blockers: ['SOW_SOURCE_MISMATCH']
+    });
+  });
+
+  it('uses countersign blockers for a signed active version only when no newer draft exists', () => {
+    expect(statusCardRepair({ currentStatus: 'SIGNED', activeStatus: 'SIGNED', hasUnsentDraft: false, gate })).toEqual({
+      title: 'Not ready to countersign',
+      blockers: ['JOB_CHANGED_SINCE_ACCEPTANCE']
+    });
+    expect(statusCardRepair({ currentStatus: 'DRAFT', activeStatus: 'SIGNED', hasUnsentDraft: true, gate })?.title).toBe('Not ready to send');
   });
 });

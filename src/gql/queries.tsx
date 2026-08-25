@@ -103,6 +103,10 @@ export const GET_JOB_BY_ID = gql`
             customerCategory
             state
             customerEditingEnabled
+            customerActionRequired
+            acceptedJobVersionNumber
+            acceptedContractFingerprint
+            acceptedBillingFingerprint
             submitted
             notes
             attachments {
@@ -220,6 +224,10 @@ export const GET_OWN_JOB_BY_ID = gql`
             customerCategory
             state
             customerEditingEnabled
+            customerActionRequired
+            acceptedJobVersionNumber
+            acceptedContractFingerprint
+            acceptedBillingFingerprint
             submitted
             notes
             attachments {
@@ -393,6 +401,8 @@ export const ACTIVITY_EVENTS = gql`
       message
       actorDisplayName
       jobId
+      sowId
+      sowVersionNumber
       workflowId
       workflowNodeId
       serviceName
@@ -853,6 +863,17 @@ export const GET_SOW_BY_JOB_ID = gql`
       updatedAt
       createdBy
       status
+      activeVersion {
+        versionNumber
+        status
+        visibleToCustomer
+        sourceJobVersionNumber
+        sourceContractFingerprint
+      }
+      actionGate {
+        canSign
+        signBlockers
+      }
       clientSignature {
         name
         title
@@ -1412,6 +1433,8 @@ export const SOW_VERSION_FIELDS = gql`
         note
         createdByName
         createdAt
+        sourceJobVersionNumber
+        sourceContractFingerprint
         clientSignature { name signedAt consentedGroups sectionInitials { key label initials } legacySignatureDataUrl }
         staffSignature { name signedAt sectionInitials { key label initials } legacySignatureDataUrl }
         fields {
@@ -1457,9 +1480,9 @@ export const GET_SOW_EDITOR_STATE = gql`
             documentStale
             liveCustomerCategory
             liveServices { serviceId name description cost unitCost multiplier runCount }
-            actionGate { canSend sendBlockers canCountersign countersignBlockers missingFields }
+            actionGate { canSend sendBlockers canSign signBlockers canCountersign countersignBlockers missingFields }
             currentVersion { ...SowVersionFields }
-            activeVersion { versionNumber displayVersion status }
+            activeVersion { versionNumber displayVersion status visibleToCustomer sourceJobVersionNumber sourceContractFingerprint }
             versions { ...SowVersionFields }
         }
     }

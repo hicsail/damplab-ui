@@ -29,6 +29,8 @@ interface ActivityEvent {
   message: string;
   actorDisplayName?: string | null;
   jobId?: string | null;
+  sowId?: string | null;
+  sowVersionNumber?: number | null;
   workflowId?: string | null;
   workflowNodeId?: string | null;
   serviceName?: string | null;

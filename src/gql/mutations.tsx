@@ -165,6 +165,34 @@ export const SET_JOB_CUSTOMER_EDITING = gql`
     }
 `;
 
+export const REVIEW_JOB = gql`
+    mutation ReviewJob($input: ReviewJobInput!) {
+        reviewJob(input: $input) {
+            id
+            state
+            customerEditingEnabled
+            customerActionRequired
+            acceptedJobVersionNumber
+            acceptedContractFingerprint
+            acceptedBillingFingerprint
+        }
+    }
+`;
+
+export const RESPOND_TO_JOB_REVIEW = gql`
+    mutation RespondToJobReview($input: RespondToJobReviewInput!) {
+        respondToJobReview(input: $input) {
+            id
+            state
+            customerEditingEnabled
+            customerActionRequired
+            acceptedJobVersionNumber
+            acceptedContractFingerprint
+            acceptedBillingFingerprint
+        }
+    }
+`;
+
 export const MUTATE_JOB_STATE = gql`
     mutation changeJobState($ID: ID!, $State: JobState!, $Note: String) {
         changeJobState(

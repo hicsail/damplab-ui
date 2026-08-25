@@ -1,3 +1,5 @@
+import type { JobReviewDecision } from '../utils/jobReview';
+
 /**
  * Wording for the accept option in the staff Review Job modal.
  *
@@ -69,55 +71,14 @@ export type ReviewDecisionValue = (typeof REVIEW_DECISIONS)[number];
 
 export interface ReviewDecisionSpec {
   value: ReviewDecisionValue;
+  decision: JobReviewDecision;
   optionLabel: string;
   buttonLabel: string;
   /** Shown under the option once chosen, to spell out consequences. Null when there are none worth calling out. */
   note: string | null;
-  /**
-   * Prefixed to the comment so the customer can see which decision this was.
-   *
-   * Plain text on purpose: comment bodies are not markdown (CommentBody only
-   * linkifies `[label](url)` and bare URLs), so any `**` would render literally.
-   */
-  commentHeader: string;
-  /**
-   * True where staff must write something. Where false the header stands alone:
-   * "Lab decision: Job accepted" is the whole message, and inventing a canned
-   * body to sit under it would only pad the comment with words no one chose.
-   */
+  /** Only acceptance permits an empty note. */
   messageRequired: boolean;
-  nextState: 'ACCEPTED' | 'CHANGES_REQUESTED';
-  /**
-   * How the "let the customer edit" checkbox behaves for this decision.
-   *
-   *  - `hidden`  — the control cannot mean anything. Accepting returns the job to
-   *    the lab, and editingClosedByTransition closes editing on any move out of
-   *    CHANGES_REQUESTED, so a ticked box would be undone a moment later. Better
-   *    to show no control than one that does not hold.
-   *  - `locked`  — shown, ticked, and not clickable. Asking the customer to edit
-   *    the design while denying them the editor is a self-contradiction, so the
-   *    grant is part of the decision rather than a box to remember.
-   *  - `choice`  — genuinely staff's call.
-   *
-   * Only ever locked *on*: a locked-off box tells the reader nothing a hidden one
-   * would not, while implying a choice exists.
-   */
-  editingControl: 'hidden' | 'locked' | 'choice';
-  /**
-   * Whether the customer ends up able to edit.
-   *
-   * On only for a design-edit request, the one decision that is an invitation to
-   * change the canvas. A clarification is a question — it is answered in the
-   * comments, not by reopening the editor — and being asked to approve someone
-   * else's edit is not an invitation to make your own. Staff can tick the box in
-   * both of those; the point is that they choose it rather than inherit it.
-   */
-  defaultEditingEnabled: boolean;
-  /** Version-history label, so an approval request does not read as "Changes requested". */
-  historyNote: string;
 }
-
-const CUSTOMER_EDITOR_LINK_STATE = 'CHANGES_REQUESTED';
 
 export function reviewDecisions(jobState: string | null | undefined): ReviewDecisionSpec[] {
   const accept = jobReviewLabels(jobState);
@@ -125,51 +86,35 @@ export function reviewDecisions(jobState: string | null | undefined): ReviewDeci
   return [
     {
       value: 'accept',
+      decision: 'ACCEPT',
       optionLabel: accept.acceptOption,
       buttonLabel: accept.acceptButton,
       note: accept.acceptNote,
-      commentHeader: 'Lab decision: Job accepted',
-      messageRequired: false,
-      nextState: 'ACCEPTED',
-      editingControl: 'hidden',
-      defaultEditingEnabled: false,
-      historyNote: 'Accepted'
+      messageRequired: false
     },
     {
       value: 'clarify',
+      decision: 'REQUEST_CLARIFICATION',
       optionLabel: 'Request clarification',
       buttonLabel: 'Submit Decision',
-      note: null,
-      commentHeader: 'Lab decision: Clarification requested',
-      messageRequired: true,
-      nextState: CUSTOMER_EDITOR_LINK_STATE,
-      editingControl: 'choice',
-      defaultEditingEnabled: false,
-      historyNote: 'Changes requested'
+      note: 'The customer will be asked to reply. They can view the workflow but cannot edit it.',
+      messageRequired: true
     },
     {
       value: 'edits',
+      decision: 'REQUEST_EDITS',
       optionLabel: 'Request design edits',
       buttonLabel: 'Submit Decision',
-      note: null,
-      commentHeader: 'Lab decision: Design edits requested',
-      messageRequired: true,
-      nextState: CUSTOMER_EDITOR_LINK_STATE,
-      editingControl: 'locked',
-      defaultEditingEnabled: true,
-      historyNote: 'Changes requested'
+      note: 'The customer can edit the workflow and submit the updated workflow for review.',
+      messageRequired: true
     },
     {
       value: 'approval',
+      decision: 'REQUEST_APPROVAL',
       optionLabel: 'Request approval of edits',
       buttonLabel: 'Request Approval',
-      note: 'Hands the job back so the customer can approve edits the lab made. They see the job and can approve it, but cannot change it unless you also enable editing below.',
-      commentHeader: 'Lab decision: Your approval requested',
-      messageRequired: true,
-      nextState: CUSTOMER_EDITOR_LINK_STATE,
-      editingControl: 'choice',
-      defaultEditingEnabled: false,
-      historyNote: 'Approval requested'
+      note: 'The customer can view and approve the lab’s edits, but cannot edit the workflow.',
+      messageRequired: true
     }
   ];
 }

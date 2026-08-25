@@ -7,7 +7,8 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 import { GET_SOW_EDITOR_STATE } from '../../gql/queries';
 import SowPdfDocument from './SowPdfDocument';
 import SowSignaturesSummary from './SowSignaturesSummary';
-import { blockerStep, type DocumentBlocker, SETTLED_BLOCKERS, SowEditorState, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
+import { blockerStep, type DocumentBlocker, SowEditorState, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
+import { statusCardRepair } from './sowEditorView';
 
 /**
  * Staff-side summary of a job's SOW: where it stands, who has signed, and whether
@@ -31,18 +32,13 @@ export default function SowStatusCard({ jobId, onOpenEditor }: Props): React.JSX
   const active = (sow.versions ?? []).find((v) => v.versionNumber === sow.activeVersionNumber) ?? null;
   const current = sow.currentVersion ?? null;
   const hasUnsentDraft = sow.currentVersionNumber > sow.activeVersionNumber;
-  // The card is the pre-editor view, so it shows whichever stage the SOW is
-  // actually waiting on. Same ordering as the editor's button (nextSowAction): an
-  // outstanding draft has to go out first, so it is only a countersignature the
-  // SOW is waiting on once nothing newer sits above the signed version.
-  const awaitingCountersignature = !hasUnsentDraft && sow.activeVersion?.status === 'SIGNED';
   const gate = sow.actionGate;
-  // "Already issued" and "waiting on the customer" are states, not chores. Listing
-  // them under "Not ready to send" produced a banner on a countersigned SOW whose
-  // only item was a blocker with no staff-facing step attached to it.
-  const blockers = ((awaitingCountersignature ? gate?.countersignBlockers : gate?.sendBlockers) ?? []).filter(
-    (b: DocumentBlocker) => !SETTLED_BLOCKERS.includes(b)
-  );
+  const repair = statusCardRepair({
+    currentStatus: current?.status,
+    activeStatus: sow.activeVersion?.status,
+    hasUnsentDraft,
+    gate
+  });
   const missingFields = gate?.missingFields ?? [];
   const forPdf = active ?? current;
 
@@ -68,11 +64,11 @@ export default function SowStatusCard({ jobId, onOpenEditor }: Props): React.JSX
           {/* One banner, not several: the blockers arrive in the order they should
               be cleared, so they read as a repair sequence rather than as a set of
               independent alarms. */}
-          {blockers.length > 0 && (
+          {repair && (
             <Alert severity="warning" sx={{ mb: 1.5 }}>
-              <AlertTitle>{awaitingCountersignature ? 'Not ready to countersign' : 'Not ready to send'}</AlertTitle>
+              <AlertTitle>{repair.title}</AlertTitle>
               <Box component="ol" sx={{ pl: 2.5, m: 0 }}>
-                {blockers.map((b: DocumentBlocker) => (
+                {repair.blockers.map((b: DocumentBlocker) => (
                   <li key={b}>
                     <Typography variant="body2">
                       {blockerStep(b)}

@@ -1,8 +1,7 @@
-import React, { useState, useContext, useEffect } from 'react'
+import React, { useState, useContext, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router';
 import { useQuery } from '@apollo/client';
-import { Box, Button, Card, CardContent, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, Divider } from '@mui/material';
-import { AccessTime, Publish, NotInterested, Check, CheckCircle as CheckCircleIcon } from '@mui/icons-material';
+import { Box, Button, Card, CardContent, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, Divider } from '@mui/material';
 
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
@@ -20,7 +19,8 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SendIcon from '@mui/icons-material/Send';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ThumbUpIcon from '@mui/icons-material/ThumbUpAltOutlined';
-import { customerMayEdit, awaitingCustomerApproval } from '../utils/jobEditing';
+import { deriveCustomerLifecycle, validResponseAction } from '../utils/customerLifecycle';
+import type { CustomerActionRequired } from '../utils/jobReview';
 
 export default function Tracking() {
 
@@ -31,7 +31,6 @@ export default function Tracking() {
     const [workflowName,        setWorkflowName]        = useState('');
     const [workflowState,       setWorkflowState]       = useState('');
     const [jobName,             setJobName]             = useState('');
-    const [jobState,            setJobState]            = useState('');
     const [jobTime,             setJobTime]             = useState('');
     const [workflowUsername,    setWorkflowUsername]    = useState('');
     const [workflowInstitution, setWorkflowInstitution] = useState('');
@@ -44,9 +43,9 @@ export default function Tracking() {
     // the job editor so Compare-to is a live controlled value on first paint.
     const [viewingVersion, setViewingVersion] = useState<number | null>(null);
     const [baselineVersionNumber, setBaselineVersionNumber] = useState<number | null | undefined>(undefined);
-    const [sowData, setSowData] = useState<any>(null);
     const [attachments, setAttachments] = useState<any[]>([]);
-    const [resubmitOpen, setResubmitOpen] = useState(false);
+    const [responseAction, setResponseAction] = useState<CustomerActionRequired | null>(null);
+    const sowSectionRef = useRef<HTMLDivElement>(null);
 
     const skipQuery = !id || !userContext?.userProps?.isAuthenticated;
 
@@ -61,13 +60,11 @@ export default function Tracking() {
         const job = data?.ownJobById;
         if (!job) return;
         setJobName(job.name ?? '');
-        setJobState(job.state ?? '');
         setJobTime(job.submitted ?? '');
         setWorkflowUsername(job.clientDisplayName || job.username || '');
         setWorkflowInstitution(job.institute ?? '');
         setWorkflowEmail(job.email ?? '');
         setWorklows(job.workflows ?? []);
-        setSowData(job.sow ?? null);
         setAttachments(job.attachments ?? []);
         const wfs = job.workflows ?? [];
         if (wfs.length > 0) {
@@ -78,7 +75,7 @@ export default function Tracking() {
         if (latest) setViewingVersion((prev) => prev ?? latest.versionNumber);
     }, [data?.ownJobById]);
 
-    const { data: sowByJobIdResult } = useQuery(GET_SOW_BY_JOB_ID, {
+    const { data: sowByJobIdResult, refetch: refetchSow } = useQuery(GET_SOW_BY_JOB_ID, {
         variables: { jobId: id as string },
         skip: !id,
         fetchPolicy: 'network-only',
@@ -91,6 +88,24 @@ export default function Tracking() {
         fetchPolicy: 'network-only',
     });
     const invoices = invoicesResult?.invoicesByJobId ?? [];
+
+    const job = data?.ownJobById;
+    const activeSow = sowFullData?.activeVersion ?? null;
+    const visibleActiveSow = activeSow?.visibleToCustomer === true ? activeSow : null;
+    const lifecycle = deriveCustomerLifecycle({
+        state: job?.state,
+        customerActionRequired: job?.customerActionRequired,
+        activeSow: visibleActiveSow,
+        signBlockers: sowFullData?.actionGate?.signBlockers
+    });
+
+    useEffect(() => {
+        setResponseAction(null);
+    }, [id]);
+
+    useEffect(() => {
+        setResponseAction((current) => validResponseAction(current, lifecycle.primaryAction));
+    }, [lifecycle.primaryAction]);
 
     if (skipQuery) return <p>Loading...</p>;
     if (loading) return <p>Loading...</p>;
@@ -107,42 +122,6 @@ export default function Tracking() {
         );
     }
     if (data && !data.ownJobById) return <p>Job not found. You may not have access to this job.</p>;
-
-    // Editing is a staff-set flag now, not a state: the lab can hand the job
-    // back for approval without handing over the canvas.
-    const jobFacts = { state: jobState, customerEditingEnabled: (data?.ownJobById as any)?.customerEditingEnabled };
-    const canEdit = customerMayEdit(jobFacts);
-    const needsApproval = awaitingCustomerApproval(jobFacts);
-
-    const jobStatus = () => {
-        const submitText = "Your job has been submitted to the DAMP lab and is awaiting review. Once the review is done, you will see the updated state over here.";
-        const createText = "Your job is currently being created. Once the job is created, you will see the updated state over here.";
-        const acceptText = "Your job has been reviewed by the DAMP lab and has been accepted. You will receive a SOW to review and sign here once it has been generated.";
-        const rejectText = "Your job has been reviewed by the DAMP lab and has been accepted. Please complete any necessary modifications and resubmit your job.";
-        const changesText = canEdit
-            ? "The DAMP Lab has asked for changes to this job. Use Edit Job above to make your edits, then resubmit it to the lab."
-            : "The DAMP Lab has edited this job and is asking you to approve it. Use View workflow above to see what changed, then approve it. See the comments below for what they changed and why.";
-        const defaultText = "Invalid Case";
-
-        switch (jobState) {
-            case 'SUBMITTED':
-                return ['rgba(256, 256, 0, 0.5)', <Publish />, submitText]
-            case 'CREATING':
-                return ['rgba(256, 256, 0, 0.5)', <AccessTime />, createText]
-            case 'ACCEPTED':
-                return ['rgb(0, 256, 0, 0.5)', <Check />, acceptText];
-            case 'REJECTED':
-                return ['rgb(256, 0, 0, 0.5)', <NotInterested />, rejectText];
-            case 'CHANGES_REQUESTED':
-                return ['rgba(255, 152, 0, 0.4)', <Publish />, changesText];
-            default:
-                return ['rgb(0, 0, 0, 0)', <NotInterested />, defaultText];
-        }
-    }
-
-    const jobStatusColor = jobStatus()[0];
-    const jobStatusIcon  = jobStatus()[1];
-    const jobStatusText  = jobStatus()[2];
 
     // Highlight what changed since the last version written by the other side,
     // unless the reader has picked a different pair from the history.
@@ -185,16 +164,10 @@ export default function Tracking() {
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
-                {sowData && (
-                    <Alert severity="success" sx={{ mb: 2 }} icon={<CheckCircleIcon />}>
-                        <strong>Statement of Work available.</strong> A Statement of Work has been generated for this job. View and download it in the section below.
-                    </Alert>
-                )}
                 {/* View is permanent — the canvas is what a customer submitted, and
                     there is no state in which they should have to take the lab's word
-                    for what it says. Edit and Resubmit join it only while the job is
-                    theirs to change; the Resubmit button used to live in the comments
-                    header, far enough down the page to be missed. */}
+                    for what it says. Every other affordance comes from the explicit
+                    lifecycle primary action. */}
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1 }}>
                     <Button
                         variant="outlined"
@@ -204,7 +177,17 @@ export default function Tracking() {
                     >
                         View workflow
                     </Button>
-                    {canEdit && (
+                    {lifecycle.primaryAction === 'REPLY' && (
+                        <Button
+                            variant="contained"
+                            startIcon={<SendIcon />}
+                            onClick={() => setResponseAction('REPLY')}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            Reply to lab
+                        </Button>
+                    )}
+                    {lifecycle.primaryAction === 'EDIT_WORKFLOW' && (
                         <>
                             <Button
                                 variant="outlined"
@@ -217,37 +200,50 @@ export default function Tracking() {
                             <Button
                                 variant="contained"
                                 startIcon={<SendIcon />}
-                                onClick={() => setResubmitOpen(true)}
+                                onClick={() => setResponseAction('EDIT_WORKFLOW')}
                                 sx={{ textTransform: 'none' }}
                             >
-                                Resubmit job
+                                Submit updated workflow
                             </Button>
                         </>
                     )}
-                    {/* The job is theirs to act on but not to change: the only
-                        thing left to do with it is say yes. */}
-                    {needsApproval && (
+                    {lifecycle.primaryAction === 'APPROVE_WORKFLOW' && (
                         <Button
                             variant="contained"
                             startIcon={<ThumbUpIcon />}
-                            onClick={() => setResubmitOpen(true)}
+                            onClick={() => setResponseAction('APPROVE_WORKFLOW')}
                             sx={{ textTransform: 'none' }}
                         >
-                            Approve edits
+                            Approve workflow
+                        </Button>
+                    )}
+                    {lifecycle.primaryAction === 'SIGN_SOW' && (
+                        <Button
+                            variant="contained"
+                            onClick={() => {
+                                sowSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                sowSectionRef.current?.focus({ preventScroll: true });
+                            }}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            Review and sign SOW
                         </Button>
                     )}
                 </Box>
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}
                 </Typography>
-                <Box sx={{ p: 3, my: 2, bgcolor: jobStatusColor as any, borderRadius: '8px' }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', ml: -0.5 }}>
-                        <Typography>                              {jobStatusIcon} </Typography>
-                        <Typography style={{textAlign: 'right'}}> {id}            </Typography>
+                <Alert severity={lifecycle.primaryAction ? 'warning' : 'info'} sx={{ my: 2 }}>
+                    {/* The derived prose says what to do; the raw state is what
+                        the customer quotes back to the lab when they call about
+                        this job, so it stays visible alongside it. */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography fontWeight={700}>{lifecycle.title}</Typography>
+                        {job?.state && <Chip label={job.state} size="small" variant="outlined" />}
                     </Box>
-                    <Typography>                             <b> {jobState}      </b></Typography>
-                    <Typography sx={{ fontSize: 13, mt: 1 }}><i> {jobStatusText} </i></Typography>
-                </Box>
+                    <Typography variant="body2">{lifecycle.body}</Typography>
+                    <Typography variant="caption" sx={{ display: 'block', mt: 1 }}>{id}</Typography>
+                </Alert>
                 <Box sx={{ mx: 3, fontSize: 13 }}>
                     <p><b>Time:</b>         {jobTime.slice(0, 16).replace('T', ' ')}</p>
                     <p><b>User:</b>         {workflowUsername} ({workflowEmail})</p>
@@ -310,7 +306,11 @@ export default function Tracking() {
                 </Box>
 
                 {/* SOW Status Indicator and Viewer */}
-                {sowData && <SowCustomerView jobId={id || ''} />}
+                {visibleActiveSow && (
+                    <Box ref={sowSectionRef} tabIndex={-1} sx={{ outline: 'none' }}>
+                        <SowCustomerView jobId={id || ''} />
+                    </Box>
+                )}
 
                 {/* Invoices */}
                 <Box sx={{ mx: 3, my: 2 }}>
@@ -365,13 +365,18 @@ export default function Tracking() {
                         isStaff: false
                     }}
                 />
-                <ResubmitJobModal
-                    mode={needsApproval ? 'approve' : 'resubmit'}
-                    open={resubmitOpen}
-                    onClose={() => setResubmitOpen(false)}
-                    jobId={id || ''}
-                    onResubmitted={() => refetch()}
-                />
+                {responseAction && (
+                    <ResubmitJobModal
+                        action={responseAction}
+                        open
+                        onClose={() => setResponseAction(null)}
+                        jobId={id || ''}
+                        onResubmitted={async () => {
+                            await Promise.all([refetch(), refetchSow()]);
+                            setResponseAction(null);
+                        }}
+                    />
+                )}
             </div>
         </div>
     )

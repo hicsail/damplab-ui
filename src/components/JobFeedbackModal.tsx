@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMutation } from '@apollo/client';
-import { Alert, Box, Button, Checkbox, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import { styled } from "@mui/system";
 
-import { MUTATE_JOB_STATE, SET_JOB_CUSTOMER_EDITING, CREATE_COMMENT } from '../gql/mutations';
-import { UserContext } from '../contexts/UserContext';
+import { REVIEW_JOB } from '../gql/mutations';
 import { reviewDecisions, type ReviewDecisionValue } from './jobReviewLabels';
+import { buildReviewInput, retryOperationId } from '../utils/jobReview';
 
 
 const CenteredModal = styled(Modal)`
@@ -36,14 +36,11 @@ export default function JobFeedbackModal(props: any) {
 
   const [decision,        setDecision]        = useState<ReviewDecisionValue | ''>('');
   const [feedbackMessage, setFeedbackMessage] = useState("");
-  const [editingEnabled,  setEditingEnabled]  = useState(false);
   const [submitting,      setSubmitting]      = useState(false);
   const [submitError,     setSubmitError]     = useState<string | null>(null);
+  const operationIdRef = useRef<string | null>(null);
 
-  const [mutateJobState]     = useMutation(MUTATE_JOB_STATE);
-  const [setCustomerEditing] = useMutation(SET_JOB_CUSTOMER_EDITING);
-  const [createComment]      = useMutation(CREATE_COMMENT);
-  const userContext          = useContext(UserContext);
+  const [reviewJob] = useMutation(REVIEW_JOB);
 
   // Reachable from SUBMITTED, CHANGES_REQUESTED and ACCEPTED alike, and the
   // accept option means something different in each — see jobReviewLabels.
@@ -61,20 +58,19 @@ export default function JobFeedbackModal(props: any) {
     if (open) {
       setDecision('');
       setFeedbackMessage('');
-      setEditingEnabled(false);
       setSubmitError(null);
+      operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'reopen' });
     }
   }, [open]);
 
   const handleDecisionChange = (event: any) => {
     const value = event.target.value as ReviewDecisionValue;
+    operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'edit' });
     setDecision(value);
-    // Each decision carries its own sensible answer to "should they be able to
-    // edit?"; staff override it from here, not by remembering to.
-    setEditingEnabled(decisions.find((d) => d.value === value)?.defaultEditingEnabled ?? false);
   };
 
   const handleFeedbackMessageChange = (event: any) => {
+    operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'edit' });
     setFeedbackMessage(event.target.value);
   };
 
@@ -84,44 +80,23 @@ export default function JobFeedbackModal(props: any) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      // Editing first, deliberately. These three writes are not atomic, and if
-      // one is going to fail it should fail before the state moves: a job left
-      // in its old state is recoverable, whereas one handed to the customer
-      // with editing still open is access we meant to withhold.
-      await setCustomerEditing({ variables: { jobId: id, enabled: editingEnabled } });
-      await mutateJobState({ variables: { ID: id, State: chosen.nextState, Note: chosen.historyNote } });
-
-      // Every decision is announced. The customer cannot act on — or even
-      // notice — a decision they are never told about, and several of these
-      // silently change what they are allowed to do. The header names the
-      // decision, which is the whole message where staff wrote none.
-      const email = userContext.userProps?.idTokenParsed?.email ?? 'technician@bu.edu';
-      const body = feedbackMessage.trim();
-      // Only offered when they can actually act on it. Pointing someone at an
-      // editor they are not allowed to save from is worse than no link.
-      const editorLink = editingEnabled ? `\n\n[Open the workflow editor](/job_editor/${id})` : '';
-      const content = `${chosen.commentHeader}${body ? `\n\n${body}` : ''}${editorLink}`;
-
-      await createComment({
+      operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'submit', candidate: crypto.randomUUID() });
+      await reviewJob({
         variables: {
-          input: {
+          input: buildReviewInput({
+            operationId: operationIdRef.current,
             jobId: id,
-            content,
-            author: email,
-            authorType: 'STAFF',
-            isInternal: false,
-          },
-        },
+            decision: chosen.decision,
+            message: feedbackMessage
+          })
+        }
       });
 
-      // Pull the job (and its versions) fresh rather than reloading the page.
-      // The old `window.location.reload()` fired while this handler's own state
-      // updates were still settling — a teardown race that is the leading
-      // suspect for the dev-mode "Application Error" seen right after a
-      // decision, and unnecessary regardless: the job query is what changed.
       await onSubmitted?.();
+      operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'success' });
       onClose();
     } catch (error: any) {
+      operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'failure' });
       // Previously swallowed into console.log and then hidden by the reload, so
       // a decision that never reached the server still looked like it landed.
       console.error(error);
@@ -133,11 +108,17 @@ export default function JobFeedbackModal(props: any) {
 
 
   return (
-    <CenteredModal open={open} onClose={onClose}>
+    <CenteredModal
+      open={open}
+      disableEscapeKeyDown={submitting}
+      onClose={() => {
+        if (!submitting) onClose();
+      }}
+    >
       <ModalBox>
         <Typography variant="h6" sx={{ mb: 1 }}>Review Job</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Record a decision on this job. Whichever you pick is posted to the client as a comment.
+          Record one review decision. The server posts the lifecycle comment and history entry.
         </Typography>
 
         {jobName && (
@@ -161,12 +142,12 @@ export default function JobFeedbackModal(props: any) {
           </Box>
         )}
 
-        <FormControl component="fieldset" sx={{width: '100%'}}>
+        <FormControl component="fieldset" sx={{width: '100%'}} disabled={submitting}>
 
           <RadioGroup onChange={handleDecisionChange} value={decision} name="feedback-type" aria-label="feedback-type">
             {decisions.map((option) => (
               <React.Fragment key={option.value}>
-                <FormControlLabel control={<Radio />} value={option.value} label={option.optionLabel} />
+                <FormControlLabel control={<Radio disabled={submitting} />} value={option.value} label={option.optionLabel} />
                 {decision === option.value && (
                   <Box sx={{ ml: 4, mb: 1 }}>
                     {option.note && (
@@ -180,9 +161,10 @@ export default function JobFeedbackModal(props: any) {
                       minRows={option.messageRequired ? 3 : 2}
                       onChange={handleFeedbackMessageChange}
                       value={feedbackMessage}
+                      disabled={submitting}
                       required={option.messageRequired}
                       label={option.messageRequired ? 'Message to the customer' : 'Message to the customer (optional)'}
-                      helperText={option.messageRequired ? undefined : `Left blank, the comment reads “${option.commentHeader}”.`}
+                      helperText={option.messageRequired ? undefined : 'You may include an optional acceptance note.'}
                     />
                   </Box>
                 )}
@@ -190,37 +172,9 @@ export default function JobFeedbackModal(props: any) {
             ))}
           </RadioGroup>
 
-          {/* Independent of the decision above — who holds the job and whether they
-              may change it are two separate calls — except where the decision
-              settles it: accept returns the job to the lab, and a design-edit
-              request cannot coherently withhold the editor. */}
-          {chosen && chosen.editingControl !== 'hidden' && (
-            <Box sx={{ mt: 1, mb: 1 }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={editingEnabled}
-                    disabled={chosen.editingControl === 'locked'}
-                    onChange={(e) => setEditingEnabled(e.target.checked)}
-                  />
-                }
-                label="Let the customer edit the workflow"
-              />
-              <Typography variant="body2" color="text.secondary" sx={{ ml: 4 }}>
-                {chosen.editingControl === 'locked'
-                  ? 'Always on for a design-edit request — you are asking the customer to change the workflow, so they need the editor.'
-                  : editingEnabled
-                    ? 'The customer can open the workflow editor and save changes to this job.'
-                    : 'The customer can view the workflow but not change it.'}
-              </Typography>
-            </Box>
-          )}
-
           <Box sx={{ mt: 1, mb: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              {chosen
-                ? `Posted to the client as a comment headed “${chosen.commentHeader}”.`
-                : 'Your decision will be posted to the client as a comment.'}
+              The selected decision determines the customer’s next action. The server records the lifecycle comment and history atomically.
             </Typography>
           </Box>
 
