@@ -1098,6 +1098,25 @@ export const GET_ACTIVE_INVENTORY_ITEMS = gql`
   }
 `;
 
+export const GET_PUBLIC_INVENTORY_ITEMS = gql`
+  query GetPublicInventoryItems {
+    publicInventoryItems {
+      id
+      name
+      type
+      description
+      location
+      quantity
+      bookable
+      placements { stationId quantity }
+      tags
+      modelNumber
+      hasServiceContract
+      dimensions { value unit }
+    }
+  }
+`;
+
 export const CREATE_INVENTORY_ITEM = gql`
   mutation CreateInventoryItem($item: CreateInventoryItem!) {
     createInventoryItem(item: $item) {
