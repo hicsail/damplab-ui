@@ -10,10 +10,8 @@ describe('job review GraphQL contracts', () => {
     const expectedFields = [
       'id',
       'state',
-      'customerEditingEnabled',
       'customerActionRequired',
       'acceptedJobVersionNumber',
-      'acceptedContractFingerprint',
       'acceptedBillingFingerprint'
     ];
     const review = compact(REVIEW_JOB);
@@ -30,7 +28,7 @@ describe('job review GraphQL contracts', () => {
   });
 
   it('requests review and acceptance facts in both job-detail queries', () => {
-    const expectedFields = ['customerActionRequired', 'acceptedJobVersionNumber', 'acceptedContractFingerprint', 'acceptedBillingFingerprint'];
+    const expectedFields = ['customerActionRequired', 'acceptedJobVersionNumber', 'acceptedBillingFingerprint'];
 
     for (const document of [GET_JOB_BY_ID, GET_OWN_JOB_BY_ID]) {
       const query = compact(document);
@@ -42,8 +40,9 @@ describe('job review GraphQL contracts', () => {
 describe('SOW and activity GraphQL contracts', () => {
   it('requests immutable job-source linkage on every full SOW version', () => {
     const fragment = compact(SOW_VERSION_FIELDS);
+    // The version number identifies the accepted content exactly, since job
+    // versions are immutable — no companion hash is needed.
     expect(fragment).toMatch(/\bsourceJobVersionNumber\b/);
-    expect(fragment).toMatch(/\bsourceContractFingerprint\b/);
   });
 
   it('requests the customer signing gate', () => {
@@ -53,9 +52,7 @@ describe('SOW and activity GraphQL contracts', () => {
 
   it('requests customer lifecycle data in ClientView’s SOW query', () => {
     const query = compact(GET_SOW_BY_JOB_ID);
-    expect(query).toMatch(
-      /activeVersion \{[^}]*\bversionNumber\b[^}]*\bstatus\b[^}]*\bvisibleToCustomer\b[^}]*\bsourceJobVersionNumber\b[^}]*\bsourceContractFingerprint\b[^}]*\}/
-    );
+    expect(query).toMatch(/activeVersion \{[^}]*\bversionNumber\b[^}]*\bstatus\b[^}]*\bvisibleToCustomer\b[^}]*\bsourceJobVersionNumber\b[^}]*\}/);
     expect(query).toMatch(/actionGate \{[^}]*\bcanSign\b[^}]*\bsignBlockers\b[^}]*\}/);
   });
 

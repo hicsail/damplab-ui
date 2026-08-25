@@ -9,7 +9,7 @@ import PictureAsPdfIcon                               from '@mui/icons-material/
 import DescriptionIcon                                from '@mui/icons-material/Description';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
-import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY }  from '../gql/mutations';
+import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, latestContentVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -23,6 +23,7 @@ import JobPDFDocument             from '../components/JobPDFDocument';
 import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SowEditorModal             from '../components/sow/SowEditorModal';
 import SowStatusCard              from '../components/sow/SowStatusCard';
+import ReasonDialog               from '../components/ReasonDialog';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
@@ -134,6 +135,49 @@ export default function TechnicianView() {
 
     const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
+    const [withdrawFromCustomer] = useMutation(WITHDRAW_JOB_FROM_CUSTOMER);
+    const [withdrawAcceptance] = useMutation(WITHDRAW_JOB_ACCEPTANCE);
+    const [withdrawing, setWithdrawing] = useState(false);
+
+    /**
+     * Taking a job back so the lab can edit it again.
+     *
+     * Two shapes of the same intent. Both undo something the client can see, so
+     * both state what is lost and require a reason — which is posted to the
+     * client, and is the only account they get of why their job moved.
+     */
+    const [withdrawKind, setWithdrawKind] = useState<'customer' | 'acceptance' | null>(null);
+
+    const withdrawCopy = {
+        customer: {
+            title: 'Withdraw this job from the client?',
+            warning:
+                'The workflow will be restored to the version the client was sent.\n\nEdits they saved but did not submit stay in the job history, but will no longer be the current version — they will see the workflow revert.',
+            confirmLabel: 'Withdraw from client'
+        },
+        acceptance: {
+            title: 'Withdraw the acceptance on this job?',
+            warning:
+                'The spec stops being agreed, so its Statement of Work cannot be sent or signed until you accept the job again.\n\nThe document itself is left alone — cancel it separately if it is not going ahead.',
+            confirmLabel: 'Withdraw acceptance'
+        }
+    } as const;
+
+    const handleWithdraw = async (reason: string) => {
+        if (!id || !withdrawKind) return;
+        setWithdrawing(true);
+        try {
+            const input = { operationId: crypto.randomUUID(), jobId: id, reason };
+            if (withdrawKind === 'customer') await withdrawFromCustomer({ variables: { input } });
+            else await withdrawAcceptance({ variables: { input } });
+            await handleReviewSubmitted();
+            setWithdrawKind(null);
+        } catch (e: any) {
+            window.alert(e?.message ?? 'Could not withdraw the job.');
+        } finally {
+            setWithdrawing(false);
+        }
+    };
 
     const handleCloseJob = async () => {
         if (!id) return;
@@ -497,6 +541,18 @@ export default function TechnicianView() {
                     >
                         Review Job
                     </Button>
+                    {/* Editing is exclusive now: to change a job the customer holds,
+                        or one whose spec is agreed, staff take it back first. */}
+                    {jobState === 'CHANGES_REQUESTED' && (
+                        <Button variant="outlined" color="warning" onClick={() => setWithdrawKind('customer')} disabled={withdrawing} sx={{ textTransform: 'none' }}>
+                            {withdrawing ? 'Withdrawing…' : 'Withdraw from customer'}
+                        </Button>
+                    )}
+                    {jobState === 'ACCEPTED' && (
+                        <Button variant="outlined" color="warning" onClick={() => setWithdrawKind('acceptance')} disabled={withdrawing} sx={{ textTransform: 'none' }}>
+                            {withdrawing ? 'Withdrawing…' : 'Withdraw acceptance'}
+                        </Button>
+                    )}
                     <Button
                         variant="outlined"
                         onClick={handleExportJobJson}
@@ -662,6 +718,17 @@ export default function TechnicianView() {
                     }}
                 />
 
+                {withdrawKind && (
+                    <ReasonDialog
+                        open
+                        title={withdrawCopy[withdrawKind].title}
+                        warning={withdrawCopy[withdrawKind].warning}
+                        confirmLabel={withdrawCopy[withdrawKind].confirmLabel}
+                        busy={withdrawing}
+                        onCancel={() => setWithdrawKind(null)}
+                        onConfirm={handleWithdraw}
+                    />
+                )}
                 <JobFeedbackModal
                     open={modalOpen}
                     onClose={handleCloseModal}

@@ -13,7 +13,8 @@ import {
   pdfSourceVersion,
   revertIsEnabled,
   cloneVersionDocument,
-  statusCardRepair
+  statusCardRepair,
+  cancelIsOffered
 } from './sowEditorView';
 import { SowField, SowStatus, SowVersion, SowVersionInputs } from './sowTypes';
 
@@ -72,9 +73,8 @@ describe('editorIsReadOnly', () => {
     expect(editorIsReadOnly(editable)).toBe(false);
   });
 
-  it('locks historic snapshots and cancelled documents', () => {
+  it('locks historic snapshots', () => {
     expect(editorIsReadOnly({ ...editable, viewing: 1001, dirty: false })).toBe(true);
-    expect(editorIsReadOnly({ ...editable, cancelled: true })).toBe(true);
   });
 
   it('allows editing the current saved version when it is the working copy', () => {
@@ -297,11 +297,12 @@ describe('nextSowAction', () => {
     expect(blockedReason(action)).not.toContain('has not signed');
   });
 
-  it('reports a cancelled SOW as cancelled rather than as history', () => {
-    // readOnly is true for a cancelled SOW, so this has to win over it.
-    const action = nextSowAction({ ...base, status: 'CANCELLED', activeStatus: 'CANCELLED', readOnly: true });
-
-    expect(action).toMatchObject({ kind: 'blocked', label: 'Cancelled' });
+  // Cancellation is not terminal. A job has exactly one Statement of Work, so
+  // editing the cancelled one into a new version is the only way to replace it —
+  // freezing it left staff with a document they could neither use nor discard.
+  it('lets a cancelled SOW be edited and reissued', () => {
+    expect(nextSowAction({ ...base, status: 'CANCELLED', activeStatus: 'CANCELLED', dirty: true }).kind).toBe('save');
+    expect(nextSowAction({ ...base, status: 'DRAFT', activeStatus: 'CANCELLED' }).kind).toBe('send');
   });
 
   it('still offers Send on a draft saved above a countersigned version', () => {
@@ -353,5 +354,50 @@ describe('statusCardRepair', () => {
       blockers: ['JOB_CHANGED_SINCE_ACCEPTANCE']
     });
     expect(statusCardRepair({ currentStatus: 'DRAFT', activeStatus: 'SIGNED', hasUnsentDraft: true, gate })?.title).toBe('Not ready to send');
+  });
+});
+
+describe('cancelIsOffered', () => {
+  const v = (status: string): any => ({ versionNumber: 1000, status });
+
+  // A draft nobody has seen is edited or discarded, not cancelled.
+  it('is hidden until the document has reached the client', () => {
+    expect(cancelIsOffered([v('DRAFT')])).toBe(false);
+    expect(cancelIsOffered([])).toBe(false);
+  });
+
+  it('is offered once it has been issued', () => {
+    expect(cancelIsOffered([v('DRAFT'), v('SENT')])).toBe(true);
+    expect(cancelIsOffered([v('SIGNED')])).toBe(true);
+  });
+
+  // Withdrawal resets activeVersionNumber to 0, so a pointer-based check would
+  // hide Cancel exactly when the document most needs disposing of.
+  it('survives a withdrawal, which leaves nothing in force', () => {
+    expect(cancelIsOffered([v('SENT'), v('DRAFT')])).toBe(true);
+  });
+});
+
+describe('nextSowAction — reissuing a cancelled SOW', () => {
+  const cancelled = { dirty: false, status: 'CANCELLED' as SowStatus, activeStatus: 'CANCELLED' as SowStatus, missingRequired: [], gate: null };
+
+  // A job has one Statement of Work, so reissuing means a fresh draft from the
+  // cancelled one — and there is often nothing to edit, the terms being reissued
+  // verbatim once the reason for cancelling has passed.
+  it('offers a new draft with nothing edited, rather than requiring a token change', () => {
+    expect(nextSowAction(cancelled)).toMatchObject({ kind: 'save', label: 'Start a new draft' });
+  });
+
+  it('never claims the lab is waiting on a customer who holds nothing', () => {
+    expect(nextSowAction(cancelled).label).not.toMatch(/awaiting customer/i);
+  });
+
+  it('still reads as an ordinary save once staff do edit it', () => {
+    expect(nextSowAction({ ...cancelled, dirty: true })).toMatchObject({ kind: 'save', label: 'Save draft' });
+  });
+
+  // The draft that results is sendable like any other.
+  it('offers Send once the new draft is saved', () => {
+    expect(nextSowAction({ ...cancelled, status: 'DRAFT', gate: { canSend: true } as any }).kind).toBe('send');
   });
 });

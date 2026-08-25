@@ -160,7 +160,6 @@ export const SET_JOB_CUSTOMER_EDITING = gql`
     mutation setJobCustomerEditing($jobId: ID!, $enabled: Boolean!) {
         setJobCustomerEditing(jobId: $jobId, enabled: $enabled) {
             id
-            customerEditingEnabled
         }
     }
 `;
@@ -170,10 +169,8 @@ export const REVIEW_JOB = gql`
         reviewJob(input: $input) {
             id
             state
-            customerEditingEnabled
             customerActionRequired
             acceptedJobVersionNumber
-            acceptedContractFingerprint
             acceptedBillingFingerprint
         }
     }
@@ -184,11 +181,52 @@ export const RESPOND_TO_JOB_REVIEW = gql`
         respondToJobReview(input: $input) {
             id
             state
-            customerEditingEnabled
             customerActionRequired
             acceptedJobVersionNumber
-            acceptedContractFingerprint
             acceptedBillingFingerprint
+        }
+    }
+`;
+
+export const WITHDRAW_JOB_FROM_CUSTOMER = gql`
+    mutation WithdrawJobFromCustomer($input: WithdrawJobInput!) {
+        withdrawJobFromCustomer(input: $input) {
+            id
+            state
+            customerActionRequired
+            handoverVersionNumber
+        }
+    }
+`;
+
+export const WITHDRAW_JOB_ACCEPTANCE = gql`
+    mutation WithdrawJobAcceptance($input: WithdrawJobInput!) {
+        withdrawJobAcceptance(input: $input) {
+            id
+            state
+            customerActionRequired
+            acceptedJobVersionNumber
+            acceptedBillingFingerprint
+        }
+    }
+`;
+
+export const RESTORE_JOB_VERSION = gql`
+    mutation RestoreJobVersion($jobId: ID!, $versionNumber: Int!, $note: String) {
+        restoreJobVersion(jobId: $jobId, versionNumber: $versionNumber, note: $note) {
+            id
+            state
+        }
+    }
+`;
+
+export const WITHDRAW_SOW_FROM_CUSTOMER = gql`
+    mutation WithdrawSowFromCustomer($sowId: ID!, $reason: String!) {
+        withdrawSowFromCustomer(sowId: $sowId, reason: $reason) {
+            id
+            status
+            currentVersionNumber
+            activeVersionNumber
         }
     }
 `;

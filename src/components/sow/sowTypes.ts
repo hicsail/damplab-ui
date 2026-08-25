@@ -192,11 +192,9 @@ export type DocumentBlocker =
   | 'NOT_ACCEPTED'
   | 'ACCEPTED_SOURCE_UNAVAILABLE'
   | 'JOB_CHANGED_SINCE_ACCEPTANCE'
-  | 'SOW_SOURCE_MISMATCH'
   | 'DOCUMENT_STALE'
   | 'DRAFT_INCOMPLETE'
   | 'NO_DRAFT_TO_SEND'
-  | 'UNSENT_DRAFT'
   | 'STALE_SIGN_VERSION'
   | 'AWAITING_SENT_VERSION'
   | 'AWAITING_CUSTOMER_SIGNATURE';
@@ -231,13 +229,11 @@ const CUSTOMER_BLOCKER_MESSAGE: Record<DocumentBlocker, string> = {
   NOT_ACCEPTED: 'The lab is still preparing this Statement of Work.',
   ACCEPTED_SOURCE_UNAVAILABLE: 'The lab must issue an updated Statement of Work before you can sign.',
   JOB_CHANGED_SINCE_ACCEPTANCE: 'The lab must issue an updated Statement of Work before you can sign.',
-  SOW_SOURCE_MISMATCH: 'The lab must issue an updated Statement of Work before you can sign.',
   DOCUMENT_STALE: 'The lab must update this Statement of Work before you can sign.',
   DRAFT_INCOMPLETE: 'The lab is still completing this Statement of Work.',
   NO_DRAFT_TO_SEND: 'This Statement of Work is not available to sign.',
-  UNSENT_DRAFT: 'The lab is preparing a revised Statement of Work.',
-  STALE_SIGN_VERSION: 'A newer Statement of Work is available. Reload this job to continue.',
-  AWAITING_SENT_VERSION: 'The lab is preparing a revised Statement of Work.',
+  STALE_SIGN_VERSION: 'A newer Statement of Work has been issued. Reload this job to read it before signing.',
+  AWAITING_SENT_VERSION: 'There is nothing to sign right now — the lab may have withdrawn the Statement of Work to make changes.',
   AWAITING_CUSTOMER_SIGNATURE: 'This Statement of Work is waiting for your signature.'
 };
 
@@ -277,13 +273,11 @@ export const BLOCKER_STEP: Record<DocumentBlocker, string> = {
   NOT_ACCEPTED: 'Use Review Job to accept it, so the spec these prices come from is agreed before the customer sees them.',
   ACCEPTED_SOURCE_UNAVAILABLE: 'Use Review Job to re-accept it, save a fresh draft, and reissue it.',
   JOB_CHANGED_SINCE_ACCEPTANCE: 'The job changed after it was accepted. Use Review Job to re-accept it, save a fresh draft, and reissue it.',
-  SOW_SOURCE_MISMATCH: 'This SOW does not match the accepted job version. Re-accept the job, save a fresh draft, and reissue it.',
   DOCUMENT_STALE: "Recalculate the Fee Schedule and save — this document still bills the job's earlier figures.",
   DRAFT_INCOMPLETE: 'Fill in the required sections.',
   NO_DRAFT_TO_SEND: 'This version has already been issued. Edit the document to start a new draft.',
-  UNSENT_DRAFT: 'Send the revised version and have the customer sign it.',
   STALE_SIGN_VERSION: 'Reload the latest version before signing.',
-  AWAITING_SENT_VERSION: 'Wait for the lab to reissue the sent document.',
+  AWAITING_SENT_VERSION: 'Send the document to the customer.',
   AWAITING_CUSTOMER_SIGNATURE: 'Waiting for the customer to sign.'
 };
 
@@ -526,4 +520,18 @@ export function formatCurrency(amount: number): string {
   const n = Number.isFinite(amount) ? amount : 0;
   const magnitude = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${n < 0 ? '-' : ''}$${magnitude}`;
+}
+
+/**
+ * The label a draft will carry once it is sent.
+ *
+ * Sending bumps the whole number and resets the sub-revision — the same rule
+ * SowVersionService.nextVersionNumber applies — so the draft staff are looking
+ * at is never the version the customer receives. Saying "version 0.4 will be
+ * sent" when the customer will see 1.0 is the kind of small lie that makes the
+ * version history unreadable afterwards.
+ */
+export function nextSentVersionLabel(v?: { versionNumber: number } | null): string {
+  if (!v) return '';
+  return `${Math.floor(v.versionNumber / 1000) + 1}.0`;
 }

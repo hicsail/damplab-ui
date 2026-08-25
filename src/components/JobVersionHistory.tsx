@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Chip, Divider, ListItemText, MenuItem, Select, Typography } from '@mui/material';
 import { JobVersionLike, jobStateColor, jobVersionChip, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
+import { formatSOWInstant } from '../utils/sowDateUtils';
 
 /**
  * Two pickers over a job's version history: which version is on screen, and
@@ -22,10 +23,9 @@ interface Props {
     dense?: boolean;
 }
 
+/** Lab-timezone date and clock time, matching SowVersionHistory. */
 function when(iso?: string): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return iso ? formatSOWInstant(iso, 'datetime') : '';
 }
 
 /** Who wrote it, in the reader's terms rather than the enum's. */
@@ -114,8 +114,18 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
                 size="small"
                 value={selectableBaseline ?? ''}
                 displayEmpty
-                sx={{ minWidth: dense ? 170 : 200, backgroundColor: 'background.paper' }}
+                sx={{ minWidth: dense ? 190 : 230, backgroundColor: 'background.paper' }}
                 onChange={(e) => onBaselineChange(e.target.value === '' ? null : Number(e.target.value))}
+                renderValue={(val) => {
+                    if (val == null || String(val) === '') return <em>Nothing</em>;
+                    const v = versions.find((x) => x.versionNumber === Number(val));
+                    return (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                            <span>Version {labelFor(v, Number(val))}</span>
+                            {v && <VersionChips version={v} />}
+                        </Box>
+                    );
+                }}
             >
                 {/* Only ever older versions: comparing forwards would report every
                     later edit as a deletion. */}
@@ -124,7 +134,15 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
                 </MenuItem>
                 {older.map((v) => (
                     <MenuItem key={v.versionNumber} value={v.versionNumber}>
-                        v{labelFor(v, v.versionNumber)} · {authorLabel(v).toLowerCase()} · {when(v.createdAt)}
+                        <ListItemText
+                            primary={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                    <span>Version {labelFor(v, v.versionNumber)}</span>
+                                    <VersionChips version={v} />
+                                </Box>
+                            }
+                            secondary={subtitle(v)}
+                        />
                     </MenuItem>
                 ))}
             </Select>

@@ -7,17 +7,20 @@ import {
   needsReply,
   technicianCustomerActionCopy,
   needsWorkflowApproval,
-  needsWorkflowEdit
+  needsWorkflowEdit,
+  staffMayEdit,
+  staffEditBlockedReason,
+  canRevertVersions
 } from './jobEditing';
 
 describe('customerMayEdit', () => {
-  it('requires both a change request and an explicit editing grant', () => {
-    expect(customerMayEdit({ state: 'CHANGES_REQUESTED', customerEditingEnabled: true })).toBe(true);
-    expect(customerMayEdit({ state: 'ACCEPTED', customerEditingEnabled: true })).toBe(false);
-    expect(customerMayEdit({ state: 'CHANGES_REQUESTED', customerEditingEnabled: false })).toBe(false);
+  it('requires both a change request and an explicit request for edits', () => {
+    expect(customerMayEdit({ state: 'CHANGES_REQUESTED', customerActionRequired: 'EDIT_WORKFLOW' })).toBe(true);
+    expect(customerMayEdit({ state: 'ACCEPTED', customerActionRequired: 'EDIT_WORKFLOW' })).toBe(false);
+    expect(customerMayEdit({ state: 'CHANGES_REQUESTED', customerActionRequired: 'REPLY' })).toBe(false);
   });
 
-  it('locks an unread or unwritten flag', () => {
+  it('locks a job with no recorded action', () => {
     expect(customerMayEdit(null)).toBe(false);
     expect(customerMayEdit(undefined)).toBe(false);
     expect(customerMayEdit({ state: 'CHANGES_REQUESTED' })).toBe(false);
@@ -49,8 +52,8 @@ describe('awaitingCustomerApproval', () => {
   });
 
   it('does not infer approval from editing being disabled', () => {
-    expect(awaitingCustomerApproval({ state: 'CHANGES_REQUESTED', customerEditingEnabled: false, customerActionRequired: 'REPLY' })).toBe(false);
-    expect(awaitingCustomerApproval({ state: 'CHANGES_REQUESTED', customerEditingEnabled: false })).toBe(false);
+    expect(awaitingCustomerApproval({ state: 'CHANGES_REQUESTED', customerActionRequired: 'REPLY' })).toBe(false);
+    expect(awaitingCustomerApproval({ state: 'CHANGES_REQUESTED' })).toBe(false);
   });
 
   it('ignores a stale approval action outside CHANGES_REQUESTED', () => {
@@ -98,8 +101,46 @@ describe('technicianCustomerActionCopy', () => {
   });
 
   it('uses conservative repair copy when the explicit action is missing', () => {
-    const message = technicianCustomerActionCopy({ state: 'CHANGES_REQUESTED', customerEditingEnabled: true });
+    const message = technicianCustomerActionCopy({ state: 'CHANGES_REQUESTED' });
     expect(message).toMatch(/action.*unavailable|repair/i);
     expect(message).not.toMatch(/approval|edit and resubmit|waiting for.*reply/i);
+  });
+});
+
+describe('staffMayEdit', () => {
+  it('allows the states where the lab holds an uncommitted job', () => {
+    for (const state of ['CREATING', 'SUBMITTED', 'QUEUED', 'IN_PROGRESS', 'COMPLETE']) {
+      expect(staffMayEdit({ state })).toBe(true);
+    }
+  });
+
+  // The two that used to be open: editing a job the customer holds, and moving
+  // a spec out from under its acceptance.
+  it('refuses while the customer holds it and once the spec is accepted', () => {
+    expect(staffMayEdit({ state: 'CHANGES_REQUESTED' })).toBe(false);
+    expect(staffMayEdit({ state: 'ACCEPTED' })).toBe(false);
+  });
+
+  it('names the action that would unblock them', () => {
+    expect(staffEditBlockedReason({ state: 'CHANGES_REQUESTED' })).toMatch(/Withdraw it from them/);
+    expect(staffEditBlockedReason({ state: 'ACCEPTED' })).toMatch(/Withdraw the acceptance/);
+    expect(staffEditBlockedReason({ state: 'SUBMITTED' })).toBeNull();
+  });
+});
+
+describe('canRevertVersions', () => {
+  it('offers revert only to whoever the server would let save', () => {
+    expect(canRevertVersions({ state: 'SUBMITTED' }, true)).toBe(true);
+    // Staff must withdraw the acceptance first — a button whose save is refused
+    // is worse than no button.
+    expect(canRevertVersions({ state: 'ACCEPTED' }, true)).toBe(false);
+    expect(canRevertVersions({ state: 'CHANGES_REQUESTED', customerActionRequired: 'EDIT_WORKFLOW' }, false)).toBe(true);
+    expect(canRevertVersions({ state: 'CHANGES_REQUESTED', customerActionRequired: 'APPROVE_WORKFLOW' }, false)).toBe(false);
+  });
+
+  it('hides it once the lab has started work', () => {
+    for (const state of ['QUEUED', 'IN_PROGRESS', 'COMPLETE', 'CLOSED']) {
+      expect(canRevertVersions({ state }, true)).toBe(false);
+    }
   });
 });

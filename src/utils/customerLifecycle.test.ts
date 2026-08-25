@@ -68,7 +68,7 @@ describe('deriveCustomerLifecycle', () => {
     const result = deriveCustomerLifecycle({
       state: 'ACCEPTED',
       activeSow: { status: 'SENT', visibleToCustomer: true },
-      signBlockers: ['SOW_SOURCE_MISMATCH']
+      signBlockers: ['JOB_CHANGED_SINCE_ACCEPTANCE']
     });
     expect(result).toMatchObject({ key: 'SOW_REISSUE_REQUIRED', primaryAction: null });
     expect(result.body).toMatch(/reissue/i);

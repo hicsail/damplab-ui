@@ -27,7 +27,7 @@ import {
   sowTotals,
   toInputsPayload,
   versionDisplayLabel
-} from './sowTypes';
+, nextSentVersionLabel} from './sowTypes';
 
 describe('SOW contract repair types', () => {
   it('represents accepted source linkage and the customer signing gate', () => {
@@ -70,9 +70,8 @@ describe('SOW contract repair types', () => {
   it.each([
     ['ACCEPTED_SOURCE_UNAVAILABLE', /re-accept.*save a fresh draft.*reissue/i],
     ['JOB_CHANGED_SINCE_ACCEPTANCE', /re-accept.*save a fresh draft.*reissue/i],
-    ['SOW_SOURCE_MISMATCH', /re-accept.*save a fresh draft.*reissue/i],
     ['STALE_SIGN_VERSION', /reload.*latest version/i],
-    ['AWAITING_SENT_VERSION', /wait.*reissue.*sent document/i]
+    ['AWAITING_SENT_VERSION', /send the document/i]
   ] as const)('gives %s an actionable repair step', (blocker, expected) => {
     expect(blockerStep(blocker)).toMatch(expected);
   });
@@ -95,11 +94,11 @@ describe('customer signing gate', () => {
       isActive: true,
       status: 'SENT',
       canSign: false,
-      signBlockers: ['SOW_SOURCE_MISMATCH', 'JOB_CHANGED_SINCE_ACCEPTANCE']
+      signBlockers: ['JOB_CHANGED_SINCE_ACCEPTANCE']
     });
     expect(state.enabled).toBe(false);
-    expect(state.blockerMessage).toBe(customerBlockerMessage('SOW_SOURCE_MISMATCH'));
-    expect(state.blockerMessage).toMatch(/lab.*updated.*sign/i);
+    expect(state.blockerMessage).toBe(customerBlockerMessage('JOB_CHANGED_SINCE_ACCEPTANCE'));
+    expect(state.blockerMessage).toMatch(/lab must issue an updated/i);
     expect(state.blockerMessage).not.toMatch(/re-accept|save.*draft/i);
   });
 });
@@ -384,5 +383,19 @@ describe('sowTotals', () => {
   it('treats missing lists as nothing rather than NaN', () => {
     expect(sowTotals(null, null)).toEqual({ baseCost: 0, totalCost: 0 });
     expect(sowTotals(undefined, undefined)).toEqual({ baseCost: 0, totalCost: 0 });
+  });
+});
+
+describe('nextSentVersionLabel', () => {
+  // Sending bumps the whole number, so the draft label is never what the
+  // customer ends up holding.
+  it('reports the version the customer will actually receive', () => {
+    expect(nextSentVersionLabel({ versionNumber: 4 })).toBe('1.0');
+    expect(nextSentVersionLabel({ versionNumber: 1003 })).toBe('2.0');
+    expect(nextSentVersionLabel({ versionNumber: 2000 })).toBe('3.0');
+  });
+
+  it('is empty with nothing to send', () => {
+    expect(nextSentVersionLabel(null)).toBe('');
   });
 });

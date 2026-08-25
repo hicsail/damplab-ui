@@ -15,13 +15,16 @@ export function isShowingWorkingCopy(viewing: SowViewing, currentVersionNumber: 
 }
 
 export function editorIsReadOnly(opts: {
-  cancelled: boolean;
   viewing: SowViewing;
   currentVersionNumber: number;
   dirty: boolean;
   baseline: number | null;
 }): boolean {
-  if (opts.cancelled) return true;
+  // Cancellation is not terminal. A job has exactly one Statement of Work, so
+  // the only way to replace a cancelled one is to edit it and issue a new
+  // version — freezing it left staff with a document they could neither use nor
+  // get rid of. The backend agrees: assertSowContractWritable blocks only SENT
+  // and FINAL.
   if (opts.baseline != null) return true;
   return !isShowingWorkingCopy(opts.viewing, opts.currentVersionNumber, opts.dirty);
 }
@@ -161,16 +164,10 @@ export function nextSowAction(opts: {
   activeStatus: SowStatus | null;
   gate?: SowActionGate | null;
   missingRequired: string[];
-  /** True while staff are paging through history or the SOW is cancelled. */
+  /** True while staff are paging through history. */
   readOnly?: boolean;
 }): SowNextAction {
   const { dirty, status, activeStatus, gate, missingRequired, readOnly } = opts;
-
-  // Checked before readOnly, which a cancelled SOW also trips: "viewing history"
-  // would be the wrong explanation for a document that has been withdrawn.
-  if (status === 'CANCELLED') {
-    return { kind: 'blocked', label: 'Cancelled', reason: 'This Statement of Work was cancelled and cannot be altered.' };
-  }
 
   // Every action below operates on the *current* version, not the one on screen.
   // Offering them while a historic version is displayed would act on something
@@ -180,6 +177,18 @@ export function nextSowAction(opts: {
   }
 
   if (dirty) return { kind: 'save', label: 'Save draft' };
+
+  // A cancelled document is retired, not finished: a job has exactly one
+  // Statement of Work, so reissuing means starting a fresh draft from it.
+  //
+  // Offered even with nothing edited, because there is often nothing to edit —
+  // the terms may be reissued verbatim after the reason for cancelling passed.
+  // Without this the only route to a new draft was to make a pointless change
+  // to dirty the buffer, and the fallthrough below claimed the lab was
+  // "Awaiting customer" on a document no customer holds.
+  if (status === 'CANCELLED') {
+    return { kind: 'save', label: 'Start a new draft' };
+  }
 
   // An outstanding draft is always the next thing to go out — this is checked
   // before the signature stage on purpose. Revising a signed SOW leaves a draft
@@ -211,4 +220,17 @@ export function nextSowAction(opts: {
   }
 
   return { kind: 'blocked', label: 'Awaiting customer', reason: 'The customer has this version and has not signed it yet.' };
+}
+
+/**
+ * Whether to offer Cancel on a Statement of Work.
+ *
+ * Cancelling retires a document that has reached the client; a draft they have
+ * never seen is edited or discarded instead. Read from the history rather than
+ * activeVersionNumber, which a withdrawal resets to 0 — that pointer answers
+ * "what is in force now", and a withdrawn SOW is exactly one that has been
+ * issued and still needs disposing of.
+ */
+export function cancelIsOffered(versions: Pick<SowVersion, 'status'>[] | null | undefined): boolean {
+  return (versions ?? []).some((v) => v.status !== 'DRAFT');
 }

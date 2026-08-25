@@ -102,10 +102,9 @@ export const GET_JOB_BY_ID = gql`
             email
             customerCategory
             state
-            customerEditingEnabled
             customerActionRequired
+            handoverVersionNumber
             acceptedJobVersionNumber
-            acceptedContractFingerprint
             acceptedBillingFingerprint
             submitted
             notes
@@ -223,10 +222,9 @@ export const GET_OWN_JOB_BY_ID = gql`
             email
             customerCategory
             state
-            customerEditingEnabled
             customerActionRequired
+            handoverVersionNumber
             acceptedJobVersionNumber
-            acceptedContractFingerprint
             acceptedBillingFingerprint
             submitted
             notes
@@ -868,7 +866,6 @@ export const GET_SOW_BY_JOB_ID = gql`
         status
         visibleToCustomer
         sourceJobVersionNumber
-        sourceContractFingerprint
       }
       actionGate {
         canSign
@@ -1434,7 +1431,6 @@ export const SOW_VERSION_FIELDS = gql`
         createdByName
         createdAt
         sourceJobVersionNumber
-        sourceContractFingerprint
         clientSignature { name signedAt consentedGroups sectionInitials { key label initials } legacySignatureDataUrl }
         staffSignature { name signedAt sectionInitials { key label initials } legacySignatureDataUrl }
         fields {
@@ -1482,7 +1478,7 @@ export const GET_SOW_EDITOR_STATE = gql`
             liveServices { serviceId name description cost unitCost multiplier runCount }
             actionGate { canSend sendBlockers canSign signBlockers canCountersign countersignBlockers missingFields }
             currentVersion { ...SowVersionFields }
-            activeVersion { versionNumber displayVersion status visibleToCustomer sourceJobVersionNumber sourceContractFingerprint }
+            activeVersion { versionNumber displayVersion status visibleToCustomer sourceJobVersionNumber }
             versions { ...SowVersionFields }
         }
     }

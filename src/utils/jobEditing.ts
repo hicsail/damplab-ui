@@ -12,13 +12,12 @@ export type { CustomerActionRequired } from './jobReview';
 
 export interface JobEditingFacts {
     state?: string | null;
-    customerEditingEnabled?: boolean | null;
     customerActionRequired?: CustomerActionRequired | null;
 }
 
 /** Whether the job's owner may currently change its workflow graph. */
 export function customerMayEdit(job: JobEditingFacts | null | undefined): boolean {
-    return job?.state === 'CHANGES_REQUESTED' && job.customerEditingEnabled === true;
+    return needsWorkflowEdit(job);
 }
 
 /** Whether the job is sitting with the customer rather than the lab. */
@@ -80,4 +79,48 @@ export function editingBlockedMessage(job: JobEditingFacts | null | undefined): 
         default:
             return `This job is no longer open for edits. ${seeComments}`;
     }
+}
+
+/**
+ * States in which the lab holds the job and has not committed to its spec.
+ * Mirrors STAFF_EDITABLE_STATES in the backend's job-editing.ts.
+ */
+const STAFF_EDITABLE_STATES = ['CREATING', 'SUBMITTED', 'QUEUED', 'IN_PROGRESS', 'COMPLETE'];
+
+/** Whether staff may currently change this job's contract. */
+export function staffMayEdit(job: JobEditingFacts | null | undefined): boolean {
+    return !!job?.state && STAFF_EDITABLE_STATES.includes(job.state);
+}
+
+/**
+ * Why staff cannot edit, phrased as the action that would unblock them.
+ * Null when nothing is in the way.
+ */
+export function staffEditBlockedReason(job: JobEditingFacts | null | undefined): string | null {
+    if (staffMayEdit(job)) return null;
+    switch (job?.state) {
+        case 'CHANGES_REQUESTED':
+            return 'This job is with the customer. Withdraw it from them before editing — that restores the workflow to the version they were sent.';
+        case 'ACCEPTED':
+            return 'This job has been accepted and its Statement of Work is priced against that spec. Withdraw the acceptance before editing.';
+        case 'CLOSED':
+            return 'This job is closed and can no longer be edited.';
+        case 'REJECTED':
+            return 'This job was not accepted and can no longer be edited.';
+        default:
+            return 'This job cannot be edited in its current state.';
+    }
+}
+
+/**
+ * Whether to offer Revert at all.
+ *
+ * Revert is a contract write, so it is offered only to whoever the server would
+ * actually let save — and never once the lab has started work, where
+ * assertWorkInFlightUntouched would refuse to re-service a started node.
+ */
+export function canRevertVersions(job: JobEditingFacts | null | undefined, isStaff: boolean): boolean {
+    const started = ['QUEUED', 'IN_PROGRESS', 'COMPLETE', 'CLOSED', 'REJECTED'];
+    if (!job?.state || started.includes(job.state)) return false;
+    return isStaff ? staffMayEdit(job) : customerMayEdit(job);
 }

@@ -87,8 +87,8 @@ function activeSowLifecycle(input: CustomerLifecycleInput): CustomerLifecycleRes
       }
       return result(
         'SOW_REISSUE_REQUIRED',
-        'Statement of Work withdrawn',
-        'This version is no longer available to sign. The lab must reissue the Statement of Work before you can continue.'
+        'Statement of Work not available to sign',
+        'This version is not available to sign right now. The lab will reissue it — see the comments on this job for why.'
       );
     case 'SIGNED':
       return result('SOW_SIGNED', 'Statement of Work signed', 'Your signature was recorded. The Statement of Work is waiting for the lab.');
@@ -109,6 +109,8 @@ export function deriveCustomerLifecycle(input: CustomerLifecycleInput): Customer
 
   if (input.state === 'ACCEPTED') {
     const sowLifecycle = activeSowLifecycle(input);
+    // Also where a withdrawn SOW lands: nothing is in force, so there is
+    // nothing to sign, and the automated comment explains why.
     return sowLifecycle ?? result('SOW_PREPARING', 'Statement of Work in preparation', 'The lab is preparing the Statement of Work. There is nothing to sign yet.');
   }
 
