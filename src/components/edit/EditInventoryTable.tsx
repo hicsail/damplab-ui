@@ -2,14 +2,17 @@ import { useApolloClient, useQuery } from '@apollo/client';
 import { DataGrid, GridActionsCellItem, GridColDef, GridRowId, GridRowModesModel, GridSlots } from '@mui/x-data-grid';
 import { Alert, Box, Button, Chip, Snackbar, Stack } from '@mui/material';
 import { Delete, Edit } from '@mui/icons-material';
+import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { UserContext } from '../../contexts/UserContext';
 import { GridToolBar } from './GridToolBar';
 import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS } from '../../gql/queries';
 import { validateFileType } from '../data-translation/utils';
 import { parseInventoryFile, ParsedInventoryRow, UploadSummary } from './inventoryUploadUtils';
 import { InventoryUploadPreview } from './InventoryUploadPreview';
+import * as XLSX from 'xlsx';
 
 export interface EditInventoryTableProps {
   searchString?: string;
@@ -18,6 +21,8 @@ export interface EditInventoryTableProps {
 export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchString = '' }) => {
   const navigate = useNavigate();
   const client = useApolloClient();
+  const { userProps } = useContext(UserContext);
+  const isStaff = !!userProps?.isDamplabStaff;
   // The inventory list isn't on AppContext yet (unlike services/bundles), so we
   // query directly and refetch after mutations. If the catalog grows enough
   // that this gets called a lot, lift to AppContext.
@@ -84,7 +89,36 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     setErrorMessage(`Import complete: ${parts.join(', ')}.`);
   };
 
-  const columns: GridColDef[] = [
+  const handleDownloadInventory = () => {
+    try {
+      const headers = ['Name', 'Type', 'Tag', 'Station', 'Quantity', 'Unique ID', 'Model #', 'Serial #', 'Service Contract Y/N', 'Service contract (expiration date)'];
+      const dataRows = rows.map((row: any) => {
+        const placement = row.placements?.[0];
+        return [
+          row.name ?? '',
+          row.type ?? '',
+          (row.tags ?? []).join(', '),
+          '', // Station name not resolved here — just leave blank for re-upload matching by uniqueId
+          placement?.quantity ?? '',
+          row.uniqueId ?? '',
+          row.modelNumber ?? '',
+          row.serialNumber ?? '',
+          row.hasServiceContract ? 'Y' : '',
+          row.serviceContractExpiration ? String(row.serviceContractExpiration).slice(0, 10) : ''
+        ];
+      });
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+      ws['!cols'] = [{ wch: 38 }, { wch: 12 }, { wch: 22 }, { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 22 }, { wch: 30 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+      XLSX.writeFile(wb, 'damplab-inventory.xlsx');
+    } catch (e) {
+      console.error('Download failed:', e);
+      setErrorMessage('Failed to generate inventory spreadsheet.');
+    }
+  };
+
+  const allColumns: GridColDef[] = [
     {
       field: 'actions',
       type: 'actions',
@@ -134,14 +168,22 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     }
   ];
 
+  const STAFF_ONLY_FIELDS = new Set(['actions', 'uniqueId', 'serialNumber']);
+  const columns = isStaff ? allColumns : allColumns.filter((col) => !STAFF_ONLY_FIELDS.has(col.field));
+
   return (
     <Stack spacing={1}>
-      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-        <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>
-          Upload inventory
-        </Button>
-        <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
-      </Box>
+      {isStaff && (
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Button variant='outlined' startIcon={<DownloadIcon />} onClick={handleDownloadInventory}>
+            Download inventory
+          </Button>
+          <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>
+            Upload inventory
+          </Button>
+          <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
+        </Box>
+      )}
       {previewRows && (
         <InventoryUploadPreview
           rows={previewRows}
@@ -157,8 +199,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         slotProps={{
           toolbar: {
             setRowModesModel,
-            addButtonLabel: 'Add new inventory item',
-            onAdd: () => navigate('/edit/inventory/new'),
+            ...(isStaff ? { addButtonLabel: 'Add new inventory item', onAdd: () => navigate('/edit/inventory/new') } : {}),
             showEditModeHint: false
           }
         }}
