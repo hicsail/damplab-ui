@@ -20,6 +20,7 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SendIcon from '@mui/icons-material/Send';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ThumbUpIcon from '@mui/icons-material/ThumbUpAltOutlined';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { deriveCustomerLifecycle, validResponseAction } from '../utils/customerLifecycle';
 import type { CustomerActionRequired } from '../utils/jobReview';
 import { chipStatusBackground, invoiceVersionLabel } from '../utils/technicianProcessStatus';
@@ -84,12 +85,17 @@ export default function Tracking() {
     });
     const sowFullData = sowByJobIdResult?.sowByJobId ?? null;
 
-    const { data: invoicesResult } = useQuery(GET_INVOICES_BY_JOB_ID, {
+    const { data: invoicesResult, refetch: refetchInvoices } = useQuery(GET_INVOICES_BY_JOB_ID, {
         variables: { jobId: id as string },
         skip: !id,
         fetchPolicy: 'network-only',
     });
     const invoices = invoicesResult?.invoicesByJobId ?? [];
+    const [refreshing, setRefreshing] = useState(false);
+
+    const refreshJobPage = async () => {
+        await Promise.all([refetch(), refetchSow(), refetchInvoices()]);
+    };
 
     const job = data?.ownJobById;
     const activeSow = sowFullData?.activeVersion ?? null;
@@ -173,6 +179,22 @@ export default function Tracking() {
                 <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1 }}>
                     <Button
                         variant="outlined"
+                        startIcon={<RefreshIcon />}
+                        onClick={async () => {
+                            setRefreshing(true);
+                            try {
+                                await refreshJobPage();
+                            } finally {
+                                setRefreshing(false);
+                            }
+                        }}
+                        disabled={!id || refreshing}
+                        sx={{ textTransform: 'none' }}
+                    >
+                        {refreshing ? 'Refreshing…' : 'Refresh Job'}
+                    </Button>
+                    <Button
+                        variant="outlined"
                         startIcon={<VisibilityIcon />}
                         onClick={() => navigate(`/job_editor/${id}`)}
                         sx={{ textTransform: 'none' }}
@@ -197,7 +219,7 @@ export default function Tracking() {
                                 onClick={() => navigate(`/job_editor/${id}`)}
                                 sx={{ textTransform: 'none' }}
                             >
-                                Edit Job
+                                View/Edit Job
                             </Button>
                             <Button
                                 variant="contained"
@@ -243,7 +265,6 @@ export default function Tracking() {
 
                 <CollapsibleStatusCard
                     title="Job"
-                    defaultExpanded
                     titleExtra={id ? <Typography variant="body2" color="text.secondary">{id}</Typography> : undefined}
                     statusPaneSx={{
                         bgcolor: lifecycle.primaryAction
@@ -324,7 +345,6 @@ export default function Tracking() {
 
                 <CollapsibleStatusCard
                     title="Invoices"
-                    defaultExpanded={invoices.length > 0}
                     statusPaneSx={{ bgcolor: chipStatusBackground(invoices.length ? 'info' : 'default') }}
                     statusPane={
                         invoices.length ? (

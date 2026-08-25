@@ -6,8 +6,8 @@ import { STATUS_PANE_MIN_HEIGHT } from '../CollapsibleStatusCard';
 import type { PartyBadge } from '../../utils/technicianProcessStatus';
 
 /**
- * Technician job-page card: parties and status always visible; buttons and
- * details expand together from the card header.
+ * Technician job-page card: parties and status always visible. The card header
+ * reveals actions; a separate control reveals right-column details.
  */
 
 interface Props {
@@ -36,21 +36,20 @@ export default function ProcessCard({
   defaultExpanded = false
 }: Props): React.JSX.Element {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     setExpanded(defaultExpanded);
   }, [defaultExpanded]);
 
-  const toggle = () => setExpanded((open) => !open);
+  useEffect(() => {
+    if (!expanded) setDetailsOpen(false);
+  }, [expanded]);
 
-  const headerToggle = {
-    onClick: toggle,
-    onKeyDown: (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggle();
-      }
-    }
+  const toggleCard = () => setExpanded((open) => !open);
+  const toggleDetails = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    setDetailsOpen((open) => !open);
   };
 
   return (
@@ -61,7 +60,13 @@ export default function ProcessCard({
           tabIndex={0}
           aria-expanded={expanded}
           aria-label={expanded ? `Collapse ${title}` : `Expand ${title}`}
-          {...headerToggle}
+          onClick={toggleCard}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleCard();
+            }
+          }}
           sx={{
             display: 'flex',
             alignItems: 'center',
@@ -100,11 +105,9 @@ export default function ProcessCard({
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Box
-              onClick={toggle}
               sx={{
                 p: 2,
                 borderRadius: 1,
-                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: 1,
@@ -116,7 +119,40 @@ export default function ProcessCard({
               <Box sx={{ flex: 1, minWidth: 0 }}>{statusPane}</Box>
             </Box>
             <Collapse in={expanded} unmountOnExit={false}>
-              <Box sx={{ pt: 2 }}>{details}</Box>
+              <Box
+                role="button"
+                tabIndex={0}
+                aria-expanded={detailsOpen}
+                onClick={toggleDetails}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleDetails(e);
+                  }
+                }}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  mt: 1,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  color: 'text.secondary',
+                  width: 'fit-content'
+                }}
+              >
+                <Typography variant="body2">{detailsOpen ? 'Hide details' : 'Show details'}</Typography>
+                <ExpandMoreIcon
+                  sx={{
+                    fontSize: 20,
+                    transform: detailsOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 150ms'
+                  }}
+                />
+              </Box>
+              <Collapse in={detailsOpen} unmountOnExit={false}>
+                <Box sx={{ pt: 2 }}>{details}</Box>
+              </Collapse>
             </Collapse>
           </Box>
         </Box>

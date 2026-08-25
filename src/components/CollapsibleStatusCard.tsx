@@ -16,8 +16,8 @@ interface Props {
 }
 
 /**
- * Single-column collapsible card: a colored status header and the existing
- * details underneath. Used on the customer job page.
+ * Single-column collapsible card: a colored status header and details behind
+ * a Show details control. Used on the customer job page.
  */
 export default function CollapsibleStatusCard({
   title,
@@ -46,6 +46,20 @@ export default function CollapsibleStatusCard({
           )}
         </Box>
         <Box
+          sx={{
+            p: 2,
+            borderRadius: 1,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 1,
+            minHeight: STATUS_PANE_MIN_HEIGHT,
+            boxSizing: 'border-box',
+            ...statusPaneSx
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0 }}>{statusPane}</Box>
+        </Box>
+        <Box
           role="button"
           tabIndex={0}
           aria-expanded={expanded}
@@ -57,22 +71,20 @@ export default function CollapsibleStatusCard({
             }
           }}
           sx={{
-            p: 2,
-            borderRadius: 1,
-            cursor: 'pointer',
             display: 'flex',
-            alignItems: 'flex-start',
-            gap: 1,
-            minHeight: STATUS_PANE_MIN_HEIGHT,
-            boxSizing: 'border-box',
-            ...statusPaneSx
+            alignItems: 'center',
+            gap: 0.5,
+            mt: 1,
+            cursor: 'pointer',
+            userSelect: 'none',
+            color: 'text.secondary',
+            width: 'fit-content'
           }}
         >
-          <Box sx={{ flex: 1, minWidth: 0 }}>{statusPane}</Box>
+          <Typography variant="body2">{expanded ? 'Hide details' : 'Show details'}</Typography>
           <ExpandMoreIcon
             sx={{
-              mt: 0.25,
-              flexShrink: 0,
+              fontSize: 20,
               transform: expanded ? 'rotate(180deg)' : 'none',
               transition: 'transform 150ms'
             }}

@@ -553,7 +553,7 @@ export default function TechnicianView() {
                                 disabled={jobState === 'CLOSED'}
                                 sx={railBtnSx}
                             >
-                                Edit Job
+                                View/Edit Job
                             </Button>
                             <Button
                                 variant="contained"
