@@ -4,6 +4,7 @@ import { Alert, Box, Button, Chip, Snackbar, Stack } from '@mui/material';
 import { Delete, Edit } from '@mui/icons-material';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
+import HistoryIcon from '@mui/icons-material/History';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { UserContext } from '../../contexts/UserContext';
@@ -32,6 +33,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
   const [, setRowModesModel] = useState<GridRowModesModel>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewRows, setPreviewRows] = useState<ParsedInventoryRow[] | null>(null);
+  const [uploadFileName, setUploadFileName] = useState('');
 
   useEffect(() => {
     setRows(data?.inventoryItems ?? []);
@@ -73,6 +75,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         setErrorMessage('No valid rows found in the spreadsheet.');
         return;
       }
+      setUploadFileName(file.name);
       setPreviewRows(parsed);
     } catch (e) {
       setErrorMessage(e instanceof Error ? e.message : 'Failed to parse file.');
@@ -181,12 +184,16 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
           <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>
             Upload inventory
           </Button>
+          <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history')}>
+            Upload history
+          </Button>
           <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
         </Box>
       )}
       {previewRows && (
         <InventoryUploadPreview
           rows={previewRows}
+          fileName={uploadFileName}
           open={!!previewRows}
           onClose={() => setPreviewRows(null)}
           onComplete={handleUploadComplete}

@@ -57,6 +57,7 @@ export default [
         route("/edit/bundles/:bundleId", "./pages/AdminEditBundle.tsx"),
         route("/edit/sow-sections/:sectionKey", "./pages/AdminEditSowSection.tsx"),
         route("/edit/inventory/new", "./pages/AdminNewInventoryItem.tsx"),
+        route("/edit/inventory/upload-history", "./pages/InventoryUploadHistory.tsx"),
         route("/edit/inventory/:id", "./pages/AdminEditInventoryItem.tsx"),
         route("/inventory", "./pages/Inventory.tsx"),
 

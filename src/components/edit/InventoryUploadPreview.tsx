@@ -17,9 +17,11 @@ import {
   Typography
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
+import { UserContext } from '../../contexts/UserContext';
 import {
   CREATE_INVENTORY_ITEM,
+  CREATE_UPLOAD_LOG,
   GET_INVENTORY_ITEMS,
   GET_STATIONS,
   UPDATE_INVENTORY_ITEM
@@ -40,13 +42,15 @@ import {
 
 interface InventoryUploadPreviewProps {
   rows: ParsedInventoryRow[];
+  fileName: string;
   open: boolean;
   onClose: () => void;
   onComplete: (summary: UploadSummary) => void;
 }
 
-export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ rows, open, onClose, onComplete }) => {
+export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ rows, fileName, open, onClose, onComplete }) => {
   const client = useApolloClient();
+  const { userProps } = useContext(UserContext);
   const { data: stationData } = useQuery(GET_STATIONS, { fetchPolicy: 'cache-and-network' });
   const { data: inventoryData } = useQuery(GET_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
   const [importing, setImporting] = useState(false);
@@ -186,28 +190,47 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
     setError(null);
     setProgress(0);
 
+    const uploaderName = userProps?.idTokenParsed?.name || userProps?.idTokenParsed?.preferred_username || 'unknown';
+    const uploaderSub = userProps?.subject;
     const summary: UploadSummary = { created: 0, updated: 0, skipped: 0, errors: [] };
+    const affectedItemIds: string[] = [];
+    const fieldSnapshots: Array<{ itemId: string; action: string; before?: Record<string, unknown>; after?: Record<string, unknown> }> = [];
+
+    // Build a lookup of existing items for before-snapshots
+    const existingById = new Map<string, Record<string, unknown>>();
+    for (const item of existingItems as any[]) {
+      existingById.set(String(item.id), item);
+    }
 
     try {
-      // Create/update inventory items
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         setProgress(Math.round(((i + 1) / rows.length) * 100));
 
         try {
           if (row.existingItemId) {
-            // Skip soft-deleted matches unless user chose to reactivate
             if (row.matchedIsDeleted && !reactivateSet.has(i)) {
               summary.skipped += 1;
               continue;
             }
             const changes = buildUpdateChanges(row, selectedColumns);
+            changes.lastModifiedBy = uploaderName;
             if (row.matchedIsDeleted && reactivateSet.has(i)) {
               changes.isDeleted = false;
             }
-            await client.mutate({
+            const beforeItem = existingById.get(row.existingItemId);
+            const result = await client.mutate({
               mutation: UPDATE_INVENTORY_ITEM,
               variables: { item: row.existingItemId, changes }
+            });
+            const afterItem = result.data?.updateInventoryItem;
+            const action = row.matchedIsDeleted && reactivateSet.has(i) ? 'REACTIVATE' : 'UPDATE';
+            affectedItemIds.push(row.existingItemId);
+            fieldSnapshots.push({
+              itemId: row.existingItemId,
+              action,
+              before: beforeItem ? { name: beforeItem.name, type: beforeItem.type, tags: beforeItem.tags } : undefined,
+              after: afterItem ? { name: afterItem.name, type: afterItem.type, tags: afterItem.tags } : undefined
             });
             summary.updated += 1;
           } else {
@@ -216,10 +239,20 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
               summary.skipped += 1;
               continue;
             }
-            await client.mutate({
+            input.lastModifiedBy = uploaderName;
+            const result = await client.mutate({
               mutation: CREATE_INVENTORY_ITEM,
               variables: { item: input }
             });
+            const created = result.data?.createInventoryItem;
+            if (created?.id) {
+              affectedItemIds.push(created.id);
+              fieldSnapshots.push({
+                itemId: created.id,
+                action: 'CREATE',
+                after: { name: created.name, type: created.type, tags: created.tags }
+              });
+            }
             summary.created += 1;
           }
         } catch (e) {
@@ -230,6 +263,29 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
       setError(e instanceof Error ? e.message : String(e));
       setImporting(false);
       return;
+    }
+
+    // Record upload log
+    try {
+      await client.mutate({
+        mutation: CREATE_UPLOAD_LOG,
+        variables: {
+          input: {
+            uploaderName,
+            uploaderSub,
+            fileName,
+            rowCount: rows.length,
+            createdCount: summary.created,
+            updatedCount: summary.updated,
+            skippedCount: summary.skipped,
+            failedCount: summary.errors.length,
+            affectedItemIds,
+            fieldSnapshots
+          }
+        }
+      });
+    } catch (e) {
+      console.error('Failed to create upload log:', e);
     }
 
     setImporting(false);
