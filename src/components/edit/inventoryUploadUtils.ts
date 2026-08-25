@@ -202,39 +202,59 @@ export function matchExistingItems(
   }
 }
 
+/** Selectable columns for the upload preview. "name" is always included (not optional). */
+export const UPLOAD_COLUMNS = [
+  { key: 'type', label: 'Type' },
+  { key: 'tag', label: 'Tag' },
+  { key: 'station', label: 'Station & Quantity' },
+  { key: 'modelNumber', label: 'Model #' },
+  { key: 'serialNumber', label: 'Serial #' },
+  { key: 'hasServiceContract', label: 'Service Contract' }
+] as const;
+
+export type UploadColumnKey = (typeof UPLOAD_COLUMNS)[number]['key'];
+
 /** Build the GraphQL input for creating a new inventory item. */
-export function buildCreateInput(row: ParsedInventoryRow): Record<string, unknown> {
+export function buildCreateInput(row: ParsedInventoryRow, selectedColumns?: Set<UploadColumnKey>): Record<string, unknown> {
+  const include = (col: UploadColumnKey): boolean => !selectedColumns || selectedColumns.has(col);
+
   const input: Record<string, unknown> = {
     name: row.name,
-    type: row.type,
-    tags: row.tag ? [row.tag] : [],
-    modelNumber: row.modelNumber || undefined,
-    serialNumber: row.serialNumber || undefined,
-    hasServiceContract: row.hasServiceContract,
-    serviceContractExpiration: row.serviceContractExpiration || undefined
+    type: include('type') ? row.type : 'EQUIPMENT',
+    tags: include('tag') ? (row.tag ? [row.tag] : []) : []
   };
 
-  if (row.resolvedStationId) {
+  if (include('station') && row.resolvedStationId) {
     input.placements = [{ stationId: row.resolvedStationId, quantity: row.quantity }];
+  }
+  if (include('modelNumber')) input.modelNumber = row.modelNumber || undefined;
+  if (include('serialNumber')) input.serialNumber = row.serialNumber || undefined;
+  if (include('hasServiceContract')) {
+    input.hasServiceContract = row.hasServiceContract;
+    input.serviceContractExpiration = row.serviceContractExpiration || undefined;
   }
 
   return input;
 }
 
 /** Build the GraphQL changes for updating an existing inventory item. */
-export function buildUpdateChanges(row: ParsedInventoryRow): Record<string, unknown> {
+export function buildUpdateChanges(row: ParsedInventoryRow, selectedColumns?: Set<UploadColumnKey>): Record<string, unknown> {
+  const include = (col: UploadColumnKey): boolean => !selectedColumns || selectedColumns.has(col);
+
   const changes: Record<string, unknown> = {
-    name: row.name,
-    type: row.type,
-    tags: row.tag ? [row.tag] : [],
-    modelNumber: row.modelNumber || null,
-    serialNumber: row.serialNumber || null,
-    hasServiceContract: row.hasServiceContract,
-    serviceContractExpiration: row.serviceContractExpiration || null
+    name: row.name
   };
 
-  if (row.resolvedStationId) {
+  if (include('type')) changes.type = row.type;
+  if (include('tag')) changes.tags = row.tag ? [row.tag] : [];
+  if (include('station') && row.resolvedStationId) {
     changes.placements = [{ stationId: row.resolvedStationId, quantity: row.quantity }];
+  }
+  if (include('modelNumber')) changes.modelNumber = row.modelNumber || null;
+  if (include('serialNumber')) changes.serialNumber = row.serialNumber || null;
+  if (include('hasServiceContract')) {
+    changes.hasServiceContract = row.hasServiceContract;
+    changes.serviceContractExpiration = row.serviceContractExpiration || null;
   }
 
   return changes;

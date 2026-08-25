@@ -3,11 +3,13 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   LinearProgress,
   Stack,
   Typography
@@ -27,6 +29,8 @@ import {
   matchExistingItems,
   ParsedInventoryRow,
   resolveStations,
+  UPLOAD_COLUMNS,
+  UploadColumnKey,
   UploadSummary
 } from './inventoryUploadUtils';
 
@@ -44,6 +48,18 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [selectedColumns, setSelectedColumns] = useState<Set<UploadColumnKey>>(
+    () => new Set(UPLOAD_COLUMNS.map((c) => c.key))
+  );
+
+  const toggleColumn = (key: UploadColumnKey) => {
+    setSelectedColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const stations: Array<{ id: string; name: string }> = stationData?.stations ?? [];
   const existingItems: Array<{ id: string; uniqueId?: string }> = inventoryData?.inventoryItems ?? [];
@@ -138,14 +154,14 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
               mutation: UPDATE_INVENTORY_ITEM,
               variables: {
                 item: row.existingItemId,
-                changes: buildUpdateChanges(row)
+                changes: buildUpdateChanges(row, selectedColumns)
               }
             });
             summary.updated += 1;
           } else {
             await client.mutate({
               mutation: CREATE_INVENTORY_ITEM,
-              variables: { item: buildCreateInput(row) }
+              variables: { item: buildCreateInput(row, selectedColumns) }
             });
             summary.created += 1;
           }
@@ -186,6 +202,28 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
               {warningRows.length} row{warningRows.length > 1 ? 's have' : ' has'} warnings. Review the table below.
             </Alert>
           )}
+
+          <Box>
+            <Typography variant='subtitle2' sx={{ mb: 0.5 }}>
+              Columns to import (unchecked columns will be skipped for updates):
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
+              {UPLOAD_COLUMNS.map((col) => (
+                <FormControlLabel
+                  key={col.key}
+                  control={
+                    <Checkbox
+                      size='small'
+                      checked={selectedColumns.has(col.key)}
+                      onChange={() => toggleColumn(col.key)}
+                      disabled={importing}
+                    />
+                  }
+                  label={col.label}
+                />
+              ))}
+            </Box>
+          </Box>
 
           {error && <Alert severity='error'>{error}</Alert>}
 
