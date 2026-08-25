@@ -11,7 +11,7 @@ import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
 import SowSignaturesSummary from './SowSignaturesSummary';
 import { diffVersions, previousCustomerVersion } from '../../utils/sowDiff';
-import { GROUP_ORDER, SowEditorState, SowField, customerDocumentFields, signingAgreementText, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
+import { GROUP_ORDER, SowEditorState, SowField, customerDocumentFields, customerSigningState, signingAgreementText, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 import { formatSOWInstant } from '../../utils/sowDateUtils';
 
 /**
@@ -69,6 +69,12 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
 
   const isCurrent = !!version && version.versionNumber === activeNumber;
   const awaitingSignature = isCurrent && version?.status === 'SENT';
+  const signingState = customerSigningState({
+    isActive: isCurrent,
+    status: version?.status,
+    canSign: sow?.actionGate?.canSign,
+    signBlockers: sow?.actionGate?.signBlockers
+  });
   const signedName = version?.clientSignature?.name;
 
   useEffect(() => {
@@ -79,10 +85,10 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   if (!loading && !sow) return null;
 
   const allInitialed = sectionsNeedingInitials.every((f) => (initials[f.key] ?? '').trim().length > 0);
-  const canSign = awaitingSignature && agreed && allInitialed && name.trim().length > 0 && !busy;
+  const canSign = signingState.enabled && agreed && allInitialed && name.trim().length > 0 && !busy;
 
   const handleSign = async (): Promise<void> => {
-    if (!sow || !version) return;
+    if (!sow || !version || !signingState.enabled) return;
     setBusy(true);
     setBanner(null);
     try {
@@ -169,6 +175,12 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                 </Alert>
               )}
 
+              {awaitingSignature && !signingState.enabled && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  {signingState.blockerMessage ?? 'Signing is temporarily unavailable. Reload this job or contact the lab before continuing.'}
+                </Alert>
+              )}
+
               {signedName && (
                 <Alert severity="success" icon={<CheckCircleOutlineIcon />} sx={{ mb: 2 }}>
                   Signed by {signedName}
@@ -212,7 +224,7 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                             value={initials[f.key] ?? ''}
                             onChange={(e) => setInitials((prev) => ({ ...prev, [f.key]: e.target.value }))}
                             sx={{ width: 120 }}
-                            disabled={busy}
+                            disabled={busy || !signingState.enabled}
                           />
                           <Typography variant="caption" color="text.secondary">
                             Please initial to confirm you have read this section.
@@ -245,7 +257,7 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                   <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <FormControlLabel
                       sx={{ flex: '1 1 280px', alignItems: 'flex-start', mr: 0 }}
-                      control={<Checkbox checked={agreed} onChange={(e) => setAgreed(e.target.checked)} sx={{ pt: 0.25 }} />}
+                      control={<Checkbox checked={agreed} onChange={(e) => setAgreed(e.target.checked)} sx={{ pt: 0.25 }} disabled={!signingState.enabled || busy} />}
                       label={
                         <Typography variant="body2" data-verbatim-text>
                           {agreementText}
@@ -253,7 +265,7 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                       }
                     />
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <TextField size="small" label="Your full name" value={name} onChange={(e) => setName(e.target.value)} sx={{ minWidth: 220 }} disabled={busy} />
+                      <TextField size="small" label="Your full name" value={name} onChange={(e) => setName(e.target.value)} sx={{ minWidth: 220 }} disabled={busy || !signingState.enabled} />
                       <Button variant="contained" onClick={handleSign} disabled={!canSign}>
                         Sign
                       </Button>

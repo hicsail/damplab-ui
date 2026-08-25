@@ -10,13 +10,14 @@ import { buildNodeParameters, createNodeObject } from '../controllers/ReactFlowE
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
 import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from '../controllers/jobGraphHydration';
 import { diffJobGraphs, latestContentVersion, latestVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
+import { canRevertVersions, customerMayEdit, editingBlockedMessage, staffEditBlockedReason } from '../utils/jobEditing';
 import { missedContentVersion, missedUnfilteredContent, pickersAfterSave, seedLoadedVersionNumber } from '../utils/jobEditorSave';
 import JobVersionHistory from '../components/JobVersionHistory';
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
 import RightSidebar   from '../components/RightSidebar';
 import { GET_JOB_BY_ID, GET_OWN_JOB_BY_ID } from '../gql/queries';
-import { SAVE_JOB_WORKFLOWS } from '../gql/mutations';
+import { RESTORE_JOB_VERSION, SAVE_JOB_WORKFLOWS } from '../gql/mutations';
 import { AppContext }    from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas';
 import { UserContext }   from '../contexts/UserContext';
@@ -73,6 +74,8 @@ export default function JobEditor() {
     const job = data?.jobById ?? data?.ownJobById ?? null;
 
     const [saveJobWorkflows] = useMutation(SAVE_JOB_WORKFLOWS);
+    const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
+    const [restoring, setRestoring] = useState(false);
 
     const versions: JobVersionLike[] = useMemo(() => job?.versions ?? [], [job]);
     // Staff skip trailing events so they do not land on a Closed copy.
@@ -109,20 +112,67 @@ export default function JobEditor() {
         setLoadedVersionNumber((prev) => prev ?? seedLoadedVersionNumber(isStaff, latest.versionNumber, job.latestContentVersionNumber));
     }, [latest, job, id, isStaff]);
 
+    /**
+     * Restoring an earlier version.
+     *
+     * Server-side on purpose: withdrawing a job from the customer restores the
+     * same way, and the gate that decides who may write lives there. Doing it in
+     * the browser would duplicate the logic and sit outside that gate.
+     */
+    const canRevert = canRevertVersions(job, isStaff);
+    const isLatestVersion = latest != null && viewing === latest.versionNumber;
+
+    const handleRestoreVersion = async (): Promise<void> => {
+        if (viewing == null || !id) return;
+        const label = jobVersionDisplayLabel(viewing);
+        if (!window.confirm(`Restore version ${label}? This becomes the current workflow, saved as a new version. Nothing already in the history is lost.`)) return;
+        setRestoring(true);
+        try {
+            await restoreJobVersion({ variables: { jobId: id, versionNumber: viewing, note: `Restored version ${label}` } });
+            const { data: fresh } = await refetch();
+            const freshJob = fresh?.jobById ?? fresh?.ownJobById ?? null;
+            const freshLatest = isStaff ? latestContentVersion(freshJob?.versions ?? []) : latestVersion(freshJob?.versions ?? []);
+            if (freshLatest) {
+                setViewing(freshLatest.versionNumber);
+                setBaseline(undefined);
+            }
+            setMessage({ text: `Restored version ${label}.`, severity: 'success' });
+        } catch (err: any) {
+            setMessage({ text: err?.message ?? 'Could not restore that version.', severity: 'error' });
+        } finally {
+            setRestoring(false);
+        }
+    };
+
     /** Viewing anything but the newest version is a read-only look at history.
      *  Suppressed while a save is in flight so a refetch that lands a new latest
      *  before we snap the picker cannot flash the canvas into historic mode. */
     const isHistoric = !saving && latest != null && viewing != null && viewing !== latest.versionNumber;
 
-    /** The job is back with the lab, so it is not the customer's to change.
-     *  Mirrors the server rule in job.resolver.saveJobWorkflows exactly: without
-     *  it, a customer who follows the editor link in an old comment after
-     *  resubmitting gets a fully editable canvas and a Forbidden error on save. */
-    const lockedToLab = !isStaff && job != null && job.state !== 'CHANGES_REQUESTED';
+    /** Not the customer's to change right now.
+     *  Mirrors the server gate exactly: both CHANGES_REQUESTED and the explicit
+     *  editing grant are required. A stale true flag in any other lifecycle state
+     *  therefore remains read-only. */
+    const lockedToLab = !isStaff && job != null && !customerMayEdit(job);
+    /** Staff cannot edit a job the customer holds, or one whose spec is accepted. */
+    const staffBlockedReason = isStaff && job != null ? staffEditBlockedReason(job) : null;
+
+    /** What to show when a save is refused.
+     *  A customer whose job was accepted while they had the editor open needs to
+     *  be told *that*, not handed Apollo's wrapper text. The job this tab loaded
+     *  cannot answer the question — it is precisely the thing that went stale —
+     *  so the fresh copy decides, and only genuine failures echo the error. */
+    const saveErrorText = async (err: any): Promise<string> => {
+        if (!isStaff) {
+            const fresh = await peekJob().catch(() => null);
+            if (fresh && !customerMayEdit(fresh)) return editingBlockedMessage(fresh);
+        }
+        return err?.message ?? 'Could not save changes.';
+    };
 
     /** Nothing on the canvas may be changed — either a past version is on
      *  screen, or the job is not editable by this reader right now. */
-    const readOnly = isHistoric || lockedToLab;
+    const readOnly = isHistoric || lockedToLab || staffBlockedReason != null;
 
     const { baseline: baselineVersion } = useMemo(() => selectedDiffPair(versions, viewing, baseline), [versions, viewing, baseline]);
 
@@ -405,6 +455,16 @@ export default function JobEditor() {
         setSaving(true);
         try {
             const peekedJob = await peekJob();
+
+            // The lab may have taken the job back while this canvas sat open —
+            // accepting closes editing. Caught here rather than left to the
+            // server's rejection so the customer is told what happened to their
+            // job, not that their save failed.
+            if (!isStaff && !customerMayEdit(peekedJob)) {
+                setMessage({ text: editingBlockedMessage(peekedJob), severity: 'error' });
+                return;
+            }
+
             const peekedVersions: JobVersionLike[] = peekedJob?.versions ?? [];
             const missed = isStaff
                 ? missedContentVersion(peekedVersions, loadedVersionNumber)
@@ -423,7 +483,7 @@ export default function JobEditor() {
             }
             await persistCanvas(null);
         } catch (err: any) {
-            setMessage({ text: err?.message ?? 'Could not save changes.', severity: 'error' });
+            setMessage({ text: await saveErrorText(err), severity: 'error' });
         } finally {
             setSaving(false);
         }
@@ -436,7 +496,7 @@ export default function JobEditor() {
         try {
             await persistCanvas(missedVersionNumber);
         } catch (err: any) {
-            setMessage({ text: err?.message ?? 'Could not save changes.', severity: 'error' });
+            setMessage({ text: await saveErrorText(err), severity: 'error' });
         } finally {
             setSaving(false);
         }
@@ -501,7 +561,7 @@ export default function JobEditor() {
                                     Back to job
                                 </Button>
                                 <Typography variant="caption" sx={{ display: 'block', mt: 0.5, backgroundColor: 'white', px: 0.75, borderRadius: 1, width: 'fit-content' }}>
-                                    Editing <strong>{job.name}</strong>{job.jobId ? ` (#${job.jobId})` : ''}
+                                    {readOnly ? 'Viewing' : 'Editing'} <strong>{job.name}</strong>{job.jobId ? ` (#${job.jobId})` : ''}
                                 </Typography>
                                 <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
                                     <Chip size="small" label="New" sx={{ height: 18, fontSize: 10, backgroundColor: '#2e7d32', color: 'white', fontWeight: 700 }} />
@@ -529,6 +589,21 @@ export default function JobEditor() {
                                             onBaselineChange={setBaseline}
                                             dense
                                         />
+                                        {/* Restoring is a contract write like any
+                                            other, so it is offered only where the
+                                            server would accept the save — see
+                                            canRevertVersions. */}
+                                        {canRevert && !isLatestVersion && (
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                disabled={restoring}
+                                                onClick={handleRestoreVersion}
+                                                sx={{ textTransform: 'none', mt: 0.75, width: '100%' }}
+                                            >
+                                                {restoring ? 'Restoring…' : 'Restore this version'}
+                                            </Button>
+                                        )}
                                     </Box>
                                 )}
                             </Panel>
@@ -538,12 +613,23 @@ export default function JobEditor() {
                                     <Alert severity="info" sx={{ py: 0.25, fontSize: 12 }}>
                                         Viewing version {jobVersionDisplayLabel(viewing!)} — read only. Switch back to version {jobVersionDisplayLabel(latest!.versionNumber)} to edit.
                                     </Alert>
+                                ) : staffBlockedReason ? (
+                                    /* Names the withdrawal that would unblock them —
+                                       "read only" on a job a technician is looking at is
+                                       otherwise indistinguishable from a bug. */
+                                    <Alert severity="info" sx={{ py: 0.25, fontSize: 12 }}>
+                                        {staffBlockedReason}
+                                    </Alert>
                                 ) : lockedToLab ? (
                                     /* Deliberately not the historic message: telling a
                                        customer to switch versions is advice they cannot act
-                                       on, because no version of this job is theirs to edit. */
+                                       on, because no version of this job is theirs to edit.
+                                       Phrased for arrival by the job view's View button too,
+                                       which reaches finished jobs no lab review is pending
+                                       on — hence no claim about what happens next beyond the
+                                       one condition that does reopen editing. */
                                     <Alert severity="info" sx={{ py: 0.25, fontSize: 12 }}>
-                                        This job is with the DAMP Lab for review — read only. You can edit it again if the lab requests further changes.
+                                        {editingBlockedMessage(job)}
                                     </Alert>
                                 ) : (
                                 <>
@@ -592,7 +678,7 @@ export default function JobEditor() {
                                         }}
                                         sx={{ textTransform: 'none', backgroundColor: 'white' }}
                                     >
-                                        Revert to saved job
+                                        Discard unsaved edits
                                     </Button>
                                 </Panel>
                             )}
@@ -603,7 +689,7 @@ export default function JobEditor() {
                                 the same treatment CanvasPreview already uses. */}
                             <RightSidebar
                                 changedParamIdsByNode={changedParamIdsByNode}
-                                noMouseEvents={readOnly}
+                                readOnly={readOnly}
                                 customerCategory={job?.customerCategory ?? undefined}
                             />
                         </div>

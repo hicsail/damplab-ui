@@ -155,11 +155,88 @@ export const UPDATE_WORKFLOW_NODE_ESTIMATED_TIME = gql`
     }
 `;
 
+/** Staff-only: open or close the customer's ability to edit a job's workflow graph. */
+export const SET_JOB_CUSTOMER_EDITING = gql`
+    mutation setJobCustomerEditing($jobId: ID!, $enabled: Boolean!) {
+        setJobCustomerEditing(jobId: $jobId, enabled: $enabled) {
+            id
+        }
+    }
+`;
+
+export const REVIEW_JOB = gql`
+    mutation ReviewJob($input: ReviewJobInput!) {
+        reviewJob(input: $input) {
+            id
+            state
+            customerActionRequired
+            acceptedJobVersionNumber
+            acceptedBillingFingerprint
+        }
+    }
+`;
+
+export const RESPOND_TO_JOB_REVIEW = gql`
+    mutation RespondToJobReview($input: RespondToJobReviewInput!) {
+        respondToJobReview(input: $input) {
+            id
+            state
+            customerActionRequired
+            acceptedJobVersionNumber
+            acceptedBillingFingerprint
+        }
+    }
+`;
+
+export const WITHDRAW_JOB_FROM_CUSTOMER = gql`
+    mutation WithdrawJobFromCustomer($input: WithdrawJobInput!) {
+        withdrawJobFromCustomer(input: $input) {
+            id
+            state
+            customerActionRequired
+            handoverVersionNumber
+        }
+    }
+`;
+
+export const WITHDRAW_JOB_ACCEPTANCE = gql`
+    mutation WithdrawJobAcceptance($input: WithdrawJobInput!) {
+        withdrawJobAcceptance(input: $input) {
+            id
+            state
+            customerActionRequired
+            acceptedJobVersionNumber
+            acceptedBillingFingerprint
+        }
+    }
+`;
+
+export const RESTORE_JOB_VERSION = gql`
+    mutation RestoreJobVersion($jobId: ID!, $versionNumber: Int!, $note: String) {
+        restoreJobVersion(jobId: $jobId, versionNumber: $versionNumber, note: $note) {
+            id
+            state
+        }
+    }
+`;
+
+export const WITHDRAW_SOW_FROM_CUSTOMER = gql`
+    mutation WithdrawSowFromCustomer($sowId: ID!, $reason: String!) {
+        withdrawSowFromCustomer(sowId: $sowId, reason: $reason) {
+            id
+            status
+            currentVersionNumber
+            activeVersionNumber
+        }
+    }
+`;
+
 export const MUTATE_JOB_STATE = gql`
-    mutation changeJobState($ID: ID!, $State: JobState!) {
+    mutation changeJobState($ID: ID!, $State: JobState!, $Note: String) {
         changeJobState(
             job: $ID,
-            newState: $State
+            newState: $State,
+            note: $Note
         ) {
             id
             state

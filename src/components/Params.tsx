@@ -34,6 +34,23 @@ interface ParamFormProps {
    * decorated.
    */
   changedParamIds?: Set<string>;
+  /**
+   * Show the parameters without letting them be changed.
+   *
+   * Deliberately carried as an explicit prop rather than left to the
+   * `pointer-events: none` wrapper RightSidebar puts around this, which does not
+   * hold: MUI sets `pointer-events: auto` on a shrunk outlined InputLabel and
+   * links it to its input with `htmlFor`, so clicking a filled-in parameter's
+   * *label* reached through the wrapper, focused the input, and the keyboard did
+   * the rest — typing over a value on a canvas that called itself read only.
+   * (Tabbing straight into a field was never covered either; pointer-events has
+   * no say over focus.) Labels on Selects carry no `htmlFor`, so those were only
+   * ever reachable by keyboard, which MUI's own `readOnly` blocks.
+   *
+   * Inputs get `readOnly` rather than `disabled` so a customer can still read and
+   * copy what was submitted instead of squinting at greyed-out text.
+   */
+  readOnly?: boolean;
 }
 
 type PendingParamFile = {
@@ -51,7 +68,7 @@ const isPendingParamFile = (value: unknown): value is PendingParamFile =>
   (value as PendingParamFile).__kind === "pending-file" &&
   typeof (value as PendingParamFile).filename === "string";
 
-export default function ({ activeNode, onFormDataChange, changedParamIds }: ParamFormProps) {
+export default function ({ activeNode, onFormDataChange, changedParamIds, readOnly = false }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
 
   /** Marks one parameter as edited relative to the diff baseline. */
@@ -261,7 +278,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                     sx={{ mt: 3, width: "26ch" }}
                     key={param.id}
                   >
-                    {param.dynamicAdd && (
+                    {param.dynamicAdd && !readOnly && (
                       <IconButton onClick={() => {
                         // add param to form data
                         const newParam = {
@@ -295,7 +312,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                     )}
                     {
                         // if added dynamically, show delete button
-                        param.addedDynamically && (
+                        param.addedDynamically && !readOnly && (
                             <IconButton onClick={() => {
                                 // remove param from form data
                                 const newFormData = activeNode.data.formData;
@@ -319,6 +336,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
                       error={Boolean(formik.errors[param.id])}
+                      readOnly={readOnly}
                     >
                       {param.options.map((option: any) => (
                         <MenuItem key={option.id} value={option.id}>
@@ -354,6 +372,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                                   formik.setFieldValue(param.id, next);
                                 }}
                                 onBlur={formik.handleBlur}
+                                readOnly={readOnly}
                               >
                                 {param.options?.map((option: any) => (
                                   <MenuItem key={option.id} value={option.id}>
@@ -365,7 +384,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                                 <FormHelperText>{param.description}</FormHelperText>
                               )}
                             </FormControl>
-                            {idx > 0 && (
+                            {idx > 0 && !readOnly && (
                               <IconButton
                                 size="small"
                                 onClick={() => {
@@ -377,7 +396,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                                 <DeleteForeverSharp fontSize="small" />
                               </IconButton>
                             )}
-                            {idx === 0 && (
+                            {idx === 0 && !readOnly && (
                               <IconButton
                                 size="small"
                                 onClick={() => formik.setFieldValue(param.id, [...values, ""])}
@@ -399,19 +418,23 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                   const files = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [];
                   return (
                     <div key={param.id} style={{ marginTop: 12 }}>
-                      <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
-                        {param.name}
-                        <input
-                          hidden
-                          type="file"
-                          multiple
-                          onChange={(e) => {
-                            const selected = toPendingFiles(e.target.files);
-                            formik.setFieldValue(param.id, [...files, ...selected]);
-                            e.currentTarget.value = "";
-                          }}
-                        />
-                      </Button>
+                      {readOnly ? (
+                        <FormHelperText sx={{ m: 0, fontWeight: 600 }}>{param.name}</FormHelperText>
+                      ) : (
+                        <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                          {param.name}
+                          <input
+                            hidden
+                            type="file"
+                            multiple
+                            onChange={(e) => {
+                              const selected = toPendingFiles(e.target.files);
+                              formik.setFieldValue(param.id, [...files, ...selected]);
+                              e.currentTarget.value = "";
+                            }}
+                          />
+                        </Button>
+                      )}
                       {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
                       <Box sx={{ mt: 1 }}>
                         {files.map((f: any, idx: number) => (
@@ -419,13 +442,15 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                             <FormHelperText sx={{ m: 0 }}>
                               {isPendingParamFile(f) ? f.filename : "Uploaded file"}
                             </FormHelperText>
-                            <IconButton
-                              size="small"
-                              onClick={() => formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx))}
-                              aria-label="Remove file"
-                            >
-                              <DeleteForeverSharp fontSize="small" />
-                            </IconButton>
+                            {!readOnly && (
+                              <IconButton
+                                size="small"
+                                onClick={() => formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx))}
+                                aria-label="Remove file"
+                              >
+                                <DeleteForeverSharp fontSize="small" />
+                              </IconButton>
+                            )}
                           </Box>
                         ))}
                       </Box>
@@ -435,27 +460,33 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                 const fileValue = formik.values[param.id];
                 return (
                   <div key={param.id} style={{ marginTop: 12 }}>
-                    <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
-                      {param.name}
-                      <input
-                        hidden
-                        type="file"
-                        onChange={(e) => {
-                          const selected = toPendingFiles(e.target.files);
-                          formik.setFieldValue(param.id, selected[0] ?? null);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                    </Button>
+                    {readOnly ? (
+                      <FormHelperText sx={{ m: 0, fontWeight: 600 }}>{param.name}</FormHelperText>
+                    ) : (
+                      <Button variant="outlined" component="label" size="small" sx={{ textTransform: "none" }}>
+                        {param.name}
+                        <input
+                          hidden
+                          type="file"
+                          onChange={(e) => {
+                            const selected = toPendingFiles(e.target.files);
+                            formik.setFieldValue(param.id, selected[0] ?? null);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                      </Button>
+                    )}
                     {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
                     {fileValue ? (
                       <Box display="flex" alignItems="center" gap={0.5} sx={{ mt: 0.5 }}>
                         <FormHelperText sx={{ m: 0 }}>
                           {isPendingParamFile(fileValue) ? fileValue.filename : "Uploaded file"}
                         </FormHelperText>
-                        <IconButton size="small" onClick={() => formik.setFieldValue(param.id, null)} aria-label="Remove file">
-                          <DeleteForeverSharp fontSize="small" />
-                        </IconButton>
+                        {!readOnly && (
+                          <IconButton size="small" onClick={() => formik.setFieldValue(param.id, null)} aria-label="Remove file">
+                            <DeleteForeverSharp fontSize="small" />
+                          </IconButton>
+                        )}
                       </Box>
                     ) : null}
                   </div>
@@ -484,8 +515,9 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                               onBlur={formik.handleBlur}
                               sx={{ width: "26ch" }}
                               InputLabelProps={{ shrink: true }}
+                              InputProps={{ readOnly }}
                             />
-                            {idx > 0 && (
+                            {idx > 0 && !readOnly && (
                               <IconButton
                                 size="small"
                                 onClick={() => {
@@ -497,7 +529,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                                 <DeleteForeverSharp fontSize="small" />
                               </IconButton>
                             )}
-                            {idx === 0 && (
+                            {idx === 0 && !readOnly && (
                               <IconButton
                                 size="small"
                                 onClick={() => formik.setFieldValue(param.id, [...values, ""])}
@@ -516,7 +548,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
               }
               return (
                   <div key={param.id}>
-                    {param.dynamicAdd && (
+                    {param.dynamicAdd && !readOnly && (
                       <IconButton onClick={() => alert("Dynamic Add")}>
                         <InfoOutlinedIcon />
                       </IconButton>
@@ -538,6 +570,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                       error={Boolean(formik.errors[param.id])}
                       helperText={formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
                       InputLabelProps={{ shrink: true }}
+                      InputProps={{ readOnly }}
                       inputProps={param.isPriceMultiplier === true && param.type === 'number' ? { min: 1, step: 1 } : undefined}
                     />
                   </div>
@@ -586,6 +619,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                     checked={formik.values[param.id]}
                     onChange={formik.handleChange}
                     name={param.id}
+                    disabled={readOnly}
                   />
                   {
                     // add input if not checked
@@ -602,6 +636,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds }: Para
                           name={`resultParamValue${param.id}`}
                           onChange={formik.handleChange}
                           onBlur={formik.handleBlur}
+                          readOnly={readOnly}
                         />
                       </div>
                     )

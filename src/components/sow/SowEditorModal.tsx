@@ -25,7 +25,7 @@ import {
   pdfSourceVersion,
   viewingAfterDirtyChange
 } from './sowEditorView';
-import { SowEditorState, SowField, SowVersionInputs, feeScheduleIsStale, feeScheduleLivePatch, sowStatusLabel, statusColor, toInputsPayload, versionDisplayLabel, withPeriodDragKeys } from './sowTypes';
+import { SowEditorState, SowField, SowVersionInputs, feeScheduleIsStale, feeScheduleLivePatch, sowStatusLabel, statusColor, toInputsPayload, versionDisplayLabel, nextSentVersionLabel, withPeriodDragKeys } from './sowTypes';
 
 /**
  * Staff editor for the SOW document.
@@ -274,7 +274,6 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const activeStatus = sow?.activeVersion?.status ?? null;
   const hasUnsentDraft = !!sow && sow.currentVersionNumber > sow.activeVersionNumber;
   const readOnly = editorIsReadOnly({
-    cancelled: status === 'CANCELLED',
     viewing: viewing ?? currentVersion?.versionNumber ?? 0,
     currentVersionNumber: currentVersion?.versionNumber ?? 0,
     dirty,
@@ -623,7 +622,9 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
           <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flex: 1, minWidth: 280 }}>
             <TextField
               size="small"
-              placeholder="What changed? (Required to save)"
+              /* Reissuing a cancelled document often changes nothing, so asking
+                 "what changed?" would be the wrong question there. */
+              placeholder={status === 'CANCELLED' && !dirty ? 'Why is it being reissued? (Required)' : 'What changed? (Required to save)'}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               error={dirty && !note.trim()}
@@ -671,8 +672,8 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
         <DialogContent>
           {confirming === 'send' ? (
             <Typography variant="body2">
-              {sow?.sowNumber} version {versionDisplayLabel(currentVersion)} will be sent to the customer for signature. They will be asked to review and
-              sign this exact document.
+              {sow?.sowNumber} draft {versionDisplayLabel(currentVersion)} will be issued to the customer as <strong>version {nextSentVersionLabel(currentVersion)}</strong> — sending
+              starts a new whole version. They will be asked to review and sign that exact document.
             </Typography>
           ) : (
             <>

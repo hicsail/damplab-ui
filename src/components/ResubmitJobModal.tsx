@@ -1,91 +1,98 @@
-import React, { useState, useContext } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@apollo/client';
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from '@mui/material';
 
-import { MUTATE_JOB_STATE, CREATE_COMMENT } from '../gql/mutations';
-import { UserContext } from '../contexts/UserContext';
-
-/**
- * Hands an edited job back to the lab.
- *
- * Two steps, in this order: post the customer's note, then move the job to
- * SUBMITTED. If the state change failed after the comment was posted the
- * customer would at least have said something visible; the reverse would leave
- * the technician a job to re-review with no explanation of what changed.
- *
- * This writes no job version — the customer's edits were already versioned when
- * they saved in the workflow editor.
- */
+import { RESPOND_TO_JOB_REVIEW } from '../gql/mutations';
+import { buildReviewResponseInput, retryOperationId, reviewResponseCopy, type CustomerActionRequired } from '../utils/jobReview';
 
 interface Props {
     open: boolean;
     onClose: () => void;
     jobId: string;
     onResubmitted?: () => void;
+    action: CustomerActionRequired;
 }
 
-export default function ResubmitJobModal({ open, onClose, jobId, onResubmitted }: Props): React.JSX.Element {
+export default function ResubmitJobModal({ open, onClose, jobId, onResubmitted, action }: Props): React.JSX.Element {
+    const copy = reviewResponseCopy(action);
     const [message, setMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const operationIdRef = useRef<string | null>(null);
 
-    const [mutateJobState] = useMutation(MUTATE_JOB_STATE);
-    const [createComment] = useMutation(CREATE_COMMENT);
-    const { userProps } = useContext(UserContext);
+    const [respondToReview] = useMutation(RESPOND_TO_JOB_REVIEW);
+
+    useEffect(() => {
+        if (open) {
+            setMessage('');
+            setError(null);
+            operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'reopen' });
+        }
+    }, [open, jobId, action]);
 
     const handleSubmit = async () => {
         setSubmitting(true);
         setError(null);
         try {
-            if (message.trim()) {
-                await createComment({
-                    variables: {
-                        input: {
-                            jobId,
-                            content: message.trim(),
-                            author: userProps?.idTokenParsed?.email ?? '',
-                            authorType: 'CLIENT',
-                            isInternal: false
-                        }
-                    }
-                });
-            }
+            operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'submit', candidate: crypto.randomUUID() });
+            await respondToReview({
+                variables: {
+                    input: buildReviewResponseInput({
+                        operationId: operationIdRef.current,
+                        jobId,
+                        action,
+                        message
+                    })
+                }
+            });
 
-            await mutateJobState({ variables: { ID: jobId, State: 'SUBMITTED' } });
-
+            await onResubmitted?.();
+            operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'success' });
             setMessage('');
             onClose();
-            onResubmitted?.();
         } catch (err: any) {
-            setError(err?.message ?? 'Could not resubmit the job.');
+            operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'failure' });
+            setError(err?.message ?? copy.failure);
         } finally {
             setSubmitting(false);
         }
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Resubmit job</DialogTitle>
+        <Dialog
+            open={open}
+            onClose={() => {
+                if (!submitting) onClose();
+            }}
+            disableEscapeKeyDown={submitting}
+            maxWidth="sm"
+            fullWidth
+        >
+            <DialogTitle>{copy.title}</DialogTitle>
             <DialogContent>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Send your updated workflow back to the DAMP Lab for review. Any edits you saved in the
-                    workflow editor are already recorded; add a note to explain what you changed.
+                    {copy.body}
                 </Typography>
                 <TextField
                     fullWidth
                     multiline
                     minRows={3}
-                    label="Note to the technician (optional)"
+                    label={copy.fieldLabel}
                     value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    onChange={(e) => {
+                        operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'edit' });
+                        setMessage(e.target.value);
+                    }}
+                    required={copy.messageRequired}
+                    disabled={submitting}
                 />
                 {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
             </DialogContent>
             <DialogActions>
                 <Box sx={{ display: 'flex', gap: 1, px: 1, pb: 1 }}>
                     <Button onClick={onClose} color="inherit" disabled={submitting}>Cancel</Button>
-                    <Button variant="contained" onClick={handleSubmit} disabled={submitting}>
-                        {submitting ? 'Resubmitting…' : 'Resubmit updated job to technician'}
+                    <Button variant="contained" onClick={handleSubmit} disabled={submitting || (copy.messageRequired && !message.trim())}>
+                        {submitting ? copy.pendingLabel : copy.submitLabel}
                     </Button>
                 </Box>
             </DialogActions>

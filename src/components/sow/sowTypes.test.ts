@@ -1,5 +1,107 @@
 import { describe, it, expect } from 'vitest';
-import { consentSummaryLabels, sowStatusLabel, versionDisplayLabel, feeScheduleIsStale, feeScheduleLivePatch, formatMultiplier, serviceMultiplier, serviceUnitCost, adjustmentDescriptionText, adjustmentLineAmount, adjustmentMultiplier, adjustmentUnitAmount, toInputsPayload, SowVersionInputs, sowTotals, signingAgreementText, customerDocumentFields, DEFAULT_SIGNATURES_TEXT, SowField } from './sowTypes';
+import {
+  adjustmentDescriptionText,
+  adjustmentLineAmount,
+  adjustmentMultiplier,
+  adjustmentUnitAmount,
+  blockerStep,
+  consentSummaryLabels,
+  customerBlockerMessage,
+  customerDocumentFields,
+  customerSigningState,
+  DEFAULT_SIGNATURES_TEXT,
+  feeScheduleIsStale,
+  feeScheduleLivePatch,
+  formatMultiplier,
+  isSettledBlocker,
+  repairBlockers,
+  serviceMultiplier,
+  serviceUnitCost,
+  signingAgreementText,
+  SowActionGate,
+  SowEditorState,
+  SowField,
+  SowVersion,
+  SowVersionInputs,
+  sowStatusLabel,
+  sowTotals,
+  toInputsPayload,
+  versionDisplayLabel
+, nextSentVersionLabel} from './sowTypes';
+
+describe('SOW contract repair types', () => {
+  it('represents accepted source linkage and the customer signing gate', () => {
+    const version = {
+      id: 'version-1',
+      versionNumber: 1000,
+      status: 'SENT',
+      visibleToCustomer: true,
+      sourceJobVersionNumber: 7,
+      sourceContractFingerprint: 'contract-fingerprint',
+      createdByName: 'Technician',
+      createdAt: '2026-08-21T12:00:00Z',
+      fields: [],
+      inputs: {} as SowVersionInputs
+    } satisfies SowVersion;
+    const gate = {
+      canSend: false,
+      sendBlockers: ['NO_DRAFT_TO_SEND'],
+      canSign: true,
+      signBlockers: [],
+      canCountersign: false,
+      countersignBlockers: ['AWAITING_CUSTOMER_SIGNATURE'],
+      missingFields: []
+    } satisfies SowActionGate;
+    const state = { id: 'sow-1', sowNumber: 'SOW-1', currentVersionNumber: 1000, activeVersionNumber: 1000, documentStale: false, currentVersion: version, actionGate: gate } satisfies SowEditorState;
+
+    expect(state.currentVersion?.sourceJobVersionNumber).toBe(7);
+    expect(state.actionGate?.canSign).toBe(true);
+  });
+
+  it('keeps waiting states settled and identifies source/sign-version blockers as repairs', () => {
+    expect(isSettledBlocker('NO_DRAFT_TO_SEND')).toBe(true);
+    expect(isSettledBlocker('AWAITING_CUSTOMER_SIGNATURE')).toBe(true);
+    expect(repairBlockers(['AWAITING_CUSTOMER_SIGNATURE', 'ACCEPTED_SOURCE_UNAVAILABLE', 'STALE_SIGN_VERSION'])).toEqual([
+      'ACCEPTED_SOURCE_UNAVAILABLE',
+      'STALE_SIGN_VERSION'
+    ]);
+  });
+
+  it.each([
+    ['ACCEPTED_SOURCE_UNAVAILABLE', /re-accept.*save a fresh draft.*reissue/i],
+    ['JOB_CHANGED_SINCE_ACCEPTANCE', /re-accept.*save a fresh draft.*reissue/i],
+    ['STALE_SIGN_VERSION', /reload.*latest version/i],
+    ['AWAITING_SENT_VERSION', /send the document/i]
+  ] as const)('gives %s an actionable repair step', (blocker, expected) => {
+    expect(blockerStep(blocker)).toMatch(expected);
+  });
+});
+
+describe('customer signing gate', () => {
+  it('enables signing only for the active SENT version with an explicit clear gate', () => {
+    expect(customerSigningState({ isActive: true, status: 'SENT', canSign: true, signBlockers: [] })).toEqual({
+      enabled: true,
+      blockerMessage: null
+    });
+    expect(customerSigningState({ isActive: false, status: 'SENT', canSign: true, signBlockers: [] }).enabled).toBe(false);
+    expect(customerSigningState({ isActive: true, status: 'SIGNED', canSign: true, signBlockers: [] }).enabled).toBe(false);
+    expect(customerSigningState({ isActive: true, status: 'SENT', canSign: false, signBlockers: [] }).enabled).toBe(false);
+    expect(customerSigningState({ isActive: true, status: 'SENT', canSign: true, signBlockers: undefined }).enabled).toBe(false);
+  });
+
+  it('explains the first blocker without exposing staff repair instructions', () => {
+    const state = customerSigningState({
+      isActive: true,
+      status: 'SENT',
+      canSign: false,
+      signBlockers: ['JOB_CHANGED_SINCE_ACCEPTANCE']
+    });
+    expect(state.enabled).toBe(false);
+    expect(state.blockerMessage).toBe(customerBlockerMessage('JOB_CHANGED_SINCE_ACCEPTANCE'));
+    expect(state.blockerMessage).toMatch(/lab must issue an updated/i);
+    expect(state.blockerMessage).not.toMatch(/re-accept|save.*draft/i);
+  });
+});
 
 describe('consentSummaryLabels', () => {
   it('reads the two boilerplate groups back as a single agreement', () => {
@@ -281,5 +383,19 @@ describe('sowTotals', () => {
   it('treats missing lists as nothing rather than NaN', () => {
     expect(sowTotals(null, null)).toEqual({ baseCost: 0, totalCost: 0 });
     expect(sowTotals(undefined, undefined)).toEqual({ baseCost: 0, totalCost: 0 });
+  });
+});
+
+describe('nextSentVersionLabel', () => {
+  // Sending bumps the whole number, so the draft label is never what the
+  // customer ends up holding.
+  it('reports the version the customer will actually receive', () => {
+    expect(nextSentVersionLabel({ versionNumber: 4 })).toBe('1.0');
+    expect(nextSentVersionLabel({ versionNumber: 1003 })).toBe('2.0');
+    expect(nextSentVersionLabel({ versionNumber: 2000 })).toBe('3.0');
+  });
+
+  it('is empty with nothing to send', () => {
+    expect(nextSentVersionLabel(null)).toBe('');
   });
 });

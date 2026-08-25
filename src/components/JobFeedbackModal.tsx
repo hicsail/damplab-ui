@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMutation } from '@apollo/client';
 import { Alert, Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import { styled } from "@mui/system";
 
-import { MUTATE_JOB_STATE, CREATE_COMMENT } from '../gql/mutations';
-import { UserContext } from '../contexts/UserContext';
+import { REVIEW_JOB } from '../gql/mutations';
+import { reviewDecisions, type ReviewDecisionValue } from './jobReviewLabels';
+import { buildReviewInput, retryOperationId } from '../utils/jobReview';
 
 
 const CenteredModal = styled(Modal)`
@@ -21,6 +22,8 @@ const ModalBox = styled(Box)`
   outline: none;
   margin: 20px;
   width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
 `;
 
 const FeedbackField = styled(TextField)`
@@ -31,14 +34,21 @@ const FeedbackField = styled(TextField)`
 export default function JobFeedbackModal(props: any) {
   const { open, onClose, onSubmitted, id, jobName, jobUsername, jobEmail, jobInstitution, jobTime, jobState } = props;
 
-  const [feedbackType,    setFeedbackType]    = useState("");
+  const [decision,        setDecision]        = useState<ReviewDecisionValue | ''>('');
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [submitting,      setSubmitting]      = useState(false);
   const [submitError,     setSubmitError]     = useState<string | null>(null);
+  const operationIdRef = useRef<string | null>(null);
 
-  const [mutateJobState] = useMutation(MUTATE_JOB_STATE);
-  const [createComment]  = useMutation(CREATE_COMMENT);
-  const userContext      = useContext(UserContext);
+  const [reviewJob] = useMutation(REVIEW_JOB);
+
+  // Reachable from SUBMITTED, CHANGES_REQUESTED and ACCEPTED alike, and the
+  // accept option means something different in each — see jobReviewLabels.
+  // Staff reach re-acceptance here rather than from the SOW card so that "send
+  // it back to the customer" stays an equally available choice at the same
+  // moment.
+  const decisions = reviewDecisions(jobState);
+  const chosen = decisions.find((d) => d.value === decision) ?? null;
 
   // TechnicianView keeps this modal mounted and only toggles `open`, so nothing
   // clears the form between openings. The page reload used to do it by
@@ -46,79 +56,47 @@ export default function JobFeedbackModal(props: any) {
   // message, and any stale error still filled in.
   useEffect(() => {
     if (open) {
-      setFeedbackType('');
+      setDecision('');
       setFeedbackMessage('');
       setSubmitError(null);
+      operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'reopen' });
     }
   }, [open]);
 
-  // Re-accepting an already-accepted job is the same decision, taken again: it
-  // re-stamps the billing fingerprint the SOW send gate compares against, which
-  // is what releases a send that a later job edit locked. Staff reach it here
-  // rather than from the SOW card, so that "send it back to the customer" stays
-  // an equally available choice at the same moment.
-  const isReview = jobState === 'ACCEPTED';
-
-  const handleFeedbackTypeChange = (event: any) => {
-    setFeedbackType(event.target.value);
+  const handleDecisionChange = (event: any) => {
+    const value = event.target.value as ReviewDecisionValue;
+    operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'edit' });
+    setDecision(value);
   };
 
   const handleFeedbackMessageChange = (event: any) => {
+    operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'edit' });
     setFeedbackMessage(event.target.value);
   };
-  
-  const handleSubmit = async () => {
-    if (!feedbackType) return;
 
-    let updatedState: string;
-    switch (feedbackType) {
-      case "looks-good":
-        updatedState = "ACCEPTED";
-        break;
-      case "minor-changes":
-      case "major-changes":
-        updatedState = "CHANGES_REQUESTED";
-        break;
-      default:
-        updatedState = jobState || "SUBMITTED";
-    }
+  const handleSubmit = async () => {
+    if (!chosen) return;
 
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await mutateJobState({ variables: { ID: id, State: updatedState } });
+      operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'submit', candidate: crypto.randomUUID() });
+      await reviewJob({
+        variables: {
+          input: buildReviewInput({
+            operationId: operationIdRef.current,
+            jobId: id,
+            decision: chosen.decision,
+            message: feedbackMessage
+          })
+        }
+      });
 
-      // Always posted — the customer cannot act on feedback they never see.
-      if (feedbackMessage.trim()) {
-        const email = userContext.userProps?.idTokenParsed?.email ?? 'technician@bu.edu';
-        // Requesting changes hands the customer the editor; the link is what
-        // turns the request into something they can actually do.
-        const editorLink = `[Open the workflow editor](/job_editor/${id})`;
-        const content = updatedState === 'CHANGES_REQUESTED'
-          ? `${feedbackMessage.trim()}\n\n${editorLink}`
-          : feedbackMessage.trim();
-
-        await createComment({
-          variables: {
-            input: {
-              jobId: id,
-              content,
-              author: email,
-              authorType: 'STAFF',
-              isInternal: false,
-            },
-          },
-        });
-      }
-
-      // Pull the job (and its versions) fresh rather than reloading the page.
-      // The old `window.location.reload()` fired while this handler's own state
-      // updates were still settling — a teardown race that is the leading
-      // suspect for the dev-mode "Application Error" seen right after a
-      // decision, and unnecessary regardless: the job query is what changed.
       await onSubmitted?.();
+      operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'success' });
       onClose();
     } catch (error: any) {
+      operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'failure' });
       // Previously swallowed into console.log and then hidden by the reload, so
       // a decision that never reached the server still looked like it landed.
       console.error(error);
@@ -127,14 +105,20 @@ export default function JobFeedbackModal(props: any) {
       setSubmitting(false);
     }
   };
-  
-  
+
+
   return (
-    <CenteredModal open={open} onClose={onClose}>
+    <CenteredModal
+      open={open}
+      disableEscapeKeyDown={submitting}
+      onClose={() => {
+        if (!submitting) onClose();
+      }}
+    >
       <ModalBox>
         <Typography variant="h6" sx={{ mb: 1 }}>Review Job</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Record a decision on this job and optionally send structured feedback to the client.
+          Record one review decision. The server posts the lifecycle comment and history entry.
         </Typography>
 
         {jobName && (
@@ -158,55 +142,39 @@ export default function JobFeedbackModal(props: any) {
           </Box>
         )}
 
-        <FormControl component="fieldset" sx={{width: '100%'}}>
+        <FormControl component="fieldset" sx={{width: '100%'}} disabled={submitting}>
 
-          <RadioGroup onChange = {handleFeedbackTypeChange} value = {feedbackType} name = "feedback-type" aria-label = "feedback-type">
-
-            <FormControlLabel
-              control={<Radio />}
-              value="looks-good"
-              label={isReview ? "Re-accept on the customer's behalf (ready to proceed)" : 'Accept job (ready to proceed)'}
-            />
-            {isReview && feedbackType === 'looks-good' && (
-              <Typography variant="body2" color="text.secondary" sx={{ ml: 4, mb: 1 }}>
-                Confirms the job as it now stands, without asking the customer again. This unlocks sending the Statement of
-                Work. If the change should be the customer&apos;s call, request edits below instead.
-              </Typography>
-            )}
-
-            <FormControlLabel control={<Radio />} value="minor-changes" label="Request clarification" />
-              {feedbackType === "minor-changes" && (
-                <FeedbackField
-                  fullWidth
-                  multiline
-                  minRows={3}
-                  onChange={handleFeedbackMessageChange}
-                  value={feedbackMessage}
-                  label="What needs clarifying?"
-                  required
-                />
-              )}
-
-            <FormControlLabel control={<Radio />} value="major-changes" label="Request design edits"/>
-              {feedbackType === "major-changes" && (
-                <FeedbackField
-                  fullWidth
-                  multiline
-                  minRows={3}
-                  onChange={handleFeedbackMessageChange}
-                  value={feedbackMessage}
-                  label="Explain what needs to change"
-                  required
-                />
-              )}
-
+          <RadioGroup onChange={handleDecisionChange} value={decision} name="feedback-type" aria-label="feedback-type">
+            {decisions.map((option) => (
+              <React.Fragment key={option.value}>
+                <FormControlLabel control={<Radio disabled={submitting} />} value={option.value} label={option.optionLabel} />
+                {decision === option.value && (
+                  <Box sx={{ ml: 4, mb: 1 }}>
+                    {option.note && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {option.note}
+                      </Typography>
+                    )}
+                    <FeedbackField
+                      fullWidth
+                      multiline
+                      minRows={option.messageRequired ? 3 : 2}
+                      onChange={handleFeedbackMessageChange}
+                      value={feedbackMessage}
+                      disabled={submitting}
+                      required={option.messageRequired}
+                      label={option.messageRequired ? 'Message to the customer' : 'Message to the customer (optional)'}
+                      helperText={option.messageRequired ? undefined : 'You may include an optional acceptance note.'}
+                    />
+                  </Box>
+                )}
+              </React.Fragment>
+            ))}
           </RadioGroup>
 
           <Box sx={{ mt: 1, mb: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              {feedbackType && feedbackType !== 'looks-good'
-                ? 'This will be posted to the client as a comment, with a link to the workflow editor.'
-                : 'Your decision will be posted to the client as a comment.'}
+              The selected decision determines the customer’s next action. The server records the lifecycle comment and history atomically.
             </Typography>
           </Box>
 
@@ -224,18 +192,12 @@ export default function JobFeedbackModal(props: any) {
               variant="contained"
               color="primary"
               onClick={handleSubmit}
-              disabled={submitting || !feedbackType || (feedbackType !== 'looks-good' && !feedbackMessage.trim())}
+              disabled={submitting || !chosen || (chosen.messageRequired && !feedbackMessage.trim())}
             >
-              {submitting
-                ? "Saving…"
-                : feedbackType === "looks-good"
-                  ? isReview
-                    ? 'Re-accept'
-                    : 'Accept Job'
-                  : "Submit Decision"}
+              {submitting ? 'Saving…' : (chosen?.buttonLabel ?? 'Submit Decision')}
             </Button>
           </Box>
-          
+
         </FormControl>
       </ModalBox>
     </CenteredModal>
