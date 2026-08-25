@@ -24,6 +24,8 @@ interface Props {
   unsaved?: boolean;
   unsavedBasedOn?: string;
   onRevert?: () => void;
+  /** Overrides the default Revert tooltip when the action is a restore, not a local copy. */
+  revertTooltip?: string;
   onReset?: () => void;
   resetDisabled?: boolean;
   busy?: boolean;
@@ -48,6 +50,7 @@ export default function SowVersionHistory({
   unsaved,
   unsavedBasedOn,
   onRevert,
+  revertTooltip,
   onReset,
   resetDisabled,
   busy
@@ -114,7 +117,7 @@ export default function SowVersionHistory({
       </Select>
 
       {onRevert && (
-        <Tooltip title={revertDisabled ? 'Select a saved version to revert to.' : 'Replace Unsaved with this version.'}>
+        <Tooltip title={revertDisabled ? 'Select a saved version to revert to.' : revertTooltip ?? 'Replace Unsaved with this version.'}>
           <span>
             <Button size="small" variant="outlined" disabled={revertDisabled} onClick={onRevert}>
               Revert

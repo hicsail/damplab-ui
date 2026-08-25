@@ -106,6 +106,28 @@ export function revertIsEnabled(viewing: SowViewing): boolean {
   return viewing !== UNSAVED_VIEW;
 }
 
+export type SowRevertAction = { kind: 'restore-signed' } | { kind: 'replace-unsaved' };
+
+/**
+ * What Revert should do for the version on screen.
+ *
+ * Restoring the signed version in force discards later drafts so Countersign
+ * can land on the document the customer actually signed. Any other historic
+ * version is copied into Unsaved, which is how staff start a new draft from it.
+ */
+export function revertAction(opts: {
+  viewing: SowViewing;
+  currentVersionNumber: number;
+  activeVersionNumber: number;
+  activeStatus: SowStatus | null;
+}): SowRevertAction | null {
+  if (opts.viewing === UNSAVED_VIEW) return null;
+  if (opts.viewing === opts.activeVersionNumber && opts.activeStatus === 'SIGNED' && opts.currentVersionNumber > opts.activeVersionNumber) {
+    return { kind: 'restore-signed' };
+  }
+  return { kind: 'replace-unsaved' };
+}
+
 export function cloneVersionDocument(source: SowVersion): { fields: SowField[]; inputs: SowVersionInputs } {
   return {
     fields: structuredClone(source.fields),

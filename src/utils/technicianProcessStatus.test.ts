@@ -71,6 +71,10 @@ describe('sowPartyStatus', () => {
     expect(sowPartyStatus({ currentStatus: 'SIGNED', activeStatus: 'SIGNED' })).toEqual({ customer: 'check', staff: 'paper' });
   });
 
+  it('keeps the customer check when a later draft sits above the signed version', () => {
+    expect(sowPartyStatus({ currentStatus: 'DRAFT', activeStatus: 'SIGNED' })).toEqual({ customer: 'check', staff: 'paper' });
+  });
+
   it('gives both sides a check once the SOW is finalized', () => {
     expect(sowPartyStatus({ currentStatus: 'FINAL', activeStatus: 'FINAL' })).toEqual({ customer: 'check', staff: 'check' });
   });

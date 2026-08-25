@@ -8,7 +8,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_LAB_MONITOR_STAFF_LIST, GET_SOW_TEXT_PRESETS } from '../../gql/queries';
-import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW } from '../../gql/mutations';
+import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW, RESTORE_SOW_SIGNED_VERSION } from '../../gql/mutations';
 import SowFieldRow from './SowFieldRow';
 import { SowTextPresetOption } from './SowPresetPicker';
 import SowVersionHistory from './SowVersionHistory';
@@ -23,6 +23,7 @@ import {
   editorIsReadOnly,
   nextSowAction,
   pdfSourceVersion,
+  revertAction,
   viewingAfterDirtyChange
 } from './sowEditorView';
 import { SowEditorState, SowField, SowVersionInputs, feeScheduleIsStale, feeScheduleLivePatch, sowStatusLabel, statusColor, toInputsPayload, versionDisplayLabel, nextSentVersionLabel, withPeriodDragKeys } from './sowTypes';
@@ -146,6 +147,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const [saveVersion] = useMutation(SAVE_SOW_VERSION);
   const [sendToCustomer] = useMutation(SEND_SOW_TO_CUSTOMER);
   const [finalizeSow] = useMutation(FINALIZE_SOW);
+  const [restoreSignedVersion] = useMutation(RESTORE_SOW_SIGNED_VERSION);
 
   // What the server actually holds for the current version — dirty and Reset
   // both compare against this rather than a boolean flag, so undoing a change
@@ -343,9 +345,12 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
 
   const handleRecalculateFeeSchedule = useCallback(() => {
     if (!inputs || !sow?.liveServices) return;
+    // Recalc is an unsaved edit only when the job's figures actually differ.
+    // A no-op click must not dirty the buffer or block Countersign.
+    if (!feeScheduleIsStale(inputs, sow)) return;
     patchInputs(feeScheduleLivePatch(inputs, sow.liveServices, sow.liveCustomerCategory));
     setRefreshFeeSchedule(true);
-  }, [inputs, patchInputs, sow?.liveServices, sow?.liveCustomerCategory]);
+  }, [inputs, patchInputs, sow]);
 
   /* ----------------------------------------------------------------- edits */
 
@@ -385,21 +390,44 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     setInputs(snap.inputs);
     setNote('');
     if (draftKey) window.localStorage.removeItem(draftKey);
+    setRefreshFeeSchedule(false);
     setViewing((v) => (v === UNSAVED_VIEW ? currentVersion.versionNumber : v));
     setBaseline(null);
   }, [draftKey, currentVersion]);
 
   const handleRevert = useCallback(() => {
-    if (viewing == null || viewing === UNSAVED_VIEW) return;
+    if (viewing == null || viewing === UNSAVED_VIEW || !currentVersion) return;
     const source = history.find((v) => v.versionNumber === viewing);
     if (!source) return;
+    const action = revertAction({
+      viewing,
+      currentVersionNumber: currentVersion.versionNumber,
+      activeVersionNumber: sow?.activeVersionNumber ?? 0,
+      activeStatus
+    });
+    if (!action) return;
+
+    if (action.kind === 'restore-signed') {
+      if (!window.confirm(`Discard newer drafts and restore version ${versionDisplayLabel(source)} — the version the customer signed — so you can countersign it?`)) return;
+      void withBusy(async () => {
+        if (!sow?.id) return;
+        if (draftKey) window.localStorage.removeItem(draftKey);
+        setRefreshFeeSchedule(false);
+        await restoreSignedVersion({ variables: { sowId: sow.id, versionNumber: source.versionNumber } });
+        await refetch();
+        setBanner({ severity: 'success', text: `Restored version ${versionDisplayLabel(source)}. You can countersign this document.` });
+      });
+      return;
+    }
+
     if (dirty && !window.confirm(`Replace your unsaved edits with version ${versionDisplayLabel(source)}?`)) return;
     const copy = cloneVersionDocument(source);
     setFields([...copy.fields].sort((a, b) => a.order - b.order));
     setInputs(withPeriodDragKeys(copy.inputs));
+    setRefreshFeeSchedule(false);
     setViewing(UNSAVED_VIEW);
     setBaseline(null);
-  }, [viewing, history, dirty]);
+  }, [viewing, history, dirty, currentVersion, sow, activeStatus, draftKey, restoreSignedVersion, refetch]);
 
   const handleSave = (): Promise<void> =>
     withBusy(async () => {
@@ -453,6 +481,14 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     () => nextSowAction({ dirty, status, activeStatus, gate: sow?.actionGate, missingRequired, readOnly }),
     [dirty, status, activeStatus, sow?.actionGate, missingRequired, readOnly]
   );
+  const viewingRevert = viewing != null && currentVersion
+    ? revertAction({
+        viewing,
+        currentVersionNumber: currentVersion.versionNumber,
+        activeVersionNumber: sow?.activeVersionNumber ?? 0,
+        activeStatus
+      })
+    : null;
   /**
    * The merged button's click. Save fires directly — it is routine, repeatable
    * and reversible. The two that leave the building open a confirmation first.
@@ -538,6 +574,11 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                       unsaved={dirty || viewing === UNSAVED_VIEW}
                       unsavedBasedOn={versionDisplayLabel(currentVersion)}
                       onRevert={handleRevert}
+                      revertTooltip={
+                        viewingRevert?.kind === 'restore-signed'
+                          ? 'Discard newer drafts and restore this signed version so you can countersign it.'
+                          : undefined
+                      }
                       onReset={handleReset}
                       resetDisabled={busy || !dirty}
                       busy={busy}
@@ -553,7 +594,9 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
 
                 {isHistoric && onScreen && (
                   <Alert severity="info" sx={{ mb: 2 }}>
-                    Viewing version {versionDisplayLabel(onScreen)} from the history. Use Revert to this version to make it your working copy, or switch back to {dirty ? 'Unsaved' : `version ${versionDisplayLabel(currentVersion)}`} to continue editing.
+                    {viewingRevert?.kind === 'restore-signed'
+                      ? `Viewing version ${versionDisplayLabel(onScreen)} — the version the customer signed. Use Revert to discard newer drafts and countersign this document, or switch back to version ${versionDisplayLabel(currentVersion)} to keep editing the draft.`
+                      : `Viewing version ${versionDisplayLabel(onScreen)} from the history. Use Revert to this version to make it your working copy, or switch back to ${dirty ? 'Unsaved' : `version ${versionDisplayLabel(currentVersion)}`} to continue editing.`}
                   </Alert>
                 )}
 
