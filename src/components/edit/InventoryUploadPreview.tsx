@@ -67,9 +67,10 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
   // Match existing items by uniqueId
   matchExistingItems(rows, existingItems);
 
-  // Count how many will be created vs updated
+  // Count how many will be created vs updated vs skipped
   const updateCount = rows.filter((r) => !!r.existingItemId).length;
-  const createCount = rows.length - updateCount;
+  const skipCount = rows.filter((r) => !r.existingItemId && !r.name).length;
+  const createCount = rows.length - updateCount - skipCount;
 
   // Find stations that will be auto-created
   const existingStationNames = new Set(stations.map((s) => s.name.trim().toLowerCase()));
@@ -102,11 +103,9 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
       width: 100,
       renderCell: (params) => {
         const row = params.row as ParsedInventoryRow;
-        return row.existingItemId ? (
-          <Chip size='small' color='info' label='Update' />
-        ) : (
-          <Chip size='small' color='success' label='Create' />
-        );
+        if (row.existingItemId) return <Chip size='small' color='info' label='Update' />;
+        if (!row.name) return <Chip size='small' color='default' label='Skip' />;
+        return <Chip size='small' color='success' label='Create' />;
       }
     },
     {
@@ -159,9 +158,14 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
             });
             summary.updated += 1;
           } else {
+            const input = buildCreateInput(row, selectedColumns);
+            if (!input) {
+              summary.skipped += 1;
+              continue;
+            }
             await client.mutate({
               mutation: CREATE_INVENTORY_ITEM,
-              variables: { item: buildCreateInput(row, selectedColumns) }
+              variables: { item: input }
             });
             summary.created += 1;
           }
@@ -188,6 +192,7 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
             <Chip label={`${rows.length} rows`} />
             <Chip label={`${createCount} to create`} color='success' variant='outlined' />
             <Chip label={`${updateCount} to update`} color='info' variant='outlined' />
+            {skipCount > 0 && <Chip label={`${skipCount} to skip`} color='default' variant='outlined' />}
           </Box>
 
           {newStationNames.length > 0 && (

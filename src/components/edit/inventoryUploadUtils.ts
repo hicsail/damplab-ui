@@ -104,17 +104,22 @@ export async function parseInventoryFile(file: File): Promise<{
   const headerWarnings: string[] = [];
 
   if (indices.name === undefined) {
-    throw new Error('Could not find a "Name" column in the spreadsheet.');
+    headerWarnings.push('No "Name" column found — rows without a uniqueId will be skipped.');
   }
 
   const rows: ParsedInventoryRow[] = [];
 
   for (const raw of dataRows) {
     const name = cellStr(raw, indices.name);
-    if (!name) continue; // skip blank rows
+    const uniqueId = cellStr(raw, indices.uniqueId);
+    // Skip rows that have neither name nor uniqueId (truly blank)
+    if (!name && !uniqueId) continue;
 
     const rawType = cellStr(raw, indices.type);
     const { type, warning: typeWarning } = parseType(rawType);
+
+    const warnings: string[] = [];
+    if (!name) warnings.push('Name is blank — will be skipped if this is a new item.');
 
     const row: ParsedInventoryRow = {
       name,
@@ -122,12 +127,12 @@ export async function parseInventoryFile(file: File): Promise<{
       tag: cellStr(raw, indices.tag),
       stationName: cellStr(raw, indices.stationName),
       quantity: parseQuantity(cellStr(raw, indices.quantity)),
-      uniqueId: cellStr(raw, indices.uniqueId),
+      uniqueId,
       modelNumber: cellStr(raw, indices.modelNumber),
       serialNumber: cellStr(raw, indices.serialNumber),
       hasServiceContract: parseBool(cellStr(raw, indices.hasServiceContract)),
       serviceContractExpiration: cellStr(raw, indices.serviceContractExpiration),
-      warnings: []
+      warnings
     };
 
     if (typeWarning) row.warnings.push(typeWarning);
@@ -214,8 +219,10 @@ export const UPLOAD_COLUMNS = [
 
 export type UploadColumnKey = (typeof UPLOAD_COLUMNS)[number]['key'];
 
-/** Build the GraphQL input for creating a new inventory item. */
-export function buildCreateInput(row: ParsedInventoryRow, selectedColumns?: Set<UploadColumnKey>): Record<string, unknown> {
+/** Build the GraphQL input for creating a new inventory item. Returns null if name is blank (cannot create). */
+export function buildCreateInput(row: ParsedInventoryRow, selectedColumns?: Set<UploadColumnKey>): Record<string, unknown> | null {
+  if (!row.name) return null; // Name required for new items
+
   const include = (col: UploadColumnKey): boolean => !selectedColumns || selectedColumns.has(col);
 
   const input: Record<string, unknown> = {
@@ -241,9 +248,8 @@ export function buildCreateInput(row: ParsedInventoryRow, selectedColumns?: Set<
 export function buildUpdateChanges(row: ParsedInventoryRow, selectedColumns?: Set<UploadColumnKey>): Record<string, unknown> {
   const include = (col: UploadColumnKey): boolean => !selectedColumns || selectedColumns.has(col);
 
-  const changes: Record<string, unknown> = {
-    name: row.name
-  };
+  const changes: Record<string, unknown> = {};
+  if (row.name) changes.name = row.name;
 
   if (include('type')) changes.type = row.type;
   if (include('tag')) changes.tags = row.tag ? [row.tag] : [];
