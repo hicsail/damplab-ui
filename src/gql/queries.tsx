@@ -1073,6 +1073,13 @@ const INVENTORY_FIELDS = `
     external
     legacy
   }
+  uniqueId
+  tags
+  modelNumber
+  serialNumber
+  hasServiceContract
+  serviceContractExpiration
+  dimensions { value unit }
 `;
 
 export const GET_INVENTORY_ITEMS = gql`

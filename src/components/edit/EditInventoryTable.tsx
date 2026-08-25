@@ -30,7 +30,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     const q = searchString.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((row) => {
-      const haystack = [row?.name, row?.type, row?.description, row?.location]
+      const haystack = [row?.name, row?.type, row?.description, row?.location, ...(row?.tags ?? []), row?.modelNumber, row?.uniqueId]
         .map((v) => String(v ?? '').toLowerCase())
         .join(' ');
       return haystack.includes(q);
@@ -57,15 +57,32 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         <GridActionsCellItem key='delete' icon={<Delete />} label='Delete' onClick={() => handleDelete(id)} color='inherit' />
       ]
     },
+    { field: 'uniqueId', headerName: 'ID', width: 110 },
     { field: 'name', headerName: 'Name', width: 240, flex: 1 },
     {
       field: 'type',
       headerName: 'Type',
-      width: 140,
+      width: 130,
       renderCell: (params) => (params.row.type ? <Chip size='small' label={String(params.row.type)} /> : null)
     },
-    { field: 'location', headerName: 'Location', width: 200 },
-    { field: 'description', headerName: 'Description', width: 320, flex: 1 },
+    {
+      field: 'tags',
+      headerName: 'Tags',
+      width: 200,
+      renderCell: (params) => (
+        <>{(params.row.tags ?? []).map((t: string, i: number) => <Chip key={i} size='small' label={t} sx={{ mr: 0.5 }} />)}</>
+      )
+    },
+    { field: 'location', headerName: 'Location', width: 150 },
+    { field: 'description', headerName: 'Description', width: 240, flex: 1 },
+    { field: 'modelNumber', headerName: 'Model #', width: 130 },
+    { field: 'serialNumber', headerName: 'Serial #', width: 130 },
+    {
+      field: 'hasServiceContract',
+      headerName: 'Contract',
+      width: 100,
+      renderCell: (params) => (params.row.hasServiceContract ? <Chip size='small' color='info' label='Yes' /> : null)
+    },
     {
       field: 'isDeleted',
       headerName: 'Status',
