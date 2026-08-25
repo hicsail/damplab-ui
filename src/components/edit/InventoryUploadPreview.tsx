@@ -61,7 +61,8 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
   };
 
   const stations: Array<{ id: string; name: string }> = stationData?.stations ?? [];
-  const existingItems: Array<{ id: string; uniqueId?: string }> = inventoryData?.inventoryItems ?? [];
+  const existingItems: Array<{ id: string; uniqueId?: string; isDeleted?: boolean }> = inventoryData?.inventoryItems ?? [];
+  const [reactivateSet, setReactivateSet] = useState<Set<number>>(() => new Set());
 
   // Match existing items by uniqueId
   matchExistingItems(rows, existingItems);
@@ -70,6 +71,9 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
   const updateCount = rows.filter((r) => !!r.existingItemId).length;
   const skipCount = rows.filter((r) => !r.existingItemId && !r.name).length;
   const createCount = rows.length - updateCount - skipCount;
+
+  // Count rows matching soft-deleted items
+  const deletedMatchCount = rows.filter((r) => r.matchedIsDeleted).length;
 
   // Resolve stations (synchronous — no auto-creation)
   resolveStations(rows, stations);
@@ -102,9 +106,32 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
     {
       field: 'action',
       headerName: 'Action',
-      width: 100,
+      width: 180,
       renderCell: (params) => {
         const row = params.row as ParsedInventoryRow;
+        const idx = params.row.id as number;
+        if (row.existingItemId && row.matchedIsDeleted) {
+          return (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size='small'
+                  checked={reactivateSet.has(idx)}
+                  onChange={() => {
+                    setReactivateSet((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(idx)) next.delete(idx);
+                      else next.add(idx);
+                      return next;
+                    });
+                  }}
+                  disabled={importing}
+                />
+              }
+              label={<Chip size='small' color='warning' label='Deleted — Reactivate?' />}
+            />
+          );
+        }
         if (row.existingItemId) return <Chip size='small' color='info' label='Update' />;
         if (!row.name) return <Chip size='small' color='default' label='Skip' />;
         return <Chip size='small' color='success' label='Create' />;
@@ -142,12 +169,18 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
 
         try {
           if (row.existingItemId) {
+            // Skip soft-deleted matches unless user chose to reactivate
+            if (row.matchedIsDeleted && !reactivateSet.has(i)) {
+              summary.skipped += 1;
+              continue;
+            }
+            const changes = buildUpdateChanges(row, selectedColumns);
+            if (row.matchedIsDeleted && reactivateSet.has(i)) {
+              changes.isDeleted = false;
+            }
             await client.mutate({
               mutation: UPDATE_INVENTORY_ITEM,
-              variables: {
-                item: row.existingItemId,
-                changes: buildUpdateChanges(row, selectedColumns)
-              }
+              variables: { item: row.existingItemId, changes }
             });
             summary.updated += 1;
           } else {
@@ -187,6 +220,13 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
             <Chip label={`${updateCount} to update`} color='info' variant='outlined' />
             {skipCount > 0 && <Chip label={`${skipCount} to skip`} color='default' variant='outlined' />}
           </Box>
+
+          {deletedMatchCount > 0 && (
+            <Alert severity='warning'>
+              {deletedMatchCount} row{deletedMatchCount > 1 ? 's match' : ' matches'} soft-deleted items. Check the
+              ones you want to reactivate in the Action column.
+            </Alert>
+          )}
 
           {unknownStationNames.length > 0 && (
             <Alert severity='warning'>

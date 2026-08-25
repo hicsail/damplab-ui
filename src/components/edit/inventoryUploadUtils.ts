@@ -16,7 +16,11 @@ export interface ParsedInventoryRow {
   resolvedStationId?: string;
   /** Whether this row matches an existing item (by uniqueId). */
   existingItemId?: string;
-  /** Warnings to show in the preview (e.g. unknown type, station to be created). */
+  /** Whether the matched existing item is soft-deleted. */
+  matchedIsDeleted?: boolean;
+  /** User choice: reactivate a soft-deleted match (true) or skip it. */
+  reactivate?: boolean;
+  /** Warnings to show in the preview (e.g. unknown type, station not found). */
   warnings: string[];
 }
 
@@ -178,16 +182,16 @@ export function resolveStations(
 
 /**
  * Match parsed rows against existing inventory items by uniqueId.
- * Mutates rows in-place (sets existingItemId).
+ * Mutates rows in-place (sets existingItemId and matchedIsDeleted).
  */
 export function matchExistingItems(
   rows: ParsedInventoryRow[],
-  existingItems: Array<{ id: string; uniqueId?: string }>
+  existingItems: Array<{ id: string; uniqueId?: string; isDeleted?: boolean }>
 ): void {
-  const idMap = new Map<string, string>();
+  const idMap = new Map<string, { id: string; isDeleted?: boolean }>();
   for (const item of existingItems) {
     if (item.uniqueId) {
-      idMap.set(item.uniqueId.trim().toLowerCase(), item.id);
+      idMap.set(item.uniqueId.trim().toLowerCase(), { id: item.id, isDeleted: item.isDeleted });
     }
   }
 
@@ -195,7 +199,8 @@ export function matchExistingItems(
     if (!row.uniqueId) continue;
     const existing = idMap.get(row.uniqueId.trim().toLowerCase());
     if (existing) {
-      row.existingItemId = existing;
+      row.existingItemId = existing.id;
+      row.matchedIsDeleted = !!existing.isDeleted;
     }
   }
 }
