@@ -146,41 +146,34 @@ export async function parseInventoryFile(file: File): Promise<{
 /**
  * Resolve station names to ObjectIds.
  * - Matches existing stations by name (case-insensitive).
- * - Auto-creates missing stations via the provided callback.
+ * - Unknown stations are skipped (item imported without placement).
  * - Mutates rows in-place (sets resolvedStationId).
  */
-export async function resolveStations(
+export function resolveStations(
   rows: ParsedInventoryRow[],
-  existingStations: Array<{ id: string; name: string }>,
-  createStation: (name: string) => Promise<string>
-): Promise<{ createdStations: string[] }> {
+  existingStations: Array<{ id: string; name: string }>
+): { unknownStations: string[] } {
   const lookup = new Map<string, string>();
   for (const s of existingStations) {
     lookup.set(s.name.trim().toLowerCase(), s.id);
   }
 
-  const createdStations: string[] = [];
+  const unknownSet = new Set<string>();
 
   for (const row of rows) {
     if (!row.stationName) continue;
     const key = row.stationName.trim().toLowerCase();
 
-    let stationId = lookup.get(key);
-    if (!stationId) {
-      // Auto-create station
-      try {
-        stationId = await createStation(row.stationName.trim());
-        lookup.set(key, stationId);
-        createdStations.push(row.stationName.trim());
-      } catch (e) {
-        row.warnings.push(`Failed to create station "${row.stationName}": ${e instanceof Error ? e.message : String(e)}`);
-        continue;
-      }
+    const stationId = lookup.get(key);
+    if (stationId) {
+      row.resolvedStationId = stationId;
+    } else {
+      row.warnings.push(`Station "${row.stationName}" not found — item imported without station placement.`);
+      unknownSet.add(row.stationName.trim());
     }
-    row.resolvedStationId = stationId;
   }
 
-  return { createdStations };
+  return { unknownStations: [...unknownSet] };
 }
 
 /**

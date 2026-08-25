@@ -18,7 +18,6 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useState } from 'react';
 import {
   CREATE_INVENTORY_ITEM,
-  CREATE_STATION,
   GET_INVENTORY_ITEMS,
   GET_STATIONS,
   UPDATE_INVENTORY_ITEM
@@ -72,9 +71,12 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
   const skipCount = rows.filter((r) => !r.existingItemId && !r.name).length;
   const createCount = rows.length - updateCount - skipCount;
 
-  // Find stations that will be auto-created
+  // Resolve stations (synchronous — no auto-creation)
+  resolveStations(rows, stations);
+
+  // Find unknown station names
   const existingStationNames = new Set(stations.map((s) => s.name.trim().toLowerCase()));
-  const newStationNames = [
+  const unknownStationNames = [
     ...new Set(
       rows
         .map((r) => r.stationName.trim())
@@ -133,16 +135,7 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
     const summary: UploadSummary = { created: 0, updated: 0, skipped: 0, errors: [] };
 
     try {
-      // Step 1: Resolve stations (create missing ones)
-      await resolveStations(rows, stations, async (name: string) => {
-        const result = await client.mutate({
-          mutation: CREATE_STATION,
-          variables: { input: { name } }
-        });
-        return result.data.createStation.id;
-      });
-
-      // Step 2: Create/update inventory items
+      // Create/update inventory items
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         setProgress(Math.round(((i + 1) / rows.length) * 100));
@@ -195,10 +188,10 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
             {skipCount > 0 && <Chip label={`${skipCount} to skip`} color='default' variant='outlined' />}
           </Box>
 
-          {newStationNames.length > 0 && (
-            <Alert severity='info'>
-              {newStationNames.length} new station{newStationNames.length > 1 ? 's' : ''} will be created:{' '}
-              {newStationNames.join(', ')}
+          {unknownStationNames.length > 0 && (
+            <Alert severity='warning'>
+              {unknownStationNames.length} station name{unknownStationNames.length > 1 ? 's were' : ' was'} not found
+              and will be skipped: {unknownStationNames.join(', ')}
             </Alert>
           )}
 
