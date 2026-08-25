@@ -92,9 +92,22 @@ export default function LoadCanvasButton (props: LoadDialogProps ) {
   
     return (
         <React.Fragment>
-            <IconButton onClick={openLoadDialog} title="Load canvas" aria-controls='menu-appbar' aria-haspopup='true'>
-                <UploadFileIcon style={{color: 'white'}}/>
-            </IconButton>
+            <Button
+                onClick={openLoadDialog}
+                title="Load Job"
+                variant="outlined"
+                size="small"
+                startIcon={<UploadFileIcon />}
+                sx={{
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.5)',
+                    textTransform: 'none',
+                    fontSize: 12,
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                Load Job
+            </Button>
 
             <Dialog onClose={() => closeLoadDialog()} open={open}>
                 <DialogTitle>Load Canvas</DialogTitle>

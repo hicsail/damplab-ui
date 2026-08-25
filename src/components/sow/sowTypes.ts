@@ -197,7 +197,8 @@ export type DocumentBlocker =
   | 'NO_DRAFT_TO_SEND'
   | 'STALE_SIGN_VERSION'
   | 'AWAITING_SENT_VERSION'
-  | 'AWAITING_CUSTOMER_SIGNATURE';
+  | 'AWAITING_CUSTOMER_SIGNATURE'
+  | 'UNSENT_DRAFT';
 
 /**
  * Blockers that describe a settled document rather than something staff can fix.
@@ -234,7 +235,8 @@ const CUSTOMER_BLOCKER_MESSAGE: Record<DocumentBlocker, string> = {
   NO_DRAFT_TO_SEND: 'This Statement of Work is not available to sign.',
   STALE_SIGN_VERSION: 'A newer Statement of Work has been issued. Reload this job to read it before signing.',
   AWAITING_SENT_VERSION: 'There is nothing to sign right now — the lab may have withdrawn the Statement of Work to make changes.',
-  AWAITING_CUSTOMER_SIGNATURE: 'This Statement of Work is waiting for your signature.'
+  AWAITING_CUSTOMER_SIGNATURE: 'This Statement of Work is waiting for your signature.',
+  UNSENT_DRAFT: 'The lab is still revising this Statement of Work.'
 };
 
 /** Customer-safe copy: never exposes the staff-only repair checklist. */
@@ -278,7 +280,8 @@ export const BLOCKER_STEP: Record<DocumentBlocker, string> = {
   NO_DRAFT_TO_SEND: 'This version has already been issued. Edit the document to start a new draft.',
   STALE_SIGN_VERSION: 'Reload the latest version before signing.',
   AWAITING_SENT_VERSION: 'Send the document to the customer.',
-  AWAITING_CUSTOMER_SIGNATURE: 'Waiting for the customer to sign.'
+  AWAITING_CUSTOMER_SIGNATURE: 'Waiting for the customer to sign.',
+  UNSENT_DRAFT: 'Revert to the signed version to countersign it, or send this draft for the customer to sign.'
 };
 
 export interface SowEditorState {

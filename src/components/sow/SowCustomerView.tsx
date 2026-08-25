@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { Alert, Box, Button, Card, CardContent, Checkbox, Chip, CircularProgress, FormControlLabel, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, TextField, Typography } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
@@ -10,9 +10,11 @@ import SowDiffText from './SowDiffText';
 import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
 import SowSignaturesSummary from './SowSignaturesSummary';
+import CollapsibleStatusCard from '../CollapsibleStatusCard';
 import { diffVersions, previousCustomerVersion } from '../../utils/sowDiff';
 import { GROUP_ORDER, SowEditorState, SowField, customerDocumentFields, customerSigningState, signingAgreementText, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 import { formatSOWInstant } from '../../utils/sowDateUtils';
+import { chipStatusBackground } from '../../utils/technicianProcessStatus';
 
 /**
  * The customer's view of a Statement of Work.
@@ -77,6 +79,17 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   });
   const signedName = version?.clientSignature?.name;
 
+  const sowStatusLine = (() => {
+    if (sow && activeNumber === 0) return 'The lab is still preparing your Statement of Work.';
+    if (awaitingSignature && !signingState.enabled) return signingState.blockerMessage ?? 'Signing is temporarily unavailable.';
+    if (awaitingSignature) return 'Review the issued Statement of Work and sign it when you are ready.';
+    if (signedName) {
+      return `Signed by ${signedName}${version?.staffSignature?.name ? `. Countersigned by ${version.staffSignature.name}.` : '.'}`;
+    }
+    if (version) return `${versionDisplayLabel(version)} · ${sowStatusLabel(version.status)}`;
+    return 'No Statement of Work is available yet.';
+  })();
+
   useEffect(() => {
     setAgreed(false);
     setInitials({});
@@ -114,30 +127,43 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   };
 
   return (
-    <Box sx={{ mx: 3, my: 2 }}>
-      <Card variant="outlined">
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-            <Typography variant="h6" sx={{ flex: 1 }}>
-              Statement of Work
+    <CollapsibleStatusCard
+      title="Statement of Work"
+      defaultExpanded
+      titleExtra={
+        <>
+          {sow?.sowNumber && <Typography variant="body2" color="text.secondary">{sow.sowNumber}</Typography>}
+          {version && (
+            <PDFDownloadLink
+              document={<SowPdfDocument version={version} sowNumber={sow?.sowNumber} />}
+              fileName={`${(sow?.sowNumber ?? 'SOW').replace(/\s+/g, '-')}-v${versionDisplayLabel(version)}.pdf`}
+              style={{ textDecoration: 'none' }}
+            >
+              {({ loading: pdfLoading }) => (
+                <Button size="small" variant="outlined" disabled={pdfLoading} sx={{ textTransform: 'none' }}>
+                  {pdfLoading ? 'Preparing…' : 'Download a copy'}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          )}
+        </>
+      }
+      statusPaneSx={{ bgcolor: chipStatusBackground(version ? statusColor(version.status) : 'default') }}
+      statusPane={
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="subtitle1" fontWeight={600}>
+              {version ? sowStatusLabel(version.status) : loading ? 'Loading' : 'Not available'}
             </Typography>
-            {sow?.sowNumber && <Typography variant="body2" color="text.secondary">{sow.sowNumber}</Typography>}
-            {version && <Chip size="small" label={`${versionDisplayLabel(version)} · ${sowStatusLabel(version.status)}`} color={statusColor(version.status)} />}
-            {version && (
-              <PDFDownloadLink
-                document={<SowPdfDocument version={version} sowNumber={sow?.sowNumber} />}
-                fileName={`${(sow?.sowNumber ?? 'SOW').replace(/\s+/g, '-')}-v${versionDisplayLabel(version)}.pdf`}
-                style={{ textDecoration: 'none' }}
-              >
-                {({ loading: pdfLoading }) => (
-                  <Button size="small" variant="outlined" disabled={pdfLoading}>
-                    {pdfLoading ? 'Preparing…' : 'Download a copy'}
-                  </Button>
-                )}
-              </PDFDownloadLink>
-            )}
+            {version && <Chip size="small" label={versionDisplayLabel(version)} color={statusColor(version.status)} />}
           </Box>
-
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {sowStatusLine}
+          </Typography>
+        </Box>
+      }
+      details={
+        <>
           {loading && !sow && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <CircularProgress />
@@ -195,7 +221,6 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                 </Alert>
               )}
 
-              {/* The document */}
               <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
                 {visible.map((f) => {
                   const d = diffByKey.get(f.key);
@@ -242,7 +267,6 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                 </Typography>
               )}
 
-              {/* Signing */}
               {awaitingSignature && !signedName && (
                 <Box sx={{ mt: 3 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -289,8 +313,8 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
               )}
             </>
           )}
-        </CardContent>
-      </Card>
-    </Box>
+        </>
+      }
+    />
   );
 }

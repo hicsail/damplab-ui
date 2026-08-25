@@ -12,6 +12,7 @@ import {
   editorDiff,
   pdfSourceVersion,
   revertIsEnabled,
+  revertAction,
   cloneVersionDocument,
   statusCardRepair,
   cancelIsOffered
@@ -170,6 +171,28 @@ describe('revertIsEnabled', () => {
   it('is enabled only for a saved version, never for Unsaved', () => {
     expect(revertIsEnabled(UNSAVED_VIEW)).toBe(false);
     expect(revertIsEnabled(1002)).toBe(true);
+  });
+});
+
+describe('revertAction', () => {
+  const signed = { currentVersionNumber: 1001, activeVersionNumber: 1000, activeStatus: 'SIGNED' as const };
+
+  it('restores the signed version in force when a later draft sits above it', () => {
+    expect(revertAction({ viewing: 1000, ...signed })).toEqual({ kind: 'restore-signed' });
+  });
+
+  it('copies the signed version into Unsaved when it is already current (local edits only)', () => {
+    expect(revertAction({ viewing: 1000, currentVersionNumber: 1000, activeVersionNumber: 1000, activeStatus: 'SIGNED' })).toEqual({
+      kind: 'replace-unsaved'
+    });
+  });
+
+  it('copies any other historic version into Unsaved', () => {
+    expect(revertAction({ viewing: 999, ...signed })).toEqual({ kind: 'replace-unsaved' });
+  });
+
+  it('is disabled on Unsaved', () => {
+    expect(revertAction({ viewing: UNSAVED_VIEW, ...signed })).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 import { print } from 'graphql';
 import { describe, expect, it } from 'vitest';
-import { RESPOND_TO_JOB_REVIEW, REVIEW_JOB } from './mutations';
+import { RESPOND_TO_JOB_REVIEW, REVIEW_JOB, RESTORE_SOW_SIGNED_VERSION } from './mutations';
 import { ACTIVITY_EVENTS, GET_JOB_BY_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, SOW_VERSION_FIELDS } from './queries';
 
 const compact = (document: Parameters<typeof print>[0]): string => print(document).replace(/\s+/g, ' ').trim();
@@ -60,5 +60,11 @@ describe('SOW and activity GraphQL contracts', () => {
     const query = compact(ACTIVITY_EVENTS);
     expect(query).toMatch(/\bsowId\b/);
     expect(query).toMatch(/\bsowVersionNumber\b/);
+  });
+
+  it('restores the signed version in force by version number', () => {
+    const mutation = compact(RESTORE_SOW_SIGNED_VERSION);
+    expect(mutation).toContain('mutation RestoreSowSignedVersion($sowId: ID!, $versionNumber: Int!)');
+    expect(mutation).toContain('restoreSowSignedVersion(sowId: $sowId, versionNumber: $versionNumber)');
   });
 });

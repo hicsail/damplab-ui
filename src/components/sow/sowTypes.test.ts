@@ -71,7 +71,8 @@ describe('SOW contract repair types', () => {
     ['ACCEPTED_SOURCE_UNAVAILABLE', /re-accept.*save a fresh draft.*reissue/i],
     ['JOB_CHANGED_SINCE_ACCEPTANCE', /re-accept.*save a fresh draft.*reissue/i],
     ['STALE_SIGN_VERSION', /reload.*latest version/i],
-    ['AWAITING_SENT_VERSION', /send the document/i]
+    ['AWAITING_SENT_VERSION', /send the document/i],
+    ['UNSENT_DRAFT', /revert to the signed version/i]
   ] as const)('gives %s an actionable repair step', (blocker, expected) => {
     expect(blockerStep(blocker)).toMatch(expected);
   });

@@ -737,6 +737,16 @@ export const DISCARD_SOW_DRAFT = gql`
     }
 `;
 
+export const RESTORE_SOW_SIGNED_VERSION = gql`
+    mutation RestoreSowSignedVersion($sowId: ID!, $versionNumber: Int!) {
+        restoreSowSignedVersion(sowId: $sowId, versionNumber: $versionNumber) {
+            id
+            currentVersionNumber
+            activeVersionNumber
+        }
+    }
+`;
+
 export const CANCEL_SOW = gql`
     mutation CancelSow($sowId: ID!, $note: String) {
         cancelSow(sowId: $sowId, note: $note) { id versionNumber status }

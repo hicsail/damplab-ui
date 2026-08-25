@@ -1,6 +1,6 @@
 import React, { useState, useContext } from "react";
 import { CanvasContext } from "../contexts/Canvas";
-import { Dialog, DialogTitle, TextField, Button, IconButton } from "@mui/material";
+import { Dialog, DialogTitle, TextField, Button } from "@mui/material";
 import { SaveOutlined } from '@mui/icons-material';
 import AlertDialog from "./AlertDialog";
 
@@ -57,9 +57,22 @@ export default function SaveCanvasButton (props: SaveDialogProps )  {
 
     return (
         <React.Fragment>
-            <IconButton onClick={() => setOpen(true)} title="Save canvas" aria-controls='menu-appbar' aria-haspopup='true'>
-                <SaveOutlined style={{color: 'white'}}/>
-            </IconButton>
+            <Button
+                onClick={() => setOpen(true)}
+                title="Save Job"
+                variant="outlined"
+                size="small"
+                startIcon={<SaveOutlined />}
+                sx={{
+                    color: 'white',
+                    borderColor: 'rgba(255,255,255,0.5)',
+                    textTransform: 'none',
+                    fontSize: 12,
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                Save Job
+            </Button>
             <Dialog onClose={() => setOpen(false)} open={open}>
                 <div style={{width: 300, height: 200, padding: 10}}>
                     <DialogTitle>Save Canvas</DialogTitle>
