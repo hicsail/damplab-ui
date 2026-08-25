@@ -3,6 +3,7 @@ import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { PDFDownloadLink } from '@react-pdf/renderer';
@@ -143,6 +144,7 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
   const [note, setNote] = useState('');
   const [banner, setBanner] = useState<{ severity: 'success' | 'error' | 'info' | 'warning'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [saveVersion] = useMutation(SAVE_SOW_VERSION);
   const [sendToCustomer] = useMutation(SEND_SOW_TO_CUSTOMER);
@@ -380,6 +382,17 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     }
   };
 
+  const handleRefresh = useCallback(() => {
+    if (busy || refreshing) return;
+    setRefreshing(true);
+    setBanner(null);
+    void refetch()
+      .catch(() => {
+        setBanner({ severity: 'error', text: 'Could not refresh this Statement of Work. Try again.' });
+      })
+      .finally(() => setRefreshing(false));
+  }, [busy, refreshing, refetch]);
+
   // Discards in-progress edits and the local draft behind them, landing back on
   // exactly what Save would have overwritten — the counterpart to Save rather
   // than a full reload, so it works without a round trip.
@@ -532,6 +545,13 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
             {hasUnsentDraft && activeStatus && (
               <Chip size="small" variant="outlined" label={`Customer holds ${versionDisplayLabel(sow?.activeVersion)} (${sowStatusLabel(activeStatus)})`} />
             )}
+            <Tooltip title="Refresh">
+              <span>
+                <IconButton onClick={handleRefresh} disabled={busy || refreshing} aria-label="Refresh">
+                  {refreshing ? <CircularProgress size={20} /> : <RefreshIcon />}
+                </IconButton>
+              </span>
+            </Tooltip>
             <IconButton onClick={onClose} disabled={busy} aria-label="Close">
               <CloseIcon />
             </IconButton>
