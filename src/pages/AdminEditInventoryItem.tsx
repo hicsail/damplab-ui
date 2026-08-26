@@ -1,10 +1,13 @@
 import { ApolloError, useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
+  Checkbox,
   Chip,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
@@ -23,12 +26,11 @@ import { useNavigate, useParams } from 'react-router';
 import { GET_INVENTORY_ITEMS, GET_STATIONS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, pricingToRateForm, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
 
-const TYPE_OPTIONS = [
-  { value: 'ROBOT', label: 'Robot' },
-  { value: 'MACHINE', label: 'Machine' },
-  { value: 'INSTRUMENT', label: 'Instrument' },
-  { value: 'CONSUMABLE', label: 'Consumable' },
-  { value: 'OTHER', label: 'Other' }
+const SUGGESTED_TYPES = ['EQUIPMENT', 'HOOD', 'STORAGE', 'CONSUMABLE'];
+
+const TAG_SUGGESTIONS = [
+  'Analytical Equipment', 'CLIA Equipment', 'Centrifuge', 'Cold Storage',
+  'General Equipment', 'Imaging', 'Incubator', 'Liquid Handler', 'Sequencer', 'Vortexer'
 ];
 
 /** One editable row of the placement editor: where the item lives and how many are there. */
@@ -66,13 +68,18 @@ export default function AdminEditInventoryItem() {
   const item: any = data?.inventoryItems?.find((x: any) => String(x.id) === String(itemId));
 
   const [name, setName] = useState('');
-  const [type, setType] = useState('MACHINE');
+  const [type, setType] = useState('EQUIPMENT');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [placements, setPlacements] = useState<PlacementRow[]>([]);
   const [bookable, setBookable] = useState(false);
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
+  const [tags, setTags] = useState<string[]>([]);
+  const [modelNumber, setModelNumber] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [hasServiceContract, setHasServiceContract] = useState(false);
+  const [serviceContractExpiration, setServiceContractExpiration] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -100,6 +107,11 @@ export default function AdminEditInventoryItem() {
     setBookable(!!item.bookable);
     setRateType(item.rateType === 'PER_UNIT' ? 'PER_UNIT' : 'HOURLY');
     setPricing(pricingToRateForm(item.pricing));
+    setTags(Array.isArray(item.tags) ? item.tags : []);
+    setModelNumber(item.modelNumber ?? '');
+    setSerialNumber(item.serialNumber ?? '');
+    setHasServiceContract(!!item.hasServiceContract);
+    setServiceContractExpiration(item.serviceContractExpiration ? item.serviceContractExpiration.slice(0, 10) : '');
   }, [item?.id]);
 
   if (loading && !item) {
@@ -156,7 +168,12 @@ export default function AdminEditInventoryItem() {
             placements: placementsInput,
             bookable,
             rateType: bookable ? rateType : null,
-            pricing: bookable ? ratePricingToInput(pricing) : null
+            pricing: bookable ? ratePricingToInput(pricing) : null,
+            tags,
+            modelNumber: modelNumber.trim() || null,
+            serialNumber: serialNumber.trim() || null,
+            hasServiceContract,
+            serviceContractExpiration: serviceContractExpiration || null
           }
         }
       });
@@ -199,14 +216,14 @@ export default function AdminEditInventoryItem() {
 
       <TextField label='Name' value={name} onChange={(e) => setName(e.target.value)} required />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <FormControl>
-          <InputLabel id='inventory-type-label'>Type</InputLabel>
-          <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
-            {TYPE_OPTIONS.map((o) => (
-              <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Autocomplete
+          freeSolo
+          options={SUGGESTED_TYPES}
+          value={type}
+          onChange={(_, newVal) => setType(typeof newVal === 'string' ? newVal : '')}
+          onInputChange={(_, newVal) => setType(newVal)}
+          renderInput={(params) => <TextField {...params} label='Type' />}
+        />
         <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} />
       </Box>
 
@@ -278,6 +295,44 @@ export default function AdminEditInventoryItem() {
       </Box>
 
       <TextField label='Description' value={description} onChange={(e) => setDescription(e.target.value)} multiline minRows={3} />
+
+      <Autocomplete
+        multiple
+        freeSolo
+        options={TAG_SUGGESTIONS}
+        value={tags}
+        onChange={(_, newValue) => setTags(newValue)}
+        renderInput={(params) => <TextField {...params} label='Tags' placeholder='Add a tag…' />}
+      />
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+        <TextField label='Model #' value={modelNumber} onChange={(e) => setModelNumber(e.target.value)} placeholder='e.g. ND-2000C' />
+        <TextField label='Serial #' value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder='Internal tracking only' />
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <FormControlLabel
+          control={<Checkbox checked={hasServiceContract} onChange={(e) => setHasServiceContract(e.target.checked)} />}
+          label='Has service contract'
+        />
+        {hasServiceContract && (
+          <TextField
+            label='Contract expiration'
+            type='date'
+            size='small'
+            value={serviceContractExpiration}
+            onChange={(e) => setServiceContractExpiration(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: 200 }}
+          />
+        )}
+      </Box>
+
+      {item.uniqueId && (
+        <Typography variant='caption' color='text.secondary'>
+          Unique ID: {item.uniqueId}
+        </Typography>
+      )}
 
       <InventoryRateFields
         bookable={bookable}

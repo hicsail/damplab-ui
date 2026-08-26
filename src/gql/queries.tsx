@@ -1093,6 +1093,14 @@ const INVENTORY_FIELDS = `
     external
     legacy
   }
+  uniqueId
+  tags
+  modelNumber
+  serialNumber
+  hasServiceContract
+  serviceContractExpiration
+  lastModifiedBy
+  dimensions { value unit }
 `;
 
 export const GET_INVENTORY_ITEMS = gql`
@@ -1107,6 +1115,25 @@ export const GET_ACTIVE_INVENTORY_ITEMS = gql`
   query GetActiveInventoryItems {
     activeInventoryItems {
       ${INVENTORY_FIELDS}
+    }
+  }
+`;
+
+export const GET_PUBLIC_INVENTORY_ITEMS = gql`
+  query GetPublicInventoryItems {
+    publicInventoryItems {
+      id
+      name
+      type
+      description
+      location
+      quantity
+      bookable
+      placements { stationId quantity }
+      tags
+      modelNumber
+      hasServiceContract
+      dimensions { value unit }
     }
   }
 `;
@@ -1191,6 +1218,62 @@ export const GET_BILLABLE_BOOKINGS = gql`
 export const DELETE_INVENTORY_ITEM = gql`
   mutation DeleteInventoryItem($item: ID!) {
     deleteInventoryItem(item: $item)
+  }
+`;
+
+export const DELETE_ALL_INVENTORY_ITEMS = gql`
+  mutation DeleteAllInventoryItems {
+    deleteAllInventoryItems
+  }
+`;
+
+export const CREATE_UPLOAD_LOG = gql`
+  mutation CreateUploadLog($input: CreateUploadLogInput!) {
+    createUploadLog(input: $input) {
+      id
+      uploadDate
+    }
+  }
+`;
+
+export const GET_UPLOAD_LOGS = gql`
+  query UploadLogs {
+    uploadLogs {
+      id
+      uploaderName
+      uploaderSub
+      fileName
+      uploadDate
+      rowCount
+      createdCount
+      updatedCount
+      skippedCount
+      failedCount
+    }
+  }
+`;
+
+export const GET_UPLOAD_LOG = gql`
+  query UploadLog($id: ID!) {
+    uploadLog(id: $id) {
+      id
+      uploaderName
+      uploaderSub
+      fileName
+      uploadDate
+      rowCount
+      createdCount
+      updatedCount
+      skippedCount
+      failedCount
+      affectedItemIds
+      fieldSnapshots {
+        itemId
+        action
+        before
+        after
+      }
+    }
   }
 `;
 

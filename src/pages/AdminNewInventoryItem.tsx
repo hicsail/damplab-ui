@@ -1,9 +1,12 @@
 import { ApolloError, useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
+  Checkbox,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
@@ -21,12 +24,11 @@ import { useNavigate } from 'react-router';
 import { CREATE_INVENTORY_ITEM, GET_STATIONS } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
 
-const TYPE_OPTIONS = [
-  { value: 'ROBOT', label: 'Robot' },
-  { value: 'MACHINE', label: 'Machine' },
-  { value: 'INSTRUMENT', label: 'Instrument' },
-  { value: 'CONSUMABLE', label: 'Consumable' },
-  { value: 'OTHER', label: 'Other' }
+const SUGGESTED_TYPES = ['EQUIPMENT', 'HOOD', 'STORAGE', 'CONSUMABLE'];
+
+const TAG_SUGGESTIONS = [
+  'Analytical Equipment', 'CLIA Equipment', 'Centrifuge', 'Cold Storage',
+  'General Equipment', 'Imaging', 'Incubator', 'Liquid Handler', 'Sequencer', 'Vortexer'
 ];
 
 /** One editable row of the placement editor: where the item lives and how many are there. */
@@ -58,7 +60,7 @@ export default function AdminNewInventoryItem() {
   const navigate = useNavigate();
   const client = useApolloClient();
   const [name, setName] = useState('');
-  const [type, setType] = useState('MACHINE');
+  const [type, setType] = useState('EQUIPMENT');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [placements, setPlacements] = useState<PlacementRow[]>([]);
@@ -67,6 +69,11 @@ export default function AdminNewInventoryItem() {
   const [bookable, setBookable] = useState(false);
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
+  const [tags, setTags] = useState<string[]>([]);
+  const [modelNumber, setModelNumber] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [hasServiceContract, setHasServiceContract] = useState(false);
+  const [serviceContractExpiration, setServiceContractExpiration] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -108,7 +115,12 @@ export default function AdminNewInventoryItem() {
             placements: placementsInput,
             bookable,
             rateType: bookable ? rateType : undefined,
-            pricing: bookable ? ratePricingToInput(pricing) : undefined
+            pricing: bookable ? ratePricingToInput(pricing) : undefined,
+            tags,
+            modelNumber: modelNumber.trim() || undefined,
+            serialNumber: serialNumber.trim() || undefined,
+            hasServiceContract,
+            serviceContractExpiration: serviceContractExpiration || undefined
           }
         }
       });
@@ -145,14 +157,14 @@ export default function AdminNewInventoryItem() {
       />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <FormControl>
-          <InputLabel id='inventory-type-label'>Type</InputLabel>
-          <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
-            {TYPE_OPTIONS.map((o) => (
-              <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Autocomplete
+          freeSolo
+          options={SUGGESTED_TYPES}
+          value={type}
+          onChange={(_, newVal) => setType(typeof newVal === 'string' ? newVal : '')}
+          onInputChange={(_, newVal) => setType(newVal)}
+          renderInput={(params) => <TextField {...params} label='Type' />}
+        />
         <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} placeholder='Bench A, room 304…' />
       </Box>
 
@@ -231,6 +243,38 @@ export default function AdminNewInventoryItem() {
         minRows={3}
         placeholder='Model, capabilities, notes…'
       />
+
+      <Autocomplete
+        multiple
+        freeSolo
+        options={TAG_SUGGESTIONS}
+        value={tags}
+        onChange={(_, newValue) => setTags(newValue)}
+        renderInput={(params) => <TextField {...params} label='Tags' placeholder='Add a tag…' />}
+      />
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+        <TextField label='Model #' value={modelNumber} onChange={(e) => setModelNumber(e.target.value)} placeholder='e.g. ND-2000C' />
+        <TextField label='Serial #' value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder='Internal tracking only' />
+      </Box>
+
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <FormControlLabel
+          control={<Checkbox checked={hasServiceContract} onChange={(e) => setHasServiceContract(e.target.checked)} />}
+          label='Has service contract'
+        />
+        {hasServiceContract && (
+          <TextField
+            label='Contract expiration'
+            type='date'
+            size='small'
+            value={serviceContractExpiration}
+            onChange={(e) => setServiceContractExpiration(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{ width: 200 }}
+          />
+        )}
+      </Box>
 
       <InventoryRateFields
         bookable={bookable}
