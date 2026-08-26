@@ -41,7 +41,10 @@ function resolveRate(pricing: any, category?: string): number | undefined {
     case 'EXTERNAL_CUSTOMER_NO_SALARY':
       return n(pricing.externalNoSalary) ?? n(pricing.external) ?? n(pricing.legacy);
     default:
-      return n(pricing.legacy) ?? n(pricing.internal) ?? n(pricing.external);
+      // An uncategorised user must never be quoted the internal rate -- it is the
+      // cheapest tier and this is the one population with no pricing group at all.
+      // Mirrors the backend's resolveCategoryPrice fallback: legacy, then external.
+      return n(pricing.legacy) ?? n(pricing.external) ?? n(pricing.externalMarket);
   }
 }
 

@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import React, { useContext } from 'react';
 import { useNavigate, Navigate } from 'react-router';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { Badge, Box, Button, Chip, Stack, Typography } from '@mui/material';
@@ -27,6 +27,40 @@ import { useEffectiveUser } from "../hooks/useEffectiveUser";
 import AnnouncementBox from '../components/AnnouncementBox';
 import { JOBS_FEED_STATUS } from '../gql/queries';
 import { MARK_JOBS_FEED_VIEWED } from '../gql/mutations';
+import { HomeMenuItemDef, HomeMenuItemId, visibleHomeMenu } from './homeMenu';
+
+/**
+ * One icon per menu item. Typed as an exhaustive Record so adding an item to
+ * `homeMenu.ts` without an icon is a compile error rather than a blank button.
+ */
+const MENU_ICONS: Record<HomeMenuItemId, React.ReactNode> = {
+  'my-jobs': <WorkHistoryIcon />,
+  'order-services': <AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />,
+  'catalog': <FormatListBulletedIcon />,
+  'book-inventory': <EventAvailableIcon />,
+  'learning-hub': <SchoolIcon />,
+  'bugs': <BugReportIcon />,
+  'bug-backlog': <FormatListBulletedIcon />,
+  'damplab-website': <img src="/damp-white.svg" height="30px" alt="DAMP Logo" />,
+  'jobs': <ViewStreamIcon />,
+  'staff-submit-job': <SupervisorAccountOutlinedIcon />,
+  'my-bench': <ScienceIcon />,
+  'inventory-availability': <PrecisionManufacturingIcon />,
+  'inventory-schedule': <EventAvailableIcon />,
+  'release-notes': <FormatListBulletedIcon />,
+  'catalog-inventory-editor': <EditIcon />,
+  'protocol-library': <AccountTreeIcon />,
+  'lab-layout': <PlaceIcon />,
+  'announcements': <CampaignIcon />,
+  'billing': <ReceiptLongIcon />,
+  'ai-lab-assistant': <InsightsIcon />,
+  'customer-management': <PeopleIcon />,
+  'api-keys': <VpnKeyIcon />,
+  'data-translation': <EditIcon />,
+  'lab-monitor-north': <MonitorIcon />,
+  'lab-monitor-south': <MonitorIcon />,
+  'lab-status-tv': <MonitorIcon />,
+};
 
 function MenuButton({ onClick, navigateTo, children }: any) {
   const navigate = useNavigate();
@@ -50,7 +84,13 @@ function MenuButton({ onClick, navigateTo, children }: any) {
   );
 }
 
+/**
+ * Renders nothing at all when it has no children. Sections are mixed across roles
+ * now, so an emptied section would otherwise leave a dangling orphan heading — a
+ * client staring at "Admin Management Tools" above blank space.
+ */
 function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
+  if (React.Children.count(children) === 0) return null;
   return (
     <Box sx={{ width: '100%' }}>
       <Typography variant="h6" sx={{ mb: 1 }}>
@@ -95,6 +135,18 @@ export default function Home() {
     }
     navigate('/dashboard');
   }
+
+  /** Turn a menu item's declared destination into the click it needs. */
+  function activate(item: HomeMenuItemDef) {
+    if (item.action === 'open-jobs-dashboard') return void openJobsDashboard();
+    if (item.href) {
+      window.location.href = item.href;
+      return;
+    }
+    if (item.to) navigate(item.to);
+  }
+
+  const menuSections = visibleHomeMenu(userProps);
 
   const appellation = (userProps?.idTokenParsed as any)?.name || (userProps?.idTokenParsed as any)?.email || "DAMPLab User";
 
@@ -149,132 +201,22 @@ export default function Home() {
         }}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: '1 1 700px', minWidth: 320 }}>
-          <MenuSection title="Basics">
-            <MenuButton navigateTo="/my_jobs">
-              <WorkHistoryIcon />
-              My Jobs
-            </MenuButton>
-            <MenuButton navigateTo="/canvas">
-              <AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />
-              Canvas
-            </MenuButton>
-            <MenuButton navigateTo="/services-catalog">
-              <FormatListBulletedIcon />
-              Services Catalog
-            </MenuButton>
-            <MenuButton navigateTo="/book-inventory">
-              <EventAvailableIcon />
-              Book Inventory
-            </MenuButton>
-            <MenuButton navigateTo="/training">
-              <SchoolIcon />
-              Learning Hub
-            </MenuButton>
-            <MenuButton navigateTo="/bugs">
-              <BugReportIcon />
-              Bugs
-            </MenuButton>
-            <MenuButton navigateTo="/backlog">
-              <FormatListBulletedIcon />
-              Bug Backlog
-            </MenuButton>
-            <MenuButton onClick={() => (window.location.href = 'https://www.damplab.org/services')}>
-              <img src="/damp-white.svg" height="30px" alt="DAMP Logo" />
-              DAMPLab Site
-            </MenuButton>
-          </MenuSection>
-
-          {userProps.isDamplabStaff && (
-            <>
-              <MenuSection title="Staff: operations">
-                <MenuButton onClick={openJobsDashboard}>
-                  <Badge
-                    color="error"
-                    variant="dot"
-                    overlap="circular"
-                    invisible={!jobsFeedData?.jobsFeedStatus?.hasUnseen}
-                  >
-                    <ViewStreamIcon />
-                  </Badge>
-                  Jobs
+          {menuSections.map((section) => (
+            <MenuSection key={section.title} title={section.title}>
+              {section.items.map((item) => (
+                <MenuButton key={item.id} onClick={() => activate(item)}>
+                  {item.badge === 'jobs-feed-unseen' ? (
+                    <Badge color="error" variant="dot" overlap="circular" invisible={!jobsFeedData?.jobsFeedStatus?.hasUnseen}>
+                      {MENU_ICONS[item.id]}
+                    </Badge>
+                  ) : (
+                    MENU_ICONS[item.id]
+                  )}
+                  {item.label}
                 </MenuButton>
-                <MenuButton navigateTo="/staff_submit">
-                  <SupervisorAccountOutlinedIcon />
-                  Staff submit job
-                </MenuButton>
-                <MenuButton navigateTo="/technician_bench">
-                  <ScienceIcon />
-                  My Bench
-                </MenuButton>
-              </MenuSection>
-
-              <MenuSection title="Staff: displays">
-                <MenuButton navigateTo="/lab-monitor/north">
-                  <MonitorIcon />
-                  Lab Monitor North
-                </MenuButton>
-                <MenuButton navigateTo="/lab-monitor/south">
-                  <MonitorIcon />
-                  Lab Monitor South
-                </MenuButton>
-                <MenuButton navigateTo="/lab-status-tv">
-                  <MonitorIcon />
-                  Lab Status TV
-                </MenuButton>
-                <MenuButton navigateTo="/inventory">
-                  <PrecisionManufacturingIcon />
-                  Inventory Availability
-                </MenuButton>
-                <MenuButton navigateTo="/inventory-calendar">
-                  <EventAvailableIcon />
-                  Inventory Schedule
-                </MenuButton>
-                <MenuButton navigateTo="/usage-billing">
-                  <ReceiptLongIcon />
-                  Usage Billing
-                </MenuButton>
-                <MenuButton navigateTo="/lab-assistant">
-                  <InsightsIcon />
-                  Lab Status Assistant
-                </MenuButton>
-              </MenuSection>
-
-              <MenuSection title="Admin tools">
-                <MenuButton navigateTo="/edit">
-                  <EditIcon />
-                  Catalog Editor
-                </MenuButton>
-                <MenuButton navigateTo="/customer-management">
-                  <PeopleIcon />
-                  Customer Management
-                </MenuButton>
-                <MenuButton navigateTo="/protocol-map">
-                  <AccountTreeIcon />
-                  Protocol Map
-                </MenuButton>
-                <MenuButton navigateTo="/stations">
-                  <PlaceIcon />
-                  Lab Stations
-                </MenuButton>
-                <MenuButton navigateTo="/api-keys">
-                  <VpnKeyIcon />
-                  API Keys
-                </MenuButton>
-                <MenuButton navigateTo="/edit_announcements">
-                  <CampaignIcon />
-                  Announcements
-                </MenuButton>
-                <MenuButton navigateTo="/release_notes">
-                  <FormatListBulletedIcon />
-                  Release Notes
-                </MenuButton>
-                <MenuButton navigateTo="/data_translation">
-                  <EditIcon />
-                  Data Translation
-                </MenuButton>
-              </MenuSection>
-            </>
-          )}
+              ))}
+            </MenuSection>
+          ))}
         </Box>
         <AnnouncementBox />
       </Box>

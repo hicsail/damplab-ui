@@ -121,7 +121,7 @@ export default function AdminServicesCatalog() {
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
       <Typography variant="h4" gutterBottom>
-        Services Catalog
+        Catalog
       </Typography>
       <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
         Read-only view of DAMPLab services, their parameters, and pricing. Prices are shown across the four customer categories.

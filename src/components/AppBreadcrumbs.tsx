@@ -20,8 +20,8 @@ function pretty(s: string): string {
 /** One-level, static routes -> label. */
 const STATIC: Record<string, string> = {
   '/my_jobs': 'My Jobs',
-  '/services-catalog': 'Services Catalog',
-  '/admin/services-catalog': 'Services Catalog',
+  '/services-catalog': 'Catalog',
+  '/admin/services-catalog': 'Catalog',
   '/book-inventory': 'Book Inventory',
   '/training': 'Learning Hub',
   '/checkout': 'Checkout',
@@ -29,24 +29,27 @@ const STATIC: Record<string, string> = {
   '/staff_submit': 'Staff Submit Job',
   '/bugs': 'Bugs & Issues',
   '/lab-status-tv': 'Lab Status TV',
-  '/lab-assistant': 'Lab Assistant',
+  '/lab-assistant': 'AI Lab Assistant',
   '/technician_bench': 'My Bench',
   '/inventory-calendar': 'Inventory Schedule',
-  '/usage-billing': 'Usage Billing',
+  '/usage-billing': 'Billing',
   '/dashboard': 'Jobs Dashboard',
   '/customer-management': 'Customer Management',
   '/api-keys': 'API Keys',
   '/inventory': 'Inventory Availability',
-  '/edit': 'Catalog Editor',
+  '/edit': 'Catalog & Inventory Editor',
   '/release_notes': 'Release Notes',
   '/edit_announcements': 'Announcements',
   '/data_translation': 'Data Translation',
   '/dominos': 'Dominos',
   '/elabs': 'ELabs',
-  '/kernel': 'Kernel'
+  '/kernel': 'Kernel',
+  '/protocol-map': 'Protocol Library',
+  '/stations': 'Lab Layout',
+  '/backlog': 'Bug Backlog'
 };
 
-const EDIT: Crumb = { label: 'Catalog Editor', to: '/edit' };
+const EDIT: Crumb = { label: 'Catalog & Inventory Editor', to: '/edit' };
 
 /** Multi-level / dynamic routes -> explicit trail (below Home). Returns null if unmatched. */
 function dynamicTrail(path: string): Crumb[] | null {

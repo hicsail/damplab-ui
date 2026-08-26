@@ -19,6 +19,7 @@ import {
 import { CanvasContext } from '../contexts/Canvas';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { useEffectiveUser } from '../hooks/useEffectiveUser';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { getWorkflowsFromGraph } from '../controllers/GraphHelpers';
 import { submitCanvasJob } from '../utils/canvasJobSubmission';
 
@@ -44,6 +45,7 @@ export default function StaffJobSubmit() {
   const apolloClient = useApolloClient();
   const userContext: UserContextProps = useContext(UserContext);
   const { userProps } = useEffectiveUser();
+  const { can } = usePermissions();
 
   const workflows = useMemo(
     () => getWorkflowsFromGraph(val.nodes, val.edges) || [],
@@ -69,7 +71,10 @@ export default function StaffJobSubmit() {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const [lastSubmittedJob, setLastSubmittedJob] = useState<{ id: string; jobId?: string } | null>(null);
 
-  if (!userProps?.isDamplabStaff) {
+  // This redirect, not the route table, is what actually gates this page --
+  // /staff_submit lives in the baseline layout. Q7: the matrix gives this to
+  // Administrators and Equipment Users, and NOT to Technicians.
+  if (!can(PERMISSIONS.JobSubmitForClient)) {
     return <Navigate to="/checkout" replace />;
   }
 

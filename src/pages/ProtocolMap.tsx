@@ -172,7 +172,7 @@ export default function ProtocolMap() {
     <Stack spacing={3} sx={{ maxWidth: 1000 }}>
       <Stack direction='row' spacing={1.5} alignItems='center'>
         <AccountTreeIcon color='primary' />
-        <Typography variant='h2'>Protocol Step Map</Typography>
+        <Typography variant='h2'>Protocol Library</Typography>
       </Stack>
       <Typography variant='body1' color='text.secondary'>
         Map each protocols.io step to the equipment it requires. A piece of equipment can live at

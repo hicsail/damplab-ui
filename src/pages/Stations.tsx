@@ -124,7 +124,7 @@ export default function Stations() {
       <Stack direction='row' spacing={2} alignItems='center' justifyContent='space-between'>
         <Stack direction='row' spacing={1.5} alignItems='center'>
           <PlaceIcon color='primary' />
-          <Typography variant='h2'>Lab Stations</Typography>
+          <Typography variant='h2'>Lab Layout</Typography>
         </Stack>
         <Button variant='contained' startIcon={<AddIcon />} onClick={openCreate}>New station</Button>
       </Stack>

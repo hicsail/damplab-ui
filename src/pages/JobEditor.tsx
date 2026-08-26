@@ -20,7 +20,7 @@ import { GET_JOB_BY_ID, GET_OWN_JOB_BY_ID } from '../gql/queries';
 import { RESTORE_JOB_VERSION, SAVE_JOB_WORKFLOWS } from '../gql/mutations';
 import { AppContext }    from '../contexts/App';
 import { CanvasContext } from '../contexts/Canvas';
-import { UserContext }   from '../contexts/UserContext';
+import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import '../styles/sidebar.css';
 
@@ -44,7 +44,9 @@ export default function JobEditor() {
     const reactFlowWrapper = useRef<HTMLDivElement>(null);
     const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
     const { services } = useContext(AppContext);
-    const { userProps } = useContext(UserContext);
+    // useEffectiveUser, not raw UserContext: this page read the context directly and
+    // so ignored the staff "Client View" toggle entirely.
+    const { userProps } = useEffectiveUser();
     const isStaff = Boolean(userProps?.isDamplabStaff);
 
     // Canvas state, local to this page. See the note above.
