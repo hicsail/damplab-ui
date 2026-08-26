@@ -9,7 +9,7 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { UserContext } from '../../contexts/UserContext';
 import { GridToolBar } from './GridToolBar';
-import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS } from '../../gql/queries';
+import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS, GET_STATIONS } from '../../gql/queries';
 import { validateFileType } from '../data-translation/utils';
 import { parseInventoryFile, ParsedInventoryRow, UploadSummary } from './inventoryUploadUtils';
 import { InventoryUploadPreview } from './InventoryUploadPreview';
@@ -28,6 +28,12 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
   // query directly and refetch after mutations. If the catalog grows enough
   // that this gets called a lot, lift to AppContext.
   const { data, refetch } = useQuery(GET_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
+  const { data: stationsData } = useQuery(GET_STATIONS);
+  const stationMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of stationsData?.stations ?? []) map.set(s.id, s.name);
+    return map;
+  }, [stationsData]);
   const [rows, setRows] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [, setRowModesModel] = useState<GridRowModesModel>({});
@@ -148,15 +154,39 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         <>{(params.row.tags ?? []).map((t: string, i: number) => <Chip key={i} size='small' label={t} sx={{ mr: 0.5 }} />)}</>
       )
     },
+    {
+      field: 'placements',
+      headerName: 'Station',
+      width: 200,
+      renderCell: (params) => {
+        const placements: any[] = params.row.placements ?? [];
+        if (placements.length === 0) return null;
+        return (
+          <>
+            {placements.map((p: any, i: number) => {
+              const name = stationMap.get(p.stationId) ?? p.stationId;
+              return <Chip key={i} size='small' label={p.quantity > 1 ? `${name} (×${p.quantity})` : name} sx={{ mr: 0.5 }} />;
+            })}
+          </>
+        );
+      }
+    },
     { field: 'location', headerName: 'Location', width: 150 },
     { field: 'description', headerName: 'Description', width: 240, flex: 1 },
     { field: 'modelNumber', headerName: 'Model #', width: 130 },
     { field: 'serialNumber', headerName: 'Serial #', width: 130 },
+    { field: 'quantity', headerName: 'Qty', width: 70 },
     {
       field: 'hasServiceContract',
       headerName: 'Contract',
       width: 100,
       renderCell: (params) => (params.row.hasServiceContract ? <Chip size='small' color='info' label='Yes' /> : null)
+    },
+    {
+      field: 'serviceContractExpiration',
+      headerName: 'Contract Exp.',
+      width: 130,
+      valueFormatter: (value: string) => (value ? new Date(value).toLocaleDateString() : '')
     },
     {
       field: 'isDeleted',
