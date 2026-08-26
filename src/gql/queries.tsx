@@ -1100,7 +1100,9 @@ const INVENTORY_FIELDS = `
   hasServiceContract
   serviceContractExpiration
   lastModifiedBy
-  dimensions { value unit }
+  dimensionL { value unit }
+  dimensionW { value unit }
+  dimensionH { value unit }
 `;
 
 export const GET_INVENTORY_ITEMS = gql`
@@ -1133,7 +1135,9 @@ export const GET_PUBLIC_INVENTORY_ITEMS = gql`
       tags
       modelNumber
       hasServiceContract
-      dimensions { value unit }
+      dimensionL { value unit }
+  dimensionW { value unit }
+  dimensionH { value unit }
     }
   }
 `;

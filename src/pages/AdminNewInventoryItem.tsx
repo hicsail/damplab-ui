@@ -74,6 +74,9 @@ export default function AdminNewInventoryItem() {
   const [serialNumber, setSerialNumber] = useState('');
   const [hasServiceContract, setHasServiceContract] = useState(false);
   const [serviceContractExpiration, setServiceContractExpiration] = useState('');
+  const [dimL, setDimL] = useState('');
+  const [dimW, setDimW] = useState('');
+  const [dimH, setDimH] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -120,7 +123,10 @@ export default function AdminNewInventoryItem() {
             modelNumber: modelNumber.trim() || undefined,
             serialNumber: serialNumber.trim() || undefined,
             hasServiceContract,
-            serviceContractExpiration: serviceContractExpiration || undefined
+            serviceContractExpiration: serviceContractExpiration || undefined,
+            dimensionL: dimL ? { value: Number(dimL), unit: 'm' } : undefined,
+            dimensionW: dimW ? { value: Number(dimW), unit: 'm' } : undefined,
+            dimensionH: dimH ? { value: Number(dimH), unit: 'm' } : undefined
           }
         }
       });
@@ -274,6 +280,15 @@ export default function AdminNewInventoryItem() {
             sx={{ width: 200 }}
           />
         )}
+      </Box>
+
+      <Box>
+        <Typography variant='subtitle1' sx={{ mb: 1 }}>Dimensions (m)</Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+          <TextField label='L' type='number' value={dimL} onChange={(e) => setDimL(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
+          <TextField label='W' type='number' value={dimW} onChange={(e) => setDimW(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
+          <TextField label='H' type='number' value={dimH} onChange={(e) => setDimH(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
+        </Box>
       </Box>
 
       <InventoryRateFields
