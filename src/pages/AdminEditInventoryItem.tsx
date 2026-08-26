@@ -80,6 +80,9 @@ export default function AdminEditInventoryItem() {
   const [serialNumber, setSerialNumber] = useState('');
   const [hasServiceContract, setHasServiceContract] = useState(false);
   const [serviceContractExpiration, setServiceContractExpiration] = useState('');
+  const [dimL, setDimL] = useState('');
+  const [dimW, setDimW] = useState('');
+  const [dimH, setDimH] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -112,6 +115,9 @@ export default function AdminEditInventoryItem() {
     setSerialNumber(item.serialNumber ?? '');
     setHasServiceContract(!!item.hasServiceContract);
     setServiceContractExpiration(item.serviceContractExpiration ? item.serviceContractExpiration.slice(0, 10) : '');
+    setDimL(item.dimensionL?.value?.toString() ?? '');
+    setDimW(item.dimensionW?.value?.toString() ?? '');
+    setDimH(item.dimensionH?.value?.toString() ?? '');
   }, [item?.id]);
 
   if (loading && !item) {
@@ -173,7 +179,10 @@ export default function AdminEditInventoryItem() {
             modelNumber: modelNumber.trim() || null,
             serialNumber: serialNumber.trim() || null,
             hasServiceContract,
-            serviceContractExpiration: serviceContractExpiration || null
+            serviceContractExpiration: serviceContractExpiration || null,
+            dimensionL: dimL ? { value: Number(dimL), unit: 'm' } : null,
+            dimensionW: dimW ? { value: Number(dimW), unit: 'm' } : null,
+            dimensionH: dimH ? { value: Number(dimH), unit: 'm' } : null
           }
         }
       });
@@ -326,6 +335,15 @@ export default function AdminEditInventoryItem() {
             sx={{ width: 200 }}
           />
         )}
+      </Box>
+
+      <Box>
+        <Typography variant='subtitle1' sx={{ mb: 1 }}>Dimensions (m)</Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+          <TextField label='L' type='number' value={dimL} onChange={(e) => setDimL(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
+          <TextField label='W' type='number' value={dimW} onChange={(e) => setDimW(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
+          <TextField label='H' type='number' value={dimH} onChange={(e) => setDimH(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
+        </Box>
       </Box>
 
       {item.uniqueId && (

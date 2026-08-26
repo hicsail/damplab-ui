@@ -20,6 +20,9 @@ export interface ParsedInventoryRow {
   matchedIsDeleted?: boolean;
   /** User choice: reactivate a soft-deleted match (true) or skip it. */
   reactivate?: boolean;
+  dimensionL: string;
+  dimensionW: string;
+  dimensionH: string;
   /** Warnings to show in the preview (e.g. unknown type, station not found). */
   warnings: string[];
 }
@@ -63,7 +66,10 @@ const HEADER_MAP: Record<string, keyof ParsedInventoryRow> = {
   servicecontract: 'hasServiceContract',
   hasservicecontract: 'hasServiceContract',
   servicecontractexpiration: 'serviceContractExpiration',
-  contractexpiration: 'serviceContractExpiration'
+  contractexpiration: 'serviceContractExpiration',
+  lm: 'dimensionL',
+  wm: 'dimensionW',
+  hm: 'dimensionH'
 };
 
 function resolveHeaderIndices(headerRow: unknown[]): Record<string, number> {
@@ -143,6 +149,9 @@ export async function parseInventoryFile(file: File): Promise<{
       serialNumber: cellStr(raw, indices.serialNumber),
       hasServiceContract: parseBool(cellStr(raw, indices.hasServiceContract)),
       serviceContractExpiration: cellStr(raw, indices.serviceContractExpiration),
+      dimensionL: cellStr(raw, indices.dimensionL),
+      dimensionW: cellStr(raw, indices.dimensionW),
+      dimensionH: cellStr(raw, indices.dimensionH),
       warnings
     };
 
@@ -261,6 +270,11 @@ export function validateUploadRows(rows: ParsedInventoryRow[], rawQuantities?: s
   return { errors, warnings };
 }
 
+function parseDimension(raw: string): { value: number; unit: string } | undefined {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? { value: n, unit: 'm' } : undefined;
+}
+
 /** Selectable columns for the upload preview. "name" is always included (not optional). */
 export const UPLOAD_COLUMNS = [
   { key: 'type', label: 'Type' },
@@ -268,7 +282,8 @@ export const UPLOAD_COLUMNS = [
   { key: 'station', label: 'Station & Quantity' },
   { key: 'modelNumber', label: 'Model #' },
   { key: 'serialNumber', label: 'Serial #' },
-  { key: 'hasServiceContract', label: 'Service Contract' }
+  { key: 'hasServiceContract', label: 'Service Contract' },
+  { key: 'dimensions', label: 'Dimensions (L/W/H)' }
 ] as const;
 
 export type UploadColumnKey = (typeof UPLOAD_COLUMNS)[number]['key'];
@@ -294,6 +309,11 @@ export function buildCreateInput(row: ParsedInventoryRow, selectedColumns?: Set<
     input.hasServiceContract = row.hasServiceContract;
     input.serviceContractExpiration = row.serviceContractExpiration || undefined;
   }
+  if (include('dimensions')) {
+    input.dimensionL = parseDimension(row.dimensionL);
+    input.dimensionW = parseDimension(row.dimensionW);
+    input.dimensionH = parseDimension(row.dimensionH);
+  }
 
   return input;
 }
@@ -315,6 +335,11 @@ export function buildUpdateChanges(row: ParsedInventoryRow, selectedColumns?: Se
   if (include('hasServiceContract')) {
     changes.hasServiceContract = row.hasServiceContract;
     changes.serviceContractExpiration = row.serviceContractExpiration || null;
+  }
+  if (include('dimensions')) {
+    changes.dimensionL = parseDimension(row.dimensionL) ?? null;
+    changes.dimensionW = parseDimension(row.dimensionW) ?? null;
+    changes.dimensionH = parseDimension(row.dimensionH) ?? null;
   }
 
   return changes;
