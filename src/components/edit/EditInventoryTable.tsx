@@ -229,9 +229,6 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
 
   /** Columns hidden by default — users can toggle via the column menu. */
   const defaultHiddenColumns: Record<string, boolean> = {
-    location: false,
-    description: false,
-    quantity: false,
     dimensionL: false,
     dimensionW: false,
     dimensionH: false,
@@ -239,8 +236,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     serviceContractExpiration: false,
     bookable: false,
     rateType: false,
-    lastModifiedBy: false,
-    isDeleted: false
+    lastModifiedBy: false
   };
 
   const STAFF_ONLY_FIELDS = new Set(['actions', 'uniqueId', 'serialNumber']);

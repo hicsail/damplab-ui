@@ -1,6 +1,6 @@
 import { Add } from '@mui/icons-material';
 import { Box, Button } from '@mui/material';
-import { GridRowModes, GridRowModesModel, GridRowsProp, GridToolbarContainer } from '@mui/x-data-grid';
+import { GridRowModes, GridRowModesModel, GridRowsProp, GridToolbarColumnsButton, GridToolbarContainer } from '@mui/x-data-grid';
 import { v4 as uuid } from 'uuid';
 import { EditRowModeHint } from './EditRowModeHint';
 
@@ -60,6 +60,7 @@ export const GridToolBar: React.FC<GridToolBarProps> = (props) => {
         <Button color="primary" startIcon={<Add />} onClick={handleNewRecord}>
           {props.addButtonLabel ?? 'Add new item'}
         </Button>
+        <GridToolbarColumnsButton />
       </Box>
       {props.showEditModeHint !== false ? <EditRowModeHint /> : null}
     </GridToolbarContainer>
