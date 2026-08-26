@@ -177,6 +177,24 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     { field: 'serialNumber', headerName: 'Serial #', width: 130 },
     { field: 'quantity', headerName: 'Qty', width: 70 },
     {
+      field: 'dimensionL',
+      headerName: 'L (m)',
+      width: 80,
+      valueGetter: (_value: any, row: any) => row.dimensionL?.value ?? ''
+    },
+    {
+      field: 'dimensionW',
+      headerName: 'W (m)',
+      width: 80,
+      valueGetter: (_value: any, row: any) => row.dimensionW?.value ?? ''
+    },
+    {
+      field: 'dimensionH',
+      headerName: 'H (m)',
+      width: 80,
+      valueGetter: (_value: any, row: any) => row.dimensionH?.value ?? ''
+    },
+    {
       field: 'hasServiceContract',
       headerName: 'Contract',
       width: 100,
@@ -189,6 +207,14 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
       valueFormatter: (value: string) => (value ? new Date(value).toLocaleDateString() : '')
     },
     {
+      field: 'bookable',
+      headerName: 'Bookable',
+      width: 100,
+      renderCell: (params) => (params.row.bookable ? <Chip size='small' color='success' label='Yes' /> : null)
+    },
+    { field: 'rateType', headerName: 'Rate Type', width: 110 },
+    { field: 'lastModifiedBy', headerName: 'Modified By', width: 140 },
+    {
       field: 'isDeleted',
       headerName: 'Status',
       width: 110,
@@ -200,6 +226,22 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         )
     }
   ];
+
+  /** Columns hidden by default — users can toggle via the column menu. */
+  const defaultHiddenColumns: Record<string, boolean> = {
+    location: false,
+    description: false,
+    quantity: false,
+    dimensionL: false,
+    dimensionW: false,
+    dimensionH: false,
+    hasServiceContract: false,
+    serviceContractExpiration: false,
+    bookable: false,
+    rateType: false,
+    lastModifiedBy: false,
+    isDeleted: false
+  };
 
   const STAFF_ONLY_FIELDS = new Set(['actions', 'uniqueId', 'serialNumber']);
   const columns = isStaff ? allColumns : allColumns.filter((col) => !STAFF_ONLY_FIELDS.has(col.field));
@@ -232,6 +274,9 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
       <DataGrid
         rows={filteredRows}
         columns={columns}
+        initialState={{
+          columns: { columnVisibilityModel: defaultHiddenColumns }
+        }}
         slots={{ toolbar: GridToolBar as GridSlots['toolbar'] }}
         slotProps={{
           toolbar: {
