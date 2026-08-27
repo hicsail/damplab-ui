@@ -31,6 +31,8 @@ import {
   GET_PROTOCOL_STEP_MAPPINGS,
   UPSERT_PROTOCOL_STEP_MAPPING
 } from '../gql/queries';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 
 interface ParamTag { label: string; value: string; }
 interface EditState {
@@ -60,6 +62,11 @@ export default function ProtocolMap() {
   const [activeId, setActiveId] = useState(searchParams.get('protocolId') ?? '');
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [banner, setBanner] = useState<string | null>(null);
+  // The matrix gives technicians protocol-library:write, unlike the catalog and the
+  // lab layout — so this is the one editor where the read and write tiers differ
+  // from the usual "Administrator writes, Technician reads".
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.ProtocolLibraryWrite);
 
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
   const { data: stationData } = useQuery(GET_STATIONS, { fetchPolicy: 'cache-and-network' });
@@ -199,6 +206,12 @@ export default function ProtocolMap() {
       </Paper>
 
       {banner && <Alert severity='info' onClose={() => setBanner(null)}>{banner}</Alert>}
+      {!canWrite && (
+        <Alert severity='info'>
+          You have read-only access to the protocol library. Step mappings are shown for
+          reference and cannot be saved.
+        </Alert>
+      )}
       {resolveErr && <Alert severity='error'>{resolveErr.message}</Alert>}
       {resolving && <CircularProgress size={28} />}
 
@@ -239,6 +252,8 @@ export default function ProtocolMap() {
                       {step.issues.map((iss: string, i: number) => <div key={i}>{iss}</div>)}
                     </Alert>
                   )}
+
+                  <ReadOnlyFieldset canWrite={canWrite} noun='the protocol library' hideBanner>
 
                   <Autocomplete
                     multiple
@@ -305,11 +320,16 @@ export default function ProtocolMap() {
                     </Button>
                   </Stack>
 
-                  <Stack direction='row' justifyContent='flex-end'>
-                    <Button variant='contained' size='small' onClick={() => saveStep(step)} disabled={e.saving || !e.dirty}>
-                      {e.saving ? 'Saving…' : e.dirty ? 'Save step' : 'Saved'}
-                    </Button>
-                  </Stack>
+                  </ReadOnlyFieldset>
+
+                  {/* Outside the fieldset — see ReadOnlyFieldset. */}
+                  {canWrite && (
+                    <Stack direction='row' justifyContent='flex-end'>
+                      <Button variant='contained' size='small' onClick={() => saveStep(step)} disabled={e.saving || !e.dirty}>
+                        {e.saving ? 'Saving…' : e.dirty ? 'Save step' : 'Saved'}
+                      </Button>
+                    </Stack>
+                  )}
                 </Stack>
               </Paper>
             );

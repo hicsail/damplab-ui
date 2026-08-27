@@ -30,6 +30,9 @@ import { useNavigate, useParams } from 'react-router';
 import { GET_ACTIVE_INVENTORY_ITEMS, UPDATE_SERVICE } from '../gql/queries';
 import { AppContext } from '../contexts/App';
 import { DeliverablesEditor } from '../components/edit/DeliverablesEditor';
+import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
 
 const MENU_PROPS = {
   PaperProps: {
@@ -77,6 +80,8 @@ export default function AdminEditService() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
 
   const availableServices = useMemo(
     () =>
@@ -260,8 +265,12 @@ export default function AdminEditService() {
       });
       await refreshCatalog();
       setSuccessMessage('Service updated.');
-    } catch (_error) {
-      setErrorMessage('Unable to save service. Please try again.');
+    } catch (error) {
+      // A permission failure is not something "try again" can fix, and this page
+      // is reachable read-only by catalog-editor:read holders, so it is a failure
+      // that will actually happen.
+      console.error('Save service failed:', error);
+      setErrorMessage(formatSaveError(error, 'this service'));
     } finally {
       setIsSaving(false);
     }
@@ -313,6 +322,8 @@ export default function AdminEditService() {
           {successMessage}
         </Alert>
       </Snackbar>
+
+      <ReadOnlyFieldset canWrite={canWrite} noun="the service catalog">
 
       <TextField
         label="Service name"
@@ -588,16 +599,22 @@ export default function AdminEditService() {
         <Typography variant="subtitle1" sx={{ mb: 1 }}>
           Deliverables
         </Typography>
-        <DeliverablesEditor deliverables={deliverables} onSave={setDeliverables} />
+        <DeliverablesEditor deliverables={deliverables} onSave={setDeliverables} readOnly={!canWrite} />
       </Box>
 
+      </ReadOnlyFieldset>
+
+      {/* Outside the fieldset: a disabled fieldset would disable these too, and the
+          rule is that Save is absent for a read-tier user, not present-but-dead. */}
       <Stack direction="row" spacing={2}>
         <Button variant="outlined" onClick={() => navigate('/edit')} disabled={isSaving}>
-          Cancel
+          {canWrite ? 'Cancel' : 'Back to catalog'}
         </Button>
-        <Button variant="contained" onClick={handleSave} disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save changes'}
-        </Button>
+        {canWrite && (
+          <Button variant="contained" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save changes'}
+          </Button>
+        )}
       </Stack>
     </Stack>
   );

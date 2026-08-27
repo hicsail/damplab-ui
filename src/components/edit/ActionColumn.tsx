@@ -2,6 +2,13 @@ import { GridColDef, GridActionsCellItem, GridRowModesModel, GridRowModes, GridR
 import { Save, Cancel, Edit, Delete } from '@mui/icons-material';
 
 export interface GetActionsColumnProps {
+  /**
+   * Whether the caller may edit or delete rows. **Required, with no default** — see
+   * `GridToolBarProps.canWrite`. When false the column renders no actions at all,
+   * so a read-tier user sees the table without a dead Actions column full of
+   * controls that 403.
+   */
+  canWrite: boolean;
   rowModesModel: GridRowModesModel;
   handleSave: (id: GridRowId) => void;
   handleCancel: (id: GridRowId) => void;
@@ -17,6 +24,10 @@ export const getActionsColumn: (params: GetActionsColumnProps) => GridColDef = (
     width: 100,
     cellClassName: 'actions',
     getActions: ({ id }) => {
+      if (!params.canWrite) {
+        return [];
+      }
+
       const isInEditMode = params.rowModesModel[id]?.mode === GridRowModes.Edit;
 
       if (isInEditMode) {

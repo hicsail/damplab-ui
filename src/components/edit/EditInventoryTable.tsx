@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { GridToolBar } from './GridToolBar';
 import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS } from '../../gql/queries';
+import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
+import { formatSaveError } from '../../utils/gqlError';
 
 export interface EditInventoryTableProps {
   searchString?: string;
@@ -14,6 +16,8 @@ export interface EditInventoryTableProps {
 export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchString = '' }) => {
   const navigate = useNavigate();
   const client = useApolloClient();
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.InventoryWrite);
   // The inventory list isn't on AppContext yet (unlike services/bundles), so we
   // query directly and refetch after mutations. If the catalog grows enough
   // that this gets called a lot, lift to AppContext.
@@ -41,22 +45,30 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     try {
       await client.mutate({ mutation: DELETE_INVENTORY_ITEM, variables: { item: id } });
       await refetch();
-    } catch (_error) {
-      setErrorMessage('Unable to delete inventory item. Please try again.');
+    } catch (error) {
+      // "Please try again" is wrong for a 403 — retrying never works. Show what
+      // the server actually said.
+      console.error('Delete inventory item failed:', error);
+      setErrorMessage(formatSaveError(error, 'this inventory item'));
     }
   };
 
   const columns: GridColDef[] = [
-    {
-      field: 'actions',
-      type: 'actions',
-      headerName: 'Actions',
-      width: 100,
-      getActions: ({ id }) => [
-        <GridActionsCellItem key='edit' icon={<Edit />} label='Edit' onClick={() => navigate(`/edit/inventory/${id}`)} color='inherit' />,
-        <GridActionsCellItem key='delete' icon={<Delete />} label='Delete' onClick={() => handleDelete(id)} color='inherit' />
-      ]
-    },
+    // Read tier keeps the table and loses the Actions column — see EditServicesTable.
+    ...(canWrite
+      ? [
+          {
+            field: 'actions',
+            type: 'actions',
+            headerName: 'Actions',
+            width: 100,
+            getActions: ({ id }: { id: GridRowId }) => [
+              <GridActionsCellItem key='edit' icon={<Edit />} label='Edit' onClick={() => navigate(`/edit/inventory/${id}`)} color='inherit' />,
+              <GridActionsCellItem key='delete' icon={<Delete />} label='Delete' onClick={() => handleDelete(id)} color='inherit' />
+            ]
+          } as GridColDef
+        ]
+      : []),
     { field: 'name', headerName: 'Name', width: 240, flex: 1 },
     {
       field: 'type',
@@ -87,6 +99,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         slots={{ toolbar: GridToolBar as GridSlots['toolbar'] }}
         slotProps={{
           toolbar: {
+            canWrite,
             setRowModesModel,
             addButtonLabel: 'Add new inventory item',
             onAdd: () => navigate('/edit/inventory/new'),

@@ -156,6 +156,10 @@ async function initKeycloak(): Promise<UserProps | null> {
       isExternalCustomer: false,
       customerCategory: undefined,
       roles: devRoles,
+      // Matches AuthRolesGuard.devUser()'s sub. Without it, ownership-scoped UI
+      // (e.g. "cancel only your own booking") is dead under the bypass, because
+      // nothing would ever equal the owner's sub.
+      subject: 'dev',
       permissions: permissions?.effective ?? [],
       customerPermissions: permissions?.asCustomer ?? [],
       permissionsLoaded: permissions !== null,

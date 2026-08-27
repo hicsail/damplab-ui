@@ -1,4 +1,4 @@
-import { ApolloError, useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
   Box,
@@ -22,6 +22,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GET_INVENTORY_ITEMS, GET_STATIONS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, pricingToRateForm, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
+import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
 import {
   DEFAULT_INVENTORY_TYPE,
   EMPTY_INVENTORY_DETAILS,
@@ -42,20 +45,6 @@ const parsePlacementQuantity = (raw: string): number => {
   const n = Math.floor(Number(raw));
   return Number.isFinite(n) && n > 0 ? n : 1;
 };
-
-function formatGqlError(error: unknown): string {
-  const fallback = 'Unable to save inventory item. Please try again.';
-  if (error instanceof ApolloError) {
-    const gqlMessage = error.graphQLErrors?.[0]?.message;
-    if (gqlMessage) return `Save failed: ${gqlMessage}`;
-    if (error.networkError) {
-      const ne = error.networkError as { statusCode?: number; message?: string };
-      return `Network error${ne.statusCode ? ` (HTTP ${ne.statusCode})` : ''}: ${ne.message ?? 'request failed'}`;
-    }
-    return error.message ? `Save failed: ${error.message}` : fallback;
-  }
-  return fallback;
-}
 
 export default function AdminEditInventoryItem() {
   const { id: itemId } = useParams<{ id: string }>();
@@ -78,6 +67,8 @@ export default function AdminEditInventoryItem() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.InventoryWrite);
 
   useEffect(() => {
     if (!item) return;
@@ -167,7 +158,7 @@ export default function AdminEditInventoryItem() {
       setSuccessMessage('Saved.');
     } catch (error) {
       console.error('Update inventory item failed:', error);
-      setErrorMessage(formatGqlError(error));
+      setErrorMessage(formatSaveError(error, 'this inventory item'));
     } finally {
       setIsSaving(false);
     }
@@ -200,6 +191,8 @@ export default function AdminEditInventoryItem() {
           {successMessage}
         </Alert>
       </Snackbar>
+
+      <ReadOnlyFieldset canWrite={canWrite} noun='inventory'>
 
       <TextField label='Name' value={name} onChange={(e) => setName(e.target.value)} required />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
@@ -295,11 +288,18 @@ export default function AdminEditInventoryItem() {
 
       <InventoryDetailFields details={details} setDetails={setDetails} />
 
+      </ReadOnlyFieldset>
+
+      {/* Outside the fieldset — see ReadOnlyFieldset. */}
       <Stack direction='row' spacing={2}>
-        <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>Cancel</Button>
-        <Button variant='contained' onClick={handleSave} disabled={isSaving}>
-          {isSaving ? 'Saving…' : 'Save changes'}
+        <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>
+          {canWrite ? 'Cancel' : 'Back to catalog'}
         </Button>
+        {canWrite && (
+          <Button variant='contained' onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving…' : 'Save changes'}
+          </Button>
+        )}
       </Stack>
     </Stack>
   );

@@ -28,6 +28,9 @@ import CloseIcon from '@mui/icons-material/Close';
 import { addDays, format, isSameDay, startOfWeek } from 'date-fns';
 import { GET_ACTIVE_INVENTORY_ITEMS, GET_BOOKINGS } from '../gql/queries';
 import { CANCEL_BOOKING, CONFIRM_BOOKING_USAGE } from '../gql/mutations';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { useEffectiveUser } from '../hooks/useEffectiveUser';
+import { formatSaveError } from '../utils/gqlError';
 
 const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success'> = {
   RESERVED: 'warning',
@@ -46,6 +49,29 @@ export default function InventoryCalendar() {
   const [itemFilter, setItemFilter] = useState('');
   const [confirmTarget, setConfirmTarget] = useState<any | null>(null);
   const [actualValue, setActualValue] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  /**
+   * This calendar shows **every booking in the lab**, and the matrix amendment now
+   * lets equipment users reach it. So the per-row controls are gated on ownership,
+   * not on reaching the page:
+   *
+   * - **Confirm usage** mirrors `confirmBookingUsage`, which is `billing:view`
+   *   (Administrator-only). Confirming usage is what makes a booking chargeable —
+   *   a billing act, not a scheduling one.
+   * - **Cancel** mirrors `cancelBooking`'s server-side rule exactly: owner, OR a
+   *   caller holding `inventory:write`. Gating it on `inventory:schedule` instead
+   *   would show an equipment user a Cancel on everyone else's slots that the
+   *   server then refuses.
+   *
+   * Through `useEffectiveUser`, not raw `UserContext`, so Client View works.
+   */
+  const { can } = usePermissions();
+  const { userProps } = useEffectiveUser();
+  const canConfirmUsage = can(PERMISSIONS.BillingView);
+  const canManageOthersBookings = can(PERMISSIONS.InventoryWrite);
+  const mySub = userProps?.subject;
+  const canCancel = (booking: any): boolean => canManageOthersBookings || (!!mySub && booking?.ownerSub === mySub);
 
   const weekEnd = addDays(weekStart, 7);
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-first' });
@@ -96,15 +122,25 @@ export default function InventoryCalendar() {
     const vars: any = { id: confirmTarget._id };
     if (confirmTarget.kind === 'TIMED') vars.actualHours = Number.isFinite(v) ? v : null;
     else vars.actualQuantity = Number.isFinite(v) ? Math.round(v) : null;
-    await confirmUsage({ variables: vars });
-    setConfirmTarget(null);
-    await refetch();
+    try {
+      await confirmUsage({ variables: vars });
+      setConfirmTarget(null);
+      await refetch();
+    } catch (error) {
+      console.error('Confirm usage failed:', error);
+      setActionError(formatSaveError(error, 'this usage confirmation'));
+    }
   };
 
   const doCancel = async (id: string) => {
     if (!window.confirm('Cancel this booking?')) return;
-    await cancelBooking({ variables: { id } });
-    await refetch();
+    try {
+      await cancelBooking({ variables: { id } });
+      await refetch();
+    } catch (error) {
+      console.error('Cancel booking failed:', error);
+      setActionError(formatSaveError(error, 'this cancellation'));
+    }
   };
 
   const items = invData?.activeInventoryItems ?? [];
@@ -131,6 +167,7 @@ export default function InventoryCalendar() {
       </Stack>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>Could not load bookings.</Alert>}
+      {actionError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError(null)}>{actionError}</Alert>}
       {loading && !data && <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(7, 1fr)' }, gap: 1, alignItems: 'start' }}>
@@ -160,12 +197,12 @@ export default function InventoryCalendar() {
                       <Chip size="small" label={b.usageConfirmed ? 'Confirmed' : b.status} color={b.usageConfirmed ? 'success' : STATUS_COLOR[b.status] ?? 'default'} sx={{ height: 18 }} />
                       {b.cost != null && <Typography variant="caption">${Number(b.cost).toFixed(2)}</Typography>}
                       <Box sx={{ flex: 1 }} />
-                      {!b.usageConfirmed && b.billingStatus !== 'BILLED' && (
+                      {canConfirmUsage && !b.usageConfirmed && b.billingStatus !== 'BILLED' && (
                         <Tooltip title="Confirm usage">
                           <IconButton size="small" color="success" onClick={() => openConfirm(b)}><CheckCircleIcon fontSize="inherit" /></IconButton>
                         </Tooltip>
                       )}
-                      {b.billingStatus !== 'BILLED' && (
+                      {canCancel(b) && b.billingStatus !== 'BILLED' && (
                         <Tooltip title="Cancel booking">
                           <IconButton size="small" color="error" onClick={() => doCancel(b._id)}><CloseIcon fontSize="inherit" /></IconButton>
                         </Tooltip>
@@ -179,7 +216,7 @@ export default function InventoryCalendar() {
         })}
       </Box>
 
-      <Dialog open={!!confirmTarget} onClose={() => setConfirmTarget(null)} maxWidth="xs" fullWidth>
+      <Dialog open={!!confirmTarget && canConfirmUsage} onClose={() => setConfirmTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Confirm usage — {confirmTarget?.inventoryName}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

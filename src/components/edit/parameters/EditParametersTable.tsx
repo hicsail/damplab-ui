@@ -45,6 +45,7 @@ import {
   ParameterTableViewCell,
 } from './ParameterFieldViewCells';
 import {validateParameter} from './ParameterValidation';
+import { PERMISSIONS, usePermissions } from '../../../hooks/usePermissions';
 
 const TYPE_LABELS: Record<string, string> = {
   string: 'Text',
@@ -70,6 +71,10 @@ interface EditParametersTableProps {
 }
 
 export const EditParametersTable: React.FC<EditParametersTableProps> = (props) => {
+  // The parameter editors all live under /edit/services/:id/parameters, so one
+  // permission covers all three of them.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const isEdit = !!props.editParams;
   const [rows, setRows] = useState<any[]>(props.viewParams ? props.viewParams.value : props.editParams!.value);
@@ -464,7 +469,8 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
           [id]: { mode: GridRowModes.View, ignoreModifications: true }
         }),
         handleSave: (id) => handleSave(id),
-        rowModesModel
+        rowModesModel,
+        canWrite
       })
     );
   }
@@ -484,7 +490,7 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
           toolbar: GridToolBar as GridSlots['toolbar']
         }}
         slotProps={{
-          toolbar: { setRowModesModel, setRows }
+          toolbar: { canWrite, setRowModesModel, setRows }
         }}
         apiRef={gridRef}
       />

@@ -42,6 +42,9 @@ import { AppContext } from '../contexts/App';
 import { UPDATE_SERVICE } from '../gql/queries';
 import { validateParameter } from '../components/edit/parameters/ParameterValidation';
 import { idFromName, makeUniqueIds } from '../utils/idFromName';
+import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
 
 const TYPE_OPTIONS = [
   { value: 'string', label: 'Text' },
@@ -128,6 +131,8 @@ export default function AdminEditServiceParameters() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
 
   useEffect(() => {
     if (!service) return;
@@ -266,7 +271,8 @@ export default function AdminEditServiceParameters() {
       await refreshCatalog();
       setSuccessMessage('Parameters updated.');
     } catch (error) {
-      setErrorMessage('Unable to save parameter changes. Please try again.');
+      console.error('Save parameters failed:', error);
+      setErrorMessage(formatSaveError(error, 'these parameters'));
     } finally {
       setIsSaving(false);
     }
@@ -303,6 +309,8 @@ export default function AdminEditServiceParameters() {
           {successMessage}
         </Alert>
       </Snackbar>
+
+      <ReadOnlyFieldset canWrite={canWrite} noun='the service catalog'>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '280px 1fr' }, gap: 2 }}>
         <Paper variant='outlined' sx={{ p: 1, maxHeight: { md: '70vh' }, overflow: 'auto' }}>
@@ -761,13 +769,18 @@ export default function AdminEditServiceParameters() {
         </Paper>
       </Box>
 
+      </ReadOnlyFieldset>
+
+      {/* Outside the fieldset — see ReadOnlyFieldset. */}
       <Stack direction='row' spacing={2}>
         <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>
-          Cancel
+          {canWrite ? 'Cancel' : 'Back to catalog'}
         </Button>
-        <Button variant='contained' onClick={handleSave} disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save parameter changes'}
-        </Button>
+        {canWrite && (
+          <Button variant='contained' onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save parameter changes'}
+          </Button>
+        )}
       </Stack>
     </Stack>
   );

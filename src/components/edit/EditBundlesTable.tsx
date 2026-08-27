@@ -8,6 +8,8 @@ import { AppContext } from '../../contexts/App';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
 import { DELETE_BUNDLE } from '../../gql/queries';
+import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
+import { formatSaveError } from '../../utils/gqlError';
 
 export interface EditBundlesTableProps {
   searchString?: string;
@@ -16,6 +18,8 @@ export interface EditBundlesTableProps {
 export const EditBundlesTable: React.FC<EditBundlesTableProps> = ({ searchString = '' }) => {
   const navigate = useNavigate();
   const client = useApolloClient();
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
   const { bundles, refreshCatalog } = useContext(AppContext);
   const [rows, setRows] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -49,34 +53,40 @@ export const EditBundlesTable: React.FC<EditBundlesTableProps> = ({ searchString
         variables: { bundle: id }
       });
       await refreshCatalog();
-    } catch (_error) {
-      setErrorMessage('Unable to delete bundle. Please try again.');
+    } catch (error) {
+      console.error('Delete bundle failed:', error);
+      setErrorMessage(formatSaveError(error, 'this bundle'));
     }
   };
 
   const columns: GridColDef[] = [
-    {
-      field: 'actions',
-      type: 'actions',
-      headerName: 'Actions',
-      width: 100,
-      getActions: ({ id }) => [
-        <GridActionsCellItem
-          key='edit'
-          icon={<Edit />}
-          label='Edit'
-          onClick={() => navigate(`/edit/bundles/${id}`)}
-          color='inherit'
-        />,
-        <GridActionsCellItem
-          key='delete'
-          icon={<Delete />}
-          label='Delete'
-          onClick={() => handleDelete(id)}
-          color='inherit'
-        />
-      ]
-    },
+    // Read tier keeps the table and loses the Actions column — see EditServicesTable.
+    ...(canWrite
+      ? [
+          {
+            field: 'actions',
+            type: 'actions',
+            headerName: 'Actions',
+            width: 100,
+            getActions: ({ id }: { id: GridRowId }) => [
+              <GridActionsCellItem
+                key='edit'
+                icon={<Edit />}
+                label='Edit'
+                onClick={() => navigate(`/edit/bundles/${id}`)}
+                color='inherit'
+              />,
+              <GridActionsCellItem
+                key='delete'
+                icon={<Delete />}
+                label='Delete'
+                onClick={() => handleDelete(id)}
+                color='inherit'
+              />
+            ]
+          } as GridColDef
+        ]
+      : []),
     {
       field: 'label',
       headerName: 'Name',
@@ -104,6 +114,7 @@ export const EditBundlesTable: React.FC<EditBundlesTableProps> = ({ searchString
         slots={{ toolbar: GridToolBar as GridSlots['toolbar'] }}
         slotProps={{
           toolbar: {
+            canWrite,
             setRowModesModel,
             addButtonLabel: 'Add new bundle',
             onAdd: () => navigate('/edit/bundles/new'),

@@ -1,4 +1,4 @@
-import { ApolloError, useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
   Box,
@@ -20,6 +20,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_INVENTORY_ITEM, GET_STATIONS } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
+import { formatSaveError } from '../utils/gqlError';
+import { RequirePermissionOrRedirect } from '../components/PermissionGate';
+import { PERMISSIONS } from '../hooks/usePermissions';
 import {
   DEFAULT_INVENTORY_TYPE,
   EMPTY_INVENTORY_DETAILS,
@@ -40,21 +43,7 @@ const parsePlacementQuantity = (raw: string): number => {
   return Number.isFinite(n) && n > 0 ? n : 1;
 };
 
-function formatGqlError(error: unknown): string {
-  const fallback = 'Unable to save inventory item. Please try again.';
-  if (error instanceof ApolloError) {
-    const gqlMessage = error.graphQLErrors?.[0]?.message;
-    if (gqlMessage) return `Save failed: ${gqlMessage}`;
-    if (error.networkError) {
-      const ne = error.networkError as { statusCode?: number; message?: string };
-      return `Network error${ne.statusCode ? ` (HTTP ${ne.statusCode})` : ''}: ${ne.message ?? 'request failed'}`;
-    }
-    return error.message ? `Save failed: ${error.message}` : fallback;
-  }
-  return fallback;
-}
-
-export default function AdminNewInventoryItem() {
+function AdminNewInventoryItemForm() {
   const navigate = useNavigate();
   const client = useApolloClient();
   const [name, setName] = useState('');
@@ -117,7 +106,7 @@ export default function AdminNewInventoryItem() {
       navigate('/edit');
     } catch (error) {
       console.error('Create inventory item failed:', error);
-      setErrorMessage(formatGqlError(error));
+      setErrorMessage(formatSaveError(error, 'this inventory item'));
     } finally {
       setIsSaving(false);
     }
@@ -253,5 +242,18 @@ export default function AdminNewInventoryItem() {
         </Button>
       </Stack>
     </Stack>
+  );
+}
+
+/**
+ * A creation page has nothing to render read-only — it is an empty form whose only
+ * purpose is a mutation. So this bounces rather than disabling. The Add button that
+ * leads here is already hidden; this is what a typed URL hits.
+ */
+export default function AdminNewInventoryItem() {
+  return (
+    <RequirePermissionOrRedirect permission={PERMISSIONS.InventoryWrite}>
+      <AdminNewInventoryItemForm />
+    </RequirePermissionOrRedirect>
   );
 }

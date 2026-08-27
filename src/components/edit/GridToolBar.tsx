@@ -5,6 +5,15 @@ import { v4 as uuid } from 'uuid';
 import { EditRowModeHint } from './EditRowModeHint';
 
 export interface GridToolBarProps {
+  /**
+   * Whether the caller may add rows. **Required, with no default**: this toolbar is
+   * shared by tables gated on different permissions (`catalog-editor:write`,
+   * `inventory:write`), so it takes the answer as a prop rather than calling `can()`
+   * itself — and a default of `true` would let a table that was never wired up keep
+   * its Add button silently. Making it required means TypeScript names every
+   * unwired call site.
+   */
+  canWrite: boolean;
   setRows?: (newRows: (oldRows: GridRowsProp) => GridRowsProp) => void;
   setRowModesModel: (
     newModel: (oldModel: GridRowModesModel) => GridRowModesModel
@@ -56,12 +65,14 @@ export const GridToolBar: React.FC<GridToolBarProps> = (props) => {
         px: 0,
       }}
     >
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-        <Button color="primary" startIcon={<Add />} onClick={handleNewRecord}>
-          {props.addButtonLabel ?? 'Add new item'}
-        </Button>
-      </Box>
-      {props.showEditModeHint !== false ? <EditRowModeHint /> : null}
+      {props.canWrite && (
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+          <Button color="primary" startIcon={<Add />} onClick={handleNewRecord}>
+            {props.addButtonLabel ?? 'Add new item'}
+          </Button>
+        </Box>
+      )}
+      {props.canWrite && props.showEditModeHint !== false ? <EditRowModeHint /> : null}
     </GridToolbarContainer>
   );
 };

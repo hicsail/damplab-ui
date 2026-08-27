@@ -15,8 +15,11 @@ import {
   GridValidRowModel,
 } from "@mui/x-data-grid";
 import { getActionsColumn } from "../ActionColumn";
+import { PERMISSIONS, usePermissions } from '../../../hooks/usePermissions';
 
 export function EditParameterTableData(props) {
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
   const gridCellParams: GridRenderEditCellParams | GridRenderCellParams =
     props.tableDataParams;
   const isEditMode: boolean = gridCellParams.cellMode === "edit";
@@ -68,6 +71,7 @@ export function EditParameterTableData(props) {
     }));
     renderColumns.push(
       getActionsColumn({
+        canWrite,
         rowModesModel: rowModesModel,
         handleDelete: (id) => updateRows(rows.filter((row) => row.id !== id)),
         handleEdit: (id) =>
