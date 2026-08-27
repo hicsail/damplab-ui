@@ -39,6 +39,37 @@ export const GET_SERVICES = gql`
     }
 `;
 
+/**
+ * The client-facing catalog page's own query.
+ *
+ * Deliberately NOT a slice of GET_SERVICES: it hits a purpose-built server type so
+ * the reduction is structural. `price` is the caller's own, resolved server-side;
+ * `pricing` and `parameters` come back null without internal-fields:read, so the
+ * page builds its columns from what it actually received rather than from a
+ * client-side permission check.
+ */
+export const GET_CATALOG_SERVICES = gql`
+    query GetCatalogServices {
+        catalogServices {
+            id
+            name
+            description
+            serviceCategoryName
+            unit
+            price
+            pricingModeLabel
+            parameterCount
+            pricing {
+                internal
+                externalAcademic
+                externalMarket
+                externalNoSalary
+            }
+            parameters
+        }
+    }
+`;
+
 export const GET_BUNDLES = gql`
     query GetBundles {
         bundles {
