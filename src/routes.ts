@@ -45,7 +45,11 @@ export default [
         route("/checkout", "./pages/Checkout.tsx"),
         route("/jobs/:jobId", "./pages/JobSubmitted.tsx"), //config later so only owner of job or admin can access
         route("/client_view/:id", "./pages/ClientView.tsx"), // Client job tracking page with SOW viewer and comments
-        route("/my_jobs", "./pages/MyJobs.tsx"), // List of current user's submitted jobs
+        // /my_jobs merged into /dashboard; scope is enforced server-side, so one
+        // page serves a client and a technician alike.
+        route("/my_jobs", "./pages/MyJobsRedirect.tsx"),
+        // Moved out of PrivateRouteJobsViewAll: clients use it now.
+        route("/dashboard", "./pages/Dashboard.tsx"),
     ]),
     layout("./layouts/PrivateRouteInventoryBook.tsx", [
         route("/book-inventory", "./pages/BookInventory.tsx") // Customer: book inventory (machines by time, consumables by qty)
@@ -54,7 +58,10 @@ export default [
         route("/backlog", "./pages/Backlog.tsx"),
     ]),
     layout("./layouts/PrivateRouteJobsViewAll.tsx", [
-        route("/dashboard", "./pages/Dashboard.tsx"),
+        // Q8 amendment: was Administrator-only, which meant a technician reached the
+        // merged jobs page, clicked a job and bounced to `/`. The merge is what made
+        // that path reachable for the first time.
+        route("/technician_view/:id", "./pages/TechnicianView.tsx"),
     ]),
     layout("./layouts/PrivateRouteBench.tsx", [
         route("/technician_bench", "./pages/TechnicianBench.tsx"),
@@ -93,7 +100,6 @@ export default [
     ]),
     layout("./layouts/PrivateRouteDamplabStaff.tsx", [
         route("/lab-status-tv", "./pages/LabStatusTV.tsx"),
-        route("/technician_view/:id", "./pages/TechnicianView.tsx"),
         route("/usage-billing", "./pages/UsageBilling.tsx"),
         route("/customer-management", "./pages/CustomerManagement.tsx"),
         route("/api-keys", "./pages/ApiKeys.tsx"),

@@ -19,7 +19,9 @@ function pretty(s: string): string {
 
 /** One-level, static routes -> label. */
 const STATIC: Record<string, string> = {
-  '/my_jobs': 'My Jobs',
+  // /my_jobs redirects to /dashboard; the label survives for anyone landing on
+  // the old path from a bookmark before the redirect fires.
+  '/my_jobs': 'Jobs',
   '/services-catalog': 'Catalog',
   '/admin/services-catalog': 'Catalog',
   '/book-inventory': 'Book Inventory',
@@ -33,7 +35,7 @@ const STATIC: Record<string, string> = {
   '/technician_bench': 'My Bench',
   '/inventory-calendar': 'Inventory Schedule',
   '/usage-billing': 'Billing',
-  '/dashboard': 'Jobs Dashboard',
+  '/dashboard': 'Jobs',
   '/customer-management': 'Customer Management',
   '/api-keys': 'API Keys',
   '/inventory': 'Inventory Availability',
@@ -65,9 +67,9 @@ function dynamicTrail(path: string): Crumb[] | null {
   // Section keys are camelCase ("invoiceProcedures"); the dash makes pretty() split them.
   if ((m = path.match(/^\/edit\/sow-sections\/([^/]+)$/))) return [EDIT, { label: pretty(m[1].replace(/([A-Z])/g, '-$1')) }];
   if ((m = path.match(/^\/lab-monitor\/([^/]+)$/))) return [{ label: 'Lab Monitor' }, { label: pretty(m[1]) }];
-  if ((m = path.match(/^\/technician_view\/([^/]+)$/))) return [{ label: 'Jobs Dashboard', to: '/dashboard' }, { label: 'Technician View' }];
-  if ((m = path.match(/^\/jobs\/([^/]+)$/))) return [{ label: 'My Jobs', to: '/my_jobs' }, { label: 'Job' }];
-  if ((m = path.match(/^\/client_view\/([^/]+)$/))) return [{ label: 'My Jobs', to: '/my_jobs' }, { label: 'Job Tracking' }];
+  if ((m = path.match(/^\/technician_view\/([^/]+)$/))) return [{ label: 'Jobs', to: '/dashboard' }, { label: 'Technician View' }];
+  if ((m = path.match(/^\/jobs\/([^/]+)$/))) return [{ label: 'Jobs', to: '/dashboard' }, { label: 'Job' }];
+  if ((m = path.match(/^\/client_view\/([^/]+)$/))) return [{ label: 'Jobs', to: '/dashboard' }, { label: 'Job Tracking' }];
   if ((m = path.match(/^\/resubmission\/([^/]+)$/))) return [{ label: 'Resubmission' }];
   if ((m = path.match(/^\/training\/(.+)$/))) return [{ label: 'Learning Hub', to: '/training' }, { label: pretty(m[1]) }];
   return null;

@@ -384,6 +384,48 @@ export const OWN_JOBS = gql`
 `;
 
 /** Paginated, filterable all jobs – staff only (Dashboard). */
+/**
+ * The merged jobs page. Serves a client and a technician from one document —
+ * `scope`, `createdBySub` and `assigneeId` are all enforced server-side, so a
+ * client sending `scope: ALL` gets their own jobs rather than an error.
+ */
+export const JOBS_FOR_VIEWER = gql`
+    query JobsForViewer($input: JobsForViewerInput) {
+        jobsForViewer(input: $input) {
+            items {
+                id
+                name
+                state
+                submitted
+                username
+                institute
+                email
+                isArchived
+                archivedAt
+                archivedBy
+                archivedFromState
+                sow {
+                    id
+                    sowNumber
+                    sowTitle
+                    status
+                }
+            }
+            totalCount
+        }
+    }
+`;
+
+/** Distinct submitters, for the jobs page's client filter. jobs:view-all. */
+export const JOB_CLIENTS = gql`
+    query JobClients {
+        jobClients {
+            sub
+            displayName
+        }
+    }
+`;
+
 export const ALL_JOBS = gql`
     query AllJobs($input: AllJobsInput) {
         allJobs(input: $input) {

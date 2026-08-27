@@ -28,13 +28,13 @@ import AnnouncementBox from '../components/AnnouncementBox';
 import { JOBS_FEED_STATUS } from '../gql/queries';
 import { MARK_JOBS_FEED_VIEWED } from '../gql/mutations';
 import { HomeMenuItemDef, HomeMenuItemId, visibleHomeMenu } from './homeMenu';
+import { canFor, PERMISSIONS } from '../hooks/usePermissions';
 
 /**
  * One icon per menu item. Typed as an exhaustive Record so adding an item to
  * `homeMenu.ts` without an icon is a compile error rather than a blank button.
  */
 const MENU_ICONS: Record<HomeMenuItemId, React.ReactNode> = {
-  'my-jobs': <WorkHistoryIcon />,
   'order-services': <AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />,
   'catalog': <FormatListBulletedIcon />,
   'book-inventory': <EventAvailableIcon />,
@@ -107,9 +107,15 @@ export default function Home() {
   const userContext: UserContextProps = useContext(UserContext);
   const { userProps: effectiveUserProps } = useEffectiveUser();
   const userProps: UserProps = effectiveUserProps;
-  const isStaff = Boolean(userProps?.isDamplabStaff);
+  /**
+   * The unseen-jobs badge is about the *shared* jobs feed — every submitted job —
+   * so it is a `jobs:view-all` concept, not a staff-boolean one. `jobsFeedStatus`
+   * and `markJobsFeedViewed` both require that permission, so a technician now gets
+   * the dot and a client neither sees it nor 403s asking for it.
+   */
+  const canViewAllJobs = canFor(userProps, PERMISSIONS.JobsViewAll);
   const { data: jobsFeedData } = useQuery(JOBS_FEED_STATUS, {
-    skip: !isStaff,
+    skip: !canViewAllJobs,
     pollInterval: 10000,
     fetchPolicy: 'network-only'
   });
@@ -126,7 +132,7 @@ export default function Home() {
   }
 
   async function openJobsDashboard() {
-    if (isStaff) {
+    if (canViewAllJobs) {
       try {
         await markJobsFeedViewed();
       } catch {

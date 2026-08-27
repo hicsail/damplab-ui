@@ -28,7 +28,6 @@ import { PERMISSIONS, PermissionName, canFor } from '../hooks/usePermissions';
  */
 
 export type HomeMenuItemId =
-  | 'my-jobs'
   | 'order-services'
   | 'catalog'
   | 'book-inventory'
@@ -97,7 +96,14 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
   {
     title: 'Client Tools',
     items: [
-      { id: 'my-jobs', label: 'My Jobs', to: '/my_jobs', visible: needs(PERMISSIONS.JobsView) },
+      // One button for what used to be "My Jobs" (Client Tools) and "Jobs"
+      // (Technician Tools). The two pages rendered the same component; scope is
+      // enforced server-side now. Client Tools because the baseline holds jobs:view.
+      //
+      // The unseen-jobs badge rides along, but it is a jobs:view-all concept —
+      // there is no shared feed for one client's own jobs — so Home skips the
+      // query and the dot never shows below that permission.
+      { id: 'jobs', label: 'Jobs', action: 'open-jobs-dashboard', badge: 'jobs-feed-unseen', visible: needs(PERMISSIONS.JobsView) },
       // The product is still called Canvas; only this button is renamed.
       { id: 'order-services', label: 'Order Services', to: '/canvas', visible: everyone },
       { id: 'catalog', label: 'Catalog', to: '/services-catalog', visible: needs(PERMISSIONS.CatalogView) },
@@ -112,7 +118,6 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
   {
     title: 'Technician Tools',
     items: [
-      { id: 'jobs', label: 'Jobs', action: 'open-jobs-dashboard', badge: 'jobs-feed-unseen', visible: needs(PERMISSIONS.JobsViewAll) },
       // Q7: the matrix gives this to Equipment Users and not Technicians. It stays
       // filed here because the section is topical.
       { id: 'staff-submit-job', label: 'Staff submit job', to: '/staff_submit', visible: needs(PERMISSIONS.JobSubmitForClient) },
