@@ -204,7 +204,7 @@ export default function CustomerManagement() {
       </Stack>
 
       <Typography variant="h4" gutterBottom>
-        Customer management
+        Customer Management
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Search Keycloak users by name, username, or email. Assign a pricing customer category (Keycloak groups) or clear
