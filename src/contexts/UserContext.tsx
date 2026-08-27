@@ -149,12 +149,19 @@ async function initKeycloak(): Promise<UserProps | null> {
       .filter(Boolean);
     const permissions = await fetchPermissions(undefined, true);
     warnOnDevRoleDrift(devRoles, permissions?.roles);
+    // Derive the pricing tier from VITE_DEV_AS_ROLES exactly as the authenticated
+    // path derives it from the token. This used to be hardcoded to "no category",
+    // which stopped mattering the moment the server began resolving prices *by*
+    // category: an internal-customer walkthrough would render a blank price
+    // locally while production showed the internal rate. The bypass has to
+    // impersonate the pricing group too, not just the access role.
+    const devCategory = deriveCustomerCategory(devRoles);
     return {
       isAuthenticated: true,
       isDamplabStaff: devRoles.includes('damplab-staff'),
-      isInternalCustomer: false,
-      isExternalCustomer: false,
-      customerCategory: undefined,
+      isInternalCustomer: isInternalCustomerClaims(devRoles),
+      isExternalCustomer: isExternalCustomerClaims(devRoles),
+      customerCategory: devCategory,
       roles: devRoles,
       // Matches AuthRolesGuard.devUser()'s sub. Without it, ownership-scoped UI
       // (e.g. "cancel only your own booking") is dead under the bypass, because
