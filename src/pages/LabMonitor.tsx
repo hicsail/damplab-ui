@@ -2,19 +2,24 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Navigate } from 'react-router';
 import { useQuery, useMutation } from '@apollo/client';
 import {
+  Alert,
   Box,
   Button,
   Card,
   CardContent,
+  Chip,
   Typography,
   CircularProgress,
+  FormControlLabel,
   IconButton,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
   InputAdornment,
+  Switch,
   TextField,
+  Tooltip,
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -23,6 +28,8 @@ import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
+import ArchiveIcon from '@mui/icons-material/Archive';
+import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import InventoryPickerDialog from '../components/InventoryPickerDialog';
 import {
   DndContext,
@@ -36,7 +43,9 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { GET_LAB_MONITOR_OPERATIONS, GET_LAB_MONITOR_NODES, GET_LAB_MONITOR_STAFF_LIST, GET_WORKFLOWS_FOR_LAB_MONITOR, GET_WORKFLOWS_FOR_DOMINOS } from '../gql/queries';
-import { MUTATE_NODE_STATUS, UPDATE_WORKFLOW_NODE_ASSIGNEE, UPDATE_WORKFLOW_NODE_ESTIMATED_TIME } from '../gql/mutations';
+import { ARCHIVE_WORKFLOW_NODE, MUTATE_NODE_STATUS, UNARCHIVE_WORKFLOW_NODE, UPDATE_WORKFLOW_NODE_ASSIGNEE, UPDATE_WORKFLOW_NODE_ESTIMATED_TIME } from '../gql/mutations';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
 
 type WorkflowState = 'QUEUED' | 'IN_PROGRESS' | 'COMPLETE';
 type WorkflowNodeState = 'QUEUED' | 'IN_PROGRESS' | 'COMPLETE';
@@ -58,6 +67,10 @@ export interface LabMonitorItem {
   usedInventoryIds?: string[];
   /** Inventory IDs the service typically requires (informational). */
   serviceInventoryRequirementIds?: string[];
+  /** Archived cards are off the board unless "Show archived" is on. */
+  isArchived?: boolean;
+  archivedBy?: string | null;
+  archivedAt?: string | null;
 }
 
 export interface LabMonitorStaffMember {
@@ -200,13 +213,16 @@ function nodesToItems(nodes: LabMonitorNode[]): LabMonitorItem[] {
     usedInventoryIds: Array.isArray(node.usedInventory) ? node.usedInventory.map(String) : [],
     serviceInventoryRequirementIds: Array.isArray(node.service?.inventoryRequirements)
       ? (node.service!.inventoryRequirements as any[]).map(String)
-      : []
+      : [],
+    isArchived: !!(node as any).isArchived,
+    archivedBy: (node as any).archivedBy ?? null,
+    archivedAt: (node as any).archivedAt ?? null
   }));
 }
 
-function useLabMonitorNodes(nodeState: WorkflowNodeState) {
+function useLabMonitorNodes(nodeState: WorkflowNodeState, archiveFilter: 'ACTIVE' | 'ALL') {
   const { data, loading, error } = useQuery<GetLabMonitorNodesResponse>(GET_LAB_MONITOR_NODES, {
-    variables: { nodeState },
+    variables: { nodeState, archiveFilter },
     pollInterval: 15000,
   });
   const items = React.useMemo(
@@ -281,6 +297,7 @@ interface ColumnProps {
   staffList?: LabMonitorStaffMember[];
   onUpdateAssignee?: (nodeId: string, assigneeId: string | null, assigneeDisplayName: string | null) => void;
   onUpdateEstimatedTime?: (nodeId: string, estimatedMinutes: number | null) => void;
+  onToggleArchived?: (nodeId: string, archived: boolean) => void;
 }
 
 function elapsedMinutes(startedAt: string | null | undefined): number | null {
@@ -298,6 +315,7 @@ function OperationCard({
   staffList,
   onUpdateAssignee,
   onUpdateEstimatedTime,
+  onToggleArchived,
   isDragging,
 }: {
   item: LabMonitorItem;
@@ -308,6 +326,8 @@ function OperationCard({
   staffList?: LabMonitorStaffMember[];
   onUpdateAssignee?: (nodeId: string, assigneeId: string | null, assigneeDisplayName: string | null) => void;
   onUpdateEstimatedTime?: (nodeId: string, estimatedMinutes: number | null) => void;
+  /** Present only for a caller holding labmonitor:archive. Absent = no control. */
+  onToggleArchived?: (nodeId: string, archived: boolean) => void;
   isDragging?: boolean;
 }) {
   const nodeId = item.nodeId;
@@ -370,7 +390,23 @@ function OperationCard({
                 Job: {item.jobName}
               </Typography>
             )}
+            {item.isArchived && (
+              <Chip
+                size="small"
+                label={item.archivedBy ? `Archived by ${item.archivedBy}` : 'Archived'}
+                sx={{ mt: 0.5, height: 20 }}
+              />
+            )}
           </Box>
+          {/* Administrator-only. `onToggleArchived` is simply not passed down for
+              anyone else, so there is no control to disable. */}
+          {onToggleArchived && nodeId && (
+            <Tooltip title={item.isArchived ? 'Restore to the board' : 'Archive this card'}>
+              <IconButton size="small" onClick={() => onToggleArchived(nodeId, !item.isArchived)} sx={{ mt: -0.5, mr: -0.5 }}>
+                {item.isArchived ? <UnarchiveIcon fontSize="small" /> : <ArchiveIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
         <Box
           sx={{
@@ -521,6 +557,7 @@ function DraggableCard({
   staffList,
   onUpdateAssignee,
   onUpdateEstimatedTime,
+  onToggleArchived,
 }: {
   item: LabMonitorItem;
   variant: 'pending' | 'running' | 'completed';
@@ -528,6 +565,7 @@ function DraggableCard({
   staffList?: LabMonitorStaffMember[];
   onUpdateAssignee?: (nodeId: string, assigneeId: string | null, assigneeDisplayName: string | null) => void;
   onUpdateEstimatedTime?: (nodeId: string, estimatedMinutes: number | null) => void;
+  onToggleArchived?: (nodeId: string, archived: boolean) => void;
 }) {
   const id = item.nodeId ?? item.id;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id, data: { item, columnState } });
@@ -546,6 +584,7 @@ function DraggableCard({
         staffList={staffList}
         onUpdateAssignee={onUpdateAssignee}
         onUpdateEstimatedTime={onUpdateEstimatedTime}
+        onToggleArchived={onToggleArchived}
         isDragging={isDragging}
       />
     </Box>
@@ -569,6 +608,7 @@ function StatusColumn({
   staffList,
   onUpdateAssignee,
   onUpdateEstimatedTime,
+  onToggleArchived,
 }: ColumnProps) {
   const { main, border } = COLORS[variant];
   const isRunning = variant === 'running';
@@ -689,6 +729,7 @@ function StatusColumn({
                   staffList={staffList}
                   onUpdateAssignee={onUpdateAssignee}
                   onUpdateEstimatedTime={onUpdateEstimatedTime}
+                  onToggleArchived={onToggleArchived}
                 />
               ) : (
                 <OperationCard
@@ -701,6 +742,7 @@ function StatusColumn({
                   staffList={staffList}
                   onUpdateAssignee={onUpdateAssignee}
                   onUpdateEstimatedTime={onUpdateEstimatedTime}
+                  onToggleArchived={onToggleArchived}
                 />
               ),
             )}
@@ -763,9 +805,18 @@ export default function LabMonitor() {
   const [activeDragItem, setActiveDragItem] = React.useState<LabMonitorItem | null>(null);
   const [activeVariant, setActiveVariant] = React.useState<'pending' | 'running' | 'completed'>('pending');
 
-  const nodeQueued = useLabMonitorNodes('QUEUED');
-  const nodeRunning = useLabMonitorNodes('IN_PROGRESS');
-  const nodeCompleted = useLabMonitorNodes('COMPLETE');
+  /**
+   * Archiving is Administrator-only, and so is the toggle that reveals archived
+   * cards — there is nothing for a technician to do with them.
+   */
+  const { can } = usePermissions();
+  const canArchive = can(PERMISSIONS.LabMonitorArchive);
+  const [showArchived, setShowArchived] = React.useState(false);
+  const archiveFilter: 'ACTIVE' | 'ALL' = canArchive && showArchived ? 'ALL' : 'ACTIVE';
+
+  const nodeQueued = useLabMonitorNodes('QUEUED', archiveFilter);
+  const nodeRunning = useLabMonitorNodes('IN_PROGRESS', archiveFilter);
+  const nodeCompleted = useLabMonitorNodes('COMPLETE', archiveFilter);
   const useNodeBased =
     !nodeQueued.error && !nodeRunning.error && !nodeCompleted.error;
 
@@ -785,27 +836,46 @@ export default function LabMonitor() {
 
   const staffList = useLabMonitorStaffList();
 
+  /**
+   * Every board mutation refetches all three columns. The variables must match the
+   * ones in flight — Apollo keys a refetch by query *and* variables, so refetching
+   * `{ nodeState }` while the board is watching `{ nodeState, archiveFilter }` would
+   * fire a second, unrelated request and leave the visible board stale.
+   */
+  const boardRefetchQueries = React.useMemo(
+    () =>
+      (['QUEUED', 'IN_PROGRESS', 'COMPLETE'] as const).map((nodeState) => ({
+        query: GET_LAB_MONITOR_NODES,
+        variables: { nodeState, archiveFilter },
+      })),
+    [archiveFilter],
+  );
+
   const [changeNodeState] = useMutation(MUTATE_NODE_STATUS, {
-    refetchQueries: [
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'QUEUED' } },
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'IN_PROGRESS' } },
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'COMPLETE' } },
-    ],
+    refetchQueries: boardRefetchQueries,
   });
   const [updateAssignee] = useMutation(UPDATE_WORKFLOW_NODE_ASSIGNEE, {
-    refetchQueries: [
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'QUEUED' } },
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'IN_PROGRESS' } },
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'COMPLETE' } },
-    ],
+    refetchQueries: boardRefetchQueries,
   });
   const [updateEstimatedTime] = useMutation(UPDATE_WORKFLOW_NODE_ESTIMATED_TIME, {
-    refetchQueries: [
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'QUEUED' } },
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'IN_PROGRESS' } },
-      { query: GET_LAB_MONITOR_NODES, variables: { nodeState: 'COMPLETE' } },
-    ],
+    refetchQueries: boardRefetchQueries,
   });
+  const [archiveNode] = useMutation(ARCHIVE_WORKFLOW_NODE, { refetchQueries: boardRefetchQueries });
+  const [unarchiveNode] = useMutation(UNARCHIVE_WORKFLOW_NODE, { refetchQueries: boardRefetchQueries });
+  const [archiveError, setArchiveError] = React.useState<string | null>(null);
+
+  const handleToggleArchived = React.useCallback(
+    async (nodeId: string, archived: boolean) => {
+      setArchiveError(null);
+      try {
+        await (archived ? archiveNode : unarchiveNode)({ variables: { workflowNode: nodeId } });
+      } catch (error) {
+        console.error('Archive workflow node failed:', error);
+        setArchiveError(formatSaveError(error, 'this card'));
+      }
+    },
+    [archiveNode, unarchiveNode],
+  );
 
   const handleUpdateAssignee = React.useCallback(
     (nodeId: string, assigneeId: string | null, assigneeDisplayName: string | null) => {
@@ -866,11 +936,22 @@ export default function LabMonitor() {
 
   const anyError = queued.error || running.error || completed.error;
 
+  /**
+   * Archiving applies to the node-based board only. The `useNodeBased` fallback
+   * degrades to workflow-level cards, which have no node to archive — so a
+   * fallback board shows no archive controls, and `isArchived` filtering does not
+   * apply to it either. That is the documented behaviour, not an oversight:
+   * `getWorkflowsByStateForLabMonitor` has no equivalent flag, and giving it one
+   * would mean archiving a whole workflow, which is a different act.
+   */
   const columnProps = useNodeBased
     ? {
         staffList,
         onUpdateAssignee: handleUpdateAssignee,
         onUpdateEstimatedTime: handleUpdateEstimatedTime,
+        // Absent for anyone without labmonitor:archive, so there is no control at
+        // all rather than a disabled one.
+        onToggleArchived: canArchive ? handleToggleArchived : undefined,
       }
     : {};
 
@@ -920,6 +1001,15 @@ export default function LabMonitor() {
             </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#6b7280' }}>
+            {/* Administrator-only: archived cards are only actionable by whoever
+                can restore them, so nobody else is offered the view. */}
+            {canArchive && useNodeBased && (
+              <FormControlLabel
+                sx={{ mr: 1 }}
+                control={<Switch size="small" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />}
+                label={<Typography variant="body2">Show archived</Typography>}
+              />
+            )}
             <AccessTimeIcon sx={{ fontSize: 20 }} />
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
               {time}
@@ -989,6 +1079,11 @@ export default function LabMonitor() {
             </Typography>
           )}
         </Box>
+        {archiveError && (
+          <Alert severity="error" sx={{ mt: 1 }} onClose={() => setArchiveError(null)}>
+            {archiveError}
+          </Alert>
+        )}
       </Box>
 
       <DragOverlay>

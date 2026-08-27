@@ -807,3 +807,30 @@ export const REORDER_SOW_TEXT_PRESETS = gql`
         }
     }
 `;
+
+/**
+ * Lab monitor archiving. `labmonitor:archive` is Administrator-only, which is the
+ * whole distinction the permission exists to draw: anyone who can see the board can
+ * move a card to COMPLETE, but only an administrator can take it off the board.
+ */
+export const ARCHIVE_WORKFLOW_NODE = gql`
+    mutation ArchiveWorkflowNode($workflowNode: ID!) {
+        archiveWorkflowNode(workflowNode: $workflowNode) {
+            _id
+            isArchived
+            archivedAt
+            archivedBy
+            archivedFromState
+        }
+    }
+`;
+
+export const UNARCHIVE_WORKFLOW_NODE = gql`
+    mutation UnarchiveWorkflowNode($workflowNode: ID!) {
+        unarchiveWorkflowNode(workflowNode: $workflowNode) {
+            _id
+            isArchived
+            state
+        }
+    }
+`;

@@ -535,12 +535,16 @@ export const GET_LAB_MONITOR_OPERATIONS = gql`
 
 // Lab monitor: nodes by node state (for drag-drop columns). One query per column.
 export const GET_LAB_MONITOR_NODES = gql`
-    query GetLabMonitorNodes($nodeState: WorkflowNodeState!) {
-        getLabMonitorNodes(nodeState: $nodeState) {
+    query GetLabMonitorNodes($nodeState: WorkflowNodeState!, $archiveFilter: NodeArchiveFilter) {
+        getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter) {
             _id
             id
             label
             state
+            isArchived
+            archivedAt
+            archivedBy
+            archivedFromState
             assigneeId
             assigneeDisplayName
             estimatedMinutes
