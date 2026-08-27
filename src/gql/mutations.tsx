@@ -284,9 +284,11 @@ export const MARK_JOBS_FEED_VIEWED = gql`
 export const CREATE_ANNOUNCEMENT = gql`
   mutation createAnnouncement($input: CreateAnnouncementInput!) {
     createAnnouncement(input: $input) {
+      id
       text
       timestamp
       is_displayed
+      audienceRoles
     }
   }
 `;
@@ -294,9 +296,18 @@ export const CREATE_ANNOUNCEMENT = gql`
 export const UPDATE_ANNOUNCEMENT = gql`
   mutation UpdateAnnouncement($input: UpdateAnnouncementInput!) {
     updateAnnouncement(input: $input) {
+      id
+      text
       timestamp
       is_displayed
+      audienceRoles
     }
+  }
+`;
+
+export const DELETE_ANNOUNCEMENT = gql`
+  mutation DeleteAnnouncement($id: ID!) {
+    deleteAnnouncement(id: $id)
   }
 `;
 

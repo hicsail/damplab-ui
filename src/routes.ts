@@ -30,6 +30,9 @@ export default [
         route("/bugs", "./pages/Bugs.tsx"),
         // Static page, no queries behind it, and the matrix gives it to everyone.
         route("/release_notes", "./pages/ReleaseNotes.tsx"),
+        // announcements:read is baseline, so this sits in the baseline tier. What
+        // differs per person is which rows the server sends.
+        route("/announcements", "./pages/AnnouncementsFeed.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         // Both roles use the same editor; the page itself picks jobById vs
         // ownJobById and the server enforces who may save.
@@ -68,6 +71,9 @@ export default [
     layout("./layouts/PrivateRouteProtocolLibrary.tsx", [
         route("/protocol-map", "./pages/ProtocolMap.tsx"),
     ]),
+    layout("./layouts/PrivateRouteAnnouncementsWrite.tsx", [
+        route("/edit_announcements", "./pages/Announcements.tsx"),
+    ]),
     layout("./layouts/PrivateRouteLabAssistant.tsx", [
         route("/lab-assistant", "./pages/LabStatusAssistant.tsx"),
     ]),
@@ -95,7 +101,6 @@ export default [
         route("/elabs", "./pages/ELabs.tsx"),
         route("/kernel", "./pages/Kernel.tsx"),
         route("/training/admin-edit", "./pages/TrainingAdminEdit.tsx"),
-        route("/edit_announcements", "./pages/Announcements.tsx"),
         route("/data_translation", "./pages/DataTranslation.tsx"),
 
         /* Old comments from pre-React-Router-migration App.tsx: */

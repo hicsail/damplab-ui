@@ -22,10 +22,22 @@ const TECHNICIAN_PERMISSIONS: PermissionName[] = [
   PERMISSIONS.InventorySchedule,
   PERMISSIONS.LabMonitorView,
   PERMISSIONS.BenchUse,
+  // Amended after the transcription: technicians reach the AI Lab Assistant.
+  PERMISSIONS.LabAssistantUse,
   PERMISSIONS.InternalFieldsRead,
 ];
 
-const EQUIPMENT_USER_PERMISSIONS: PermissionName[] = [...CLIENT_PERMISSIONS, PERMISSIONS.JobSubmitForClient, PERMISSIONS.InventoryRead, PERMISSIONS.InventoryBook, PERMISSIONS.LabMonitorView];
+const EQUIPMENT_USER_PERMISSIONS: PermissionName[] = [
+  ...CLIENT_PERMISSIONS,
+  PERMISSIONS.JobSubmitForClient,
+  PERMISSIONS.InventoryRead,
+  PERMISSIONS.InventoryBook,
+  // Amended after the transcription: equipment users reach the Inventory Schedule
+  // and My Bench. See docs/access-matrix.md, "Amendments to the transcription".
+  PERMISSIONS.InventorySchedule,
+  PERMISSIONS.BenchUse,
+  PERMISSIONS.LabMonitorView
+];
 
 const user = (permissions: PermissionName[], isDamplabStaff = false): HomeMenuUser => ({ permissions, permissionsLoaded: true, isDamplabStaff });
 
@@ -47,16 +59,19 @@ describe('homepage sections match the access matrix', () => {
     expect(HOME_MENU.map((s) => s.title)).toEqual(['Client Tools', 'Technician Tools', 'Operational Tools', 'Admin Operational Tools', 'Admin Management Tools']);
 
     expect(labelsBySection(STAFF)).toEqual({
-      'Client Tools': ['My Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
+      'Client Tools': ['My Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
       'Technician Tools': ['Jobs', 'Staff submit job', 'My Bench'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
-      'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'Announcements', 'Billing', 'AI Lab Assistant'],
+      'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'Edit Announcements', 'Billing', 'AI Lab Assistant'],
       'Admin Management Tools': ['Customer Management', 'API Keys', 'Data Translation', 'Lab Monitor North', 'Lab Monitor South', 'Lab Status TV'],
     });
   });
 
-  it('still has 26 buttons, the same 26 as before the re-sectioning', () => {
-    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(26);
+  it('has 27 buttons: the 26 from the re-sectioning, plus the announcements feed', () => {
+    // 27th is Client Tools > Announcements, the read-only feed at /announcements.
+    // Older announcements were previously unreachable — the home page shows only
+    // the newest visible one and there was nowhere else to go.
+    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('gives every item a unique id', () => {
@@ -80,48 +95,56 @@ describe('homepage sections match the access matrix', () => {
 describe('what each role sees', () => {
   it('shows a plain client only the baseline buttons — no Book Inventory, no Bug Backlog', () => {
     expect(labelsBySection(CLIENT)).toEqual({
-      'Client Tools': ['My Jobs', 'Order Services', 'Catalog', 'Learning Hub', 'Bugs', 'DAMP Lab Website'],
+      'Client Tools': ['My Jobs', 'Order Services', 'Catalog', 'Learning Hub', 'Announcements', 'Bugs', 'DAMP Lab Website'],
       'Admin Operational Tools': ['Release Notes'],
     });
   });
 
   it('shows a technician their operational set, and Technician Tools without Staff submit job (Q7)', () => {
     expect(labelsBySection(TECHNICIAN)).toEqual({
-      'Client Tools': ['My Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
+      'Client Tools': ['My Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
       'Technician Tools': ['Jobs', 'My Bench'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
-      'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout'],
+      'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'AI Lab Assistant'],
       'Admin Management Tools': ['Lab Monitor North', 'Lab Monitor South'],
     });
   });
 
-  it('shows an equipment user a "Technician Tools" section containing only Staff submit job (Q7)', () => {
+  it('shows an equipment user My Bench and the Inventory Schedule, per the matrix amendment', () => {
     expect(labelsBySection(EQUIPMENT_USER)).toEqual({
-      'Client Tools': ['My Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Bugs', 'DAMP Lab Website'],
-      'Technician Tools': ['Staff submit job'],
-      'Operational Tools': ['Inventory Availability'],
+      'Client Tools': ['My Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Bugs', 'DAMP Lab Website'],
+      // Q7 still holds: an equipment user may submit for a client, a technician may not.
+      'Technician Tools': ['Staff submit job', 'My Bench'],
+      'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
       'Admin Operational Tools': ['Release Notes'],
       'Admin Management Tools': ['Lab Monitor North', 'Lab Monitor South'],
     });
   });
 
   it('shows an administrator everything', () => {
-    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(26);
+    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('gates each button on what its destination needs, not what its label resembles', () => {
-    const announcements = HOME_MENU.flatMap((s) => s.items).find((i) => i.id === 'announcements')!;
-    // /edit_announcements is the editor, so a client holding announcements:read
-    // must not see it.
-    expect(announcements.visible(CLIENT)).toBe(false);
-    expect(announcements.visible(STAFF)).toBe(true);
+    const all = HOME_MENU.flatMap((s) => s.items);
+    // The two announcement buttons are the case this test exists for: the labels
+    // are nearly identical and the permissions are not.
+    const editor = all.find((i) => i.id === 'edit-announcements')!;
+    expect(editor.visible(CLIENT)).toBe(false);
+    expect(editor.visible(STAFF)).toBe(true);
+
+    const feed = all.find((i) => i.id === 'announcements')!;
+    // announcements:read is baseline, so everyone reaches the feed. The server
+    // decides which rows they get.
+    expect(feed.visible(CLIENT)).toBe(true);
+    expect(feed.visible(STAFF)).toBe(true);
   });
 });
 
 describe('degraded mode: the permissions fetch failed', () => {
   it('falls back to the legacy staff boolean rather than hiding everything from staff', () => {
     const staffWithoutPermissions: HomeMenuUser = { permissions: [], permissionsLoaded: false, isDamplabStaff: true };
-    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(26);
+    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('leaves a client with only the two unpermissioned buttons — the cost of the fallback, stated', () => {

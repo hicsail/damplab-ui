@@ -723,12 +723,31 @@ export const CREATE_SERVICE = gql`
 `;
 
 
+/**
+ * Announcements the caller may see. The server filters by audience — this query
+ * takes no arguments because the caller is the token, not a parameter.
+ */
 export const GET_ANNOUNCEMENTS = gql`
-  query{
-	announcements{
-    text
-    timestamp
-    is_displayed
+  query GetAnnouncements {
+    announcements {
+      id
+      text
+      timestamp
+      is_displayed
+      audienceRoles
+    }
+  }
+`;
+
+/** Every announcement regardless of audience. Requires announcements:write. */
+export const GET_ALL_ANNOUNCEMENTS = gql`
+  query GetAllAnnouncements {
+    allAnnouncements {
+      id
+      text
+      timestamp
+      is_displayed
+      audienceRoles
     }
   }
 `;

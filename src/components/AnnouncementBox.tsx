@@ -7,10 +7,19 @@ export default function AnnouncementBox() {
   const { data, loading, error } = useQuery(GET_ANNOUNCEMENTS);
   if (loading || error) return null; // Don't render while loading or on error
 
-  // Grab the first announcement that is displayed
-  const currentAnnouncement = data?.announcements?.[0] || null;
+  /**
+   * Filter first, *then* take the newest.
+   *
+   * This used to take `announcements[0]` and then check `is_displayed`, so hiding
+   * the newest announcement blanked the whole panel even when an older visible one
+   * existed — the box went empty rather than falling back.
+   *
+   * The list is already newest-first and already audience-filtered by the server,
+   * so there is nothing else to decide here.
+   */
+  const currentAnnouncement = (data?.announcements ?? []).find((a: any) => a?.is_displayed) ?? null;
 
-  if (!currentAnnouncement || !currentAnnouncement.is_displayed) return null;
+  if (!currentAnnouncement) return null;
 
   return (
     <Stack
