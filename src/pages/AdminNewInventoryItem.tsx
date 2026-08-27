@@ -20,14 +20,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_INVENTORY_ITEM, GET_STATIONS } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
-
-const TYPE_OPTIONS = [
-  { value: 'ROBOT', label: 'Robot' },
-  { value: 'MACHINE', label: 'Machine' },
-  { value: 'INSTRUMENT', label: 'Instrument' },
-  { value: 'CONSUMABLE', label: 'Consumable' },
-  { value: 'OTHER', label: 'Other' }
-];
+import {
+  DEFAULT_INVENTORY_TYPE,
+  EMPTY_INVENTORY_DETAILS,
+  INVENTORY_TYPE_OPTIONS,
+  InventoryDetailFields,
+  InventoryDetails,
+  inventoryDetailsToInput
+} from '../components/edit/InventoryDetailFields';
 
 /** One editable row of the placement editor: where the item lives and how many are there. */
 interface PlacementRow {
@@ -58,7 +58,7 @@ export default function AdminNewInventoryItem() {
   const navigate = useNavigate();
   const client = useApolloClient();
   const [name, setName] = useState('');
-  const [type, setType] = useState('MACHINE');
+  const [type, setType] = useState(DEFAULT_INVENTORY_TYPE);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [placements, setPlacements] = useState<PlacementRow[]>([]);
@@ -67,6 +67,7 @@ export default function AdminNewInventoryItem() {
   const [bookable, setBookable] = useState(false);
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
+  const [details, setDetails] = useState<InventoryDetails>(EMPTY_INVENTORY_DETAILS);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -108,7 +109,8 @@ export default function AdminNewInventoryItem() {
             placements: placementsInput,
             bookable,
             rateType: bookable ? rateType : undefined,
-            pricing: bookable ? ratePricingToInput(pricing) : undefined
+            pricing: bookable ? ratePricingToInput(pricing) : undefined,
+            ...inventoryDetailsToInput(details)
           }
         }
       });
@@ -148,7 +150,7 @@ export default function AdminNewInventoryItem() {
         <FormControl>
           <InputLabel id='inventory-type-label'>Type</InputLabel>
           <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
-            {TYPE_OPTIONS.map((o) => (
+            {INVENTORY_TYPE_OPTIONS.map((o) => (
               <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
             ))}
           </Select>
@@ -241,6 +243,8 @@ export default function AdminNewInventoryItem() {
         setPricing={setPricing}
         itemType={type}
       />
+
+      <InventoryDetailFields details={details} setDetails={setDetails} />
 
       <Stack direction='row' spacing={2}>
         <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>Cancel</Button>

@@ -57,7 +57,16 @@ export interface TokenClaims {
  * user is fully known. Fetching permissions later would make every gated route
  * bounce to home on a hard refresh.
  */
-async function fetchPermissions(token: string | undefined): Promise<{ effective: string[]; asCustomer: string[] } | null> {
+async function fetchPermissions(
+  token: string | undefined,
+  /**
+   * Ask for `myPermissions.roles` too. Only the dev-bypass path needs it (see
+   * `warnOnDevRoleDrift`), and requesting a field the deployed backend does not yet
+   * have would fail the whole query and drop the caller to the legacy staff
+   * boolean — so the authenticated path deliberately does not ask for it.
+   */
+  includeRoles = false
+): Promise<{ effective: string[]; asCustomer: string[]; roles: string[] } | null> {
   const endpoint = import.meta.env.VITE_BACKEND;
   if (!endpoint) return null;
   try {
@@ -67,13 +76,13 @@ async function fetchPermissions(token: string | undefined): Promise<{ effective:
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ query: '{ myPermissions { effective asCustomer } }' }),
+      body: JSON.stringify({ query: `{ myPermissions { effective asCustomer${includeRoles ? ' roles' : ''} } }` }),
     });
     if (!res.ok) return null;
     const body = await res.json();
     const permissions = body?.data?.myPermissions;
     if (!permissions) return null;
-    return { effective: permissions.effective ?? [], asCustomer: permissions.asCustomer ?? [] };
+    return { effective: permissions.effective ?? [], asCustomer: permissions.asCustomer ?? [], roles: permissions.roles ?? [] };
   } catch (error) {
     console.error('Failed to fetch permissions:', error);
     return null;
@@ -102,6 +111,28 @@ async function getAccessToken() : Promise<string | undefined> {
 /** When true, skip Keycloak and act as a logged-in staff user (for local dev with backend DISABLE_AUTH=true). */
 const isAuthDisabled = import.meta.env.VITE_DISABLE_AUTH === 'true';
 
+/**
+ * Shout when the two halves of the local auth bypass disagree.
+ *
+ * Only the *backend's* DEV_AS_ROLES decides what `myPermissions` returns, so if
+ * VITE_DEV_AS_ROLES says something else the UI renders one role's menu and chips
+ * while every gate is evaluated against another — and a per-role walkthrough
+ * silently tests the wrong role. Loud is the whole point; this is dev-only code.
+ */
+function warnOnDevRoleDrift(uiRoles: string[], serverRoles: string[] | undefined): void {
+  if (serverRoles === undefined) return;
+  const norm = (roles: string[]) => [...roles].map((r) => r.trim()).filter(Boolean).sort().join(',');
+  if (norm(uiRoles) === norm(serverRoles)) return;
+  console.error(
+    '[auth bypass] VITE_DEV_AS_ROLES and the backend\'s DEV_AS_ROLES disagree.\n' +
+      `  frontend (VITE_DEV_AS_ROLES): [${uiRoles.join(', ') || '<none>'}]\n` +
+      `  backend  (DEV_AS_ROLES):     [${serverRoles.join(', ') || '<none>'}]\n` +
+      'Permissions come from the backend, so the menu and role chips you see are for the frontend value ' +
+      'while every gate resolves against the backend one. Set both to the same value before trusting a ' +
+      'role walkthrough. See CLAUDE.md, "Local auth bypass".'
+  );
+}
+
 async function initKeycloak(): Promise<UserProps | null> {
   // Do not attempt to initialize during SSR
   if (typeof window === 'undefined') {
@@ -116,7 +147,8 @@ async function initKeycloak(): Promise<UserProps | null> {
       .split(',')
       .map((r: string) => r.trim())
       .filter(Boolean);
-    const permissions = await fetchPermissions(undefined);
+    const permissions = await fetchPermissions(undefined, true);
+    warnOnDevRoleDrift(devRoles, permissions?.roles);
     return {
       isAuthenticated: true,
       isDamplabStaff: devRoles.includes('damplab-staff'),

@@ -1093,12 +1093,31 @@ const INVENTORY_FIELDS = `
     external
     legacy
   }
+  uniqueId
+  tags
+  modelNumber
+  dimensions {
+    value
+    unit
+  }
+`;
+
+/**
+ * Fields the model marks internal. Deliberately NOT part of INVENTORY_FIELDS: that
+ * fragment is shared with `activeInventoryItems`, which feeds client-facing pickers
+ * (BookInventory, the canvas). Appended only to the staff editing queries below.
+ */
+const INVENTORY_INTERNAL_FIELDS = `
+  serialNumber
+  hasServiceContract
+  serviceContractExpiration
 `;
 
 export const GET_INVENTORY_ITEMS = gql`
   query GetInventoryItems {
     inventoryItems {
       ${INVENTORY_FIELDS}
+      ${INVENTORY_INTERNAL_FIELDS}
     }
   }
 `;
@@ -1115,6 +1134,7 @@ export const CREATE_INVENTORY_ITEM = gql`
   mutation CreateInventoryItem($item: CreateInventoryItem!) {
     createInventoryItem(item: $item) {
       ${INVENTORY_FIELDS}
+      ${INVENTORY_INTERNAL_FIELDS}
     }
   }
 `;
@@ -1123,6 +1143,7 @@ export const UPDATE_INVENTORY_ITEM = gql`
   mutation UpdateInventoryItem($item: ID!, $changes: InventoryItemChange!) {
     updateInventoryItem(item: $item, changes: $changes) {
       ${INVENTORY_FIELDS}
+      ${INVENTORY_INTERNAL_FIELDS}
     }
   }
 `;

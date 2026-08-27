@@ -22,14 +22,15 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GET_INVENTORY_ITEMS, GET_STATIONS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, pricingToRateForm, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
-
-const TYPE_OPTIONS = [
-  { value: 'ROBOT', label: 'Robot' },
-  { value: 'MACHINE', label: 'Machine' },
-  { value: 'INSTRUMENT', label: 'Instrument' },
-  { value: 'CONSUMABLE', label: 'Consumable' },
-  { value: 'OTHER', label: 'Other' }
-];
+import {
+  DEFAULT_INVENTORY_TYPE,
+  EMPTY_INVENTORY_DETAILS,
+  INVENTORY_TYPE_OPTIONS,
+  InventoryDetailFields,
+  InventoryDetails,
+  inventoryDetailsFrom,
+  inventoryDetailsToInput
+} from '../components/edit/InventoryDetailFields';
 
 /** One editable row of the placement editor: where the item lives and how many are there. */
 interface PlacementRow {
@@ -66,13 +67,14 @@ export default function AdminEditInventoryItem() {
   const item: any = data?.inventoryItems?.find((x: any) => String(x.id) === String(itemId));
 
   const [name, setName] = useState('');
-  const [type, setType] = useState('MACHINE');
+  const [type, setType] = useState(DEFAULT_INVENTORY_TYPE);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [placements, setPlacements] = useState<PlacementRow[]>([]);
   const [bookable, setBookable] = useState(false);
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
+  const [details, setDetails] = useState<InventoryDetails>(EMPTY_INVENTORY_DETAILS);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -80,7 +82,7 @@ export default function AdminEditInventoryItem() {
   useEffect(() => {
     if (!item) return;
     setName(item.name ?? '');
-    setType(item.type ?? 'MACHINE');
+    setType(item.type ?? DEFAULT_INVENTORY_TYPE);
     setDescription(item.description ?? '');
     setLocation(item.location ?? '');
     // placements replaced the single stationId; fall back to the legacy field so
@@ -100,6 +102,7 @@ export default function AdminEditInventoryItem() {
     setBookable(!!item.bookable);
     setRateType(item.rateType === 'PER_UNIT' ? 'PER_UNIT' : 'HOURLY');
     setPricing(pricingToRateForm(item.pricing));
+    setDetails(inventoryDetailsFrom(item));
   }, [item?.id]);
 
   if (loading && !item) {
@@ -156,7 +159,8 @@ export default function AdminEditInventoryItem() {
             placements: placementsInput,
             bookable,
             rateType: bookable ? rateType : null,
-            pricing: bookable ? ratePricingToInput(pricing) : null
+            pricing: bookable ? ratePricingToInput(pricing) : null,
+            ...inventoryDetailsToInput(details)
           }
         }
       });
@@ -202,7 +206,7 @@ export default function AdminEditInventoryItem() {
         <FormControl>
           <InputLabel id='inventory-type-label'>Type</InputLabel>
           <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
-            {TYPE_OPTIONS.map((o) => (
+            {INVENTORY_TYPE_OPTIONS.map((o) => (
               <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
             ))}
           </Select>
@@ -288,6 +292,8 @@ export default function AdminEditInventoryItem() {
         setPricing={setPricing}
         itemType={type}
       />
+
+      <InventoryDetailFields details={details} setDetails={setDetails} />
 
       <Stack direction='row' spacing={2}>
         <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>Cancel</Button>
