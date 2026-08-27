@@ -1638,3 +1638,55 @@ export const GET_SOW_TEXT_PRESETS = gql`
         }
     }
 `;
+
+
+// ─── Learning Hub ─────────────────────────────────────────────────────────
+// Guides are markdown in Mongo. Drafts come back only for a training:write
+// holder — the server decides that from the caller, not from an argument.
+
+export const GET_GUIDES = gql`
+    query GetGuides {
+        guides {
+            id
+            title
+            slug
+            category
+            order
+            isPublished
+            updatedAt
+            updatedBy
+        }
+    }
+`;
+
+/** The list plus bodies, for the admin editor's live preview. */
+export const GET_GUIDES_WITH_BODIES = gql`
+    query GetGuidesWithBodies {
+        guides {
+            id
+            title
+            slug
+            category
+            body
+            order
+            isPublished
+            updatedAt
+            updatedBy
+        }
+    }
+`;
+
+export const GET_GUIDE_BY_SLUG = gql`
+    query GetGuideBySlug($slug: String!) {
+        guideBySlug(slug: $slug) {
+            id
+            title
+            slug
+            category
+            body
+            isPublished
+            updatedAt
+            updatedBy
+        }
+    }
+`;

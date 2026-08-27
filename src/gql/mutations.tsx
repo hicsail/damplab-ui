@@ -845,3 +845,41 @@ export const UNARCHIVE_WORKFLOW_NODE = gql`
         }
     }
 `;
+
+// ─── Learning Hub ─────────────────────────────────────────────────────────
+
+export const CREATE_GUIDE = gql`
+    mutation CreateGuide($input: CreateGuideInput!) {
+        createGuide(input: $input) {
+            id
+            title
+            slug
+            category
+            body
+            order
+            isPublished
+        }
+    }
+`;
+
+export const UPDATE_GUIDE = gql`
+    mutation UpdateGuide($input: UpdateGuideInput!) {
+        updateGuide(input: $input) {
+            id
+            title
+            slug
+            category
+            body
+            order
+            isPublished
+            updatedAt
+            updatedBy
+        }
+    }
+`;
+
+export const DELETE_GUIDE = gql`
+    mutation DeleteGuide($id: ID!) {
+        deleteGuide(id: $id)
+    }
+`;

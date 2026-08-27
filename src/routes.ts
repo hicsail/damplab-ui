@@ -24,7 +24,11 @@ export default [
     layout("./layouts/PrivateRouteAuthed.tsx", [
         index("./pages/Home.tsx"),
         route("/training", "./pages/Training.tsx"),
-        route("/training/canvas", "./pages/TrainingCanvas.tsx"),
+        // Guides are data now: one dynamic route replaces the two hardcoded pages,
+        // whose content is seeded as documents. `/training/admin` below is a static
+        // segment and so out-ranks this one — React Router scores static above
+        // dynamic regardless of declaration order.
+        route("/training/:slug", "./pages/TrainingGuide.tsx"),
         route("/services-catalog", "./pages/AdminServicesCatalog.tsx"),
         route("/admin/services-catalog", "./pages/AdminServicesCatalog.tsx", { id: "admin-services-catalog-legacy" }),
         route("/bugs", "./pages/Bugs.tsx"),
@@ -81,6 +85,9 @@ export default [
     layout("./layouts/PrivateRouteAnnouncementsWrite.tsx", [
         route("/edit_announcements", "./pages/Announcements.tsx"),
     ]),
+    layout("./layouts/PrivateRouteTrainingWrite.tsx", [
+        route("/training/admin", "./pages/TrainingAdmin.tsx"),
+    ]),
     layout("./layouts/PrivateRouteLabAssistant.tsx", [
         route("/lab-assistant", "./pages/LabStatusAssistant.tsx"),
     ]),
@@ -106,7 +113,6 @@ export default [
         route("/dominos", "./pages/Dominos.tsx"),
         route("/elabs", "./pages/ELabs.tsx"),
         route("/kernel", "./pages/Kernel.tsx"),
-        route("/training/admin-edit", "./pages/TrainingAdminEdit.tsx"),
         route("/data_translation", "./pages/DataTranslation.tsx"),
 
         /* Old comments from pre-React-Router-migration App.tsx: */
