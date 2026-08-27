@@ -1690,3 +1690,28 @@ export const GET_GUIDE_BY_SLUG = gql`
         }
     }
 `;
+
+
+/**
+ * The Protocol Library's browse list, grouped by category.
+ *
+ * Categories come from the service catalog — protocols.io has none — so a protocol
+ * inherits the category of the service that references it. Each entry is a
+ * protocols.io round trip on the server, which is why ProtocolsService caches;
+ * `unavailable` marks an entry whose fetch failed, so one bad protocol lists as
+ * broken rather than blanking the page.
+ */
+export const GET_PROTOCOL_LIBRARY = gql`
+    query GetProtocolLibrary {
+        protocolLibrary {
+            category
+            protocols {
+                protocolId
+                title
+                stepCount
+                serviceNames
+                unavailable
+            }
+        }
+    }
+`;
