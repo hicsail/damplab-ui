@@ -68,6 +68,9 @@ export default [
     layout("./layouts/PrivateRouteProtocolLibrary.tsx", [
         route("/protocol-map", "./pages/ProtocolMap.tsx"),
     ]),
+    layout("./layouts/PrivateRouteLabAssistant.tsx", [
+        route("/lab-assistant", "./pages/LabStatusAssistant.tsx"),
+    ]),
     layout("./layouts/PrivateRouteLabLayout.tsx", [
         route("/stations", "./pages/Stations.tsx"),
     ]),
@@ -84,7 +87,6 @@ export default [
     ]),
     layout("./layouts/PrivateRouteDamplabStaff.tsx", [
         route("/lab-status-tv", "./pages/LabStatusTV.tsx"),
-        route("/lab-assistant", "./pages/LabStatusAssistant.tsx"),
         route("/technician_view/:id", "./pages/TechnicianView.tsx"),
         route("/usage-billing", "./pages/UsageBilling.tsx"),
         route("/customer-management", "./pages/CustomerManagement.tsx"),
