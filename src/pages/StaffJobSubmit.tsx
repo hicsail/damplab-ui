@@ -113,6 +113,7 @@ export default function StaffJobSubmit() {
         institute: formData.institute.trim(),
         notes,
         clientDisplayName: formData.clientName.trim(),
+        clientEmail: formData.clientEmail.trim() || undefined,
         attachments,
         getAccessToken: () => userContext.userProps?.getAccessToken() ?? Promise.resolve(undefined),
       });

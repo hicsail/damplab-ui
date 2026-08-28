@@ -1,6 +1,6 @@
 import { Add } from '@mui/icons-material';
 import { Box, Button } from '@mui/material';
-import { GridRowModes, GridRowModesModel, GridRowsProp, GridToolbarContainer } from '@mui/x-data-grid';
+import { GridRowModes, GridRowModesModel, GridRowsProp, GridToolbarColumnsButton, GridToolbarContainer } from '@mui/x-data-grid';
 import { v4 as uuid } from 'uuid';
 import { EditRowModeHint } from './EditRowModeHint';
 
@@ -65,13 +65,18 @@ export const GridToolBar: React.FC<GridToolBarProps> = (props) => {
         px: 0,
       }}
     >
-      {props.canWrite && (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+      {/* Add is gated on `canWrite`; the column picker is not. Choosing which
+          columns to look at is a view control, and a read-only viewer wants it as
+          much as an editor does — so the row renders either way, and only the
+          button inside it is conditional. */}
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+        {props.canWrite && (
           <Button color="primary" startIcon={<Add />} onClick={handleNewRecord}>
             {props.addButtonLabel ?? 'Add new item'}
           </Button>
-        </Box>
-      )}
+        )}
+        <GridToolbarColumnsButton />
+      </Box>
       {props.canWrite && props.showEditModeHint !== false ? <EditRowModeHint /> : null}
     </GridToolbarContainer>
   );

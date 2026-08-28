@@ -1,15 +1,12 @@
-import { Box, Button, Checkbox, Chip, FormControlLabel, IconButton, Stack, TextField, Tooltip, Typography } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { useState } from 'react';
+import { Autocomplete, Box, Checkbox, Chip, FormControlLabel, Stack, TextField, Typography } from '@mui/material';
 
 /**
  * The item type vocabulary, shared by both inventory forms.
  *
- * `EQUIPMENT` / `HOOD` / `STORAGE` are the canonical values; `ROBOT`, `MACHINE`,
- * `INSTRUMENT` and `OTHER` are deprecated on the backend enum and kept selectable
- * only so an existing record can round-trip through the form without silently
- * changing type. New items default to `EQUIPMENT`, matching the model's default.
+ * **Suggestions, not a closed list.** The model relaxed `type` from an enum to a
+ * free string, so the forms offer these and accept anything. `ROBOT`, `MACHINE`,
+ * `INSTRUMENT` and `OTHER` are legacy values kept here so an existing record still
+ * shows a readable label rather than a bare token.
  */
 export const INVENTORY_TYPE_OPTIONS: { value: string; label: string; deprecated?: boolean }[] = [
   { value: 'EQUIPMENT', label: 'Equipment' },
@@ -22,13 +19,38 @@ export const INVENTORY_TYPE_OPTIONS: { value: string; label: string; deprecated?
   { value: 'OTHER', label: 'Other (legacy)', deprecated: true }
 ];
 
+/** What the type picker offers. Legacy values are reachable by typing, not by picking. */
+export const SUGGESTED_INVENTORY_TYPES = INVENTORY_TYPE_OPTIONS.filter((o) => !o.deprecated).map((o) => o.value);
+
 export const DEFAULT_INVENTORY_TYPE = 'EQUIPMENT';
 
-/** One editable dimension row. Kept as strings so a half-typed value does not reset. */
+/** Common tags, offered as completions. Free text is still accepted. */
+export const TAG_SUGGESTIONS = [
+  'Analytical Equipment',
+  'CLIA Equipment',
+  'Centrifuge',
+  'Cold Storage',
+  'General Equipment',
+  'Imaging',
+  'Incubator',
+  'Liquid Handler',
+  'Sequencer',
+  'Vortexer'
+];
+
+/**
+ * One dimension. Held as strings so a half-typed value does not reset under you.
+ *
+ * The unit rides along per dimension because the model stores one — but it defaults
+ * to metres, which is what the spreadsheet import writes and what the grid's
+ * "L (m)" headers assume.
+ */
 export interface DimensionRow {
   value: string;
   unit: string;
 }
+
+const emptyDimension = (): DimensionRow => ({ value: '', unit: 'm' });
 
 /** The half of an inventory item that neither form exposed before. */
 export interface InventoryDetails {
@@ -37,7 +59,9 @@ export interface InventoryDetails {
   hasServiceContract: boolean;
   serviceContractExpiration: string;
   tags: string[];
-  dimensions: DimensionRow[];
+  dimensionL: DimensionRow;
+  dimensionW: DimensionRow;
+  dimensionH: DimensionRow;
 }
 
 export const EMPTY_INVENTORY_DETAILS: InventoryDetails = {
@@ -46,8 +70,15 @@ export const EMPTY_INVENTORY_DETAILS: InventoryDetails = {
   hasServiceContract: false,
   serviceContractExpiration: '',
   tags: [],
-  dimensions: []
+  dimensionL: emptyDimension(),
+  dimensionW: emptyDimension(),
+  dimensionH: emptyDimension()
 };
+
+const dimensionFrom = (d: any): DimensionRow => ({
+  value: d?.value === undefined || d?.value === null ? '' : String(d.value),
+  unit: String(d?.unit ?? 'm')
+});
 
 /** Hydrate the detail half of the form from a fetched inventory item. */
 export function inventoryDetailsFrom(item: any): InventoryDetails {
@@ -58,31 +89,55 @@ export function inventoryDetailsFrom(item: any): InventoryDetails {
     // The model stores a Date; the date input wants YYYY-MM-DD.
     serviceContractExpiration: item?.serviceContractExpiration ? String(item.serviceContractExpiration).slice(0, 10) : '',
     tags: Array.isArray(item?.tags) ? item.tags.map((t: any) => String(t)) : [],
-    dimensions: Array.isArray(item?.dimensions)
-      ? item.dimensions.filter((d: any) => d).map((d: any) => ({ value: String(d.value ?? ''), unit: String(d.unit ?? '') }))
-      : []
+    dimensionL: dimensionFrom(item?.dimensionL),
+    dimensionW: dimensionFrom(item?.dimensionW),
+    dimensionH: dimensionFrom(item?.dimensionH)
   };
 }
 
+const dimensionToInput = (row: DimensionRow): { value: number; unit: string } | undefined => {
+  if (row.value.trim() === '') return undefined;
+  const value = Number(row.value);
+  if (!Number.isFinite(value)) return undefined;
+  return { value, unit: row.unit.trim() || 'm' };
+};
+
 /**
- * Serialise the detail half for `CreateInventoryItem` / `UpdateInventoryItem`.
+ * Serialise the detail half for `CreateInventoryItem` / `InventoryItemChange`.
  *
- * Both inputs accept every one of these as nullable, so an untouched form sends
- * nothing rather than sending empty strings.
+ * `clearEmpty` is the difference between the two forms, and it matters. The update
+ * mutation hands its input straight to `updateOne`, so an **omitted** key leaves the
+ * stored value alone while an explicit **null** clears it. On create, omitting is
+ * right — there is nothing to clear. On edit, omitting would make "delete this
+ * serial number" a silent no-op, so the edit form passes `clearEmpty` and empty
+ * fields go over as null.
  */
-export function inventoryDetailsToInput(details: InventoryDetails) {
-  const dimensions = details.dimensions
-    .filter((d) => d.value.trim() !== '' && d.unit.trim() !== '')
-    .map((d) => ({ value: Number(d.value), unit: d.unit.trim() }))
-    .filter((d) => Number.isFinite(d.value));
+export function inventoryDetailsToInput(details: InventoryDetails, { clearEmpty = false }: { clearEmpty?: boolean } = {}) {
+  const blank = clearEmpty ? null : undefined;
   return {
-    modelNumber: details.modelNumber.trim() || undefined,
-    serialNumber: details.serialNumber.trim() || undefined,
+    modelNumber: details.modelNumber.trim() || blank,
+    serialNumber: details.serialNumber.trim() || blank,
     hasServiceContract: details.hasServiceContract,
-    serviceContractExpiration: details.serviceContractExpiration ? new Date(details.serviceContractExpiration).toISOString() : undefined,
+    serviceContractExpiration: details.serviceContractExpiration ? new Date(details.serviceContractExpiration).toISOString() : blank,
     tags: details.tags,
-    dimensions
+    dimensionL: dimensionToInput(details.dimensionL) ?? blank,
+    dimensionW: dimensionToInput(details.dimensionW) ?? blank,
+    dimensionH: dimensionToInput(details.dimensionH) ?? blank
   };
+}
+
+/** The type picker, free-text with suggestions — `type` is a free string on the model. */
+export function InventoryTypePicker({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  return (
+    <Autocomplete
+      freeSolo
+      options={SUGGESTED_INVENTORY_TYPES}
+      value={value}
+      onChange={(_, next) => onChange(typeof next === 'string' ? next : '')}
+      onInputChange={(_, next) => onChange(next)}
+      renderInput={(params) => <TextField {...params} label='Type' helperText='Pick one or type your own.' />}
+    />
+  );
 }
 
 interface Props {
@@ -91,56 +146,64 @@ interface Props {
 }
 
 /**
- * Model / serial / service-contract / tags / dimensions editor. These fields
- * shipped on the model in PR #70 but were never added to either form, so they were
- * unreachable from the UI.
+ * Model / serial / service-contract / tags / dimensions editor, shared by the new
+ * and edit inventory forms. These fields shipped on the model but were never added
+ * to either form, so they were unreachable from the UI.
  */
 export function InventoryDetailFields({ details, setDetails }: Props) {
-  const [tagDraft, setTagDraft] = useState('');
   const patch = (changes: Partial<InventoryDetails>) => setDetails({ ...details, ...changes });
 
-  const addTag = () => {
-    const tag = tagDraft.trim();
-    if (!tag || details.tags.includes(tag)) {
-      setTagDraft('');
-      return;
-    }
-    patch({ tags: [...details.tags, tag] });
-    setTagDraft('');
-  };
-
-  const setDimensionRow = (index: number, change: Partial<DimensionRow>) =>
-    patch({ dimensions: details.dimensions.map((row, i) => (i === index ? { ...row, ...change } : row)) });
+  const dimensionField = (key: 'dimensionL' | 'dimensionW' | 'dimensionH', label: string) => (
+    <Stack direction='row' spacing={1} alignItems='center' key={key}>
+      <TextField
+        label={label}
+        type='number'
+        size='small'
+        value={details[key].value}
+        onChange={(e) => patch({ [key]: { ...details[key], value: e.target.value } } as Partial<InventoryDetails>)}
+        inputProps={{ min: 0, step: 'any' }}
+        sx={{ width: 140 }}
+      />
+      <TextField
+        label='Unit'
+        size='small'
+        value={details[key].unit}
+        onChange={(e) => patch({ [key]: { ...details[key], unit: e.target.value } } as Partial<InventoryDetails>)}
+        placeholder='m'
+        sx={{ width: 100 }}
+      />
+    </Stack>
+  );
 
   return (
     <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
-      <Typography variant="subtitle1" sx={{ mb: 1.5 }}>
+      <Typography variant='subtitle1' sx={{ mb: 1.5 }}>
         Identification &amp; service
       </Typography>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
         <TextField
-          label="Model number"
+          label='Model number'
           value={details.modelNumber}
           onChange={(e) => patch({ modelNumber: e.target.value })}
-          helperText="Items sharing a model number are the same type of equipment."
+          helperText='Items sharing a model number are the same type of equipment.'
         />
         <TextField
-          label="Serial number"
+          label='Serial number'
           value={details.serialNumber}
           onChange={(e) => patch({ serialNumber: e.target.value })}
-          helperText="Internal use only — hidden from non-staff."
+          helperText='Internal use only — hidden from anyone without internal-fields:read.'
         />
       </Box>
 
       <Box sx={{ mt: 1.5 }}>
         <FormControlLabel
           control={<Checkbox checked={details.hasServiceContract} onChange={(e) => patch({ hasServiceContract: e.target.checked })} />}
-          label="Has an active service contract"
+          label='Has an active service contract'
         />
         {details.hasServiceContract && (
           <TextField
-            label="Service contract expires"
-            type="date"
+            label='Service contract expires'
+            type='date'
             value={details.serviceContractExpiration}
             onChange={(e) => patch({ serviceContractExpiration: e.target.value })}
             InputLabelProps={{ shrink: true }}
@@ -149,88 +212,32 @@ export function InventoryDetailFields({ details, setDetails }: Props) {
         )}
       </Box>
 
-      <Typography variant="subtitle1" sx={{ mt: 3, mb: 0.5 }}>
+      <Typography variant='subtitle1' sx={{ mt: 3, mb: 0.5 }}>
         Tags
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        Finer categorisation for filtering (e.g. "Analytical Equipment", "Centrifuge").
+      <Typography variant='body2' color='text.secondary' sx={{ mb: 1.5 }}>
+        Finer categorisation for filtering. Pick from the list or type your own.
       </Typography>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
-        {details.tags.map((tag) => (
-          <Chip key={tag} label={tag} onDelete={() => patch({ tags: details.tags.filter((t) => t !== tag) })} />
-        ))}
-        {details.tags.length === 0 && (
-          <Typography variant="body2" color="text.secondary">
-            No tags yet.
-          </Typography>
-        )}
-      </Stack>
-      <Stack direction="row" spacing={1} alignItems="center">
-        <TextField
-          label="Add a tag"
-          size="small"
-          value={tagDraft}
-          onChange={(e) => setTagDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              addTag();
-            }
-          }}
-        />
-        <Tooltip title="Add tag">
-          <span>
-            <IconButton size="small" onClick={addTag} disabled={!tagDraft.trim()}>
-              <AddIcon fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
-      </Stack>
+      <Autocomplete
+        multiple
+        freeSolo
+        options={TAG_SUGGESTIONS}
+        value={details.tags}
+        onChange={(_, next) => patch({ tags: (next as string[]).map((t) => t.trim()).filter(Boolean) })}
+        renderTags={(value, getTagProps) => value.map((tag, index) => <Chip {...getTagProps({ index })} key={tag} label={tag} />)}
+        renderInput={(params) => <TextField {...params} label='Tags' placeholder='Add a tag' />}
+      />
 
-      <Typography variant="subtitle1" sx={{ mt: 3, mb: 0.5 }}>
+      <Typography variant='subtitle1' sx={{ mt: 3, mb: 0.5 }}>
         Dimensions
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-        Up to three measurements (e.g. 60 cm × 45 cm × 90 cm). Rows missing a value or a unit are
-        dropped on save.
+      <Typography variant='body2' color='text.secondary' sx={{ mb: 1.5 }}>
+        Length, width and height. Leave a measurement blank if you do not have it — blanks are not saved.
       </Typography>
       <Stack spacing={1.5}>
-        {details.dimensions.map((row, index) => (
-          <Stack key={index} direction="row" spacing={1} alignItems="center">
-            <TextField
-              label="Value"
-              type="number"
-              size="small"
-              value={row.value}
-              onChange={(e) => setDimensionRow(index, { value: e.target.value })}
-              inputProps={{ min: 0, step: 'any' }}
-              sx={{ width: 140 }}
-            />
-            <TextField
-              label="Unit"
-              size="small"
-              value={row.unit}
-              onChange={(e) => setDimensionRow(index, { unit: e.target.value })}
-              placeholder="cm"
-              sx={{ width: 140 }}
-            />
-            <Tooltip title="Remove dimension">
-              <IconButton size="small" onClick={() => patch({ dimensions: details.dimensions.filter((_, i) => i !== index) })}>
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        ))}
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<AddIcon />}
-          onClick={() => patch({ dimensions: [...details.dimensions, { value: '', unit: '' }] })}
-          sx={{ alignSelf: 'flex-start' }}
-          disabled={details.dimensions.length >= 3}
-        >
-          Add dimension
-        </Button>
+        {dimensionField('dimensionL', 'Length')}
+        {dimensionField('dimensionW', 'Width')}
+        {dimensionField('dimensionH', 'Height')}
       </Stack>
     </Box>
   );

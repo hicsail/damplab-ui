@@ -1217,21 +1217,27 @@ const INVENTORY_FIELDS = `
   uniqueId
   tags
   modelNumber
-  dimensions {
-    value
-    unit
-  }
+  dimensionL { value unit }
+  dimensionW { value unit }
+  dimensionH { value unit }
 `;
 
 /**
  * Fields the model marks internal. Deliberately NOT part of INVENTORY_FIELDS: that
  * fragment is shared with `activeInventoryItems`, which feeds client-facing pickers
  * (BookInventory, the canvas). Appended only to the staff editing queries below.
+ *
+ * The three physical dimensions stay in the shared fragment above — they replaced the
+ * old `dimensions` array and carry no field resolver, because how big a freezer is
+ * was never staff-only. `lastModifiedBy` is here instead: it has no nulling resolver
+ * either, so the only thing keeping it away from a client is that client queries do
+ * not ask for it.
  */
 const INVENTORY_INTERNAL_FIELDS = `
   serialNumber
   hasServiceContract
   serviceContractExpiration
+  lastModifiedBy
 `;
 
 export const GET_INVENTORY_ITEMS = gql`
@@ -1247,6 +1253,27 @@ export const GET_ACTIVE_INVENTORY_ITEMS = gql`
   query GetActiveInventoryItems {
     activeInventoryItems {
       ${INVENTORY_FIELDS}
+    }
+  }
+`;
+
+export const GET_PUBLIC_INVENTORY_ITEMS = gql`
+  query GetPublicInventoryItems {
+    publicInventoryItems {
+      id
+      name
+      type
+      description
+      location
+      quantity
+      bookable
+      placements { stationId quantity }
+      tags
+      modelNumber
+      hasServiceContract
+      dimensionL { value unit }
+  dimensionW { value unit }
+  dimensionH { value unit }
     }
   }
 `;
@@ -1333,6 +1360,62 @@ export const GET_BILLABLE_BOOKINGS = gql`
 export const DELETE_INVENTORY_ITEM = gql`
   mutation DeleteInventoryItem($item: ID!) {
     deleteInventoryItem(item: $item)
+  }
+`;
+
+export const DELETE_ALL_INVENTORY_ITEMS = gql`
+  mutation DeleteAllInventoryItems {
+    deleteAllInventoryItems
+  }
+`;
+
+export const CREATE_UPLOAD_LOG = gql`
+  mutation CreateUploadLog($input: CreateUploadLogInput!) {
+    createUploadLog(input: $input) {
+      id
+      uploadDate
+    }
+  }
+`;
+
+export const GET_UPLOAD_LOGS = gql`
+  query UploadLogs {
+    uploadLogs {
+      id
+      uploaderName
+      uploaderSub
+      fileName
+      uploadDate
+      rowCount
+      createdCount
+      updatedCount
+      skippedCount
+      failedCount
+    }
+  }
+`;
+
+export const GET_UPLOAD_LOG = gql`
+  query UploadLog($id: ID!) {
+    uploadLog(id: $id) {
+      id
+      uploaderName
+      uploaderSub
+      fileName
+      uploadDate
+      rowCount
+      createdCount
+      updatedCount
+      skippedCount
+      failedCount
+      affectedItemIds
+      fieldSnapshots {
+        itemId
+        action
+        before
+        after
+      }
+    }
   }
 `;
 

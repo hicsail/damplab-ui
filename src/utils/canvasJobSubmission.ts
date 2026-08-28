@@ -39,6 +39,7 @@ export type SubmitCanvasJobInput = {
   institute: string;
   notes: string;
   clientDisplayName: string;
+  clientEmail?: string;
   attachments: File[];
   getAccessToken: () => Promise<string | undefined>;
 };
@@ -59,6 +60,7 @@ export async function submitCanvasJob(
     institute,
     notes,
     clientDisplayName,
+    clientEmail,
     attachments,
     getAccessToken,
   } = input;
@@ -208,11 +210,12 @@ export async function submitCanvasJob(
     return clonedWorkflows;
   })();
 
-  const data = {
+  const data: Record<string, unknown> = {
     name: jobName,
     clientDisplayName,
     institute,
     notes,
+    ...(clientEmail ? { clientEmail } : {}),
     workflows: workflowsWithUploadedParamFiles.map((workflow: any) => ({
       name: `Workflow-${workflow.id || workflow[0]?.id}`,
       nodes: transformNodesToGQL(Array.isArray(workflow) ? workflow : [workflow]),

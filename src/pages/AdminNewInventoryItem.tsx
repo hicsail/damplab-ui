@@ -26,7 +26,7 @@ import { PERMISSIONS } from '../hooks/usePermissions';
 import {
   DEFAULT_INVENTORY_TYPE,
   EMPTY_INVENTORY_DETAILS,
-  INVENTORY_TYPE_OPTIONS,
+  InventoryTypePicker,
   InventoryDetailFields,
   InventoryDetails,
   inventoryDetailsToInput
@@ -136,14 +136,7 @@ function AdminNewInventoryItemForm() {
       />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <FormControl>
-          <InputLabel id='inventory-type-label'>Type</InputLabel>
-          <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
-            {INVENTORY_TYPE_OPTIONS.map((o) => (
-              <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <InventoryTypePicker value={type} onChange={setType} />
         <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} placeholder='Bench A, room 304…' />
       </Box>
 
@@ -222,6 +215,9 @@ function AdminNewInventoryItemForm() {
         minRows={3}
         placeholder='Model, capabilities, notes…'
       />
+
+      {/* Tags, model/serial, service contract and dimensions all live in
+          <InventoryDetailFields /> below — the same editor both forms share. */}
 
       <InventoryRateFields
         bookable={bookable}

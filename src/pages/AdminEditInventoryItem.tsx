@@ -28,7 +28,7 @@ import { formatSaveError } from '../utils/gqlError';
 import {
   DEFAULT_INVENTORY_TYPE,
   EMPTY_INVENTORY_DETAILS,
-  INVENTORY_TYPE_OPTIONS,
+  InventoryTypePicker,
   InventoryDetailFields,
   InventoryDetails,
   inventoryDetailsFrom,
@@ -151,7 +151,7 @@ export default function AdminEditInventoryItem() {
             bookable,
             rateType: bookable ? rateType : null,
             pricing: bookable ? ratePricingToInput(pricing) : null,
-            ...inventoryDetailsToInput(details)
+            ...inventoryDetailsToInput(details, { clearEmpty: true })
           }
         }
       });
@@ -196,14 +196,7 @@ export default function AdminEditInventoryItem() {
 
       <TextField label='Name' value={name} onChange={(e) => setName(e.target.value)} required />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <FormControl>
-          <InputLabel id='inventory-type-label'>Type</InputLabel>
-          <Select labelId='inventory-type-label' value={type} label='Type' onChange={(e) => setType(e.target.value)}>
-            {INVENTORY_TYPE_OPTIONS.map((o) => (
-              <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <InventoryTypePicker value={type} onChange={setType} />
         <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} />
       </Box>
 
@@ -275,6 +268,15 @@ export default function AdminEditInventoryItem() {
       </Box>
 
       <TextField label='Description' value={description} onChange={(e) => setDescription(e.target.value)} multiline minRows={3} />
+
+      {/* Tags, model/serial, service contract and dimensions all live in
+          <InventoryDetailFields /> below — the same editor both forms share. */}
+
+      {item.uniqueId && (
+        <Typography variant='caption' color='text.secondary'>
+          Unique ID: {item.uniqueId}
+        </Typography>
+      )}
 
       <InventoryRateFields
         bookable={bookable}
