@@ -23,6 +23,8 @@ import { useContext, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AppContext } from '../contexts/App';
 import { CREATE_BUNDLE } from '../gql/queries';
+import { RequirePermissionOrRedirect } from '../components/PermissionGate';
+import { PERMISSIONS } from '../hooks/usePermissions';
 
 const MENU_PROPS = {
   PaperProps: {
@@ -33,7 +35,7 @@ const MENU_PROPS = {
   }
 };
 
-export default function AdminNewBundle() {
+function AdminNewBundleForm() {
   const navigate = useNavigate();
   const client = useApolloClient();
   const { services, refreshCatalog } = useContext(AppContext);
@@ -192,5 +194,18 @@ export default function AdminNewBundle() {
         </Stack>
       </Box>
     </Stack>
+  );
+}
+
+/**
+ * A creation page has nothing to render read-only — it is an empty form whose only
+ * purpose is a mutation. So this bounces rather than disabling. The Add button that
+ * leads here is already hidden; this is what a typed URL hits.
+ */
+export default function AdminNewBundle() {
+  return (
+    <RequirePermissionOrRedirect permission={PERMISSIONS.CatalogEditorWrite}>
+      <AdminNewBundleForm />
+    </RequirePermissionOrRedirect>
   );
 }

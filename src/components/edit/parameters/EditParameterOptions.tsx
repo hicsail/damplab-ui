@@ -15,6 +15,7 @@ import { getActionsColumn } from '../ActionColumn';
 import { MutableRefObject, useState } from 'react';
 import { GridApiCommunity } from '@mui/x-data-grid/internals';
 import { GridToolBar } from '../GridToolBar';
+import { PERMISSIONS, usePermissions } from '../../../hooks/usePermissions';
 
 interface EditParametersOptionsProps {
   viewParams: GridRenderCellParams | null;
@@ -23,6 +24,8 @@ interface EditParametersOptionsProps {
 }
 
 export const EditParameterOptions: React.FC<EditParametersOptionsProps> = (props) => {
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const isEdit = !!props.editParams;
   const providedValue = props.viewParams ? props.viewParams.value : props.editParams!.value;
@@ -234,7 +237,8 @@ export const EditParameterOptions: React.FC<EditParametersOptionsProps> = (props
           [id]: { mode: GridRowModes.View, ignoreModifications: true }
         }),
         handleSave: (id) => handleSave(id),
-        rowModesModel
+        rowModesModel,
+        canWrite
       })
     );
   }
@@ -253,7 +257,7 @@ export const EditParameterOptions: React.FC<EditParametersOptionsProps> = (props
         toolbar: GridToolBar as GridSlots['toolbar']
       }}
       slotProps={{
-        toolbar: { setRowModesModel, setRows }
+        toolbar: { canWrite, setRowModesModel, setRows }
       }}
     />
   );

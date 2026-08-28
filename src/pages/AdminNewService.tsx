@@ -24,6 +24,8 @@ import { useContext, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_SERVICE } from '../gql/queries';
 import { AppContext } from '../contexts/App';
+import { RequirePermissionOrRedirect } from '../components/PermissionGate';
+import { PERMISSIONS } from '../hooks/usePermissions';
 
 function formatCreateServiceError(error: unknown): string {
   const fallback = 'Unable to create service. Please try again.';
@@ -54,7 +56,7 @@ const MENU_PROPS = {
   }
 };
 
-export default function AdminNewService() {
+function AdminNewServiceForm() {
   const navigate = useNavigate();
   const client = useApolloClient();
   const { services, refreshCatalog } = useContext(AppContext);
@@ -409,5 +411,18 @@ export default function AdminNewService() {
         </Button>
       </Stack>
     </Stack>
+  );
+}
+
+/**
+ * A creation page has nothing to render read-only — it is an empty form whose only
+ * purpose is a mutation. So this bounces rather than disabling. The Add button that
+ * leads here is already hidden; this is what a typed URL hits.
+ */
+export default function AdminNewService() {
+  return (
+    <RequirePermissionOrRedirect permission={PERMISSIONS.CatalogEditorWrite}>
+      <AdminNewServiceForm />
+    </RequirePermissionOrRedirect>
   );
 }

@@ -39,6 +39,37 @@ export const GET_SERVICES = gql`
     }
 `;
 
+/**
+ * The client-facing catalog page's own query.
+ *
+ * Deliberately NOT a slice of GET_SERVICES: it hits a purpose-built server type so
+ * the reduction is structural. `price` is the caller's own, resolved server-side;
+ * `pricing` and `parameters` come back null without internal-fields:read, so the
+ * page builds its columns from what it actually received rather than from a
+ * client-side permission check.
+ */
+export const GET_CATALOG_SERVICES = gql`
+    query GetCatalogServices {
+        catalogServices {
+            id
+            name
+            description
+            serviceCategoryName
+            unit
+            price
+            pricingModeLabel
+            parameterCount
+            pricing {
+                internal
+                externalAcademic
+                externalMarket
+                externalNoSalary
+            }
+            parameters
+        }
+    }
+`;
+
 export const GET_BUNDLES = gql`
     query GetBundles {
         bundles {
@@ -353,6 +384,48 @@ export const OWN_JOBS = gql`
 `;
 
 /** Paginated, filterable all jobs – staff only (Dashboard). */
+/**
+ * The merged jobs page. Serves a client and a technician from one document —
+ * `scope`, `createdBySub` and `assigneeId` are all enforced server-side, so a
+ * client sending `scope: ALL` gets their own jobs rather than an error.
+ */
+export const JOBS_FOR_VIEWER = gql`
+    query JobsForViewer($input: JobsForViewerInput) {
+        jobsForViewer(input: $input) {
+            items {
+                id
+                name
+                state
+                submitted
+                username
+                institute
+                email
+                isArchived
+                archivedAt
+                archivedBy
+                archivedFromState
+                sow {
+                    id
+                    sowNumber
+                    sowTitle
+                    status
+                }
+            }
+            totalCount
+        }
+    }
+`;
+
+/** Distinct submitters, for the jobs page's client filter. jobs:view-all. */
+export const JOB_CLIENTS = gql`
+    query JobClients {
+        jobClients {
+            sub
+            displayName
+        }
+    }
+`;
+
 export const ALL_JOBS = gql`
     query AllJobs($input: AllJobsInput) {
         allJobs(input: $input) {
@@ -504,12 +577,16 @@ export const GET_LAB_MONITOR_OPERATIONS = gql`
 
 // Lab monitor: nodes by node state (for drag-drop columns). One query per column.
 export const GET_LAB_MONITOR_NODES = gql`
-    query GetLabMonitorNodes($nodeState: WorkflowNodeState!) {
-        getLabMonitorNodes(nodeState: $nodeState) {
+    query GetLabMonitorNodes($nodeState: WorkflowNodeState!, $archiveFilter: NodeArchiveFilter) {
+        getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter) {
             _id
             id
             label
             state
+            isArchived
+            archivedAt
+            archivedBy
+            archivedFromState
             assigneeId
             assigneeDisplayName
             estimatedMinutes
@@ -688,12 +765,31 @@ export const CREATE_SERVICE = gql`
 `;
 
 
+/**
+ * Announcements the caller may see. The server filters by audience — this query
+ * takes no arguments because the caller is the token, not a parameter.
+ */
 export const GET_ANNOUNCEMENTS = gql`
-  query{
-	announcements{
-    text
-    timestamp
-    is_displayed
+  query GetAnnouncements {
+    announcements {
+      id
+      text
+      timestamp
+      is_displayed
+      audienceRoles
+    }
+  }
+`;
+
+/** Every announcement regardless of audience. Requires announcements:write. */
+export const GET_ALL_ANNOUNCEMENTS = gql`
+  query GetAllAnnouncements {
+    allAnnouncements {
+      id
+      text
+      timestamp
+      is_displayed
+      audienceRoles
     }
   }
 `;
@@ -1037,16 +1133,29 @@ export const GET_BUG_REPORT_BY_ID = gql`
   }
 `;
 
+/**
+ * The two axes a Customer Management row carries. `customerCategory` sets price,
+ * `accessTier` sets permissions, and they move independently — one mutation each.
+ *
+ * `accessRoleMapped` is deliberately absent: it is only ever populated on the row
+ * returned by the tier mutation, because checking it per row would double the
+ * Keycloak Admin API calls a list page makes.
+ */
+const CUSTOMER_MANAGEMENT_ROW_FIELDS = `
+  id
+  username
+  email
+  firstName
+  lastName
+  customerCategory
+  isDefaultExternalCustomer
+  accessTier
+`;
+
 export const SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
   query SearchKeycloakUsersForCustomerManagement($search: String!, $max: Int) {
     searchKeycloakUsersForCustomerManagement(search: $search, max: $max) {
-      id
-      username
-      email
-      firstName
-      lastName
-      customerCategory
-      isDefaultExternalCustomer
+      ${CUSTOMER_MANAGEMENT_ROW_FIELDS}
     }
   }
 `;
@@ -1055,15 +1164,27 @@ export const LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
   query ListKeycloakUsersForCustomerManagement($category: CustomerManagementUserListCategory!, $offset: Int, $limit: Int) {
     listKeycloakUsersForCustomerManagement(category: $category, offset: $offset, limit: $limit) {
       items {
-        id
-        username
-        email
-        firstName
-        lastName
-        customerCategory
-        isDefaultExternalCustomer
+        ${CUSTOMER_MANAGEMENT_ROW_FIELDS}
       }
       hasNextPage
+    }
+  }
+`;
+
+/**
+ * The access tiers an administrator may preview the UI as.
+ *
+ * Fetched lazily by the header rather than folded into `myPermissions`: that one runs
+ * in a top-level await before Apollo exists, and asking a backend that has not
+ * deployed this field yet would fail the whole query and drop the caller to the
+ * legacy staff boolean. Here, a failure just means no dropdown.
+ */
+export const GET_ROLE_PREVIEWS = gql`
+  query RolePreviews {
+    rolePreviews {
+      tier
+      label
+      permissions
     }
   }
 `;
@@ -1096,19 +1217,34 @@ const INVENTORY_FIELDS = `
   uniqueId
   tags
   modelNumber
+  dimensionL { value unit }
+  dimensionW { value unit }
+  dimensionH { value unit }
+`;
+
+/**
+ * Fields the model marks internal. Deliberately NOT part of INVENTORY_FIELDS: that
+ * fragment is shared with `activeInventoryItems`, which feeds client-facing pickers
+ * (BookInventory, the canvas). Appended only to the staff editing queries below.
+ *
+ * The three physical dimensions stay in the shared fragment above — they replaced the
+ * old `dimensions` array and carry no field resolver, because how big a freezer is
+ * was never staff-only. `lastModifiedBy` is here instead: it has no nulling resolver
+ * either, so the only thing keeping it away from a client is that client queries do
+ * not ask for it.
+ */
+const INVENTORY_INTERNAL_FIELDS = `
   serialNumber
   hasServiceContract
   serviceContractExpiration
   lastModifiedBy
-  dimensionL { value unit }
-  dimensionW { value unit }
-  dimensionH { value unit }
 `;
 
 export const GET_INVENTORY_ITEMS = gql`
   query GetInventoryItems {
     inventoryItems {
       ${INVENTORY_FIELDS}
+      ${INVENTORY_INTERNAL_FIELDS}
     }
   }
 `;
@@ -1146,6 +1282,7 @@ export const CREATE_INVENTORY_ITEM = gql`
   mutation CreateInventoryItem($item: CreateInventoryItem!) {
     createInventoryItem(item: $item) {
       ${INVENTORY_FIELDS}
+      ${INVENTORY_INTERNAL_FIELDS}
     }
   }
 `;
@@ -1154,6 +1291,7 @@ export const UPDATE_INVENTORY_ITEM = gql`
   mutation UpdateInventoryItem($item: ID!, $changes: InventoryItemChange!) {
     updateInventoryItem(item: $item, changes: $changes) {
       ${INVENTORY_FIELDS}
+      ${INVENTORY_INTERNAL_FIELDS}
     }
   }
 `;
@@ -1605,6 +1743,69 @@ export const GET_SOW_TEXT_PRESETS = gql`
             order
             updatedAt
             updatedByName
+        }
+    }
+`;
+
+
+// ─── Learning Hub ─────────────────────────────────────────────────────────
+// Uploaded PDFs, each addressed to one or more access tiers. Which documents come
+// back is decided server-side from the caller's roles; `downloadUrl` is a
+// short-lived presigned GET minted per request, never a stored link.
+
+export const GET_TRAINING_RESOURCES = gql`
+    query TrainingResources {
+        trainingResources {
+            id
+            title
+            description
+            audienceRoles
+            updatedAt
+            updatedBy
+            file {
+                filename
+                contentType
+                size
+            }
+            downloadUrl
+        }
+    }
+`;
+
+/**
+ * A fresh link for one document.
+ *
+ * The URL embedded in the list response expires, and a list refetch to renew one
+ * link would re-mint every other link too. This is the audience-checked entry point
+ * server-side: an id outside the caller's audience simply returns null.
+ */
+export const GET_TRAINING_RESOURCE_DOWNLOAD_URL = gql`
+    query TrainingResourceDownloadUrl($id: ID!) {
+        trainingResourceDownloadUrl(id: $id)
+    }
+`;
+
+
+/**
+ * The Protocol Library's browse list, grouped by category.
+ *
+ * Categories come from the service catalog — protocols.io has none — so a protocol
+ * inherits the category of the service that references it. Each entry is a
+ * protocols.io round trip on the server, which is why ProtocolsService caches;
+ * `unavailable` marks an entry whose fetch failed, so one bad protocol lists as
+ * broken rather than blanking the page.
+ */
+export const GET_PROTOCOL_LIBRARY = gql`
+    query GetProtocolLibrary {
+        protocolLibrary {
+            category
+            protocols {
+                protocolId
+                title
+                stepCount
+                serviceNames
+                unavailable
+            }
         }
     }
 `;

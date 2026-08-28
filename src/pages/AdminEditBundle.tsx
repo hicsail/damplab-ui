@@ -23,6 +23,9 @@ import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { AppContext } from '../contexts/App';
 import { UPDATE_BUNDLE } from '../gql/queries';
+import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
 
 const MENU_PROPS = {
   PaperProps: {
@@ -49,6 +52,8 @@ export default function AdminEditBundle() {
   const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
 
   const availableServices = useMemo(
     () => services.map((service: any) => ({ id: String(service.id), name: String(service.name) })),
@@ -110,8 +115,9 @@ export default function AdminEditBundle() {
       });
       await refreshCatalog();
       navigate('/edit');
-    } catch (_error) {
-      setErrorMessage('Unable to update bundle. Please try again.');
+    } catch (error) {
+      console.error('Save bundle failed:', error);
+      setErrorMessage(formatSaveError(error, 'this bundle'));
     } finally {
       setIsSaving(false);
     }
@@ -125,6 +131,8 @@ export default function AdminEditBundle() {
     <Stack spacing={3} sx={{ maxWidth: 900 }}>
       <Typography variant='h2'>Edit bundle</Typography>
       {!!errorMessage && <Alert severity='error'>{errorMessage}</Alert>}
+
+      <ReadOnlyFieldset canWrite={canWrite} noun='the service catalog'>
 
       <TextField label='Bundle name' value={label} onChange={(event) => setLabel(event.target.value)} required />
       <TextField
@@ -200,14 +208,19 @@ export default function AdminEditBundle() {
         </Paper>
       </Box>
 
+      </ReadOnlyFieldset>
+
+      {/* Outside the fieldset — see ReadOnlyFieldset. */}
       <Box>
         <Stack direction='row' spacing={2}>
           <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>
-            Cancel
+            {canWrite ? 'Cancel' : 'Back to catalog'}
           </Button>
-          <Button variant='contained' onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save changes'}
-          </Button>
+          {canWrite && (
+            <Button variant='contained' onClick={handleSave} disabled={isSaving}>
+              {isSaving ? 'Saving...' : 'Save changes'}
+            </Button>
+          )}
         </Stack>
       </Box>
     </Stack>

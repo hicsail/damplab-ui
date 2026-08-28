@@ -11,18 +11,25 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
   Snackbar,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SubmittedJobsList, {
   type ArchiveFilter,
+  type JobFilterOption,
   type JobListItem,
+  type JobScope,
   STATE_OPTIONS,
 } from '../components/SubmittedJobsList';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { ALL_JOBS, JOBS_FEED_STATUS } from '../gql/queries';
+import { GET_LAB_MONITOR_STAFF_LIST, JOB_CLIENTS, JOBS_FEED_STATUS, JOBS_FOR_VIEWER } from '../gql/queries';
 import { ARCHIVE_JOB, MARK_JOBS_FEED_VIEWED, UNARCHIVE_JOB } from '../gql/mutations';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
 
 /**
  * States where lab work is genuinely under way, so archiving is worth a warning.
@@ -30,15 +37,31 @@ import { ARCHIVE_JOB, MARK_JOBS_FEED_VIEWED, UNARCHIVE_JOB } from '../gql/mutati
  */
 const ACTIVE_WORK_STATES = new Set(['IN_PROGRESS', 'QUEUED', 'ACCEPTED', 'WAITING_FOR_SOW']);
 
+/**
+ * The jobs page — one page for what `/my_jobs` and `/dashboard` used to split.
+ *
+ * The two rendered the same component and differed only in props and in which
+ * query they ran, so merging them is mostly deletion. What makes it safe is that
+ * scope is enforced by the server (`jobsForViewer`) rather than by the route: this
+ * page now sits in the baseline tier and a client reaching it gets their own jobs.
+ */
 export default function Dashboard() {
   const [markJobsFeedViewed] = useMutation(MARK_JOBS_FEED_VIEWED);
   const navigate = useNavigate();
+  const { can } = usePermissions();
+  const canViewAllJobs = can(PERMISSIONS.JobsViewAll);
+  const canArchive = can(PERMISSIONS.LabMonitorArchive);
   const [page, setPage] = React.useState(1);
   const [limit, setLimit] = React.useState(20);
   const [searchInput, setSearchInput] = React.useState('');
   const [stateFilter, setStateFilter] = React.useState<string>(STATE_OPTIONS[0]);
   const [hasSowFilter, setHasSowFilter] = React.useState<'all' | 'yes' | 'no'>('all');
   const [archiveFilter, setArchiveFilter] = React.useState<ArchiveFilter>('ACTIVE');
+  // Default scope: everything for someone who can see everything, otherwise their
+  // own. The server would force the latter anyway; this keeps the control honest.
+  const [scope, setScope] = React.useState<JobScope>(canViewAllJobs ? 'ALL' : 'CREATED_BY_ME');
+  const [createdBySub, setCreatedBySub] = React.useState('');
+  const [assigneeId, setAssigneeId] = React.useState('');
   const [lastViewedAt, setLastViewedAt] = React.useState<string | null>(null);
   const [archiveTarget, setArchiveTarget] = React.useState<JobListItem | null>(null);
   const [archiveBusy, setArchiveBusy] = React.useState(false);
@@ -54,20 +77,39 @@ export default function Dashboard() {
       sortBy: 'SUBMITTED',
       sortOrder: 'DESC',
       archiveFilter,
+      scope,
     };
     if (search.trim()) inp.search = search.trim();
     if (stateFilter) inp.state = stateFilter;
     if (hasSowFilter !== 'all') inp.hasSow = hasSowFilter === 'yes';
+    if (createdBySub) inp.createdBySub = createdBySub;
+    if (assigneeId) inp.assigneeId = assigneeId;
     return inp;
-  }, [page, limit, search, stateFilter, hasSowFilter, archiveFilter]);
+  }, [page, limit, search, stateFilter, hasSowFilter, archiveFilter, scope, createdBySub, assigneeId]);
 
-  const { data, loading, error, refetch } = useQuery(ALL_JOBS, {
+  const { data, loading, error, refetch } = useQuery(JOBS_FOR_VIEWER, {
     variables: { input },
   });
+
+  // Filter sources. Both are jobs:view-all queries, so skipped for a client —
+  // asking would 403 and put a red error on a page that is otherwise fine.
+  const { data: clientsData } = useQuery(JOB_CLIENTS, { skip: !canViewAllJobs });
+  const { data: staffData } = useQuery(GET_LAB_MONITOR_STAFF_LIST, { skip: !canViewAllJobs });
+  const clientOptions: JobFilterOption[] = useMemo(
+    () => (clientsData?.jobClients ?? []).map((c: any) => ({ id: String(c.sub), displayName: String(c.displayName) })),
+    [clientsData],
+  );
+  const technicianOptions: JobFilterOption[] = useMemo(
+    () => (staffData?.getLabMonitorStaffList ?? []).map((m: any) => ({ id: String(m.id), displayName: String(m.displayName) })),
+    [staffData],
+  );
   const [archiveJob] = useMutation(ARCHIVE_JOB);
   const [unarchiveJob] = useMutation(UNARCHIVE_JOB);
+  // The unseen-jobs badge is a jobs:view-all concept — there is no shared feed for
+  // one client's own jobs — and `markJobsFeedViewed` requires that permission too.
   const { data: feedStatusData } = useQuery(JOBS_FEED_STATUS, {
-    fetchPolicy: 'network-only'
+    fetchPolicy: 'network-only',
+    skip: !canViewAllJobs,
   });
 
   React.useEffect(() => {
@@ -80,7 +122,7 @@ export default function Dashboard() {
     });
   }, [feedStatusData, markJobsFeedViewed]);
 
-  const result = data?.allJobs;
+  const result = data?.jobsForViewer;
   const items: JobListItem[] = useMemo(() => {
     const raw = result?.items ?? [];
     return raw.map((j: Record<string, unknown>) => ({
@@ -138,8 +180,8 @@ export default function Dashboard() {
           await unarchiveJob({ variables: { jobId: job.id } });
           await refetch();
           setToast(`Restored "${job.name}".`);
-        } catch (e: any) {
-          setArchiveError(e?.graphQLErrors?.[0]?.message || e?.message || 'Could not restore the job.');
+        } catch (e) {
+          setArchiveError(formatSaveError(e, 'this restore'));
         }
         return;
       }
@@ -157,8 +199,8 @@ export default function Dashboard() {
       await refetch();
       setToast(`Archived "${archiveTarget.name}".`);
       setArchiveTarget(null);
-    } catch (e: any) {
-      setArchiveError(e?.graphQLErrors?.[0]?.message || e?.message || 'Could not archive the job.');
+    } catch (e) {
+      setArchiveError(formatSaveError(e, 'this archive'));
     } finally {
       setArchiveBusy(false);
     }
@@ -186,17 +228,38 @@ export default function Dashboard() {
       hasSowFilter={hasSowFilter}
       onHasSowFilterChange={setHasSowFilter}
       showHasSowFilter
-      getJobLink={(j) => `/technician_view/${j.id}`}
-      isStaff
-      title="Submitted Jobs"
-      subtitle="All submitted jobs. Click a job to open the technician view."
-      emptyMessage="No submitted jobs yet."
+      // `/technician_view/:id` moved to the jobs:view-all tier in the same change
+      // (matrix amendment Q8) precisely so this link is reachable by everyone who
+      // reaches this page. A client goes to their own tracking view instead.
+      getJobLink={(j) => (canViewAllJobs ? `/technician_view/${j.id}` : `/client_view/${j.id}`)}
+      canViewAllJobs={canViewAllJobs}
+      canArchive={canArchive}
+      title="Jobs"
+      subtitle={canViewAllJobs ? 'Every submitted job. Click a job to open the technician view.' : 'Jobs you have submitted. Click a job to view its status, SOW, and comments.'}
+      emptyMessage={canViewAllJobs ? 'No submitted jobs yet.' : 'You have not submitted any jobs yet. Design a workflow on the Canvas and submit it from Checkout.'}
       onBack={() => navigate('/')}
       backLabel="Back to Home"
       isJobNew={isJobNew}
       onArchiveToggle={handleArchiveToggle}
       archiveFilter={archiveFilter}
       onArchiveFilterChange={handleArchiveFilterChange}
+      scope={scope}
+      onScopeChange={(value) => {
+        setScope(value);
+        setPage(1);
+      }}
+      clientOptions={clientOptions}
+      createdBySub={createdBySub}
+      onCreatedBySubChange={(value) => {
+        setCreatedBySub(value);
+        setPage(1);
+      }}
+      technicianOptions={technicianOptions}
+      assigneeId={assigneeId}
+      onAssigneeIdChange={(value) => {
+        setAssigneeId(value);
+        setPage(1);
+      }}
     />
   );
 
@@ -209,10 +272,24 @@ export default function Dashboard() {
         spacing={2}
         sx={{ mb: 2 }}
       >
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
-          Back to Home
-        </Button>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
+            Back to Home
+          </Button>
+          {/* In the left slot on purpose. The staff shortcut stack on the right is
+              `display: none` for a client, and a client watching for their job to
+              change state is exactly who needs this most. */}
+          <Tooltip title="Refresh jobs">
+            <span>
+              <IconButton onClick={() => void refetch()} disabled={loading} aria-label="Refresh jobs">
+                <RefreshIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
+        {/* Shortcuts to staff destinations. Hidden for a client, who would only
+            be bounced by those routes' own layouts. */}
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ display: canViewAllJobs ? 'flex' : 'none' }}>
           <Button
             variant="contained"
             color="primary"
@@ -235,7 +312,7 @@ export default function Dashboard() {
             onClick={() => navigate('/customer-management')}
             sx={{ textTransform: 'none' }}
           >
-            Customer management
+            Customer Management
           </Button>
         </Stack>
       </Stack>

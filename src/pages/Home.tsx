@@ -1,32 +1,18 @@
-import { useContext } from 'react';
+import React, { useContext } from 'react';
 import { useNavigate, Navigate } from 'react-router';
-import { useApolloClient, useMutation, useQuery } from '@apollo/client';
+import { useApolloClient } from '@apollo/client';
 import { Badge, Box, Button, Chip, Stack, Typography } from '@mui/material';
 
-import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
-import ViewStreamIcon from '@mui/icons-material/ViewStream';
-import CampaignIcon from '@mui/icons-material/Campaign';
-import BugReportIcon from '@mui/icons-material/BugReport';
-import EditIcon from '@mui/icons-material/Edit';
-import WorkHistoryIcon from '@mui/icons-material/WorkHistory';
-import SchoolIcon from '@mui/icons-material/School';
-import MonitorIcon from '@mui/icons-material/Monitor';
-import PeopleIcon from '@mui/icons-material/People';
-import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturing';
-import InsightsIcon from '@mui/icons-material/Insights';
-import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
-import ScienceIcon from '@mui/icons-material/Science';
-import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import VpnKeyIcon from '@mui/icons-material/VpnKey';
-import PlaceIcon from '@mui/icons-material/Place';
 
 import { UserContext, UserContextProps, UserProps } from "../contexts/UserContext";
 import { useEffectiveUser } from "../hooks/useEffectiveUser";
+import { ViewModeContext } from "../contexts/ViewModeContext";
+import { MENU_ICONS } from "./homeMenuIcons";
+import { useHomeMenuNavigate } from "../hooks/useHomeMenuNavigate";
+import { ACCESS_TIER_LABELS } from "../constants/accessTiers";
 import AnnouncementBox from '../components/AnnouncementBox';
-import { JOBS_FEED_STATUS } from '../gql/queries';
-import { MARK_JOBS_FEED_VIEWED } from '../gql/mutations';
+import { HomeMenuItemDef, HomeMenuItemId, visibleHomeMenu } from './homeMenu';
+
 
 function MenuButton({ onClick, navigateTo, children }: any) {
   const navigate = useNavigate();
@@ -50,7 +36,13 @@ function MenuButton({ onClick, navigateTo, children }: any) {
   );
 }
 
+/**
+ * Renders nothing at all when it has no children. Sections are mixed across roles
+ * now, so an emptied section would otherwise leave a dangling orphan heading — a
+ * client staring at "Admin Management Tools" above blank space.
+ */
 function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
+  if (React.Children.count(children) === 0) return null;
   return (
     <Box sx={{ width: '100%' }}>
       <Typography variant="h6" sx={{ mb: 1 }}>
@@ -67,13 +59,10 @@ export default function Home() {
   const userContext: UserContextProps = useContext(UserContext);
   const { userProps: effectiveUserProps } = useEffectiveUser();
   const userProps: UserProps = effectiveUserProps;
-  const isStaff = Boolean(userProps?.isDamplabStaff);
-  const { data: jobsFeedData } = useQuery(JOBS_FEED_STATUS, {
-    skip: !isStaff,
-    pollInterval: 10000,
-    fetchPolicy: 'network-only'
-  });
-  const [markJobsFeedViewed] = useMutation(MARK_JOBS_FEED_VIEWED);
+  const { previewTier } = useContext(ViewModeContext);
+  // The Jobs click and its unseen badge are shared with the nav drawer, which renders
+  // the same menu. See `useHomeMenuNavigate` for why Jobs is not an ordinary link.
+  const { activate, hasUnseenJobs } = useHomeMenuNavigate();
 
   // Redirect to login if not authenticated
   if (!userProps?.isAuthenticated) {
@@ -85,16 +74,7 @@ export default function Home() {
     userContext.keycloak.logout();
   }
 
-  async function openJobsDashboard() {
-    if (isStaff) {
-      try {
-        await markJobsFeedViewed();
-      } catch {
-        // If marking viewed fails, still navigate to keep UX responsive.
-      }
-    }
-    navigate('/dashboard');
-  }
+  const menuSections = visibleHomeMenu(userProps);
 
   const appellation = (userProps?.idTokenParsed as any)?.name || (userProps?.idTokenParsed as any)?.email || "DAMPLab User";
 
@@ -132,7 +112,13 @@ export default function Home() {
         Hello, {appellation}
       </Typography>
       <Stack direction="row" spacing={1} sx={{ mb: 3 }} flexWrap="wrap" useFlexGap>
+        {/* `userProps` is the effective user, so the staff chip follows the header's
+            view-as selection. The two customer chips do not: they are the pricing
+            axis, which previewing an access tier has no business changing. */}
         {userProps.isDamplabStaff && <Chip label="DAMPLab Staff" />}
+        {/* Without this, previewing as a lower tier reads as simply having fewer
+            chips — indistinguishable from being that user for real. */}
+        {previewTier && <Chip color="warning" variant="outlined" label={`Previewing as ${ACCESS_TIER_LABELS[previewTier] ?? previewTier}`} />}
         {userProps.isInternalCustomer && <Chip label="Internal Customer" />}
         {userProps.isExternalCustomer && <Chip label="External Customer" />}
       </Stack>
@@ -149,132 +135,22 @@ export default function Home() {
         }}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, flex: '1 1 700px', minWidth: 320 }}>
-          <MenuSection title="Basics">
-            <MenuButton navigateTo="/my_jobs">
-              <WorkHistoryIcon />
-              My Jobs
-            </MenuButton>
-            <MenuButton navigateTo="/canvas">
-              <AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />
-              Canvas
-            </MenuButton>
-            <MenuButton navigateTo="/services-catalog">
-              <FormatListBulletedIcon />
-              Services Catalog
-            </MenuButton>
-            <MenuButton navigateTo="/book-inventory">
-              <EventAvailableIcon />
-              Book Inventory
-            </MenuButton>
-            <MenuButton navigateTo="/training">
-              <SchoolIcon />
-              Learning Hub
-            </MenuButton>
-            <MenuButton navigateTo="/bugs">
-              <BugReportIcon />
-              Bugs
-            </MenuButton>
-            <MenuButton navigateTo="/backlog">
-              <FormatListBulletedIcon />
-              Bug Backlog
-            </MenuButton>
-            <MenuButton onClick={() => (window.location.href = 'https://www.damplab.org/services')}>
-              <img src="/damp-white.svg" height="30px" alt="DAMP Logo" />
-              DAMPLab Site
-            </MenuButton>
-          </MenuSection>
-
-          {userProps.isDamplabStaff && (
-            <>
-              <MenuSection title="Staff: operations">
-                <MenuButton onClick={openJobsDashboard}>
-                  <Badge
-                    color="error"
-                    variant="dot"
-                    overlap="circular"
-                    invisible={!jobsFeedData?.jobsFeedStatus?.hasUnseen}
-                  >
-                    <ViewStreamIcon />
-                  </Badge>
-                  Jobs
+          {menuSections.map((section) => (
+            <MenuSection key={section.title} title={section.title}>
+              {section.items.map((item) => (
+                <MenuButton key={item.id} onClick={() => activate(item)}>
+                  {item.badge === 'jobs-feed-unseen' ? (
+                    <Badge color="error" variant="dot" overlap="circular" invisible={!hasUnseenJobs}>
+                      {MENU_ICONS[item.id]}
+                    </Badge>
+                  ) : (
+                    MENU_ICONS[item.id]
+                  )}
+                  {item.label}
                 </MenuButton>
-                <MenuButton navigateTo="/staff_submit">
-                  <SupervisorAccountOutlinedIcon />
-                  Staff submit job
-                </MenuButton>
-                <MenuButton navigateTo="/technician_bench">
-                  <ScienceIcon />
-                  My Bench
-                </MenuButton>
-              </MenuSection>
-
-              <MenuSection title="Staff: displays">
-                <MenuButton navigateTo="/lab-monitor/north">
-                  <MonitorIcon />
-                  Lab Monitor North
-                </MenuButton>
-                <MenuButton navigateTo="/lab-monitor/south">
-                  <MonitorIcon />
-                  Lab Monitor South
-                </MenuButton>
-                <MenuButton navigateTo="/lab-status-tv">
-                  <MonitorIcon />
-                  Lab Status TV
-                </MenuButton>
-                <MenuButton navigateTo="/inventory">
-                  <PrecisionManufacturingIcon />
-                  Inventory Availability
-                </MenuButton>
-                <MenuButton navigateTo="/inventory-calendar">
-                  <EventAvailableIcon />
-                  Inventory Schedule
-                </MenuButton>
-                <MenuButton navigateTo="/usage-billing">
-                  <ReceiptLongIcon />
-                  Usage Billing
-                </MenuButton>
-                <MenuButton navigateTo="/lab-assistant">
-                  <InsightsIcon />
-                  Lab Status Assistant
-                </MenuButton>
-              </MenuSection>
-
-              <MenuSection title="Admin tools">
-                <MenuButton navigateTo="/edit">
-                  <EditIcon />
-                  Catalog Editor
-                </MenuButton>
-                <MenuButton navigateTo="/customer-management">
-                  <PeopleIcon />
-                  Customer Management
-                </MenuButton>
-                <MenuButton navigateTo="/protocol-map">
-                  <AccountTreeIcon />
-                  Protocol Map
-                </MenuButton>
-                <MenuButton navigateTo="/stations">
-                  <PlaceIcon />
-                  Lab Stations
-                </MenuButton>
-                <MenuButton navigateTo="/api-keys">
-                  <VpnKeyIcon />
-                  API Keys
-                </MenuButton>
-                <MenuButton navigateTo="/edit_announcements">
-                  <CampaignIcon />
-                  Announcements
-                </MenuButton>
-                <MenuButton navigateTo="/release_notes">
-                  <FormatListBulletedIcon />
-                  Release Notes
-                </MenuButton>
-                <MenuButton navigateTo="/data_translation">
-                  <EditIcon />
-                  Data Translation
-                </MenuButton>
-              </MenuSection>
-            </>
-          )}
+              ))}
+            </MenuSection>
+          ))}
         </Box>
         <AnnouncementBox />
       </Box>

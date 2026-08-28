@@ -26,6 +26,8 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AddIcon from '@mui/icons-material/Add';
 import { GET_STATIONS, CREATE_STATION, UPDATE_STATION, DELETE_STATION } from '../gql/queries';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
 
 interface StationForm {
   id?: string;
@@ -55,6 +57,9 @@ export default function Stations() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<StationForm>(EMPTY);
   const [err, setErr] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.LabLayoutWrite);
 
   const stations: any[] = data?.stations ?? [];
   const saving = creating || updating;
@@ -97,7 +102,7 @@ export default function Stations() {
       setOpen(false);
       await refetch();
     } catch (e: any) {
-      setErr(e?.graphQLErrors?.[0]?.message || e?.message || 'Could not save the station.');
+      setErr(formatSaveError(e, 'this station'));
     }
   };
 
@@ -115,8 +120,15 @@ export default function Stations() {
       ? `\n\n${count} equipment item(s) are placed here. This station will be dropped from their placements, and protocol resolution will only point at their remaining stations.`
       : '';
     if (!window.confirm(`Delete station "${s.name}"?${warn}`)) return;
-    await deleteStation({ variables: { id: s.id } });
-    await refetch();
+    // Previously had no try/catch: a refusal was an unhandled rejection and the
+    // row just stayed on screen with nothing said.
+    try {
+      await deleteStation({ variables: { id: s.id } });
+      await refetch();
+    } catch (e) {
+      console.error('Delete station failed:', e);
+      setDeleteError(formatSaveError(e, 'this station'));
+    }
   };
 
   return (
@@ -124,9 +136,9 @@ export default function Stations() {
       <Stack direction='row' spacing={2} alignItems='center' justifyContent='space-between'>
         <Stack direction='row' spacing={1.5} alignItems='center'>
           <PlaceIcon color='primary' />
-          <Typography variant='h2'>Lab Stations</Typography>
+          <Typography variant='h2'>Lab Layout</Typography>
         </Stack>
-        <Button variant='contained' startIcon={<AddIcon />} onClick={openCreate}>New station</Button>
+        {canWrite && <Button variant='contained' startIcon={<AddIcon />} onClick={openCreate}>New station</Button>}
       </Stack>
 
       <Typography variant='body1' color='text.secondary'>
@@ -136,6 +148,13 @@ export default function Stations() {
       </Typography>
 
       {error && <Alert severity='error'>{error.message}</Alert>}
+      {deleteError && <Alert severity='error' onClose={() => setDeleteError(null)}>{deleteError}</Alert>}
+      {!canWrite && (
+        <Alert severity='info'>
+          You have read-only access to the lab layout. Stations are shown for reference; adding,
+          editing and deleting them is restricted.
+        </Alert>
+      )}
 
       <Paper variant='outlined'>
         <Table size='small'>
@@ -147,7 +166,7 @@ export default function Stations() {
               <TableCell align='right'>Capacity</TableCell>
               <TableCell align='right'>X, Y</TableCell>
               <TableCell>Equipment</TableCell>
-              <TableCell align='right'>Actions</TableCell>
+              {canWrite && <TableCell align='right'>Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -169,24 +188,26 @@ export default function Stations() {
                       </Stack>
                     )}
                 </TableCell>
-                <TableCell align='right'>
-                  <Tooltip title='Edit'>
-                    <IconButton size='small' onClick={() => openEdit(s)}><EditIcon fontSize='small' /></IconButton>
-                  </Tooltip>
-                  <Tooltip title='Delete'>
-                    <IconButton size='small' onClick={() => handleDelete(s)}><DeleteOutlineIcon fontSize='small' /></IconButton>
-                  </Tooltip>
-                </TableCell>
+                {canWrite && (
+                  <TableCell align='right'>
+                    <Tooltip title='Edit'>
+                      <IconButton size='small' onClick={() => openEdit(s)}><EditIcon fontSize='small' /></IconButton>
+                    </Tooltip>
+                    <Tooltip title='Delete'>
+                      <IconButton size='small' onClick={() => handleDelete(s)}><DeleteOutlineIcon fontSize='small' /></IconButton>
+                    </Tooltip>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
             {!loading && stations.length === 0 && (
-              <TableRow><TableCell colSpan={7}><Typography color='text.secondary'>No stations yet. Add one to get started.</Typography></TableCell></TableRow>
+              <TableRow><TableCell colSpan={canWrite ? 7 : 6}><Typography color='text.secondary'>No stations yet. Add one to get started.</Typography></TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </Paper>
 
-      <Dialog open={open} onClose={() => setOpen(false)} fullWidth maxWidth='sm'>
+      <Dialog open={open && canWrite} onClose={() => setOpen(false)} fullWidth maxWidth='sm'>
         <DialogTitle>{form.id ? 'Edit station' : 'New station'}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>

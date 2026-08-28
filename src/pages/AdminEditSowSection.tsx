@@ -29,6 +29,8 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from '@dnd-kit/utilities';
 import { GET_SOW_PRESET_SECTIONS, GET_SOW_TEXT_PRESETS } from '../gql/queries';
 import { CREATE_SOW_TEXT_PRESET, DELETE_SOW_TEXT_PRESET, REORDER_SOW_TEXT_PRESETS, UPDATE_SOW_TEXT_PRESET } from '../gql/mutations';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
 
 /**
  * One prose section's library of text blocks.
@@ -69,9 +71,11 @@ interface BlockCardProps {
   busy: boolean;
   onSave: (id: string, changes: { name: string; text: string }) => Promise<void>;
   onDelete: (preset: SowTextPreset) => void;
+  /** Passed down rather than resolved here — see GridToolBarProps.canWrite. */
+  canWrite: boolean;
 }
 
-function BlockCard({ preset, isDefault, busy, onSave, onDelete }: BlockCardProps): React.JSX.Element {
+function BlockCard({ preset, isDefault, busy, onSave, onDelete, canWrite }: BlockCardProps): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: preset.id, disabled: busy });
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(preset.name);
@@ -140,7 +144,7 @@ function BlockCard({ preset, isDefault, busy, onSave, onDelete }: BlockCardProps
           </Typography>
         </Box>
 
-        {editing ? (
+        {!canWrite ? null : editing ? (
           <Tooltip title="Save this block">
             <span>
               <IconButton size="small" color="primary" disabled={busy} aria-label={`Save ${preset.name}`} onClick={() => void save()}>
@@ -158,13 +162,15 @@ function BlockCard({ preset, isDefault, busy, onSave, onDelete }: BlockCardProps
           </Tooltip>
         )}
 
-        <Tooltip title="Delete this block">
-          <span>
-            <IconButton size="small" disabled={busy} aria-label={`Delete ${preset.name}`} onClick={() => onDelete(preset)}>
-              <DeleteOutlineIcon fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
+        {canWrite && (
+          <Tooltip title="Delete this block">
+            <span>
+              <IconButton size="small" disabled={busy} aria-label={`Delete ${preset.name}`} onClick={() => onDelete(preset)}>
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
       </Box>
 
       <Box sx={{ mt: 1.5, pl: 4 }}>
@@ -196,6 +202,8 @@ export default function AdminEditSowSection(): React.JSX.Element {
 
   const [presets, setPresets] = useState<SowTextPreset[]>([]);
   const [busy, setBusy] = useState(false);
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<SowTextPreset | null>(null);
 
@@ -219,7 +227,8 @@ export default function AdminEditSowSection(): React.JSX.Element {
         await work();
         await refetch();
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Something went wrong. Your change was not saved.');
+        console.error('SOW section edit failed:', e);
+        setError(formatSaveError(e, 'this text block'));
         await refetch();
       } finally {
         setBusy(false);
@@ -272,6 +281,12 @@ export default function AdminEditSowSection(): React.JSX.Element {
       </Box>
 
       {error && <Alert severity="error">{error}</Alert>}
+      {!canWrite && (
+        <Alert severity="info">
+          You have read-only access to the service catalog. These text blocks are shown for
+          reference and cannot be edited.
+        </Alert>
+      )}
 
       {loading && presets.length === 0 ? (
         <CircularProgress />
@@ -283,17 +298,19 @@ export default function AdminEditSowSection(): React.JSX.Element {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={presets.map((p) => p.id)} strategy={verticalListSortingStrategy}>
             {presets.map((preset, i) => (
-              <BlockCard key={preset.id} preset={preset} isDefault={i === 0} busy={busy} onSave={handleSave} onDelete={setPendingDelete} />
+              <BlockCard key={preset.id} preset={preset} isDefault={i === 0} busy={busy} onSave={handleSave} onDelete={setPendingDelete} canWrite={canWrite} />
             ))}
           </SortableContext>
         </DndContext>
       )}
 
-      <Box>
-        <Button startIcon={<AddIcon />} disabled={busy} onClick={handleCreate}>
-          New text block preset
-        </Button>
-      </Box>
+      {canWrite && (
+        <Box>
+          <Button startIcon={<AddIcon />} disabled={busy} onClick={handleCreate}>
+            New text block preset
+          </Button>
+        </Box>
+      )}
 
       <Dialog open={!!pendingDelete} onClose={() => setPendingDelete(null)}>
         <DialogTitle>Delete “{pendingDelete?.name}”?</DialogTitle>

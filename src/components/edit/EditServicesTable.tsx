@@ -19,6 +19,8 @@ import { GridToolBar } from './GridToolBar';
 import { processCSVFile, processExcelFile, validateFileType } from '../data-translation/utils';
 import { useNavigate } from 'react-router';
 import { idFromName } from '../../utils/idFromName';
+import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
+import { formatSaveError } from '../../utils/gqlError';
 
 type ServiceRow = Record<string, unknown> & { id: GridRowId };
 
@@ -45,6 +47,8 @@ export interface EditServicesTableProps {
 
 export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchString = '' }) => {
   const navigate = useNavigate();
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const { services, refreshCatalog } = useContext(AppContext);
   const client = useApolloClient();
@@ -79,13 +83,20 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   }, [rows, searchString]);
 
   const handleDeletion = async (id: GridRowId) => {
-    await client.mutate({
-      mutation: DELETE_SERVICE,
-      variables: {
-        service: id
-      }
-    });
-    await refreshCatalog();
+    // Previously had no try/catch at all, so a refusal surfaced as an unhandled
+    // rejection and the row simply stayed put with no explanation.
+    try {
+      await client.mutate({
+        mutation: DELETE_SERVICE,
+        variables: {
+          service: id
+        }
+      });
+      await refreshCatalog();
+    } catch (error) {
+      console.error('Delete service failed:', error);
+      setErrorMessage(formatSaveError(error, 'this service'));
+    }
   };
 
   const handleDownloadPricingSheet = () => {
@@ -457,29 +468,35 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   };
 
   const columns: GridColDef[] = [
-    {
-      field: 'actions',
-      type: 'actions',
-      headerName: 'Actions',
-      width: 100,
-      cellClassName: 'actions',
-      getActions: ({ id }) => [
-        <GridActionsCellItem
-          key="edit"
-          icon={<Edit />}
-          label="Edit"
-          onClick={() => navigate(`/edit/services/${id}`)}
-          color="inherit"
-        />,
-        <GridActionsCellItem
-          key="delete"
-          icon={<Delete />}
-          label="Delete"
-          onClick={() => handleDeletion(id)}
-          color="inherit"
-        />
-      ]
-    },
+    // Read tier keeps the table; it just loses the Actions column rather than
+    // getting an Edit that opens a form it cannot save and a Delete that 403s.
+    ...(canWrite
+      ? [
+          {
+            field: 'actions',
+            type: 'actions',
+            headerName: 'Actions',
+            width: 100,
+            cellClassName: 'actions',
+            getActions: ({ id }: { id: GridRowId }) => [
+              <GridActionsCellItem
+                key="edit"
+                icon={<Edit />}
+                label="Edit"
+                onClick={() => navigate(`/edit/services/${id}`)}
+                color="inherit"
+              />,
+              <GridActionsCellItem
+                key="delete"
+                icon={<Delete />}
+                label="Delete"
+                onClick={() => handleDeletion(id)}
+                color="inherit"
+              />
+            ]
+          } as GridColDef
+        ]
+      : []),
     {
       field: 'name',
       headerName: 'Name',
@@ -564,19 +581,25 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
     <>
       <Stack spacing={2}>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          {/* Download is a read of data already on screen; upload is a bulk
+              create/update, so only that half is gated. */}
           <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadPricingSheet}>
             Download pricing sheet
           </Button>
-          <Button variant="contained" startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>
-            Upload pricing sheet
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            style={{ display: 'none' }}
-            onChange={handleUploadPricingSheet}
-          />
+          {canWrite && (
+            <>
+              <Button variant="contained" startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>
+                Upload pricing sheet
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={handleUploadPricingSheet}
+              />
+            </>
+          )}
         </Box>
         <DataGrid
           rows={filteredRows}
@@ -586,6 +609,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
           }}
           slotProps={{
             toolbar: {
+              canWrite,
               setRowModesModel,
               addButtonLabel: 'Add new service',
               onAdd: () => navigate('/edit/services/new'),

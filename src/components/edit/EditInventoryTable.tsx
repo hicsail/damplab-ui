@@ -5,11 +5,12 @@ import { Delete, Edit } from '@mui/icons-material';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import HistoryIcon from '@mui/icons-material/History';
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { UserContext } from '../../contexts/UserContext';
 import { GridToolBar } from './GridToolBar';
 import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS, GET_STATIONS } from '../../gql/queries';
+import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
+import { formatSaveError } from '../../utils/gqlError';
 import { validateFileType } from '../data-translation/utils';
 import { parseInventoryFile, ParsedInventoryRow, UploadSummary } from './inventoryUploadUtils';
 import { InventoryUploadPreview } from './InventoryUploadPreview';
@@ -22,8 +23,14 @@ export interface EditInventoryTableProps {
 export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchString = '' }) => {
   const navigate = useNavigate();
   const client = useApolloClient();
-  const { userProps } = useContext(UserContext);
-  const isStaff = !!userProps?.isDamplabStaff;
+  // Was `isDamplabStaff` on main. Two permissions rather than one boolean, because
+  // the two things it gated are different questions: `inventory:write` decides
+  // whether you may change anything, `internal-fields:read` whether you may see the
+  // internal columns. A technician holds the second and not the first, and would
+  // otherwise lose columns the server is perfectly willing to send them.
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.InventoryWrite);
+  const canSeeInternalFields = can(PERMISSIONS.InternalFieldsRead);
   // The inventory list isn't on AppContext yet (unlike services/bundles), so we
   // query directly and refetch after mutations. If the catalog grows enough
   // that this gets called a lot, lift to AppContext.
@@ -60,8 +67,11 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     try {
       await client.mutate({ mutation: DELETE_INVENTORY_ITEM, variables: { item: id } });
       await refetch();
-    } catch (_error) {
-      setErrorMessage('Unable to delete inventory item. Please try again.');
+    } catch (error) {
+      // "Please try again" is wrong for a 403 — retrying never works. Show what
+      // the server actually said.
+      console.error('Delete inventory item failed:', error);
+      setErrorMessage(formatSaveError(error, 'this inventory item'));
     }
   };
 
@@ -239,12 +249,22 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     lastModifiedBy: false
   };
 
-  const STAFF_ONLY_FIELDS = new Set(['actions', 'uniqueId', 'serialNumber']);
-  const columns = isStaff ? allColumns : allColumns.filter((col) => !STAFF_ONLY_FIELDS.has(col.field));
+  /** Row actions are a write affordance; the read tier keeps the table without them. */
+  const WRITE_ONLY_FIELDS = new Set(['actions']);
+  /**
+   * Internal columns. The server already nulls `serialNumber` for anyone without
+   * `internal-fields:read`, so leaving the column in would render a permanently
+   * empty strip — hiding it is presentation catching up with what enforcement
+   * already decided. `uniqueId` rides along as the other internal identifier.
+   */
+  const INTERNAL_FIELDS = new Set(['uniqueId', 'serialNumber']);
+  const columns = allColumns.filter(
+    (col) => (canWrite || !WRITE_ONLY_FIELDS.has(col.field)) && (canSeeInternalFields || !INTERNAL_FIELDS.has(col.field))
+  );
 
   return (
     <Stack spacing={1}>
-      {isStaff && (
+      {canWrite && (
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           <Button variant='outlined' startIcon={<DownloadIcon />} onClick={handleDownloadInventory}>
             Download inventory
@@ -276,8 +296,10 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         slots={{ toolbar: GridToolBar as GridSlots['toolbar'] }}
         slotProps={{
           toolbar: {
+            canWrite,
             setRowModesModel,
-            ...(isStaff ? { addButtonLabel: 'Add new inventory item', onAdd: () => navigate('/edit/inventory/new') } : {}),
+            addButtonLabel: 'Add new inventory item',
+            onAdd: () => navigate('/edit/inventory/new'),
             showEditModeHint: false
           }
         }}

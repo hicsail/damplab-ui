@@ -17,6 +17,9 @@ import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
+import { Alert, Snackbar, Stack } from '@mui/material';
+import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
+import { formatSaveError } from '../../utils/gqlError';
 
 
 export interface EditCategoriesTableProps {
@@ -29,6 +32,9 @@ export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ search
   const { services } = useContext(AppContext);
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const client = useApolloClient();
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.CatalogEditorWrite);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (data) {
@@ -56,18 +62,22 @@ export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ search
   }, [rows, searchString]);
 
   const handleDeletion = async (id: GridRowId) => {
-    await client.mutate({
-      mutation: DELETE_CATEGORY,
-      variables: {
-        category: id
-      }
-    });
-    refetch();
+    // Previously had no try/catch, so a refusal was an unhandled rejection.
+    try {
+      await client.mutate({
+        mutation: DELETE_CATEGORY,
+        variables: {
+          category: id
+        }
+      });
+      refetch();
+    } catch (error) {
+      console.error('Delete category failed:', error);
+      setErrorMessage(formatSaveError(error, 'this category'));
+    }
   };
 
   const handleSave = async (id: GridRowId) => {
-    console.log(rowModesModel);
-    console.log(id);
     setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
   };
 
@@ -125,13 +135,13 @@ export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ search
     {
       field: 'label',
       width: 500,
-      editable: true
+      editable: canWrite
     },
     {
       field: 'services',
       headerName: 'Services',
       width: 500,
-      editable: true,
+      editable: canWrite,
       renderCell: (params) => <ServiceList services={params.row.services} />,
       renderEditCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} {...params} />
     },
@@ -143,26 +153,44 @@ export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ search
         [id]: { mode: GridRowModes.View, ignoreModifications: true }
       }),
       handleSave: (id) => handleSave(id),
-      rowModesModel
+      rowModesModel,
+      canWrite
     })
   ];
 
   return (
-    <DataGrid
-      rows={filteredRows}
-      columns={columns}
-      rowModesModel={rowModesModel}
-      onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
-      onRowEditStop={handleRowEditStop}
-      onProcessRowUpdateError={(error) => console.log(error)}
-      editMode="row"
-      processRowUpdate={processRowUpdate}
-      slots={{
-        toolbar: GridToolBar as GridSlots['toolbar']
-      }}
-      slotProps={{
-        toolbar: { setRowModesModel, setRows },
-      }}
-    />
+    <Stack spacing={1}>
+      <DataGrid
+        rows={filteredRows}
+        columns={columns}
+        rowModesModel={rowModesModel}
+        onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
+        onRowEditStop={handleRowEditStop}
+        // A rejected processRowUpdate makes MUI revert the row. This used to only
+        // console.log, so a refused save looked like the edit silently undid itself.
+        onProcessRowUpdateError={(error) => {
+          console.error('Save category failed:', error);
+          setErrorMessage(formatSaveError(error, 'this category'));
+        }}
+        editMode="row"
+        processRowUpdate={processRowUpdate}
+        slots={{
+          toolbar: GridToolBar as GridSlots['toolbar']
+        }}
+        slotProps={{
+          toolbar: { canWrite, setRowModesModel, setRows },
+        }}
+      />
+      <Snackbar
+        open={!!errorMessage}
+        autoHideDuration={6000}
+        onClose={() => setErrorMessage(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setErrorMessage(null)} severity="error" sx={{ width: '100%' }}>
+          {errorMessage}
+        </Alert>
+      </Snackbar>
+    </Stack>
   );
 };

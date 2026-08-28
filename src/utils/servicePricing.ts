@@ -19,11 +19,8 @@ export const resolveParameterName = (entry: any, paramDef?: any): string | undef
   entry?.name ||
   paramDef?.name ||
   (entry?.id === RUN_COUNT_PARAM_ID ? RUN_COUNT_PARAM_NAME : undefined);
-export type CustomerCategory =
-  | 'INTERNAL_CUSTOMERS'
-  | 'EXTERNAL_CUSTOMER_ACADEMIC'
-  | 'EXTERNAL_CUSTOMER_MARKET'
-  | 'EXTERNAL_CUSTOMER_NO_SALARY';
+import type { CustomerCategory } from './customerCategory';
+export type { CustomerCategory };
 
 interface ServiceParameterOption {
   id?: unknown;

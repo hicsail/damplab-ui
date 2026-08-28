@@ -1,12 +1,9 @@
-import { ApolloError, useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
-  Checkbox,
   FormControl,
-  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
@@ -23,13 +20,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CREATE_INVENTORY_ITEM, GET_STATIONS } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
-
-const SUGGESTED_TYPES = ['EQUIPMENT', 'HOOD', 'STORAGE', 'CONSUMABLE'];
-
-const TAG_SUGGESTIONS = [
-  'Analytical Equipment', 'CLIA Equipment', 'Centrifuge', 'Cold Storage',
-  'General Equipment', 'Imaging', 'Incubator', 'Liquid Handler', 'Sequencer', 'Vortexer'
-];
+import { formatSaveError } from '../utils/gqlError';
+import { RequirePermissionOrRedirect } from '../components/PermissionGate';
+import { PERMISSIONS } from '../hooks/usePermissions';
+import {
+  DEFAULT_INVENTORY_TYPE,
+  EMPTY_INVENTORY_DETAILS,
+  InventoryTypePicker,
+  InventoryDetailFields,
+  InventoryDetails,
+  inventoryDetailsToInput
+} from '../components/edit/InventoryDetailFields';
 
 /** One editable row of the placement editor: where the item lives and how many are there. */
 interface PlacementRow {
@@ -42,25 +43,11 @@ const parsePlacementQuantity = (raw: string): number => {
   return Number.isFinite(n) && n > 0 ? n : 1;
 };
 
-function formatGqlError(error: unknown): string {
-  const fallback = 'Unable to save inventory item. Please try again.';
-  if (error instanceof ApolloError) {
-    const gqlMessage = error.graphQLErrors?.[0]?.message;
-    if (gqlMessage) return `Save failed: ${gqlMessage}`;
-    if (error.networkError) {
-      const ne = error.networkError as { statusCode?: number; message?: string };
-      return `Network error${ne.statusCode ? ` (HTTP ${ne.statusCode})` : ''}: ${ne.message ?? 'request failed'}`;
-    }
-    return error.message ? `Save failed: ${error.message}` : fallback;
-  }
-  return fallback;
-}
-
-export default function AdminNewInventoryItem() {
+function AdminNewInventoryItemForm() {
   const navigate = useNavigate();
   const client = useApolloClient();
   const [name, setName] = useState('');
-  const [type, setType] = useState('EQUIPMENT');
+  const [type, setType] = useState(DEFAULT_INVENTORY_TYPE);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [placements, setPlacements] = useState<PlacementRow[]>([]);
@@ -69,14 +56,7 @@ export default function AdminNewInventoryItem() {
   const [bookable, setBookable] = useState(false);
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
-  const [tags, setTags] = useState<string[]>([]);
-  const [modelNumber, setModelNumber] = useState('');
-  const [serialNumber, setSerialNumber] = useState('');
-  const [hasServiceContract, setHasServiceContract] = useState(false);
-  const [serviceContractExpiration, setServiceContractExpiration] = useState('');
-  const [dimL, setDimL] = useState('');
-  const [dimW, setDimW] = useState('');
-  const [dimH, setDimH] = useState('');
+  const [details, setDetails] = useState<InventoryDetails>(EMPTY_INVENTORY_DETAILS);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -119,21 +99,14 @@ export default function AdminNewInventoryItem() {
             bookable,
             rateType: bookable ? rateType : undefined,
             pricing: bookable ? ratePricingToInput(pricing) : undefined,
-            tags,
-            modelNumber: modelNumber.trim() || undefined,
-            serialNumber: serialNumber.trim() || undefined,
-            hasServiceContract,
-            serviceContractExpiration: serviceContractExpiration || undefined,
-            dimensionL: dimL ? { value: Number(dimL), unit: 'm' } : undefined,
-            dimensionW: dimW ? { value: Number(dimW), unit: 'm' } : undefined,
-            dimensionH: dimH ? { value: Number(dimH), unit: 'm' } : undefined
+            ...inventoryDetailsToInput(details)
           }
         }
       });
       navigate('/edit');
     } catch (error) {
       console.error('Create inventory item failed:', error);
-      setErrorMessage(formatGqlError(error));
+      setErrorMessage(formatSaveError(error, 'this inventory item'));
     } finally {
       setIsSaving(false);
     }
@@ -163,14 +136,7 @@ export default function AdminNewInventoryItem() {
       />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <Autocomplete
-          freeSolo
-          options={SUGGESTED_TYPES}
-          value={type}
-          onChange={(_, newVal) => setType(typeof newVal === 'string' ? newVal : '')}
-          onInputChange={(_, newVal) => setType(newVal)}
-          renderInput={(params) => <TextField {...params} label='Type' />}
-        />
+        <InventoryTypePicker value={type} onChange={setType} />
         <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} placeholder='Bench A, room 304…' />
       </Box>
 
@@ -250,46 +216,8 @@ export default function AdminNewInventoryItem() {
         placeholder='Model, capabilities, notes…'
       />
 
-      <Autocomplete
-        multiple
-        freeSolo
-        options={TAG_SUGGESTIONS}
-        value={tags}
-        onChange={(_, newValue) => setTags(newValue)}
-        renderInput={(params) => <TextField {...params} label='Tags' placeholder='Add a tag…' />}
-      />
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <TextField label='Model #' value={modelNumber} onChange={(e) => setModelNumber(e.target.value)} placeholder='e.g. ND-2000C' />
-        <TextField label='Serial #' value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder='Internal tracking only' />
-      </Box>
-
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <FormControlLabel
-          control={<Checkbox checked={hasServiceContract} onChange={(e) => setHasServiceContract(e.target.checked)} />}
-          label='Has service contract'
-        />
-        {hasServiceContract && (
-          <TextField
-            label='Contract expiration'
-            type='date'
-            size='small'
-            value={serviceContractExpiration}
-            onChange={(e) => setServiceContractExpiration(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ width: 200 }}
-          />
-        )}
-      </Box>
-
-      <Box>
-        <Typography variant='subtitle1' sx={{ mb: 1 }}>Dimensions (m)</Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
-          <TextField label='L' type='number' value={dimL} onChange={(e) => setDimL(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
-          <TextField label='W' type='number' value={dimW} onChange={(e) => setDimW(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
-          <TextField label='H' type='number' value={dimH} onChange={(e) => setDimH(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
-        </Box>
-      </Box>
+      {/* Tags, model/serial, service contract and dimensions all live in
+          <InventoryDetailFields /> below — the same editor both forms share. */}
 
       <InventoryRateFields
         bookable={bookable}
@@ -301,6 +229,8 @@ export default function AdminNewInventoryItem() {
         itemType={type}
       />
 
+      <InventoryDetailFields details={details} setDetails={setDetails} />
+
       <Stack direction='row' spacing={2}>
         <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>Cancel</Button>
         <Button variant='contained' onClick={handleSave} disabled={isSaving}>
@@ -308,5 +238,18 @@ export default function AdminNewInventoryItem() {
         </Button>
       </Stack>
     </Stack>
+  );
+}
+
+/**
+ * A creation page has nothing to render read-only — it is an empty form whose only
+ * purpose is a mutation. So this bounces rather than disabling. The Add button that
+ * leads here is already hidden; this is what a typed URL hits.
+ */
+export default function AdminNewInventoryItem() {
+  return (
+    <RequirePermissionOrRedirect permission={PERMISSIONS.InventoryWrite}>
+      <AdminNewInventoryItemForm />
+    </RequirePermissionOrRedirect>
   );
 }

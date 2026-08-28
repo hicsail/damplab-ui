@@ -97,7 +97,7 @@ export default function UsageBilling() {
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
         <ReceiptLongIcon color="primary" />
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>Usage billing</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>Billing</Typography>
           <Typography variant="body2" color="text.secondary">
             Pick a user, select their confirmed inventory usage, and generate a SOW + invoice. Only confirmed, unbilled usage appears here.
           </Typography>

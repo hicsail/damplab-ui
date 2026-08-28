@@ -29,8 +29,11 @@ import {
   GET_STATIONS,
   RESOLVE_PROTOCOL,
   GET_PROTOCOL_STEP_MAPPINGS,
+  GET_PROTOCOL_LIBRARY,
   UPSERT_PROTOCOL_STEP_MAPPING
 } from '../gql/queries';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 
 interface ParamTag { label: string; value: string; }
 interface EditState {
@@ -60,6 +63,17 @@ export default function ProtocolMap() {
   const [activeId, setActiveId] = useState(searchParams.get('protocolId') ?? '');
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [banner, setBanner] = useState<string | null>(null);
+  // The matrix gives technicians protocol-library:write, unlike the catalog and the
+  // lab layout — so this is the one editor where the read and write tiers differ
+  // from the usual "Administrator writes, Technician reads".
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.ProtocolLibraryWrite);
+
+  const { data: libraryData, loading: libraryLoading, error: libraryErr } = useQuery(GET_PROTOCOL_LIBRARY, { fetchPolicy: 'cache-and-network' });
+  const library: any[] = libraryData?.protocolLibrary ?? [];
+  // Collapsed once a protocol is open, so the step editor is not pushed off screen
+  // by a long list. Deep links (?protocolId=…) therefore land straight on the steps.
+  const [libraryOpen, setLibraryOpen] = useState(!searchParams.get('protocolId'));
 
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
   const { data: stationData } = useQuery(GET_STATIONS, { fetchPolicy: 'cache-and-network' });
@@ -99,6 +113,9 @@ export default function ProtocolMap() {
     setActiveId(pid);
     setSearchParams({ protocolId: pid });
     setBanner(null);
+    // Collapse the browse list so the step editor is not pushed off screen behind
+    // it. Reopening is one click, and the ?protocolId= deep link keeps working.
+    setLibraryOpen(false);
     loadResolve({ variables: { protocolId: pid } });
     loadMappings({ variables: { protocolId: pid } });
   };
@@ -172,19 +189,84 @@ export default function ProtocolMap() {
     <Stack spacing={3} sx={{ maxWidth: 1000 }}>
       <Stack direction='row' spacing={1.5} alignItems='center'>
         <AccountTreeIcon color='primary' />
-        <Typography variant='h2'>Protocol Step Map</Typography>
+        <Typography variant='h2'>Protocol Library</Typography>
       </Stack>
       <Typography variant='body1' color='text.secondary'>
-        Map each protocols.io step to the equipment it requires. A piece of equipment can live at
-        several stations at once — its placements are managed in the inventory editor and shown
-        here for reference. Only references are stored — protocol content is always fetched live
-        from protocols.io.
+        Every protocol the service catalog references, grouped by the category of the service that
+        uses it. Open one to map its steps to the equipment they require. Only references are
+        stored — protocol content is always fetched live from protocols.io.
       </Typography>
+
+      {/*
+        The library replaces a bare "type an id and press Load" box, which was the
+        actual problem with this page: you had to already know the identifier of the
+        thing you wanted. The manual box survives underneath it, because a protocol
+        no service references yet cannot be reached any other way.
+      */}
+      <Paper variant='outlined' sx={{ p: 2 }}>
+        <Stack direction='row' spacing={1.5} alignItems='center' sx={{ mb: libraryOpen ? 2 : 0 }}>
+          <Typography variant='h6' sx={{ flex: 1 }}>Browse</Typography>
+          {libraryLoading && <CircularProgress size={20} />}
+          <Button size='small' onClick={() => setLibraryOpen((open) => !open)}>
+            {libraryOpen ? 'Hide' : 'Show'}
+          </Button>
+        </Stack>
+
+        {libraryOpen && (
+          <>
+            {libraryErr && <Alert severity='error' sx={{ mb: 2 }}>Could not load the library: {libraryErr.message}</Alert>}
+            {!libraryLoading && library.length === 0 && (
+              <Typography variant='body2' color='text.secondary'>
+                No service in the catalog references a protocol yet. Add protocol IDs on a service in
+                the Catalog &amp; Inventory Editor, or load one by ID below.
+              </Typography>
+            )}
+            <Stack spacing={2}>
+              {library.map((group: any) => (
+                <Box key={group.category}>
+                  <Typography variant='subtitle2' color='text.secondary' sx={{ mb: 0.5 }}>
+                    {group.category}
+                  </Typography>
+                  <Stack spacing={0.5}>
+                    {group.protocols.map((entry: any) => (
+                      <Paper
+                        key={entry.protocolId}
+                        variant='outlined'
+                        onClick={() => { setInput(entry.protocolId); load(entry.protocolId); }}
+                        sx={{
+                          p: 1.25,
+                          cursor: 'pointer',
+                          borderColor: entry.protocolId === activeId ? 'primary.main' : 'divider',
+                          '&:hover': { borderColor: 'primary.main' }
+                        }}
+                      >
+                        <Stack direction='row' spacing={1} alignItems='center' flexWrap='wrap' useFlexGap>
+                          <Typography variant='body2' sx={{ fontWeight: 600, flex: 1, minWidth: 160 }}>
+                            {entry.title}
+                          </Typography>
+                          {entry.unavailable ? (
+                            <Chip size='small' color='warning' label='Unavailable' />
+                          ) : (
+                            <Chip size='small' variant='outlined' label={`${entry.stepCount ?? 0} steps`} />
+                          )}
+                        </Stack>
+                        <Typography variant='caption' color='text.secondary'>
+                          {entry.serviceNames.join(', ')}
+                        </Typography>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          </>
+        )}
+      </Paper>
 
       <Paper variant='outlined' sx={{ p: 2 }}>
         <Stack direction='row' spacing={2} alignItems='center'>
           <TextField
-            label='protocols.io ID or slug'
+            label='Or load by protocols.io ID or slug'
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') load(input); }}
@@ -199,6 +281,12 @@ export default function ProtocolMap() {
       </Paper>
 
       {banner && <Alert severity='info' onClose={() => setBanner(null)}>{banner}</Alert>}
+      {!canWrite && (
+        <Alert severity='info'>
+          You have read-only access to the protocol library. Step mappings are shown for
+          reference and cannot be saved.
+        </Alert>
+      )}
       {resolveErr && <Alert severity='error'>{resolveErr.message}</Alert>}
       {resolving && <CircularProgress size={28} />}
 
@@ -239,6 +327,8 @@ export default function ProtocolMap() {
                       {step.issues.map((iss: string, i: number) => <div key={i}>{iss}</div>)}
                     </Alert>
                   )}
+
+                  <ReadOnlyFieldset canWrite={canWrite} noun='the protocol library' hideBanner>
 
                   <Autocomplete
                     multiple
@@ -305,11 +395,16 @@ export default function ProtocolMap() {
                     </Button>
                   </Stack>
 
-                  <Stack direction='row' justifyContent='flex-end'>
-                    <Button variant='contained' size='small' onClick={() => saveStep(step)} disabled={e.saving || !e.dirty}>
-                      {e.saving ? 'Saving…' : e.dirty ? 'Save step' : 'Saved'}
-                    </Button>
-                  </Stack>
+                  </ReadOnlyFieldset>
+
+                  {/* Outside the fieldset — see ReadOnlyFieldset. */}
+                  {canWrite && (
+                    <Stack direction='row' justifyContent='flex-end'>
+                      <Button variant='contained' size='small' onClick={() => saveStep(step)} disabled={e.saving || !e.dirty}>
+                        {e.saving ? 'Saving…' : e.dirty ? 'Save step' : 'Saved'}
+                      </Button>
+                    </Stack>
+                  )}
                 </Stack>
               </Paper>
             );

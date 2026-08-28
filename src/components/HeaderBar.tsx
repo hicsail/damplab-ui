@@ -1,15 +1,23 @@
 import { useState, useEffect, useContext, useCallback } from 'react'
 import { Link, useLocation, useMatch, useNavigate } from "react-router";
-import { AppBar, Button, Toolbar, Alert, Tooltip } from '@mui/material';
+import { AppBar, Button, Toolbar, Alert, Tooltip, Menu, MenuItem, ListItemText, Divider } from '@mui/material';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import SupervisorAccountOutlinedIcon from '@mui/icons-material/SupervisorAccountOutlined';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import MenuIcon from '@mui/icons-material/Menu';
+import IconButton from '@mui/material/IconButton';
 import Snackbar from '@mui/material/Snackbar';
 import { CanvasContext } from '../contexts/Canvas';
 import { UserContext } from '../contexts/UserContext';
 import { ViewModeContext } from '../contexts/ViewModeContext';
+import { RolePreviewContext } from '../contexts/RolePreviewContext';
+import { ACCESS_TIER_LABELS } from '../constants/accessTiers';
+import type { AccessTier } from '../constants/accessTiers';
 import { useEffectiveUser } from '../hooks/useEffectiveUser';
+import { PERMISSIONS, canFor } from '../hooks/usePermissions';
+import AppNavDrawer from './AppNavDrawer';
 import LoadCanvasButton from './LoadCanvasButton';
 import SaveCanvasButton from './SaveCanvasButton';
 import "../styles/resubmit.css";
@@ -31,9 +39,22 @@ export default function HeaderBar() {
     const { setNodes, setEdges, nodes, edges } = useContext(CanvasContext);
     const { userProps: realUserProps } = useContext(UserContext);
     const { userProps } = useEffectiveUser();
-    const { isClientView, toggleViewMode } = useContext(ViewModeContext);
-    const isActualStaff = Boolean(realUserProps?.isDamplabStaff);
+    const { previewTier, setPreviewTier } = useContext(ViewModeContext);
+    const { previews } = useContext(RolePreviewContext);
+    // Gated on `customers:manage`, the same permission `rolePreviews` requires, so the
+    // control and the query it depends on cannot disagree. Not the legacy
+    // `isDamplabStaff` boolean: that was retired as a definition of "may do admin
+    // things" precisely so there would be one answer to that question.
+    //
+    // `canFor` on the *unmasked* user rather than `can()`, which reads the masked one.
+    // Using `can()` here would hide the dropdown the moment a preview dropped
+    // `customers:manage` — and the dropdown is the only way back out of the preview.
+    const isActualStaff = canFor(realUserProps, PERMISSIONS.CustomersManage);
     const isStaff = Boolean(userProps?.isDamplabStaff);
+    const [viewMenuAnchor, setViewMenuAnchor] = useState<HTMLElement | null>(null);
+    // Collapsed by default. The canvas and the lab monitor want the full width, and a
+    // panel that opens itself would be in the way more often than it helped.
+    const [navOpen, setNavOpen] = useState(false);
     const windowLocation = useLocation();
 
     // This function is responsible for keeping currentCanvas up to date, it is called when user saves or loads a canvas.
@@ -137,6 +158,12 @@ export default function HeaderBar() {
 
                 <Toolbar style={{background: 'black'}}>
 
+                    <Tooltip title="Menu">
+                        <IconButton onClick={() => setNavOpen(true)} sx={{ color: 'white', mr: 1 }} aria-label="Open navigation menu">
+                            <MenuIcon />
+                        </IconButton>
+                    </Tooltip>
+
                     <Button onClick={() => window.location.href = "https://damplab.org/services"} style={{ textDecoration: 'none', color: 'white', marginRight: 'auto' }} sx={{ display: { xs: 'none', md: 'block' } }}>
                         <img src="https://static.wixstatic.com/media/474df2_ec8549d5afb648c692dc6362a626e406~mv2.png/v1/fill/w_496,h_76,al_c,lg_1,q_85,enc_auto/BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"
                             style={{width: 250}} alt="BU_Damp_Lab_Subbrand_Logo_WEB_whitetype.png"  />
@@ -154,25 +181,59 @@ export default function HeaderBar() {
 
                     <div style={{ marginLeft: 'auto', marginRight: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
 
-                        {isActualStaff && (
-                            <Tooltip title={isClientView ? 'Switch to Staff View' : 'Switch to Client View'}>
+                        {isActualStaff && (<>
+                            <Tooltip title={previewTier
+                                ? `Previewing the app as a ${ACCESS_TIER_LABELS[previewTier] ?? previewTier}. Your own access is unchanged.`
+                                : 'Preview the app as a lower access tier'}>
                                 <Button
-                                    onClick={toggleViewMode}
+                                    onClick={(e) => setViewMenuAnchor(e.currentTarget)}
                                     variant="outlined"
                                     size="small"
-                                    startIcon={isClientView ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                    startIcon={previewTier ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                    endIcon={<ArrowDropDownIcon />}
                                     sx={{
-                                        color: isClientView ? '#ffa726' : 'white',
-                                        borderColor: isClientView ? '#ffa726' : 'rgba(255,255,255,0.5)',
+                                        color: previewTier ? '#ffa726' : 'white',
+                                        borderColor: previewTier ? '#ffa726' : 'rgba(255,255,255,0.5)',
                                         textTransform: 'none',
                                         fontSize: 12,
                                         whiteSpace: 'nowrap',
                                     }}
                                 >
-                                    {isClientView ? 'Client View' : 'Staff View'}
+                                    {previewTier ? `${ACCESS_TIER_LABELS[previewTier] ?? previewTier} View` : 'Staff View'}
                                 </Button>
                             </Tooltip>
-                        )}
+                            <Menu
+                                anchorEl={viewMenuAnchor}
+                                open={Boolean(viewMenuAnchor)}
+                                onClose={() => setViewMenuAnchor(null)}
+                            >
+                                <MenuItem
+                                    selected={!previewTier}
+                                    onClick={() => { setPreviewTier(null); setViewMenuAnchor(null); }}
+                                >
+                                    <ListItemText
+                                        primary="Staff View"
+                                        secondary="Your own access"
+                                    />
+                                </MenuItem>
+                                <Divider />
+                                {/* Server-provided, so the list cannot claim a tier the
+                                    backend would resolve differently. Empty until the
+                                    query lands, which leaves just "Staff View". */}
+                                {previews.map((preview) => (
+                                    <MenuItem
+                                        key={preview.tier}
+                                        selected={previewTier === preview.tier}
+                                        onClick={() => { setPreviewTier(preview.tier as AccessTier); setViewMenuAnchor(null); }}
+                                    >
+                                        <ListItemText
+                                            primary={`${preview.label} View`}
+                                            secondary="Preview only — your access is unchanged"
+                                        />
+                                    </MenuItem>
+                                ))}
+                            </Menu>
+                        </>)}
 
                         { isJobEditing ? null : <>
                         <LoadCanvasButton
@@ -208,6 +269,7 @@ export default function HeaderBar() {
                     </div>
                 </Toolbar>
             </AppBar>
+            <AppNavDrawer open={navOpen} onClose={() => setNavOpen(false)} />
             <Toolbar /> 
             <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={handleSnackbarClose}> 
                 <Alert 

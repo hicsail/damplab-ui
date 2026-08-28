@@ -41,7 +41,16 @@ function resolveRate(pricing: any, category?: string): number | undefined {
     case 'EXTERNAL_CUSTOMER_NO_SALARY':
       return n(pricing.externalNoSalary) ?? n(pricing.external) ?? n(pricing.legacy);
     default:
-      return n(pricing.legacy) ?? n(pricing.internal) ?? n(pricing.external);
+      // An uncategorised user must never be quoted the internal rate -- it is the
+      // cheapest tier and this is the one population with no pricing group at all.
+      // Mirrors the backend's resolveCategoryPrice fallback: legacy, then external.
+      //
+      // The old third step, `externalMarket`, is gone. The server now strips every
+      // tier the caller is not in, so an uncategorised caller receives null there
+      // and the reach-through would only ever have produced a blank. Keeping it
+      // would have meant publishing the market rate to people not in that tier
+      // just so this line could read it.
+      return n(pricing.legacy) ?? n(pricing.external);
   }
 }
 

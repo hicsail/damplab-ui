@@ -1,13 +1,10 @@
-import { ApolloError, useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
-  Autocomplete,
   Box,
   Button,
-  Checkbox,
   Chip,
   FormControl,
-  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
@@ -25,13 +22,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { GET_INVENTORY_ITEMS, GET_STATIONS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
 import { EMPTY_RATE_PRICING, InventoryRateFields, pricingToRateForm, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
-
-const SUGGESTED_TYPES = ['EQUIPMENT', 'HOOD', 'STORAGE', 'CONSUMABLE'];
-
-const TAG_SUGGESTIONS = [
-  'Analytical Equipment', 'CLIA Equipment', 'Centrifuge', 'Cold Storage',
-  'General Equipment', 'Imaging', 'Incubator', 'Liquid Handler', 'Sequencer', 'Vortexer'
-];
+import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { formatSaveError } from '../utils/gqlError';
+import {
+  DEFAULT_INVENTORY_TYPE,
+  EMPTY_INVENTORY_DETAILS,
+  InventoryTypePicker,
+  InventoryDetailFields,
+  InventoryDetails,
+  inventoryDetailsFrom,
+  inventoryDetailsToInput
+} from '../components/edit/InventoryDetailFields';
 
 /** One editable row of the placement editor: where the item lives and how many are there. */
 interface PlacementRow {
@@ -44,20 +46,6 @@ const parsePlacementQuantity = (raw: string): number => {
   return Number.isFinite(n) && n > 0 ? n : 1;
 };
 
-function formatGqlError(error: unknown): string {
-  const fallback = 'Unable to save inventory item. Please try again.';
-  if (error instanceof ApolloError) {
-    const gqlMessage = error.graphQLErrors?.[0]?.message;
-    if (gqlMessage) return `Save failed: ${gqlMessage}`;
-    if (error.networkError) {
-      const ne = error.networkError as { statusCode?: number; message?: string };
-      return `Network error${ne.statusCode ? ` (HTTP ${ne.statusCode})` : ''}: ${ne.message ?? 'request failed'}`;
-    }
-    return error.message ? `Save failed: ${error.message}` : fallback;
-  }
-  return fallback;
-}
-
 export default function AdminEditInventoryItem() {
   const { id: itemId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -68,29 +56,24 @@ export default function AdminEditInventoryItem() {
   const item: any = data?.inventoryItems?.find((x: any) => String(x.id) === String(itemId));
 
   const [name, setName] = useState('');
-  const [type, setType] = useState('EQUIPMENT');
+  const [type, setType] = useState(DEFAULT_INVENTORY_TYPE);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [placements, setPlacements] = useState<PlacementRow[]>([]);
   const [bookable, setBookable] = useState(false);
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
-  const [tags, setTags] = useState<string[]>([]);
-  const [modelNumber, setModelNumber] = useState('');
-  const [serialNumber, setSerialNumber] = useState('');
-  const [hasServiceContract, setHasServiceContract] = useState(false);
-  const [serviceContractExpiration, setServiceContractExpiration] = useState('');
-  const [dimL, setDimL] = useState('');
-  const [dimW, setDimW] = useState('');
-  const [dimH, setDimH] = useState('');
+  const [details, setDetails] = useState<InventoryDetails>(EMPTY_INVENTORY_DETAILS);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const { can } = usePermissions();
+  const canWrite = can(PERMISSIONS.InventoryWrite);
 
   useEffect(() => {
     if (!item) return;
     setName(item.name ?? '');
-    setType(item.type ?? 'MACHINE');
+    setType(item.type ?? DEFAULT_INVENTORY_TYPE);
     setDescription(item.description ?? '');
     setLocation(item.location ?? '');
     // placements replaced the single stationId; fall back to the legacy field so
@@ -110,14 +93,7 @@ export default function AdminEditInventoryItem() {
     setBookable(!!item.bookable);
     setRateType(item.rateType === 'PER_UNIT' ? 'PER_UNIT' : 'HOURLY');
     setPricing(pricingToRateForm(item.pricing));
-    setTags(Array.isArray(item.tags) ? item.tags : []);
-    setModelNumber(item.modelNumber ?? '');
-    setSerialNumber(item.serialNumber ?? '');
-    setHasServiceContract(!!item.hasServiceContract);
-    setServiceContractExpiration(item.serviceContractExpiration ? item.serviceContractExpiration.slice(0, 10) : '');
-    setDimL(item.dimensionL?.value?.toString() ?? '');
-    setDimW(item.dimensionW?.value?.toString() ?? '');
-    setDimH(item.dimensionH?.value?.toString() ?? '');
+    setDetails(inventoryDetailsFrom(item));
   }, [item?.id]);
 
   if (loading && !item) {
@@ -175,21 +151,14 @@ export default function AdminEditInventoryItem() {
             bookable,
             rateType: bookable ? rateType : null,
             pricing: bookable ? ratePricingToInput(pricing) : null,
-            tags,
-            modelNumber: modelNumber.trim() || null,
-            serialNumber: serialNumber.trim() || null,
-            hasServiceContract,
-            serviceContractExpiration: serviceContractExpiration || null,
-            dimensionL: dimL ? { value: Number(dimL), unit: 'm' } : null,
-            dimensionW: dimW ? { value: Number(dimW), unit: 'm' } : null,
-            dimensionH: dimH ? { value: Number(dimH), unit: 'm' } : null
+            ...inventoryDetailsToInput(details, { clearEmpty: true })
           }
         }
       });
       setSuccessMessage('Saved.');
     } catch (error) {
       console.error('Update inventory item failed:', error);
-      setErrorMessage(formatGqlError(error));
+      setErrorMessage(formatSaveError(error, 'this inventory item'));
     } finally {
       setIsSaving(false);
     }
@@ -223,16 +192,11 @@ export default function AdminEditInventoryItem() {
         </Alert>
       </Snackbar>
 
+      <ReadOnlyFieldset canWrite={canWrite} noun='inventory'>
+
       <TextField label='Name' value={name} onChange={(e) => setName(e.target.value)} required />
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <Autocomplete
-          freeSolo
-          options={SUGGESTED_TYPES}
-          value={type}
-          onChange={(_, newVal) => setType(typeof newVal === 'string' ? newVal : '')}
-          onInputChange={(_, newVal) => setType(newVal)}
-          renderInput={(params) => <TextField {...params} label='Type' />}
-        />
+        <InventoryTypePicker value={type} onChange={setType} />
         <TextField label='Location (free text)' value={location} onChange={(e) => setLocation(e.target.value)} />
       </Box>
 
@@ -305,46 +269,8 @@ export default function AdminEditInventoryItem() {
 
       <TextField label='Description' value={description} onChange={(e) => setDescription(e.target.value)} multiline minRows={3} />
 
-      <Autocomplete
-        multiple
-        freeSolo
-        options={TAG_SUGGESTIONS}
-        value={tags}
-        onChange={(_, newValue) => setTags(newValue)}
-        renderInput={(params) => <TextField {...params} label='Tags' placeholder='Add a tag…' />}
-      />
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-        <TextField label='Model #' value={modelNumber} onChange={(e) => setModelNumber(e.target.value)} placeholder='e.g. ND-2000C' />
-        <TextField label='Serial #' value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder='Internal tracking only' />
-      </Box>
-
-      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <FormControlLabel
-          control={<Checkbox checked={hasServiceContract} onChange={(e) => setHasServiceContract(e.target.checked)} />}
-          label='Has service contract'
-        />
-        {hasServiceContract && (
-          <TextField
-            label='Contract expiration'
-            type='date'
-            size='small'
-            value={serviceContractExpiration}
-            onChange={(e) => setServiceContractExpiration(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            sx={{ width: 200 }}
-          />
-        )}
-      </Box>
-
-      <Box>
-        <Typography variant='subtitle1' sx={{ mb: 1 }}>Dimensions (m)</Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
-          <TextField label='L' type='number' value={dimL} onChange={(e) => setDimL(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
-          <TextField label='W' type='number' value={dimW} onChange={(e) => setDimW(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
-          <TextField label='H' type='number' value={dimH} onChange={(e) => setDimH(e.target.value)} inputProps={{ min: 0, step: 'any' }} />
-        </Box>
-      </Box>
+      {/* Tags, model/serial, service contract and dimensions all live in
+          <InventoryDetailFields /> below — the same editor both forms share. */}
 
       {item.uniqueId && (
         <Typography variant='caption' color='text.secondary'>
@@ -362,11 +288,20 @@ export default function AdminEditInventoryItem() {
         itemType={type}
       />
 
+      <InventoryDetailFields details={details} setDetails={setDetails} />
+
+      </ReadOnlyFieldset>
+
+      {/* Outside the fieldset — see ReadOnlyFieldset. */}
       <Stack direction='row' spacing={2}>
-        <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>Cancel</Button>
-        <Button variant='contained' onClick={handleSave} disabled={isSaving}>
-          {isSaving ? 'Saving…' : 'Save changes'}
+        <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>
+          {canWrite ? 'Cancel' : 'Back to catalog'}
         </Button>
+        {canWrite && (
+          <Button variant='contained' onClick={handleSave} disabled={isSaving}>
+            {isSaving ? 'Saving…' : 'Save changes'}
+          </Button>
+        )}
       </Stack>
     </Stack>
   );

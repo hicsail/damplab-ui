@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, StyleSheet, View, Text, Image, Font } from '@react-pdf/renderer';
 import type { SOWData } from '../types/SOWTypes';
 import { RUN_COUNT_PARAM_ID, RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
+import type { CustomerCategory } from '../utils/customerCategory';
 
 Font.register({ family: 'Courier-New', fonts: [{ src: '/fonts/Courier-New.ttf' }] });
 
@@ -356,12 +357,7 @@ export interface JobInvoiceDocumentProps {
   jobId: string;
   jobDisplayId?: string | null;
   jobName: string;
-  customerCategory?:
-    | 'INTERNAL_CUSTOMERS'
-    | 'EXTERNAL_CUSTOMER_ACADEMIC'
-    | 'EXTERNAL_CUSTOMER_MARKET'
-    | 'EXTERNAL_CUSTOMER_NO_SALARY'
-    | null;
+  customerCategory?: CustomerCategory | null;
   sow: SOWData | null;
   invoice?: {
     id: string;

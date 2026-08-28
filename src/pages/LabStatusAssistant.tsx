@@ -169,7 +169,7 @@ export default function LabStatusAssistant() {
         <InsightsIcon color="primary" />
         <Box sx={{ flex: 1 }}>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            Lab Ops Assistant
+            AI Lab Assistant
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Ask about lab status, or attach a CSV (📎 in the message bar) to create catalog services. Changes are previewed and require your explicit confirmation before anything is written.

@@ -46,6 +46,18 @@ export interface JobListItem {
 const PAGE_SIZE_OPTIONS = [10, 20, 25, 50] as const;
 export const STATE_OPTIONS = ['', 'SUBMITTED', 'QUEUED', 'IN_PROGRESS', 'COMPLETE'];
 export type ArchiveFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
+export type JobScope = 'ALL' | 'CREATED_BY_ME' | 'WORKED_BY_ME';
+export const SCOPE_LABELS: Record<JobScope, string> = {
+  ALL: 'All jobs',
+  CREATED_BY_ME: 'Created by me',
+  WORKED_BY_ME: 'Worked by me'
+};
+
+/** A person the jobs list can be filtered down to. */
+export interface JobFilterOption {
+  id: string;
+  displayName: string;
+}
 export const ARCHIVE_FILTER_LABELS: Record<ArchiveFilter, string> = {
   ACTIVE: 'Active',
   ARCHIVED: 'Archived',
@@ -70,18 +82,43 @@ export interface SubmittedJobsListProps {
   onHasSowFilterChange: (value: 'all' | 'yes' | 'no') => void;
   showHasSowFilter?: boolean;
   getJobLink: (job: JobListItem) => string;
-  isStaff?: boolean;
+  /**
+   * Whether the caller sees everyone's jobs. Re-pointed off the old `isStaff`
+   * boolean: this list now serves a client and a technician alike, and "staff" was
+   * never the question — `jobs:view-all` is.
+   *
+   * Controls the submitter columns, the scope toggle and the two people filters.
+   */
+  canViewAllJobs?: boolean;
   title: string;
   subtitle?: string;
   emptyMessage?: string;
   onBack?: () => void;
   backLabel?: string;
   isJobNew?: (job: JobListItem) => boolean;
-  /** Staff only. Supplying this renders the per-job archive/restore action. */
+  /**
+   * Whether the caller may archive. Separate from `canViewAllJobs` because the two
+   * are different permissions — `jobs:view-all` and `labmonitor:archive` — and the
+   * old `isStaff` flag conflated them.
+   */
+  canArchive?: boolean;
+  /** Supplying this renders the per-job archive/restore action, if canArchive. */
   onArchiveToggle?: (job: JobListItem) => void;
-  /** Staff only. Supplying both renders the Active/Archived/All filter. */
+  /** Supplying both renders the Active/Archived/All filter, if canArchive. */
   archiveFilter?: ArchiveFilter;
   onArchiveFilterChange?: (value: ArchiveFilter) => void;
+
+  /** Scope toggle. Rendered only with canViewAllJobs — a client has one scope. */
+  scope?: JobScope;
+  onScopeChange?: (value: JobScope) => void;
+  /** Filter to one submitter. Rendered only with canViewAllJobs. */
+  clientOptions?: JobFilterOption[];
+  createdBySub?: string;
+  onCreatedBySubChange?: (value: string) => void;
+  /** Filter to one assignee. Rendered only with canViewAllJobs. */
+  technicianOptions?: JobFilterOption[];
+  assigneeId?: string;
+  onAssigneeIdChange?: (value: string) => void;
 }
 
 export default function SubmittedJobsList({
@@ -100,16 +137,25 @@ export default function SubmittedJobsList({
   onHasSowFilterChange,
   showHasSowFilter = false,
   getJobLink,
-  isStaff = false,
+  canViewAllJobs = false,
   title,
   subtitle,
   emptyMessage = 'No jobs found.',
   onBack,
   backLabel = 'Back to Home',
   isJobNew,
+  canArchive = false,
   onArchiveToggle,
   archiveFilter,
   onArchiveFilterChange,
+  scope,
+  onScopeChange,
+  clientOptions,
+  createdBySub,
+  onCreatedBySubChange,
+  technicianOptions,
+  assigneeId,
+  onAssigneeIdChange,
 }: SubmittedJobsListProps) {
   const totalPages = Math.max(1, Math.ceil(totalCount / limit));
   const pageSafe = Math.min(Math.max(1, page), totalPages);
@@ -216,7 +262,48 @@ export default function SubmittedJobsList({
             </Select>
           </FormControl>
         )}
-        {isStaff && archiveFilter && onArchiveFilterChange && (
+        {/* Scope and the two people filters exist only for a caller who can see
+            everyone's jobs. For a client there is one scope — their own — and the
+            server enforces it regardless of what this sends. */}
+        {canViewAllJobs && scope && onScopeChange && (
+          <FormControl size="small" sx={{ minWidth: 170 }}>
+            <InputLabel>Scope</InputLabel>
+            <Select value={scope} label="Scope" onChange={(e) => onScopeChange(e.target.value as JobScope)}>
+              {(Object.keys(SCOPE_LABELS) as JobScope[]).map((key) => (
+                <MenuItem key={key} value={key}>
+                  {SCOPE_LABELS[key]}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        {canViewAllJobs && clientOptions && onCreatedBySubChange && (
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Client</InputLabel>
+            <Select value={createdBySub ?? ''} label="Client" onChange={(e) => onCreatedBySubChange(e.target.value)}>
+              <MenuItem value="">Any client</MenuItem>
+              {clientOptions.map((option) => (
+                <MenuItem key={option.id} value={option.id}>
+                  {option.displayName}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        {canViewAllJobs && technicianOptions && onAssigneeIdChange && (
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Technician</InputLabel>
+            <Select value={assigneeId ?? ''} label="Technician" onChange={(e) => onAssigneeIdChange(e.target.value)}>
+              <MenuItem value="">Any technician</MenuItem>
+              {technicianOptions.map((option) => (
+                <MenuItem key={option.id} value={option.id}>
+                  {option.displayName}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        {canArchive && archiveFilter && onArchiveFilterChange && (
           <FormControl size="small" sx={{ minWidth: 140 }}>
             <InputLabel>Archive</InputLabel>
             <Select
@@ -277,7 +364,7 @@ export default function SubmittedJobsList({
                       <Typography variant="body2" color="text.secondary">
                         Submitted: {job.submitted ? new Date(job.submitted).toLocaleString() : '—'}
                       </Typography>
-                      {isStaff && (
+                      {canViewAllJobs && (
                         <>
                           <Typography variant="body2" color="text.secondary">
                             {job.username && `User: ${job.username}`}
@@ -325,7 +412,7 @@ export default function SubmittedJobsList({
                           variant="outlined"
                         />
                       )}
-                      {isStaff && onArchiveToggle && (
+                      {canArchive && onArchiveToggle && (
                         <Tooltip title={job.isArchived ? 'Restore job' : 'Archive job'}>
                           <IconButton
                             size="small"
