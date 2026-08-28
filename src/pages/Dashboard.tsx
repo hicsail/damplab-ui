@@ -11,10 +11,13 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
   Snackbar,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import SubmittedJobsList, {
   type ArchiveFilter,
   type JobFilterOption,
@@ -269,9 +272,21 @@ export default function Dashboard() {
         spacing={2}
         sx={{ mb: 2 }}
       >
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
-          Back to Home
-        </Button>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/')}>
+            Back to Home
+          </Button>
+          {/* In the left slot on purpose. The staff shortcut stack on the right is
+              `display: none` for a client, and a client watching for their job to
+              change state is exactly who needs this most. */}
+          <Tooltip title="Refresh jobs">
+            <span>
+              <IconButton onClick={() => void refetch()} disabled={loading} aria-label="Refresh jobs">
+                <RefreshIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
         {/* Shortcuts to staff destinations. Hidden for a client, who would only
             be bounced by those routes' own layouts. */}
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ display: canViewAllJobs ? 'flex' : 'none' }}>

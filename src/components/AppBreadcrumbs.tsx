@@ -42,7 +42,6 @@ const STATIC: Record<string, string> = {
   '/edit': 'Catalog & Inventory Editor',
   '/release_notes': 'Release Notes',
   '/announcements': 'Announcements',
-  '/edit_announcements': 'Edit Announcements',
   '/data_translation': 'Data Translation',
   '/dominos': 'Dominos',
   '/elabs': 'ELabs',
@@ -71,7 +70,6 @@ function dynamicTrail(path: string): Crumb[] | null {
   if ((m = path.match(/^\/jobs\/([^/]+)$/))) return [{ label: 'Jobs', to: '/dashboard' }, { label: 'Job' }];
   if ((m = path.match(/^\/client_view\/([^/]+)$/))) return [{ label: 'Jobs', to: '/dashboard' }, { label: 'Job Tracking' }];
   if ((m = path.match(/^\/resubmission\/([^/]+)$/))) return [{ label: 'Resubmission' }];
-  if ((m = path.match(/^\/training\/(.+)$/))) return [{ label: 'Learning Hub', to: '/training' }, { label: pretty(m[1]) }];
   return null;
 }
 

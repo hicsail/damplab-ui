@@ -24,11 +24,10 @@ export default [
     layout("./layouts/PrivateRouteAuthed.tsx", [
         index("./pages/Home.tsx"),
         route("/training", "./pages/Training.tsx"),
-        // Guides are data now: one dynamic route replaces the two hardcoded pages,
-        // whose content is seeded as documents. `/training/admin` below is a static
-        // segment and so out-ranks this one — React Router scores static above
-        // dynamic regardless of declaration order.
-        route("/training/:slug", "./pages/TrainingGuide.tsx"),
+        // The hub is a PDF library now, listed on one page — there is nothing for a
+        // per-guide URL to address. The route survives only to redirect links that
+        // were shared while the markdown guides were live.
+        route("/training/:slug", "./pages/TrainingGuideRedirect.tsx"),
         route("/services-catalog", "./pages/AdminServicesCatalog.tsx"),
         route("/admin/services-catalog", "./pages/AdminServicesCatalog.tsx", { id: "admin-services-catalog-legacy" }),
         route("/bugs", "./pages/Bugs.tsx"),
@@ -37,6 +36,9 @@ export default [
         // announcements:read is baseline, so this sits in the baseline tier. What
         // differs per person is which rows the server sends.
         route("/announcements", "./pages/AnnouncementsFeed.tsx"),
+        // /edit_announcements merged into /announcements; the editing half is gated
+        // on announcements:write inside the page rather than by a route layout.
+        route("/edit_announcements", "./pages/EditAnnouncementsRedirect.tsx"),
         route("/resubmission/:id", "./pages/MainFlow.tsx", { id: "resubmission" }),
         // Both roles use the same editor; the page itself picks jobById vs
         // ownJobById and the server enforces who may save.
@@ -81,12 +83,6 @@ export default [
     ]),
     layout("./layouts/PrivateRouteProtocolLibrary.tsx", [
         route("/protocol-map", "./pages/ProtocolMap.tsx"),
-    ]),
-    layout("./layouts/PrivateRouteAnnouncementsWrite.tsx", [
-        route("/edit_announcements", "./pages/Announcements.tsx"),
-    ]),
-    layout("./layouts/PrivateRouteTrainingWrite.tsx", [
-        route("/training/admin", "./pages/TrainingAdmin.tsx"),
     ]),
     layout("./layouts/PrivateRouteLabAssistant.tsx", [
         route("/lab-assistant", "./pages/LabStatusAssistant.tsx"),

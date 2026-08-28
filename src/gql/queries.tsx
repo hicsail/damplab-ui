@@ -1133,16 +1133,29 @@ export const GET_BUG_REPORT_BY_ID = gql`
   }
 `;
 
+/**
+ * The two axes a Customer Management row carries. `customerCategory` sets price,
+ * `accessTier` sets permissions, and they move independently — one mutation each.
+ *
+ * `accessRoleMapped` is deliberately absent: it is only ever populated on the row
+ * returned by the tier mutation, because checking it per row would double the
+ * Keycloak Admin API calls a list page makes.
+ */
+const CUSTOMER_MANAGEMENT_ROW_FIELDS = `
+  id
+  username
+  email
+  firstName
+  lastName
+  customerCategory
+  isDefaultExternalCustomer
+  accessTier
+`;
+
 export const SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
   query SearchKeycloakUsersForCustomerManagement($search: String!, $max: Int) {
     searchKeycloakUsersForCustomerManagement(search: $search, max: $max) {
-      id
-      username
-      email
-      firstName
-      lastName
-      customerCategory
-      isDefaultExternalCustomer
+      ${CUSTOMER_MANAGEMENT_ROW_FIELDS}
     }
   }
 `;
@@ -1151,15 +1164,27 @@ export const LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
   query ListKeycloakUsersForCustomerManagement($category: CustomerManagementUserListCategory!, $offset: Int, $limit: Int) {
     listKeycloakUsersForCustomerManagement(category: $category, offset: $offset, limit: $limit) {
       items {
-        id
-        username
-        email
-        firstName
-        lastName
-        customerCategory
-        isDefaultExternalCustomer
+        ${CUSTOMER_MANAGEMENT_ROW_FIELDS}
       }
       hasNextPage
+    }
+  }
+`;
+
+/**
+ * The access tiers an administrator may preview the UI as.
+ *
+ * Fetched lazily by the header rather than folded into `myPermissions`: that one runs
+ * in a top-level await before Apollo exists, and asking a backend that has not
+ * deployed this field yet would fail the whole query and drop the caller to the
+ * legacy staff boolean. Here, a failure just means no dropdown.
+ */
+export const GET_ROLE_PREVIEWS = gql`
+  query RolePreviews {
+    rolePreviews {
+      tier
+      label
+      permissions
     }
   }
 `;
@@ -1641,53 +1666,39 @@ export const GET_SOW_TEXT_PRESETS = gql`
 
 
 // ─── Learning Hub ─────────────────────────────────────────────────────────
-// Guides are markdown in Mongo. Drafts come back only for a training:write
-// holder — the server decides that from the caller, not from an argument.
+// Uploaded PDFs, each addressed to one or more access tiers. Which documents come
+// back is decided server-side from the caller's roles; `downloadUrl` is a
+// short-lived presigned GET minted per request, never a stored link.
 
-export const GET_GUIDES = gql`
-    query GetGuides {
-        guides {
+export const GET_TRAINING_RESOURCES = gql`
+    query TrainingResources {
+        trainingResources {
             id
             title
-            slug
-            category
-            order
-            isPublished
+            description
+            audienceRoles
             updatedAt
             updatedBy
+            file {
+                filename
+                contentType
+                size
+            }
+            downloadUrl
         }
     }
 `;
 
-/** The list plus bodies, for the admin editor's live preview. */
-export const GET_GUIDES_WITH_BODIES = gql`
-    query GetGuidesWithBodies {
-        guides {
-            id
-            title
-            slug
-            category
-            body
-            order
-            isPublished
-            updatedAt
-            updatedBy
-        }
-    }
-`;
-
-export const GET_GUIDE_BY_SLUG = gql`
-    query GetGuideBySlug($slug: String!) {
-        guideBySlug(slug: $slug) {
-            id
-            title
-            slug
-            category
-            body
-            isPublished
-            updatedAt
-            updatedBy
-        }
+/**
+ * A fresh link for one document.
+ *
+ * The URL embedded in the list response expires, and a list refetch to renew one
+ * link would re-mint every other link too. This is the audience-checked entry point
+ * server-side: an id outside the caller's audience simply returns null.
+ */
+export const GET_TRAINING_RESOURCE_DOWNLOAD_URL = gql`
+    query TrainingResourceDownloadUrl($id: ID!) {
+        trainingResourceDownloadUrl(id: $id)
     }
 `;
 

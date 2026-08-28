@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { HOME_MENU, visibleHomeMenu, type HomeMenuUser } from './homeMenu';
 import { PERMISSIONS, type PermissionName } from '../hooks/usePermissions';
+import { applyPreview } from '../hooks/effectiveUser';
+import { ACCESS_TIERS } from '../constants/accessTiers';
 
 /**
  * These lists mirror `damplab-backend/src/auth/permissions/role-permissions.ts`.
@@ -64,15 +66,17 @@ describe('homepage sections match the access matrix', () => {
       'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
       'Technician Tools': ['Staff submit job', 'My Bench'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
-      'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'Edit Announcements', 'Billing', 'AI Lab Assistant'],
+      // "Edit Announcements" is gone: /edit_announcements merged into /announcements,
+      // whose editing controls are gated inside the page on announcements:write.
+      'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'Billing', 'AI Lab Assistant'],
       'Admin Management Tools': ['Customer Management', 'API Keys', 'Data Translation', 'Lab Monitor North', 'Lab Monitor South', 'Lab Status TV'],
     });
   });
 
-  it('has 26 buttons: +1 announcements feed, -1 for the merged jobs button', () => {
-    // The two changes cancel out at 26. Announcements (the read-only feed) is new;
-    // "My Jobs" and "Jobs" collapsed into one.
-    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(26);
+  it('has 25 buttons: the two announcement buttons collapsed into one', () => {
+    // Was 26. "Edit Announcements" left when the editor merged into the feed, the
+    // same way "My Jobs" left when the two jobs pages merged.
+    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(25);
   });
 
   it('has exactly one jobs button, keyed on the baseline permission', () => {
@@ -131,29 +135,39 @@ describe('what each role sees', () => {
   });
 
   it('shows an administrator everything', () => {
-    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(26);
+    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(25);
   });
 
   it('gates each button on what its destination needs, not what its label resembles', () => {
     const all = HOME_MENU.flatMap((s) => s.items);
-    // The two announcement buttons are the case this test exists for: the labels
-    // are nearly identical and the permissions are not.
-    const editor = all.find((i) => i.id === 'edit-announcements')!;
-    expect(editor.visible(CLIENT)).toBe(false);
-    expect(editor.visible(STAFF)).toBe(true);
+
+    // There is one Announcements button now, and it is keyed on the *baseline*
+    // read permission. Re-adding a write-gated twin would mean the merge had come
+    // undone: the page itself decides who sees the editing controls.
+    expect(all.filter((i) => i.label.toLowerCase().includes('announcement'))).toHaveLength(1);
 
     const feed = all.find((i) => i.id === 'announcements')!;
-    // announcements:read is baseline, so everyone reaches the feed. The server
-    // decides which rows they get.
+    // announcements:read is baseline, so everyone reaches the page. The server
+    // decides which rows they get, and announcements:write decides whether the
+    // compose form and per-row controls render.
+    expect(feed.to).toBe('/announcements');
     expect(feed.visible(CLIENT)).toBe(true);
     expect(feed.visible(STAFF)).toBe(true);
+
+    // The property the removed pair used to demonstrate, kept on a surviving case:
+    // "Catalog" and "Catalog & Inventory Editor" read alike and gate differently.
+    const catalog = all.find((i) => i.id === 'catalog')!;
+    const editor = all.find((i) => i.id === 'catalog-inventory-editor')!;
+    expect(catalog.visible(CLIENT)).toBe(true);
+    expect(editor.visible(CLIENT)).toBe(false);
+    expect(editor.visible(STAFF)).toBe(true);
   });
 });
 
 describe('degraded mode: the permissions fetch failed', () => {
   it('falls back to the legacy staff boolean rather than hiding everything from staff', () => {
     const staffWithoutPermissions: HomeMenuUser = { permissions: [], permissionsLoaded: false, isDamplabStaff: true };
-    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(26);
+    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(25);
   });
 
   it('leaves a client with only the two unpermissioned buttons — the cost of the fallback, stated', () => {
@@ -178,5 +192,57 @@ describe('a section with nothing visible in it disappears', () => {
         expect(section.items.length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+/**
+ * The header's view-as dropdown, checked where it actually matters: the menu an
+ * administrator sees while previewing must be the menu that tier really gets.
+ *
+ * `applyPreview` is exercised rather than `useEffectiveUser` because this package
+ * has no jsdom — but the hook is a three-line wrapper that reads three contexts and
+ * calls this, so every decision the preview makes is covered here.
+ *
+ * The permission lists are the fixtures above, standing in for what `rolePreviews`
+ * returns. The backend computes them for real from the one shared table.
+ */
+describe('previewing the app as a lower access tier', () => {
+  const PREVIEWS: Record<string, string[]> = {
+    [ACCESS_TIERS.Technician]: TECHNICIAN_PERMISSIONS,
+    [ACCESS_TIERS.EquipmentUser]: EQUIPMENT_USER_PERMISSIONS,
+    [ACCESS_TIERS.Client]: CLIENT_PERMISSIONS,
+  };
+
+  const previewing = (tier: string): HomeMenuUser => applyPreview(STAFF as any, tier, PREVIEWS) as HomeMenuUser;
+
+  it('shows an administrator exactly what each tier would see', () => {
+    // The whole point of the feature. If these ever diverge, the preview is lying.
+    expect(labelsBySection(previewing(ACCESS_TIERS.Technician))).toEqual(labelsBySection(TECHNICIAN));
+    expect(labelsBySection(previewing(ACCESS_TIERS.EquipmentUser))).toEqual(labelsBySection(EQUIPMENT_USER));
+    expect(labelsBySection(previewing(ACCESS_TIERS.Client))).toEqual(labelsBySection(CLIENT));
+  });
+
+  it('drops the staff boolean, so the degraded-mode fallback cannot leak admin buttons', () => {
+    // `canFor` falls back to `isDamplabStaff` when permissions failed to load. If a
+    // preview left that true, an administrator previewing as Client during a fetch
+    // failure would still see every admin button.
+    expect(previewing(ACCESS_TIERS.Client).isDamplabStaff).toBe(false);
+    expect(previewing(ACCESS_TIERS.Technician).isDamplabStaff).toBe(false);
+  });
+
+  it('returns the real user untouched when nothing is being previewed', () => {
+    expect(applyPreview(STAFF as any, null, PREVIEWS)).toBe(STAFF);
+  });
+
+  it('refuses to preview for anyone who is not really an administrator', () => {
+    // Reads the *unmasked* user, so a preview cannot nest: an administrator
+    // previewing as Technician must not then preview as an equipment user.
+    expect(applyPreview(TECHNICIAN as any, ACCESS_TIERS.Client, PREVIEWS)).toBe(TECHNICIAN);
+  });
+
+  it('falls back to the administrator\'s own view when the preview list has not arrived', () => {
+    // Over-showing beats hiding controls they hold; the header still reads as
+    // previewing, so the state is visible rather than silently lost.
+    expect(applyPreview(STAFF as any, ACCESS_TIERS.Technician, {})).toBe(STAFF);
   });
 });

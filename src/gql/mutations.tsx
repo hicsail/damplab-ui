@@ -1,4 +1,8 @@
-import { gql } from "@apollo/client";
+// `/index.js`, matching `queries.tsx` and `root.tsx`: Apollo 3's CommonJS build has
+// no named exports, so the bare specifier fails in the SSR bundle. This module is now
+// reached from `root.tsx` (HeaderBar -> AppNavDrawer -> useHomeMenuNavigate), which is
+// where that started to matter.
+import { gql } from "@apollo/client/index.js";
 
 export const CREATE_JOB = gql`
     mutation createJob($createJobInput: CreateJobInput!) {
@@ -580,6 +584,31 @@ export const SET_USER_KEYCLOAK_CUSTOMER_CATEGORY = gql`
       lastName
       customerCategory
       isDefaultExternalCustomer
+      accessTier
+    }
+  }
+`;
+
+/**
+ * The access half of Customer Management. Separate from the category mutation on
+ * purpose: pricing and access are independent axes, and two mutations mean neither
+ * request can carry the other's value.
+ *
+ * `accessRoleMapped` comes back false when the group was written but the realm has no
+ * group -> role mapping for it — the write succeeded and granted nothing. Surface it.
+ */
+export const SET_USER_KEYCLOAK_ACCESS_TIER = gql`
+  mutation SetUserKeycloakAccessTier($userId: ID!, $tier: AccessTier!) {
+    setUserKeycloakAccessTier(userId: $userId, tier: $tier) {
+      id
+      username
+      email
+      firstName
+      lastName
+      customerCategory
+      isDefaultExternalCustomer
+      accessTier
+      accessRoleMapped
     }
   }
 `;
@@ -847,39 +876,63 @@ export const UNARCHIVE_WORKFLOW_NODE = gql`
 `;
 
 // ─── Learning Hub ─────────────────────────────────────────────────────────
+// Upload is the standard three step used everywhere else in this app: create the
+// record, presign, PUT the file straight to S3, then register the metadata.
 
-export const CREATE_GUIDE = gql`
-    mutation CreateGuide($input: CreateGuideInput!) {
-        createGuide(input: $input) {
-            id
-            title
-            slug
-            category
-            body
-            order
-            isPublished
+const TRAINING_RESOURCE_FIELDS = `
+    id
+    title
+    description
+    audienceRoles
+    updatedAt
+    updatedBy
+    file {
+        filename
+        contentType
+        size
+    }
+    downloadUrl
+`;
+
+export const CREATE_TRAINING_RESOURCE = gql`
+    mutation CreateTrainingResource($input: CreateTrainingResourceInput!) {
+        createTrainingResource(input: $input) {
+            ${TRAINING_RESOURCE_FIELDS}
         }
     }
 `;
 
-export const UPDATE_GUIDE = gql`
-    mutation UpdateGuide($input: UpdateGuideInput!) {
-        updateGuide(input: $input) {
-            id
-            title
-            slug
-            category
-            body
-            order
-            isPublished
-            updatedAt
-            updatedBy
+export const UPDATE_TRAINING_RESOURCE = gql`
+    mutation UpdateTrainingResource($input: UpdateTrainingResourceInput!) {
+        updateTrainingResource(input: $input) {
+            ${TRAINING_RESOURCE_FIELDS}
         }
     }
 `;
 
-export const DELETE_GUIDE = gql`
-    mutation DeleteGuide($id: ID!) {
-        deleteGuide(id: $id)
+/** Rejected server-side for a non-PDF or an oversized file, before any URL is minted. */
+export const CREATE_TRAINING_FILE_UPLOAD_URL = gql`
+    mutation CreateTrainingFileUploadUrl($resourceId: ID!, $file: TrainingFileUploadRequest!) {
+        createTrainingFileUploadUrl(resourceId: $resourceId, file: $file) {
+            filename
+            uploadUrl
+            key
+            contentType
+            size
+        }
+    }
+`;
+
+export const ATTACH_TRAINING_FILE = gql`
+    mutation AttachTrainingFile($resourceId: ID!, $file: TrainingFileInput!) {
+        attachTrainingFile(resourceId: $resourceId, file: $file) {
+            ${TRAINING_RESOURCE_FIELDS}
+        }
+    }
+`;
+
+export const DELETE_TRAINING_RESOURCE = gql`
+    mutation DeleteTrainingResource($id: ID!) {
+        deleteTrainingResource(id: $id)
     }
 `;

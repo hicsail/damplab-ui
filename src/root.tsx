@@ -55,6 +55,7 @@ import { GET_BUNDLES, GET_SERVICES } from "./gql/queries";
 import { UserContext } from "./contexts/UserContext";
 import HeaderBar from "./components/HeaderBar";
 import { ViewModeProvider } from "./contexts/ViewModeContext";
+import { RolePreviewProvider } from "./contexts/RolePreviewContext";
 import './root.css';
 import { CircularProgress } from "@mui/material";
 import { ThemeProvider } from '@mui/material/styles';
@@ -222,6 +223,9 @@ export default function Root() {
     <ApolloProvider client={client}>
       <ThemeProvider theme={theme}>
         <ViewModeProvider>
+        {/* Inside ApolloProvider (it runs a query) and inside ViewModeProvider, so
+            useEffectiveUser sees both the chosen tier and its permission list. */}
+        <RolePreviewProvider>
         <AppContext
           value={{ services: services, bundles: bundles, hazards: hazards, refreshCatalog }}
         >
@@ -243,6 +247,7 @@ export default function Root() {
             </div>
           </CanvasContext>
         </AppContext>
+        </RolePreviewProvider>
         </ViewModeProvider>
       </ThemeProvider>
     </ApolloProvider>
