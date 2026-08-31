@@ -5,17 +5,20 @@
 import { gql } from "@apollo/client/index.js";
 
 export const CREATE_JOB = gql`
-    mutation createJob($createJobInput: CreateJobInput!) {
-        createJob(createJobInput: $createJobInput) {
-            id
-            jobId
-            name
-        }
+  mutation createJob($createJobInput: CreateJobInput!) {
+    createJob(createJobInput: $createJobInput) {
+      id
+      jobId
+      name
     }
+  }
 `;
 
 export const CREATE_JOB_ATTACHMENT_UPLOAD_URLS = gql`
-  mutation CreateJobAttachmentUploadUrls($jobId: ID!, $files: [JobAttachmentUploadRequest!]!) {
+  mutation CreateJobAttachmentUploadUrls(
+    $jobId: ID!
+    $files: [JobAttachmentUploadRequest!]!
+  ) {
     createJobAttachmentUploadUrls(jobId: $jobId, files: $files) {
       filename
       uploadUrl
@@ -27,7 +30,10 @@ export const CREATE_JOB_ATTACHMENT_UPLOAD_URLS = gql`
 `;
 
 export const ADD_JOB_ATTACHMENTS = gql`
-  mutation AddJobAttachments($jobId: ID!, $attachments: [JobAttachmentInput!]!) {
+  mutation AddJobAttachments(
+    $jobId: ID!
+    $attachments: [JobAttachmentInput!]!
+  ) {
     addJobAttachments(jobId: $jobId, attachments: $attachments) {
       id
     }
@@ -35,7 +41,9 @@ export const ADD_JOB_ATTACHMENTS = gql`
 `;
 
 export const CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS = gql`
-  mutation CreateWorkflowParameterUploadUrls($files: [WorkflowParameterFileUploadRequest!]!) {
+  mutation CreateWorkflowParameterUploadUrls(
+    $files: [WorkflowParameterFileUploadRequest!]!
+  ) {
     createWorkflowParameterUploadUrls(files: $files) {
       clientToken
       filename
@@ -49,221 +57,231 @@ export const CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS = gql`
 
 // Template mutations
 export const CREATE_TEMPLATE = gql`
-    mutation CreateTemplate($input: CreateTemplateInput!) {
-        createTemplate(input: $input) {
-            id
-            name
-            description
-            createdAt
-            columnMapping {
-                field
-                headerName
-                type
-                width
-                order
-            }
-        }
+  mutation CreateTemplate($input: CreateTemplateInput!) {
+    createTemplate(input: $input) {
+      id
+      name
+      description
+      createdAt
+      columnMapping {
+        field
+        headerName
+        type
+        width
+        order
+      }
     }
+  }
 `;
 
 export const UPDATE_TEMPLATE = gql`
-    mutation UpdateTemplate($input: UpdateTemplateInput!) {
-        updateTemplate(input: $input) {
-            id
-            name
-            description
-            createdAt
-            columnMapping {
-                field
-                headerName
-                type
-                width
-                order
-            }
-        }
+  mutation UpdateTemplate($input: UpdateTemplateInput!) {
+    updateTemplate(input: $input) {
+      id
+      name
+      description
+      createdAt
+      columnMapping {
+        field
+        headerName
+        type
+        width
+        order
+      }
     }
+  }
 `;
 
 export const DELETE_TEMPLATE = gql`
-    mutation DeleteTemplate($id: ID!) {
-        deleteTemplate(id: $id)
-    }
+  mutation DeleteTemplate($id: ID!) {
+    deleteTemplate(id: $id)
+  }
 `;
 
 export const DELETE_TEMPLATE_BY_NAME = gql`
-    mutation DeleteTemplateByName($name: String!) {
-        deleteTemplateByName(name: $name)
-    }
+  mutation DeleteTemplateByName($name: String!) {
+    deleteTemplateByName(name: $name)
+  }
 `;
 
 export const MUTATE_WORKFLOW_STATE = gql`
-    mutation updateWorkflowState($ID: ID!, $State: WorkflowState!) {
-        changeWorkflowState(
-            workflow: $ID,
-            newState: $State
-        ) {
-            id
-            state
-        }
+  mutation updateWorkflowState($ID: ID!, $State: WorkflowState!) {
+    changeWorkflowState(workflow: $ID, newState: $State) {
+      id
+      state
     }
+  }
 `;
 
 export const MUTATE_NODE_STATUS = gql`
-    mutation changeWorkflowNodeState($_ID: ID!, $State: WorkflowNodeState!) {
-        changeWorkflowNodeState(
-            workflowNode: $_ID,
-            newState: $State
-        ) {
-            _id
-            state
-            startedAt
-        }
+  mutation changeWorkflowNodeState($_ID: ID!, $State: WorkflowNodeState!) {
+    changeWorkflowNodeState(workflowNode: $_ID, newState: $State) {
+      _id
+      state
+      startedAt
     }
+  }
 `;
 
 export const SET_WORKFLOW_NODE_COMPLETED_STEPS = gql`
-    mutation SetWorkflowNodeCompletedSteps($workflowNode: ID!, $completedSteps: [String!]!) {
-        setWorkflowNodeCompletedSteps(
-            workflowNode: $workflowNode,
-            completedSteps: $completedSteps
-        ) {
-            _id
-            completedSteps
-        }
+  mutation SetWorkflowNodeCompletedSteps(
+    $workflowNode: ID!
+    $completedSteps: [String!]!
+  ) {
+    setWorkflowNodeCompletedSteps(
+      workflowNode: $workflowNode
+      completedSteps: $completedSteps
+    ) {
+      _id
+      completedSteps
     }
+  }
 `;
 
 export const UPDATE_WORKFLOW_NODE_ASSIGNEE = gql`
-    mutation UpdateWorkflowNodeAssignee($workflowNode: ID!, $assigneeId: String, $assigneeDisplayName: String) {
-        updateWorkflowNodeAssignee(
-            workflowNode: $workflowNode,
-            assigneeId: $assigneeId,
-            assigneeDisplayName: $assigneeDisplayName
-        ) {
-            _id
-            assigneeId
-            assigneeDisplayName
-        }
+  mutation UpdateWorkflowNodeAssignee(
+    $workflowNode: ID!
+    $assigneeId: String
+    $assigneeDisplayName: String
+  ) {
+    updateWorkflowNodeAssignee(
+      workflowNode: $workflowNode
+      assigneeId: $assigneeId
+      assigneeDisplayName: $assigneeDisplayName
+    ) {
+      _id
+      assigneeId
+      assigneeDisplayName
     }
+  }
 `;
 
 export const UPDATE_WORKFLOW_NODE_ESTIMATED_TIME = gql`
-    mutation UpdateWorkflowNodeEstimatedTime($workflowNode: ID!, $estimatedMinutes: Float) {
-        updateWorkflowNodeEstimatedTime(
-            workflowNode: $workflowNode,
-            estimatedMinutes: $estimatedMinutes
-        ) {
-            _id
-            estimatedMinutes
-        }
+  mutation UpdateWorkflowNodeEstimatedTime(
+    $workflowNode: ID!
+    $estimatedMinutes: Float
+  ) {
+    updateWorkflowNodeEstimatedTime(
+      workflowNode: $workflowNode
+      estimatedMinutes: $estimatedMinutes
+    ) {
+      _id
+      estimatedMinutes
     }
+  }
 `;
 
 /** Staff-only: open or close the customer's ability to edit a job's workflow graph. */
 export const SET_JOB_CUSTOMER_EDITING = gql`
-    mutation setJobCustomerEditing($jobId: ID!, $enabled: Boolean!) {
-        setJobCustomerEditing(jobId: $jobId, enabled: $enabled) {
-            id
-        }
+  mutation setJobCustomerEditing($jobId: ID!, $enabled: Boolean!) {
+    setJobCustomerEditing(jobId: $jobId, enabled: $enabled) {
+      id
     }
+  }
 `;
 
 export const REVIEW_JOB = gql`
-    mutation ReviewJob($input: ReviewJobInput!) {
-        reviewJob(input: $input) {
-            id
-            state
-            customerActionRequired
-            acceptedJobVersionNumber
-            acceptedBillingFingerprint
-        }
+  mutation ReviewJob($input: ReviewJobInput!) {
+    reviewJob(input: $input) {
+      id
+      state
+      customerActionRequired
+      acceptedJobVersionNumber
+      acceptedBillingFingerprint
     }
+  }
 `;
 
 export const RESPOND_TO_JOB_REVIEW = gql`
-    mutation RespondToJobReview($input: RespondToJobReviewInput!) {
-        respondToJobReview(input: $input) {
-            id
-            state
-            customerActionRequired
-            acceptedJobVersionNumber
-            acceptedBillingFingerprint
-        }
+  mutation RespondToJobReview($input: RespondToJobReviewInput!) {
+    respondToJobReview(input: $input) {
+      id
+      state
+      customerActionRequired
+      acceptedJobVersionNumber
+      acceptedBillingFingerprint
     }
+  }
 `;
 
 export const WITHDRAW_JOB_FROM_CUSTOMER = gql`
-    mutation WithdrawJobFromCustomer($input: WithdrawJobInput!) {
-        withdrawJobFromCustomer(input: $input) {
-            id
-            state
-            customerActionRequired
-            handoverVersionNumber
-        }
+  mutation WithdrawJobFromCustomer($input: WithdrawJobInput!) {
+    withdrawJobFromCustomer(input: $input) {
+      id
+      state
+      customerActionRequired
+      handoverVersionNumber
     }
+  }
 `;
 
 export const WITHDRAW_JOB_ACCEPTANCE = gql`
-    mutation WithdrawJobAcceptance($input: WithdrawJobInput!) {
-        withdrawJobAcceptance(input: $input) {
-            id
-            state
-            customerActionRequired
-            acceptedJobVersionNumber
-            acceptedBillingFingerprint
-        }
+  mutation WithdrawJobAcceptance($input: WithdrawJobInput!) {
+    withdrawJobAcceptance(input: $input) {
+      id
+      state
+      customerActionRequired
+      acceptedJobVersionNumber
+      acceptedBillingFingerprint
     }
+  }
 `;
 
 export const RESTORE_JOB_VERSION = gql`
-    mutation RestoreJobVersion($jobId: ID!, $versionNumber: Int!, $note: String) {
-        restoreJobVersion(jobId: $jobId, versionNumber: $versionNumber, note: $note) {
-            id
-            state
-        }
+  mutation RestoreJobVersion($jobId: ID!, $versionNumber: Int!, $note: String) {
+    restoreJobVersion(
+      jobId: $jobId
+      versionNumber: $versionNumber
+      note: $note
+    ) {
+      id
+      state
     }
+  }
 `;
 
 export const WITHDRAW_SOW_FROM_CUSTOMER = gql`
-    mutation WithdrawSowFromCustomer($sowId: ID!, $reason: String!) {
-        withdrawSowFromCustomer(sowId: $sowId, reason: $reason) {
-            id
-            status
-            currentVersionNumber
-            activeVersionNumber
-        }
+  mutation WithdrawSowFromCustomer($sowId: ID!, $reason: String!) {
+    withdrawSowFromCustomer(sowId: $sowId, reason: $reason) {
+      id
+      status
+      currentVersionNumber
+      activeVersionNumber
     }
+  }
 `;
 
 export const MUTATE_JOB_STATE = gql`
-    mutation changeJobState($ID: ID!, $State: JobState!, $Note: String) {
-        changeJobState(
-            job: $ID,
-            newState: $State,
-            note: $Note
-        ) {
-            id
-            state
-        }
+  mutation changeJobState($ID: ID!, $State: JobState!, $Note: String) {
+    changeJobState(job: $ID, newState: $State, note: $Note) {
+      id
+      state
     }
+  }
 `;
 
 export const SAVE_JOB_WORKFLOWS = gql`
-    mutation SaveJobWorkflows($input: SaveJobWorkflowsInput!) {
-        saveJobWorkflows(input: $input) {
-            id
-            state
-        }
+  mutation SaveJobWorkflows($input: SaveJobWorkflowsInput!) {
+    saveJobWorkflows(input: $input) {
+      id
+      state
     }
+  }
 `;
 
 export const CHANGE_JOB_CUSTOMER_CATEGORY = gql`
-    mutation ChangeJobCustomerCategory($jobId: ID!, $customerCategory: CustomerCategory!) {
-        changeJobCustomerCategory(jobId: $jobId, customerCategory: $customerCategory) {
-            id
-            customerCategory
-        }
+  mutation ChangeJobCustomerCategory(
+    $jobId: ID!
+    $customerCategory: CustomerCategory!
+  ) {
+    changeJobCustomerCategory(
+      jobId: $jobId
+      customerCategory: $customerCategory
+    ) {
+      id
+      customerCategory
     }
+  }
 `;
 
 export const ADD_WORKFLOW_TO_JOB = gql`
@@ -555,7 +573,10 @@ export const CREATE_BUG_REPORT = gql`
 `;
 
 export const CREATE_BUG_ATTACHMENT_UPLOAD_URLS = gql`
-  mutation CreateBugAttachmentUploadUrls($bugId: ID!, $files: [BugAttachmentUploadRequest!]!) {
+  mutation CreateBugAttachmentUploadUrls(
+    $bugId: ID!
+    $files: [BugAttachmentUploadRequest!]!
+  ) {
     createBugAttachmentUploadUrls(bugId: $bugId, files: $files) {
       filename
       uploadUrl
@@ -567,7 +588,10 @@ export const CREATE_BUG_ATTACHMENT_UPLOAD_URLS = gql`
 `;
 
 export const ADD_BUG_ATTACHMENTS = gql`
-  mutation AddBugAttachments($bugId: ID!, $attachments: [BugAttachmentInput!]!) {
+  mutation AddBugAttachments(
+    $bugId: ID!
+    $attachments: [BugAttachmentInput!]!
+  ) {
     addBugAttachments(bugId: $bugId, attachments: $attachments) {
       id
     }
@@ -575,7 +599,10 @@ export const ADD_BUG_ATTACHMENTS = gql`
 `;
 
 export const SET_USER_KEYCLOAK_CUSTOMER_CATEGORY = gql`
-  mutation SetUserKeycloakCustomerCategory($userId: ID!, $category: CustomerCategory) {
+  mutation SetUserKeycloakCustomerCategory(
+    $userId: ID!
+    $category: CustomerCategory
+  ) {
     setUserKeycloakCustomerCategory(userId: $userId, category: $category) {
       id
       username
@@ -677,14 +704,24 @@ export const CREATE_API_KEY = gql`
   mutation CreateApiKey($name: String!, $expiresAt: DateTime) {
     createApiKey(name: $name, expiresAt: $expiresAt) {
       key
-      apiKey { id name prefix scope createdAt }
+      apiKey {
+        id
+        name
+        prefix
+        scope
+        createdAt
+      }
     }
   }
 `;
 
 export const REVOKE_API_KEY = gql`
   mutation RevokeApiKey($id: ID!) {
-    revokeApiKey(id: $id) { id revoked revokedAt }
+    revokeApiKey(id: $id) {
+      id
+      revoked
+      revokedAt
+    }
   }
 `;
 
@@ -735,117 +772,140 @@ export const ADD_BACKLOG_COMMENT = gql`
  * Returns the existing SOW unchanged if the job already has one.
  */
 export const CREATE_SOW_FOR_JOB = gql`
-    mutation CreateSowForJob($jobId: ID!) {
-        createSowForJob(jobId: $jobId) {
-            id
-            sowNumber
-            status
-        }
+  mutation CreateSowForJob($jobId: ID!) {
+    createSowForJob(jobId: $jobId) {
+      id
+      sowNumber
+      status
     }
+  }
 `;
 
 export const SAVE_SOW_VERSION = gql`
-    mutation SaveSowVersion($sowId: ID!, $input: SaveSowVersionInput!) {
-        saveSowVersion(sowId: $sowId, input: $input) {
-            id
-            versionNumber
-            displayVersion
-            status
-        }
+  mutation SaveSowVersion($sowId: ID!, $input: SaveSowVersionInput!) {
+    saveSowVersion(sowId: $sowId, input: $input) {
+      id
+      versionNumber
+      displayVersion
+      status
     }
+  }
 `;
 
 export const SEND_SOW_TO_CUSTOMER = gql`
-    mutation SendSowToCustomer($sowId: ID!) {
-        sendSowToCustomer(sowId: $sowId) { id versionNumber displayVersion status }
+  mutation SendSowToCustomer($sowId: ID!) {
+    sendSowToCustomer(sowId: $sowId) {
+      id
+      versionNumber
+      displayVersion
+      status
     }
+  }
 `;
 
 export const FINALIZE_SOW = gql`
-    mutation FinalizeSow($sowId: ID!, $name: String!) {
-        finalizeSow(sowId: $sowId, name: $name) { id versionNumber displayVersion status }
+  mutation FinalizeSow($sowId: ID!, $name: String!) {
+    finalizeSow(sowId: $sowId, name: $name) {
+      id
+      versionNumber
+      displayVersion
+      status
     }
+  }
 `;
 
 export const DISCARD_SOW_DRAFT = gql`
-    mutation DiscardSowDraft($sowId: ID!, $versionNumber: Int!) {
-        discardSowDraft(sowId: $sowId, versionNumber: $versionNumber) {
-            id
-            currentVersionNumber
-            activeVersionNumber
-        }
+  mutation DiscardSowDraft($sowId: ID!, $versionNumber: Int!) {
+    discardSowDraft(sowId: $sowId, versionNumber: $versionNumber) {
+      id
+      currentVersionNumber
+      activeVersionNumber
     }
+  }
 `;
 
 export const RESTORE_SOW_SIGNED_VERSION = gql`
-    mutation RestoreSowSignedVersion($sowId: ID!, $versionNumber: Int!) {
-        restoreSowSignedVersion(sowId: $sowId, versionNumber: $versionNumber) {
-            id
-            currentVersionNumber
-            activeVersionNumber
-        }
+  mutation RestoreSowSignedVersion($sowId: ID!, $versionNumber: Int!) {
+    restoreSowSignedVersion(sowId: $sowId, versionNumber: $versionNumber) {
+      id
+      currentVersionNumber
+      activeVersionNumber
     }
+  }
 `;
 
 export const CANCEL_SOW = gql`
-    mutation CancelSow($sowId: ID!, $note: String) {
-        cancelSow(sowId: $sowId, note: $note) { id versionNumber status }
+  mutation CancelSow($sowId: ID!, $note: String) {
+    cancelSow(sowId: $sowId, note: $note) {
+      id
+      versionNumber
+      status
     }
+  }
 `;
 
 export const SIGN_SOW = gql`
-    mutation SignSow($sowId: ID!, $input: SignSowInput!) {
-        signSow(sowId: $sowId, input: $input) {
-            id
-            versionNumber
-            status
-            clientSignature { name signedAt consentedGroups sectionInitials { key label initials } }
+  mutation SignSow($sowId: ID!, $input: SignSowInput!) {
+    signSow(sowId: $sowId, input: $input) {
+      id
+      versionNumber
+      status
+      clientSignature {
+        name
+        signedAt
+        consentedGroups
+        sectionInitials {
+          key
+          label
+          initials
         }
+      }
     }
+  }
 `;
 
 /* SOW text blocks — see GET_SOW_TEXT_PRESETS in queries.tsx. */
 
 export const CREATE_SOW_TEXT_PRESET = gql`
-    mutation createSowTextPreset($preset: CreateSowTextPresetInput!) {
-        createSowTextPreset(preset: $preset) {
-            id
-            sectionKey
-            name
-            text
-            order
-            updatedAt
-            updatedByName
-        }
+  mutation createSowTextPreset($preset: CreateSowTextPresetInput!) {
+    createSowTextPreset(preset: $preset) {
+      id
+      sectionKey
+      name
+      text
+      order
+      updatedAt
+      updatedByName
     }
+  }
 `;
 
 export const UPDATE_SOW_TEXT_PRESET = gql`
-    mutation updateSowTextPreset($id: ID!, $changes: UpdateSowTextPresetInput!) {
-        updateSowTextPreset(id: $id, changes: $changes) {
-            id
-            name
-            text
-            updatedAt
-            updatedByName
-        }
+  mutation updateSowTextPreset($id: ID!, $changes: UpdateSowTextPresetInput!) {
+    updateSowTextPreset(id: $id, changes: $changes) {
+      id
+      name
+      text
+      updatedAt
+      updatedByName
     }
+  }
 `;
 
 export const DELETE_SOW_TEXT_PRESET = gql`
-    mutation deleteSowTextPreset($id: ID!) {
-        deleteSowTextPreset(id: $id)
-    }
+  mutation deleteSowTextPreset($id: ID!) {
+    deleteSowTextPreset(id: $id)
+  }
 `;
 
 export const REORDER_SOW_TEXT_PRESETS = gql`
-    mutation reorderSowTextPresets($order: ReorderSowTextPresetsInput!) {
-        reorderSowTextPresets(order: $order) {
-            id
-            name
-            order
-        }
+  mutation reorderSowTextPresets($order: ReorderSowTextPresetsInput!) {
+    reorderSowTextPresets(order: $order) {
+      id
+      name
+      order
     }
+  }
 `;
 
 /**
@@ -854,25 +914,25 @@ export const REORDER_SOW_TEXT_PRESETS = gql`
  * move a card to COMPLETE, but only an administrator can take it off the board.
  */
 export const ARCHIVE_WORKFLOW_NODE = gql`
-    mutation ArchiveWorkflowNode($workflowNode: ID!) {
-        archiveWorkflowNode(workflowNode: $workflowNode) {
-            _id
-            isArchived
-            archivedAt
-            archivedBy
-            archivedFromState
-        }
+  mutation ArchiveWorkflowNode($workflowNode: ID!) {
+    archiveWorkflowNode(workflowNode: $workflowNode) {
+      _id
+      isArchived
+      archivedAt
+      archivedBy
+      archivedFromState
     }
+  }
 `;
 
 export const UNARCHIVE_WORKFLOW_NODE = gql`
-    mutation UnarchiveWorkflowNode($workflowNode: ID!) {
-        unarchiveWorkflowNode(workflowNode: $workflowNode) {
-            _id
-            isArchived
-            state
-        }
+  mutation UnarchiveWorkflowNode($workflowNode: ID!) {
+    unarchiveWorkflowNode(workflowNode: $workflowNode) {
+      _id
+      isArchived
+      state
     }
+  }
 `;
 
 // ─── Learning Hub ─────────────────────────────────────────────────────────
@@ -912,15 +972,18 @@ export const UPDATE_TRAINING_RESOURCE = gql`
 
 /** Rejected server-side for a non-PDF or an oversized file, before any URL is minted. */
 export const CREATE_TRAINING_FILE_UPLOAD_URL = gql`
-    mutation CreateTrainingFileUploadUrl($resourceId: ID!, $file: TrainingFileUploadRequest!) {
-        createTrainingFileUploadUrl(resourceId: $resourceId, file: $file) {
-            filename
-            uploadUrl
-            key
-            contentType
-            size
-        }
+  mutation CreateTrainingFileUploadUrl(
+    $resourceId: ID!
+    $file: TrainingFileUploadRequest!
+  ) {
+    createTrainingFileUploadUrl(resourceId: $resourceId, file: $file) {
+      filename
+      uploadUrl
+      key
+      contentType
+      size
     }
+  }
 `;
 
 export const ATTACH_TRAINING_FILE = gql`
@@ -932,7 +995,35 @@ export const ATTACH_TRAINING_FILE = gql`
 `;
 
 export const DELETE_TRAINING_RESOURCE = gql`
-    mutation DeleteTrainingResource($id: ID!) {
-        deleteTrainingResource(id: $id)
+  mutation DeleteTrainingResource($id: ID!) {
+    deleteTrainingResource(id: $id)
+  }
+`;
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export const MARK_NOTIFICATION_READ = gql`
+  mutation MarkNotificationRead($id: ID!) {
+    markNotificationRead(id: $id) {
+      id
+      readAt
     }
+  }
+`;
+
+export const MARK_ALL_NOTIFICATIONS_READ = gql`
+  mutation MarkAllNotificationsRead {
+    markAllNotificationsRead
+  }
+`;
+
+export const UPDATE_NOTIFICATION_PREFERENCES = gql`
+  mutation UpdateNotificationPreferences(
+    $input: UpdateNotificationPreferencesInput!
+  ) {
+    updateNotificationPreferences(input: $input) {
+      emailDisabledEventTypes
+      inAppDisabledEventTypes
+    }
+  }
 `;
