@@ -234,7 +234,7 @@ const handleSubmitJob = async () => {
         Required Details
       </Typography>
 
-      <Grid item xs={12} sx={{ mb: 3 }}>
+      <Grid sx={{ mb: 3 }}>
         <TextField
           fullWidth
           label="Job Name"
@@ -257,8 +257,8 @@ const handleSubmitJob = async () => {
       </Typography>
 
       {/* Non-editable contact info */}
-      <Grid item xs={12} container spacing={0.5} direction="row">
-        <Grid item xs={4} sx={{ mb: 1 }}>
+      <Grid container spacing={0.5} direction="row">
+        <Grid sx={{ mb: 1 }}>
           <TextField
             label="Your Name" 
             value={name ?? ''}
@@ -266,7 +266,7 @@ const handleSubmitJob = async () => {
             disabled
           />
         </Grid>
-        <Grid item xs={4} sx={{ mb: 1 }}>
+        <Grid sx={{ mb: 1 }}>
           <TextField
             label="Email"
             value={email ?? ''}
@@ -275,7 +275,7 @@ const handleSubmitJob = async () => {
           />
         </Grid>
 
-        <Grid item xs={4} sx={{ mb: 1 }}>
+        <Grid sx={{ mb: 1 }}>
           <TextField
             label="Institute"
             required
@@ -293,7 +293,7 @@ const handleSubmitJob = async () => {
         Additional Notes
       </Typography>
       <Grid container spacing={0.5} direction="column">
-        <Grid item xs={12} sx={{ mb: 1 }}>
+        <Grid sx={{ mb: 1 }}>
           <TextField
             label="Notes"
             value={formData.notes ?? ''}
@@ -311,7 +311,7 @@ const handleSubmitJob = async () => {
       <Typography variant="body2" sx={{ mb: 1, color: 'text.secondary', textAlign: 'left' }}>
         You can select files to attach to this job. Uploaded files will be included with your submission.
       </Typography>
-      <Grid item xs={12} sx={{ mb: 2 }}>
+      <Grid sx={{ mb: 2 }}>
         <Button
           variant="outlined"
           component="label"

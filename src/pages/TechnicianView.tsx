@@ -13,6 +13,7 @@ import ReceiptLongIcon                                from '@mui/icons-material/
 import RefreshIcon                                    from '@mui/icons-material/Refresh';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
+import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
@@ -73,6 +74,9 @@ export default function TechnicianView() {
     const [jobName, setJobName]               = useState('');
     const [jobState, setJobState]             = useState('');
     const [jobTime, setJobTime]               = useState('');
+    const [submitter, setSubmitter] = useState<JobSubmitterSummary>({ user: '', onBehalfOf: null, organization: '' });
+    // Kept as their own slots because the job PDF and the feedback modal take them
+    // as separate props; the header reads `submitter` instead.
     const [jobUsername, setJobUsername]       = useState('');
     const [jobInstitution, setJobInstitution] = useState('');
     const [jobEmail, setJobEmail]             = useState('');
@@ -101,6 +105,7 @@ export default function TechnicianView() {
         setJobName(job.name ?? '');
         setJobState(job.state ?? '');
         setJobTime(job.submitted ?? '');
+        setSubmitter(summarizeJobSubmitter(job));
         setJobUsername(job.clientDisplayName || job.username || '');
         setJobInstitution(job.institute ?? '');
         setJobEmail(job.email ?? '');
@@ -503,10 +508,11 @@ export default function TechnicianView() {
                         {jobState === 'CLOSED' ? 'Job closed' : closingJob ? 'Closing…' : 'Close job'}
                     </Button>
                 </Box>
-                <Box sx={{ mx: 3, fontSize: 13, mb: 2 }}>
+                <Box sx={{ fontSize: 13, mb: 2, textAlign: 'left' }}>
                     <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
-                    <p><b>User:</b> {jobUsername} ({jobEmail})</p>
-                    <p><b>Organization:</b> {jobInstitution}</p>
+                    <p><b>User:</b> {submitter.user}</p>
+                    {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
+                    <p><b>Organization:</b> {submitter.organization}</p>
                 </Box>
 
                 {sowCreateError && (

@@ -129,6 +129,7 @@ export const GET_JOB_BY_ID = gql`
             name
             username
             clientDisplayName
+            clientEmail
             institute
             email
             customerCategory
@@ -249,6 +250,7 @@ export const GET_OWN_JOB_BY_ID = gql`
             name
             username
             clientDisplayName
+            clientEmail
             institute
             email
             customerCategory
@@ -420,7 +422,7 @@ export const JOBS_FOR_VIEWER = gql`
 export const JOB_CLIENTS = gql`
     query JobClients {
         jobClients {
-            sub
+            clientKey
             displayName
         }
     }
