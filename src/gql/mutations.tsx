@@ -936,3 +936,29 @@ export const DELETE_TRAINING_RESOURCE = gql`
         deleteTrainingResource(id: $id)
     }
 `;
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export const MARK_NOTIFICATION_READ = gql`
+    mutation MarkNotificationRead($id: ID!) {
+        markNotificationRead(id: $id) {
+            id
+            readAt
+        }
+    }
+`;
+
+export const MARK_ALL_NOTIFICATIONS_READ = gql`
+    mutation MarkAllNotificationsRead {
+        markAllNotificationsRead
+    }
+`;
+
+export const UPDATE_NOTIFICATION_PREFERENCES = gql`
+    mutation UpdateNotificationPreferences($input: UpdateNotificationPreferencesInput!) {
+        updateNotificationPreferences(input: $input) {
+            emailDisabledEventTypes
+            inAppDisabledEventTypes
+        }
+    }
+`;

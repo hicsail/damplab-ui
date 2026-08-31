@@ -20,6 +20,7 @@ import { PERMISSIONS, canFor } from '../hooks/usePermissions';
 import AppNavDrawer from './AppNavDrawer';
 import LoadCanvasButton from './LoadCanvasButton';
 import SaveCanvasButton from './SaveCanvasButton';
+import NotificationBell from './NotificationBell';
 import "../styles/resubmit.css";
 
 export default function HeaderBar() {
@@ -180,6 +181,8 @@ export default function HeaderBar() {
                     </Button>
 
                     <div style={{ marginLeft: 'auto', marginRight: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+
+                        <NotificationBell />
 
                         {isActualStaff && (<>
                             <Tooltip title={previewTier

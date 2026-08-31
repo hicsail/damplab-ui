@@ -1809,3 +1809,38 @@ export const GET_PROTOCOL_LIBRARY = gql`
         }
     }
 `;
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export const MY_UNREAD_NOTIFICATION_COUNT = gql`
+    query MyUnreadNotificationCount {
+        myUnreadNotificationCount
+    }
+`;
+
+export const MY_NOTIFICATIONS = gql`
+    query MyNotifications($limit: Int, $offset: Int) {
+        myNotifications(limit: $limit, offset: $offset) {
+            items {
+                id
+                createdAt
+                eventType
+                title
+                message
+                link
+                readAt
+                actorDisplayName
+            }
+            unreadCount
+        }
+    }
+`;
+
+export const MY_NOTIFICATION_PREFERENCES = gql`
+    query MyNotificationPreferences {
+        myNotificationPreferences {
+            emailDisabledEventTypes
+            inAppDisabledEventTypes
+        }
+    }
+`;
