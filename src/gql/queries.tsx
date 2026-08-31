@@ -1,42 +1,42 @@
 // someday: import from @apollo/client once Apollo Client 4 is out (which will address ESM issues) - see discussion at
 // https://github.com/apollographql/apollo-client/issues/9976#issuecomment-1768446694
-import { gql } from '@apollo/client/index.js';
+import { gql } from "@apollo/client/index.js";
 
 export const GET_SERVICES = gql`
-    query GetServices {
-        services {
-            id
-            name
-            serviceCategoryNumber
-            serviceCategoryName
-            unit
-            price
-            internalPrice
-            externalPrice
-            pricing {
-                internal
-                external
-                externalAcademic
-                externalMarket
-                externalNoSalary
-                legacy
-            }
-            pricingMode
-            allowMultipleRuns
-            icon
-            parameters
-            description
-            paramGroups
-            deliverables
-            allowedConnections {
-                id
-                name
-            }
-            inventoryRequirements
-            notes
-            protocolIds
-        }
+  query GetServices {
+    services {
+      id
+      name
+      serviceCategoryNumber
+      serviceCategoryName
+      unit
+      price
+      internalPrice
+      externalPrice
+      pricing {
+        internal
+        external
+        externalAcademic
+        externalMarket
+        externalNoSalary
+        legacy
+      }
+      pricingMode
+      allowMultipleRuns
+      icon
+      parameters
+      description
+      paramGroups
+      deliverables
+      allowedConnections {
+        id
+        name
+      }
+      inventoryRequirements
+      notes
+      protocolIds
     }
+  }
 `;
 
 /**
@@ -49,338 +49,338 @@ export const GET_SERVICES = gql`
  * client-side permission check.
  */
 export const GET_CATALOG_SERVICES = gql`
-    query GetCatalogServices {
-        catalogServices {
-            id
-            name
-            description
-            serviceCategoryName
-            unit
-            price
-            pricingModeLabel
-            parameterCount
-            pricing {
-                internal
-                externalAcademic
-                externalMarket
-                externalNoSalary
-            }
-            parameters
-        }
+  query GetCatalogServices {
+    catalogServices {
+      id
+      name
+      description
+      serviceCategoryName
+      unit
+      price
+      pricingModeLabel
+      parameterCount
+      pricing {
+        internal
+        externalAcademic
+        externalMarket
+        externalNoSalary
+      }
+      parameters
     }
+  }
 `;
 
 export const GET_BUNDLES = gql`
-    query GetBundles {
-        bundles {
-            id
-            label
-            icon
-            services {
-                id
-                name
-                icon
-                parameters
-            }
-        }
+  query GetBundles {
+    bundles {
+      id
+      label
+      icon
+      services {
+        id
+        name
+        icon
+        parameters
+      }
     }
+  }
 `;
 
 export const GET_BUNDLES_WITH_INVENTORY = gql`
-    query GetBundlesWithInventory {
-        bundles {
-            id
-            label
-            icon
-            services {
-                id
-                name
-                icon
-                inventoryRequirements
-            }
-        }
+  query GetBundlesWithInventory {
+    bundles {
+      id
+      label
+      icon
+      services {
+        id
+        name
+        icon
+        inventoryRequirements
+      }
     }
+  }
 `;
 
 export const GET_CATEGORIES = gql`
-    query categories {
-        categories {
-            id
-            label
-            services {
-                id
-                name
-                icon
-                parameters
-                allowedConnections {
-                    id
-                }
-            }
+  query categories {
+    categories {
+      id
+      label
+      services {
+        id
+        name
+        icon
+        parameters
+        allowedConnections {
+          id
         }
+      }
     }
+  }
 `;
 
 export const GET_JOB_BY_ID = gql`
-    query JobById($id: ID!) {
-        jobById(id: $id) {
+  query JobById($id: ID!) {
+    jobById(id: $id) {
+      id
+      latestContentVersionNumber
+      jobId
+      name
+      username
+      clientDisplayName
+      institute
+      email
+      customerCategory
+      state
+      customerActionRequired
+      handoverVersionNumber
+      acceptedJobVersionNumber
+      acceptedBillingFingerprint
+      submitted
+      notes
+      attachments {
+        filename
+        url
+        uploadedAt
+      }
+      sow {
+        id
+        sowNumber
+        date
+        status
+        createdAt
+        updatedAt
+      }
+      workflows {
+        id
+        state
+        name
+        nodes {
+          _id
+          id
+          label
+          price
+          service {
             id
-            latestContentVersionNumber
-            jobId
             name
-            username
-            clientDisplayName
-            institute
-            email
-            customerCategory
-            state
-            customerActionRequired
-            handoverVersionNumber
-            acceptedJobVersionNumber
-            acceptedBillingFingerprint
-            submitted
-            notes
-            attachments {
-                filename
-                url
-                uploadedAt
+            price
+            internalPrice
+            externalPrice
+            pricing {
+              internal
+              external
+              externalAcademic
+              externalMarket
+              externalNoSalary
+              legacy
             }
-            sow {
-                id
-                sowNumber
-                date
-                status
-                createdAt
-                updatedAt
+            pricingMode
+            allowMultipleRuns
+            icon
+            parameters
+            deliverables
+            allowedConnections {
+              id
+              name
             }
-            workflows {
-                id
-                state
-                name
-                nodes {
-                    _id
-                    id
-                    label
-                    price
-                    service {
-                        id
-                        name
-                        price
-                        internalPrice
-                        externalPrice
-                        pricing {
-                            internal
-                            external
-                            externalAcademic
-                            externalMarket
-                            externalNoSalary
-                            legacy
-                        }
-                        pricingMode
-                        allowMultipleRuns
-                        icon
-                        parameters
-                        deliverables
-                        allowedConnections {
-                            id
-                            name
-                        }
-                    }
-                    formData
-                    state
-                    additionalInstructions
-                    usedInventory
-                    reactNode
-                }
-                edges {
-                    id
-                    reactEdge
-                    source {
-                        id
-                    }
-                    target {
-                        id
-                    }
-                }
-            }
-            versions {
-                id
-                versionNumber
-                displayVersion
-                visibleToCustomer
-                authorRole
-                jobState
-                isEvent
-                createdAt
-                createdByName
-                note
-                workflows {
-                    workflowId
-                    name
-                    nodes {
-                        id
-                        label
-                        serviceId
-                        serviceName
-                        formData
-                        additionalInstructions
-                        price
-                        position {
-                            x
-                            y
-                        }
-                    }
-                    edges {
-                        id
-                        source
-                        target
-                    }
-                }
-            }
+          }
+          formData
+          state
+          additionalInstructions
+          usedInventory
+          reactNode
         }
+        edges {
+          id
+          reactEdge
+          source {
+            id
+          }
+          target {
+            id
+          }
+        }
+      }
+      versions {
+        id
+        versionNumber
+        displayVersion
+        visibleToCustomer
+        authorRole
+        jobState
+        isEvent
+        createdAt
+        createdByName
+        note
+        workflows {
+          workflowId
+          name
+          nodes {
+            id
+            label
+            serviceId
+            serviceName
+            formData
+            additionalInstructions
+            price
+            position {
+              x
+              y
+            }
+          }
+          edges {
+            id
+            source
+            target
+          }
+        }
+      }
     }
+  }
 `;
 
 export const GET_OWN_JOB_BY_ID = gql`
-    query ownJobById($id: ID!) {
-        ownJobById(id: $id) {
+  query ownJobById($id: ID!) {
+    ownJobById(id: $id) {
+      id
+      latestContentVersionNumber
+      jobId
+      name
+      username
+      clientDisplayName
+      institute
+      email
+      customerCategory
+      state
+      customerActionRequired
+      handoverVersionNumber
+      acceptedJobVersionNumber
+      acceptedBillingFingerprint
+      submitted
+      notes
+      attachments {
+        filename
+        url
+        uploadedAt
+      }
+      sow {
+        id
+        sowNumber
+        date
+        status
+        createdAt
+        updatedAt
+      }
+      workflows {
+        id
+        state
+        name
+        nodes {
+          _id
+          id
+          label
+          price
+          service {
             id
-            latestContentVersionNumber
-            jobId
             name
-            username
-            clientDisplayName
-            institute
-            email
-            customerCategory
-            state
-            customerActionRequired
-            handoverVersionNumber
-            acceptedJobVersionNumber
-            acceptedBillingFingerprint
-            submitted
-            notes
-            attachments {
-                filename
-                url
-                uploadedAt
+            price
+            internalPrice
+            externalPrice
+            pricing {
+              internal
+              external
+              externalAcademic
+              externalMarket
+              externalNoSalary
+              legacy
             }
-            sow {
-                id
-                sowNumber
-                date
-                status
-                createdAt
-                updatedAt
+            pricingMode
+            allowMultipleRuns
+            icon
+            parameters
+            allowedConnections {
+              id
+              name
             }
-            workflows {
-                id
-                state
-                name
-                nodes {
-                    _id
-                    id
-                    label
-                    price
-                    service {
-                        id
-                        name
-                        price
-                        internalPrice
-                        externalPrice
-                        pricing {
-                            internal
-                            external
-                            externalAcademic
-                            externalMarket
-                            externalNoSalary
-                            legacy
-                        }
-                        pricingMode
-                        allowMultipleRuns
-                        icon
-                        parameters
-                        allowedConnections {
-                            id
-                            name
-                        }
-                    }
-                    formData
-                    state
-                    additionalInstructions
-                    usedInventory
-                    reactNode
-                }
-                edges {
-                    id
-                    reactEdge
-                    source {
-                        id
-                    }
-                    target {
-                        id
-                    }
-                }
-            }
-            versions {
-                id
-                versionNumber
-                displayVersion
-                visibleToCustomer
-                authorRole
-                jobState
-                isEvent
-                createdAt
-                createdByName
-                note
-                workflows {
-                    workflowId
-                    name
-                    nodes {
-                        id
-                        label
-                        serviceId
-                        serviceName
-                        formData
-                        additionalInstructions
-                        price
-                        position {
-                            x
-                            y
-                        }
-                    }
-                    edges {
-                        id
-                        source
-                        target
-                    }
-                }
-            }
+          }
+          formData
+          state
+          additionalInstructions
+          usedInventory
+          reactNode
         }
+        edges {
+          id
+          reactEdge
+          source {
+            id
+          }
+          target {
+            id
+          }
+        }
+      }
+      versions {
+        id
+        versionNumber
+        displayVersion
+        visibleToCustomer
+        authorRole
+        jobState
+        isEvent
+        createdAt
+        createdByName
+        note
+        workflows {
+          workflowId
+          name
+          nodes {
+            id
+            label
+            serviceId
+            serviceName
+            formData
+            additionalInstructions
+            price
+            position {
+              x
+              y
+            }
+          }
+          edges {
+            id
+            source
+            target
+          }
+        }
+      }
     }
+  }
 `;
 
 /** Paginated, filterable own jobs (Jobs list API). */
 export const OWN_JOBS = gql`
-    query OwnJobs($input: OwnJobsInput) {
-        ownJobs(input: $input) {
-            items {
-                id
-                name
-                state
-                submitted
-                username
-                institute
-                email
-                sow {
-                    id
-                    sowNumber
-                    sowTitle
-                    status
-                }
-            }
-            totalCount
+  query OwnJobs($input: OwnJobsInput) {
+    ownJobs(input: $input) {
+      items {
+        id
+        name
+        state
+        submitted
+        username
+        institute
+        email
+        sow {
+          id
+          sowNumber
+          sowTitle
+          status
         }
+      }
+      totalCount
     }
+  }
 `;
 
 /** Paginated, filterable all jobs – staff only (Dashboard). */
@@ -390,67 +390,67 @@ export const OWN_JOBS = gql`
  * client sending `scope: ALL` gets their own jobs rather than an error.
  */
 export const JOBS_FOR_VIEWER = gql`
-    query JobsForViewer($input: JobsForViewerInput) {
-        jobsForViewer(input: $input) {
-            items {
-                id
-                name
-                state
-                submitted
-                username
-                institute
-                email
-                isArchived
-                archivedAt
-                archivedBy
-                archivedFromState
-                sow {
-                    id
-                    sowNumber
-                    sowTitle
-                    status
-                }
-            }
-            totalCount
+  query JobsForViewer($input: JobsForViewerInput) {
+    jobsForViewer(input: $input) {
+      items {
+        id
+        name
+        state
+        submitted
+        username
+        institute
+        email
+        isArchived
+        archivedAt
+        archivedBy
+        archivedFromState
+        sow {
+          id
+          sowNumber
+          sowTitle
+          status
         }
+      }
+      totalCount
     }
+  }
 `;
 
 /** Distinct submitters, for the jobs page's client filter. jobs:view-all. */
 export const JOB_CLIENTS = gql`
-    query JobClients {
-        jobClients {
-            sub
-            displayName
-        }
+  query JobClients {
+    jobClients {
+      sub
+      displayName
     }
+  }
 `;
 
 export const ALL_JOBS = gql`
-    query AllJobs($input: AllJobsInput) {
-        allJobs(input: $input) {
-            items {
-                id
-                name
-                state
-                submitted
-                username
-                institute
-                email
-                isArchived
-                archivedAt
-                archivedBy
-                archivedFromState
-                sow {
-                    id
-                    sowNumber
-                    sowTitle
-                    status
-                }
-            }
-            totalCount
+  query AllJobs($input: AllJobsInput) {
+    allJobs(input: $input) {
+      items {
+        id
+        name
+        state
+        submitted
+        username
+        institute
+        email
+        isArchived
+        archivedAt
+        archivedBy
+        archivedFromState
+        sow {
+          id
+          sowNumber
+          sowTitle
+          status
         }
+      }
+      totalCount
     }
+  }
 `;
 
 export const JOBS_FEED_STATUS = gql`
@@ -483,160 +483,163 @@ export const ACTIVITY_EVENTS = gql`
 
 // get workflows from gql
 export const GET_WORKFLOWS_BY_STATE = gql`
-    query GetWorkflowsByState($state: WorkflowState!) {
-        getWorkflowByState(state: $state) {
-                id
-                state
-                name
-                nodes {
-                    service {
-                        name
-                        icon
-                    }
-                    formData
-                }
-                edges {
-                    source {
-                        id
-                    }
-                    target {
-                        id
-                    }
-                }
+  query GetWorkflowsByState($state: WorkflowState!) {
+    getWorkflowByState(state: $state) {
+      id
+      state
+      name
+      nodes {
+        service {
+          name
+          icon
         }
+        formData
+      }
+      edges {
+        source {
+          id
+        }
+        target {
+          id
+        }
+      }
     }
+  }
 `;
 
 // workflow retrieval by state:(QUEUED | IN_PROGRESS | COMPLETE)
 export const GET_WORKFLOWS_FOR_DOMINOS = gql`
-    query GetWorkflowByState($state: WorkflowState!) {
-        getWorkflowByState(state: $state) {
-            id
-            name
-            state
-            # dueDate
-            # timeCompleted
-            nodes {
-                id
-                _id
-                label
-                state
-                # technicianFirst
-                # technicianLast
-                service {
-                    icon
-                }
-            }
+  query GetWorkflowByState($state: WorkflowState!) {
+    getWorkflowByState(state: $state) {
+      id
+      name
+      state
+      # dueDate
+      # timeCompleted
+      nodes {
+        id
+        _id
+        label
+        state
+        # technicianFirst
+        # technicianLast
+        service {
+          icon
         }
+      }
     }
+  }
 `;
 
 // Lab monitor: workflows with parent job (name, submitted for sort)
 export const GET_WORKFLOWS_FOR_LAB_MONITOR = gql`
-    query GetWorkflowsForLabMonitor($state: WorkflowState!) {
-        getWorkflowByState(state: $state) {
-            id
-            name
-            state
-            job {
-                id
-                name
-                submitted
-            }
-        }
+  query GetWorkflowsForLabMonitor($state: WorkflowState!) {
+    getWorkflowByState(state: $state) {
+      id
+      name
+      state
+      job {
+        id
+        name
+        submitted
+      }
     }
+  }
 `;
 
 // Lab monitor: only approved-job workflows, with nodes and service names (for service-level cards)
 export const GET_LAB_MONITOR_OPERATIONS = gql`
-    query GetLabMonitorOperations($state: WorkflowState!) {
-        getWorkflowsByStateForLabMonitor(state: $state) {
-            id
-            state
-            job {
-                id
-                name
-                submitted
-            }
-            nodes {
-                _id
-                id
-                label
-                state
-                assigneeId
-                assigneeDisplayName
-                estimatedMinutes
-                startedAt
-                service {
-                    name
-                }
-            }
+  query GetLabMonitorOperations($state: WorkflowState!) {
+    getWorkflowsByStateForLabMonitor(state: $state) {
+      id
+      state
+      job {
+        id
+        name
+        submitted
+      }
+      nodes {
+        _id
+        id
+        label
+        state
+        assigneeId
+        assigneeDisplayName
+        estimatedMinutes
+        startedAt
+        service {
+          name
         }
+      }
     }
+  }
 `;
 
 // Lab monitor: nodes by node state (for drag-drop columns). One query per column.
 export const GET_LAB_MONITOR_NODES = gql`
-    query GetLabMonitorNodes($nodeState: WorkflowNodeState!, $archiveFilter: NodeArchiveFilter) {
-        getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter) {
-            _id
-            id
-            label
-            state
-            isArchived
-            archivedAt
-            archivedBy
-            archivedFromState
-            assigneeId
-            assigneeDisplayName
-            estimatedMinutes
-            startedAt
-            usedInventory
-            service {
-                id
-                name
-                inventoryRequirements
-            }
-            workflow {
-                id
-                job {
-                    id
-                    name
-                    submitted
-                }
-            }
+  query GetLabMonitorNodes(
+    $nodeState: WorkflowNodeState!
+    $archiveFilter: NodeArchiveFilter
+  ) {
+    getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter) {
+      _id
+      id
+      label
+      state
+      isArchived
+      archivedAt
+      archivedBy
+      archivedFromState
+      assigneeId
+      assigneeDisplayName
+      estimatedMinutes
+      startedAt
+      usedInventory
+      service {
+        id
+        name
+        inventoryRequirements
+      }
+      workflow {
+        id
+        job {
+          id
+          name
+          submitted
         }
+      }
     }
+  }
 `;
 
 export const GET_LAB_MONITOR_STAFF_LIST = gql`
-    query GetLabMonitorStaffList {
-        getLabMonitorStaffList {
-            id
-            displayName
-        }
+  query GetLabMonitorStaffList {
+    getLabMonitorStaffList {
+      id
+      displayName
     }
+  }
 `;
 
 // generally run with IDs retrieved from GetWorkflowsByState; needed for Dashboard (which displays all submitted jobs)
 export const GET_JOB_BY_WORKFLOW_ID = gql`
-    query JobByWorkflowId($id: ID!) {
-        jobByWorkflowId(workflow: $id) {
-            id
-            name
-            username
-            institute
-            email
-            submitted
-            notes
-            state
-            sow {
-                id
-                sowNumber
-                status
-            }
-        }
+  query JobByWorkflowId($id: ID!) {
+    jobByWorkflowId(workflow: $id) {
+      id
+      name
+      username
+      institute
+      email
+      submitted
+      notes
+      state
+      sow {
+        id
+        sowNumber
+        status
+      }
     }
+  }
 `;
 
 export const DELETE_CATEGORY = gql`
@@ -757,13 +760,12 @@ export const CREATE_SERVICE = gql`
       deliverables
       protocolIds
       allowedConnections {
-          id
-          name
+        id
+        name
       }
     }
   }
 `;
-
 
 /**
  * Announcements the caller may see. The server filters by audience — this query
@@ -1267,13 +1269,25 @@ export const GET_PUBLIC_INVENTORY_ITEMS = gql`
       location
       quantity
       bookable
-      placements { stationId quantity }
+      placements {
+        stationId
+        quantity
+      }
       tags
       modelNumber
       hasServiceContract
-      dimensionL { value unit }
-  dimensionW { value unit }
-  dimensionH { value unit }
+      dimensionL {
+        value
+        unit
+      }
+      dimensionW {
+        value
+        unit
+      }
+      dimensionH {
+        value
+        unit
+      }
     }
   }
 `;
@@ -1448,8 +1462,18 @@ export const GET_IN_PROGRESS_NODES_HOLDING_INVENTORY = gql`
 // Set the inventory items a node is holding, with an optional planned time window.
 // Rejects items conflicting with other operations OR calendar bookings (shared pool).
 export const SET_WORKFLOW_NODE_USED_INVENTORY = gql`
-  mutation SetWorkflowNodeUsedInventory($_ID: ID!, $inventoryIds: [ID!]!, $reservationStart: DateTime, $reservationEnd: DateTime) {
-    setWorkflowNodeUsedInventory(workflowNode: $_ID, inventoryIds: $inventoryIds, reservationStart: $reservationStart, reservationEnd: $reservationEnd) {
+  mutation SetWorkflowNodeUsedInventory(
+    $_ID: ID!
+    $inventoryIds: [ID!]!
+    $reservationStart: DateTime
+    $reservationEnd: DateTime
+  ) {
+    setWorkflowNodeUsedInventory(
+      workflowNode: $_ID
+      inventoryIds: $inventoryIds
+      reservationStart: $reservationStart
+      reservationEnd: $reservationEnd
+    ) {
       _id
       state
       usedInventory
@@ -1461,7 +1485,11 @@ export const SET_WORKFLOW_NODE_USED_INVENTORY = gql`
 
 // Inventory items unavailable in a window — shared pool across operations + bookings.
 export const GET_INVENTORY_AVAILABILITY = gql`
-  query InventoryAvailability($from: DateTime, $to: DateTime, $excludeNodeId: ID) {
+  query InventoryAvailability(
+    $from: DateTime
+    $to: DateTime
+    $excludeNodeId: ID
+  ) {
     inventoryAvailability(from: $from, to: $to, excludeNodeId: $excludeNodeId) {
       itemId
       source
@@ -1471,7 +1499,6 @@ export const GET_INVENTORY_AVAILABILITY = gql`
     }
   }
 `;
-
 
 export const GET_API_KEYS = gql`
   query ApiKeys {
@@ -1526,7 +1553,10 @@ export const UPDATE_STATION = gql`
 
 export const DELETE_STATION = gql`
   mutation DeleteStation($id: ID!) {
-    deleteStation(id: $id) { id isDeleted }
+    deleteStation(id: $id) {
+      id
+      isDeleted
+    }
   }
 `;
 
@@ -1563,7 +1593,21 @@ export const RESOLVE_PROTOCOL = gql`
         status
         requiresNoEquipment
         issues
-        equipment { id name missing placements { quantity station { id name zone x y } } }
+        equipment {
+          id
+          name
+          missing
+          placements {
+            quantity
+            station {
+              id
+              name
+              zone
+              x
+              y
+            }
+          }
+        }
       }
     }
   }
@@ -1645,108 +1689,172 @@ export const GET_BACKLOG_CARD = gql`
  * ------------------------------------------------------------------------ */
 
 export const SOW_VERSION_FIELDS = gql`
-    fragment SowVersionFields on SowVersion {
-        id
-        versionNumber
-        displayVersion
-        status
-        visibleToCustomer
-        sentToCustomerAt
-        note
-        createdByName
-        createdAt
-        sourceJobVersionNumber
-        clientSignature { name signedAt consentedGroups sectionInitials { key label initials } legacySignatureDataUrl }
-        staffSignature { name signedAt sectionInitials { key label initials } legacySignatureDataUrl }
-        fields {
-            key
-            label
-            kind
-            order
-            value
-            calculatedValue
-            isOverridden
-            isEnabled
-            allowsTextOverride
-            allowsEmpty
-            requiresInitials
-        }
-        inputs {
-            projectManager
-            projectManagerId
-            projectLead
-            projectLeadId
-            sowTitle
-            scopeOfWork
-            deliverables
-            baseCost
-            totalCost
-            customerCategory
-            periods { startDate durationDays label }
-            services { serviceId name description cost unitCost multiplier runCount }
-            adjustments { type description amount unitAmount multiplier category reason }
-        }
+  fragment SowVersionFields on SowVersion {
+    id
+    versionNumber
+    displayVersion
+    status
+    visibleToCustomer
+    sentToCustomerAt
+    note
+    createdByName
+    createdAt
+    sourceJobVersionNumber
+    clientSignature {
+      name
+      signedAt
+      consentedGroups
+      sectionInitials {
+        key
+        label
+        initials
+      }
+      legacySignatureDataUrl
     }
+    staffSignature {
+      name
+      signedAt
+      sectionInitials {
+        key
+        label
+        initials
+      }
+      legacySignatureDataUrl
+    }
+    fields {
+      key
+      label
+      kind
+      order
+      value
+      calculatedValue
+      isOverridden
+      isEnabled
+      allowsTextOverride
+      allowsEmpty
+      requiresInitials
+    }
+    inputs {
+      projectManager
+      projectManagerId
+      projectLead
+      projectLeadId
+      sowTitle
+      scopeOfWork
+      deliverables
+      baseCost
+      totalCost
+      customerCategory
+      periods {
+        startDate
+        durationDays
+        label
+      }
+      services {
+        serviceId
+        name
+        description
+        cost
+        unitCost
+        multiplier
+        runCount
+      }
+      adjustments {
+        type
+        description
+        amount
+        unitAmount
+        multiplier
+        category
+        reason
+      }
+    }
+  }
 `;
 
 /** Everything the SOW editor needs in one round trip. */
 export const GET_SOW_EDITOR_STATE = gql`
-    ${SOW_VERSION_FIELDS}
-    query GetSowEditorState($jobId: ID!) {
-        sowByJobId(jobId: $jobId) {
-            id
-            sowNumber
-            currentVersionNumber
-            activeVersionNumber
-            documentStale
-            liveCustomerCategory
-            liveServices { serviceId name description cost unitCost multiplier runCount }
-            actionGate { canSend sendBlockers canSign signBlockers canCountersign countersignBlockers missingFields }
-            currentVersion { ...SowVersionFields }
-            activeVersion { versionNumber displayVersion status visibleToCustomer sourceJobVersionNumber }
-            versions { ...SowVersionFields }
-        }
+  ${SOW_VERSION_FIELDS}
+  query GetSowEditorState($jobId: ID!) {
+    sowByJobId(jobId: $jobId) {
+      id
+      sowNumber
+      currentVersionNumber
+      activeVersionNumber
+      documentStale
+      liveCustomerCategory
+      liveServices {
+        serviceId
+        name
+        description
+        cost
+        unitCost
+        multiplier
+        runCount
+      }
+      actionGate {
+        canSend
+        sendBlockers
+        canSign
+        signBlockers
+        canCountersign
+        countersignBlockers
+        missingFields
+      }
+      currentVersion {
+        ...SowVersionFields
+      }
+      activeVersion {
+        versionNumber
+        displayVersion
+        status
+        visibleToCustomer
+        sourceJobVersionNumber
+      }
+      versions {
+        ...SowVersionFields
+      }
     }
+  }
 `;
 
 export const SOW_FIELD_PREVIEW = gql`
-    query SowFieldPreview($sowId: ID!, $inputs: SowInputsInput!) {
-        sowFieldPreview(sowId: $sowId, inputs: $inputs) {
-            key
-            calculatedValue
-        }
+  query SowFieldPreview($sowId: ID!, $inputs: SowInputsInput!) {
+    sowFieldPreview(sowId: $sowId, inputs: $inputs) {
+      key
+      calculatedValue
     }
+  }
 `;
 
 /* SOW text blocks — the staff-managed prose library behind each SOW section. */
 
 export const GET_SOW_PRESET_SECTIONS = gql`
-    query sowPresetSections {
-        sowPresetSections {
-            key
-            label
-            presetCount
-            defaultName
-            updatedAt
-            updatedByName
-        }
+  query sowPresetSections {
+    sowPresetSections {
+      key
+      label
+      presetCount
+      defaultName
+      updatedAt
+      updatedByName
     }
+  }
 `;
 
 export const GET_SOW_TEXT_PRESETS = gql`
-    query sowTextPresets($sectionKey: String) {
-        sowTextPresets(sectionKey: $sectionKey) {
-            id
-            sectionKey
-            name
-            text
-            order
-            updatedAt
-            updatedByName
-        }
+  query sowTextPresets($sectionKey: String) {
+    sowTextPresets(sectionKey: $sectionKey) {
+      id
+      sectionKey
+      name
+      text
+      order
+      updatedAt
+      updatedByName
     }
+  }
 `;
-
 
 // ─── Learning Hub ─────────────────────────────────────────────────────────
 // Uploaded PDFs, each addressed to one or more access tiers. Which documents come
@@ -1754,22 +1862,22 @@ export const GET_SOW_TEXT_PRESETS = gql`
 // short-lived presigned GET minted per request, never a stored link.
 
 export const GET_TRAINING_RESOURCES = gql`
-    query TrainingResources {
-        trainingResources {
-            id
-            title
-            description
-            audienceRoles
-            updatedAt
-            updatedBy
-            file {
-                filename
-                contentType
-                size
-            }
-            downloadUrl
-        }
+  query TrainingResources {
+    trainingResources {
+      id
+      title
+      description
+      audienceRoles
+      updatedAt
+      updatedBy
+      file {
+        filename
+        contentType
+        size
+      }
+      downloadUrl
     }
+  }
 `;
 
 /**
@@ -1780,11 +1888,10 @@ export const GET_TRAINING_RESOURCES = gql`
  * server-side: an id outside the caller's audience simply returns null.
  */
 export const GET_TRAINING_RESOURCE_DOWNLOAD_URL = gql`
-    query TrainingResourceDownloadUrl($id: ID!) {
-        trainingResourceDownloadUrl(id: $id)
-    }
+  query TrainingResourceDownloadUrl($id: ID!) {
+    trainingResourceDownloadUrl(id: $id)
+  }
 `;
-
 
 /**
  * The Protocol Library's browse list, grouped by category.
@@ -1796,51 +1903,51 @@ export const GET_TRAINING_RESOURCE_DOWNLOAD_URL = gql`
  * broken rather than blanking the page.
  */
 export const GET_PROTOCOL_LIBRARY = gql`
-    query GetProtocolLibrary {
-        protocolLibrary {
-            category
-            protocols {
-                protocolId
-                title
-                stepCount
-                serviceNames
-                unavailable
-            }
-        }
+  query GetProtocolLibrary {
+    protocolLibrary {
+      category
+      protocols {
+        protocolId
+        title
+        stepCount
+        serviceNames
+        unavailable
+      }
     }
+  }
 `;
 
 // ─── Notifications ───────────────────────────────────────────────────────────
 
 export const MY_UNREAD_NOTIFICATION_COUNT = gql`
-    query MyUnreadNotificationCount {
-        myUnreadNotificationCount
-    }
+  query MyUnreadNotificationCount {
+    myUnreadNotificationCount
+  }
 `;
 
 export const MY_NOTIFICATIONS = gql`
-    query MyNotifications($limit: Int, $offset: Int) {
-        myNotifications(limit: $limit, offset: $offset) {
-            items {
-                id
-                createdAt
-                eventType
-                title
-                message
-                link
-                readAt
-                actorDisplayName
-            }
-            unreadCount
-        }
+  query MyNotifications($limit: Int, $offset: Int) {
+    myNotifications(limit: $limit, offset: $offset) {
+      items {
+        id
+        createdAt
+        eventType
+        title
+        message
+        link
+        readAt
+        actorDisplayName
+      }
+      unreadCount
     }
+  }
 `;
 
 export const MY_NOTIFICATION_PREFERENCES = gql`
-    query MyNotificationPreferences {
-        myNotificationPreferences {
-            emailDisabledEventTypes
-            inAppDisabledEventTypes
-        }
+  query MyNotificationPreferences {
+    myNotificationPreferences {
+      emailDisabledEventTypes
+      inAppDisabledEventTypes
     }
+  }
 `;
