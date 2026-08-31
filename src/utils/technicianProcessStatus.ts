@@ -118,7 +118,12 @@ export function sowPartyVersionLabel(version: { versionNumber: number; displayVe
 
 export type ChipStatusColor = 'default' | 'info' | 'warning' | 'success' | 'error';
 
-/** Translucent pane tint matching MUI chip colors, in the same spirit as the job status banner. */
+/**
+ * Translucent pane tint matching MUI chip colors. Every status pane on the job
+ * page resolves its background through here, so a status means the same colour
+ * whichever document it belongs to — the green below is the one the Job card
+ * used to hand-write for ACCEPTED, and SOW FINAL now shares it.
+ */
 export function chipStatusBackground(color: ChipStatusColor): string {
   switch (color) {
     case 'info':
@@ -126,12 +131,53 @@ export function chipStatusBackground(color: ChipStatusColor): string {
     case 'warning':
       return 'rgba(255, 152, 0, 0.4)';
     case 'success':
-      return 'rgba(46, 125, 50, 0.22)';
+      return 'rgba(0, 255, 0, 0.5)';
     case 'error':
       return 'rgba(211, 47, 47, 0.22)';
     default:
       return 'rgba(120, 120, 120, 0.18)';
   }
+}
+
+/**
+ * Job lifecycle in the same five-colour vocabulary the SOW uses
+ * (`STATUS_COLORS` in components/sow/sowTypes.ts). Sharing the palette merges
+ * neighbours by design: ACCEPTED and COMPLETE are both green, exactly as SIGNED
+ * and FINAL are on the SOW side.
+ */
+const JOB_STATUS_COLORS: Record<string, ChipStatusColor> = {
+  CREATING: 'default',
+  SUBMITTED: 'info',
+  CHANGES_REQUESTED: 'warning',
+  ACCEPTED: 'success',
+  WAITING_FOR_SOW: 'info',
+  QUEUED: 'info',
+  IN_PROGRESS: 'info',
+  COMPLETE: 'success',
+  REJECTED: 'error',
+  CLOSED: 'default'
+};
+
+export function jobStatusColor(state?: string | null): ChipStatusColor {
+  return (state && JOB_STATUS_COLORS[state]) || 'default';
+}
+
+/** Readable wording for a job state — the pane used to print the raw enum. */
+const JOB_STATUS_LABELS: Record<string, string> = {
+  CREATING: 'Creating',
+  SUBMITTED: 'Submitted',
+  CHANGES_REQUESTED: 'Changes Requested',
+  ACCEPTED: 'Accepted',
+  WAITING_FOR_SOW: 'Waiting for SOW',
+  QUEUED: 'Queued',
+  IN_PROGRESS: 'In Progress',
+  COMPLETE: 'Complete',
+  REJECTED: 'Rejected',
+  CLOSED: 'Closed'
+};
+
+export function jobStatusLabel(state?: string | null): string {
+  return (state && JOB_STATUS_LABELS[state]) || (state ?? '—');
 }
 
 export function invoiceVersionLabel(invoices: Array<{ invoiceNumber?: string | null }>): string {
