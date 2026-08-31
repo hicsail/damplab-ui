@@ -496,18 +496,15 @@ export default function TechnicianView() {
                     </Button>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-                    {/* The stray top margin on the first <p> would drop this column
-                        ~13px below the pricing control sitting opposite it. */}
+                    {/* Drop the stray top margin on the first <p> so this column starts
+                        flush, leaving the mt on the pricing control as the only offset. */}
                     <Box sx={{ fontSize: 13, textAlign: 'left', '& p:first-of-type': { mt: 0 } }}>
                         <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
                         <p><b>User:</b> {submitter.user}</p>
                         {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
                         <p><b>Organization:</b> {submitter.organization}</p>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, flexWrap: 'wrap' }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 250, textAlign: 'right' }}>
-                            Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
-                        </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, mt: 1 }}>
                         <FormControl size="small" sx={{ minWidth: 260 }} disabled={categoryUpdating || !jobData}>
                             <InputLabel id="pricing-category-label">Pricing category</InputLabel>
                             <Select
@@ -523,6 +520,9 @@ export default function TechnicianView() {
                                 ))}
                             </Select>
                         </FormControl>
+                        <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 260, textAlign: 'right' }}>
+                            Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
+                        </Typography>
                     </Box>
                 </Box>
 
@@ -689,6 +689,44 @@ export default function TechnicianView() {
                 />
 
                 <ProcessCard
+                    title="Biosecurity"
+                    customerBadge={null}
+                    staffBadge={null}
+                    customerVersion="—"
+                    staffVersion="—"
+                    statusPaneSx={{ bgcolor: chipStatusBackground(biosecurityStatusColor(biosecurityComposite)) }}
+                    statusPane={
+                        <StatusPaneHeader
+                            status={biosecurityStatusLabel(biosecurityComposite)}
+                            description="Metadata, homology, and customer screening have not run yet."
+                        >
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
+                                {BIOSECURITY_SCREENINGS.map((screening) => (
+                                    <Chip
+                                        key={screening.key}
+                                        size="small"
+                                        variant="outlined"
+                                        color={biosecurityStatusColor(biosecurity[screening.key])}
+                                        label={`${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`}
+                                    />
+                                ))}
+                            </Box>
+                        </StatusPaneHeader>
+                    }
+                    actions={
+                        <Button variant="outlined" size="small" disabled sx={railBtnSx}>
+                            Run screening
+                        </Button>
+                    }
+                    details={
+                        <Typography variant="body2" color="text.secondary">
+                            Biosecurity screening is not wired up yet. Metadata, homology, and customer screening will
+                            report here once they run.
+                        </Typography>
+                    }
+                />
+
+                <ProcessCard
                     title="Statement of Work"
                     defaultExpanded={!isSowProcessSettled(sowStatus.active?.status ?? sowStatus.current?.status)}
                     customerBadge={sowParties.customer}
@@ -752,44 +790,6 @@ export default function TechnicianView() {
                                 No Statement of Work has been generated for this job yet.
                             </Typography>
                         )
-                    }
-                />
-
-                <ProcessCard
-                    title="Biosecurity"
-                    customerBadge={null}
-                    staffBadge={null}
-                    customerVersion="—"
-                    staffVersion="—"
-                    statusPaneSx={{ bgcolor: chipStatusBackground(biosecurityStatusColor(biosecurityComposite)) }}
-                    statusPane={
-                        <StatusPaneHeader
-                            status={biosecurityStatusLabel(biosecurityComposite)}
-                            description="Metadata, homology, and customer screening have not run yet."
-                        >
-                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
-                                {BIOSECURITY_SCREENINGS.map((screening) => (
-                                    <Chip
-                                        key={screening.key}
-                                        size="small"
-                                        variant="outlined"
-                                        color={biosecurityStatusColor(biosecurity[screening.key])}
-                                        label={`${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`}
-                                    />
-                                ))}
-                            </Box>
-                        </StatusPaneHeader>
-                    }
-                    actions={
-                        <Button variant="outlined" size="small" disabled sx={railBtnSx}>
-                            Run screening
-                        </Button>
-                    }
-                    details={
-                        <Typography variant="body2" color="text.secondary">
-                            Biosecurity screening is not wired up yet. Metadata, homology, and customer screening will
-                            report here once they run.
-                        </Typography>
                     }
                 />
 
