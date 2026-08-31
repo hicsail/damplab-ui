@@ -7,6 +7,7 @@ import { GET_SOW_EDITOR_STATE } from '../../gql/queries';
 import { CANCEL_SOW, WITHDRAW_SOW_FROM_CUSTOMER } from '../../gql/mutations';
 import SowPdfDocument from './SowPdfDocument';
 import SowSignaturesSummary from './SowSignaturesSummary';
+import StatusPaneHeader from '../technician/StatusPaneHeader';
 import { blockerStep, type DocumentBlocker, SowEditorState, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 import { cancelIsOffered, statusCardRepair } from './sowEditorView';
 import ReasonDialog from '../ReasonDialog';
@@ -112,6 +113,13 @@ export function useSowStaffStatus(jobId: string) {
   };
 }
 
+/** `v2`, not `2` — the status pane reads the prefix as part of the version. */
+function versionChipLabel(version: { versionNumber: number; displayVersion?: string | null } | null | undefined): string {
+  const label = version ? versionDisplayLabel(version) : '';
+  if (!label) return '—';
+  return label.startsWith('v') ? label : `v${label}`;
+}
+
 export function SowStatusSummary({
   sow,
   active,
@@ -123,38 +131,32 @@ export function SowStatusSummary({
   current: ReturnType<typeof useSowStaffStatus>['current'];
   hasUnsentDraft: boolean;
 }): React.JSX.Element {
+  // No reference number exists yet, so the right-hand slot stays empty.
   if (!sow) {
     return (
-      <Box>
-        <Typography variant="subtitle1" fontWeight={600}>
-          Not generated yet
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Generate a Statement of Work to price this job and send it to the customer.
-        </Typography>
-      </Box>
+      <StatusPaneHeader
+        status="Not generated yet"
+        description="Generate a Statement of Work to price this job and send it to the customer."
+      />
     );
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-        <Typography variant="subtitle1" fontWeight={600}>
-          {sow.sowNumber}
-        </Typography>
-        {active ? (
-          <Chip size="small" label={`${versionDisplayLabel(active)} · ${sowStatusLabel(active.status)}`} color={statusColor(active.status)} />
-        ) : (
-          <Chip size="small" label="Not sent yet" />
-        )}
-        {hasUnsentDraft && <Chip size="small" variant="outlined" label={`Draft ${versionDisplayLabel(current)} in progress`} />}
-      </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-        {active
-          ? `Customer is bound by ${versionDisplayLabel(active)}.`
-          : 'Nothing is in force with the customer yet.'}
-      </Typography>
-    </Box>
+    <StatusPaneHeader
+      status={active ? sowStatusLabel(active.status) : 'Not sent yet'}
+      chips={
+        <>
+          {active && <Chip size="small" label={versionChipLabel(active)} color={statusColor(active.status)} />}
+          {hasUnsentDraft && <Chip size="small" variant="outlined" label={`Draft ${versionChipLabel(current)} in progress`} />}
+        </>
+      }
+      reference={sow.sowNumber}
+      description={
+        active
+          ? `Customer is bound by ${versionChipLabel(active)}.`
+          : 'Nothing is in force with the customer yet.'
+      }
+    />
   );
 }
 

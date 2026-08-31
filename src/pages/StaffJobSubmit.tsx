@@ -190,8 +190,9 @@ export default function StaffJobSubmit() {
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         This uses the same job pipeline as the customer checkout. Pricing review is skipped. The job is
-        created under your staff account; the client name below is stored as the job&apos;s display name
-        for SOWs and customer-facing documents.
+        submitted under your staff account, and the client name and email below are what attach it to the
+        client: the name is the display name on SOWs and customer-facing documents, and the email is what
+        lets the client see the job in their own dashboard.
       </Typography>
 
       <Button variant="outlined" onClick={() => navigate('/canvas')} sx={{ mb: 3, textTransform: 'none' }}>
@@ -207,7 +208,7 @@ export default function StaffJobSubmit() {
       </Typography>
 
       <Grid container spacing={2} direction="column">
-        <Grid item xs={12}>
+        <Grid size={12}>
           <TextField
             fullWidth
             required
@@ -221,7 +222,7 @@ export default function StaffJobSubmit() {
             }
           />
         </Grid>
-        <Grid item xs={12}>
+        <Grid size={12}>
           <TextField
             fullWidth
             required
@@ -237,17 +238,17 @@ export default function StaffJobSubmit() {
             }
           />
         </Grid>
-        <Grid item xs={12}>
+        <Grid size={12}>
           <TextField
             fullWidth
             label="Client email (optional)"
             type="email"
             value={formData.clientEmail}
             onChange={handleInputChange('clientEmail')}
-            helperText="If provided, prepended to job notes so the lab has the client contact on file"
+            helperText="The client's login email. Without it they cannot see this job or its SOW; it is also kept in the job notes as the contact on file."
           />
         </Grid>
-        <Grid item xs={12}>
+        <Grid size={12}>
           <TextField
             fullWidth
             required
@@ -261,7 +262,7 @@ export default function StaffJobSubmit() {
             }
           />
         </Grid>
-        <Grid item xs={12}>
+        <Grid size={12}>
           <TextField
             fullWidth
             label="Notes"
@@ -271,7 +272,7 @@ export default function StaffJobSubmit() {
             onChange={handleInputChange('notes')}
           />
         </Grid>
-        <Grid item xs={12}>
+        <Grid size={12}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
             Attachments (optional)
           </Typography>
@@ -289,7 +290,7 @@ export default function StaffJobSubmit() {
             </Box>
           )}
         </Grid>
-        <Grid item xs={12}>
+        <Grid size={12}>
           <Button
             variant="contained"
             size="large"

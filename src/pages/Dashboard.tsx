@@ -60,7 +60,7 @@ export default function Dashboard() {
   // Default scope: everything for someone who can see everything, otherwise their
   // own. The server would force the latter anyway; this keeps the control honest.
   const [scope, setScope] = React.useState<JobScope>(canViewAllJobs ? 'ALL' : 'CREATED_BY_ME');
-  const [createdBySub, setCreatedBySub] = React.useState('');
+  const [createdByClient, setCreatedByClient] = React.useState('');
   const [assigneeId, setAssigneeId] = React.useState('');
   const [lastViewedAt, setLastViewedAt] = React.useState<string | null>(null);
   const [archiveTarget, setArchiveTarget] = React.useState<JobListItem | null>(null);
@@ -82,10 +82,10 @@ export default function Dashboard() {
     if (search.trim()) inp.search = search.trim();
     if (stateFilter) inp.state = stateFilter;
     if (hasSowFilter !== 'all') inp.hasSow = hasSowFilter === 'yes';
-    if (createdBySub) inp.createdBySub = createdBySub;
+    if (createdByClient) inp.createdByClient = createdByClient;
     if (assigneeId) inp.assigneeId = assigneeId;
     return inp;
-  }, [page, limit, search, stateFilter, hasSowFilter, archiveFilter, scope, createdBySub, assigneeId]);
+  }, [page, limit, search, stateFilter, hasSowFilter, archiveFilter, scope, createdByClient, assigneeId]);
 
   const { data, loading, error, refetch } = useQuery(JOBS_FOR_VIEWER, {
     variables: { input },
@@ -96,7 +96,7 @@ export default function Dashboard() {
   const { data: clientsData } = useQuery(JOB_CLIENTS, { skip: !canViewAllJobs });
   const { data: staffData } = useQuery(GET_LAB_MONITOR_STAFF_LIST, { skip: !canViewAllJobs });
   const clientOptions: JobFilterOption[] = useMemo(
-    () => (clientsData?.jobClients ?? []).map((c: any) => ({ id: String(c.sub), displayName: String(c.displayName) })),
+    () => (clientsData?.jobClients ?? []).map((c: any) => ({ id: String(c.clientKey), displayName: String(c.displayName) })),
     [clientsData],
   );
   const technicianOptions: JobFilterOption[] = useMemo(
@@ -249,9 +249,9 @@ export default function Dashboard() {
         setPage(1);
       }}
       clientOptions={clientOptions}
-      createdBySub={createdBySub}
-      onCreatedBySubChange={(value) => {
-        setCreatedBySub(value);
+      createdByClient={createdByClient}
+      onCreatedByClientChange={(value) => {
+        setCreatedByClient(value);
         setPage(1);
       }}
       technicianOptions={technicianOptions}

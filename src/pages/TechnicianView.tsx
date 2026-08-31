@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel } from '@mui/material';
+import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
@@ -13,6 +13,7 @@ import ReceiptLongIcon                                from '@mui/icons-material/
 import RefreshIcon                                    from '@mui/icons-material/Refresh';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
+import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
@@ -32,7 +33,9 @@ import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
 import { CUSTOMER_CATEGORY_OPTIONS, statusColor } from '../components/sow/sowTypes';
-import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
+import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
+import StatusPaneHeader from '../components/technician/StatusPaneHeader';
+import { BIOSECURITY_SCREENINGS, PLACEHOLDER_BIOSECURITY, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus } from '../components/technician/biosecurityStatus';
 
 const stripTypename = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stripTypename);
@@ -73,6 +76,9 @@ export default function TechnicianView() {
     const [jobName, setJobName]               = useState('');
     const [jobState, setJobState]             = useState('');
     const [jobTime, setJobTime]               = useState('');
+    const [submitter, setSubmitter] = useState<JobSubmitterSummary>({ user: '', onBehalfOf: null, organization: '' });
+    // Kept as their own slots because the job PDF and the feedback modal take them
+    // as separate props; the header reads `submitter` instead.
     const [jobUsername, setJobUsername]       = useState('');
     const [jobInstitution, setJobInstitution] = useState('');
     const [jobEmail, setJobEmail]             = useState('');
@@ -101,6 +107,7 @@ export default function TechnicianView() {
         setJobName(job.name ?? '');
         setJobState(job.state ?? '');
         setJobTime(job.submitted ?? '');
+        setSubmitter(summarizeJobSubmitter(job));
         setJobUsername(job.clientDisplayName || job.username || '');
         setJobInstitution(job.institute ?? '');
         setJobEmail(job.email ?? '');
@@ -311,33 +318,34 @@ export default function TechnicianView() {
     //     }))
     // })
 
-    const jobStatus = () => {
-        const submitText = "The job was submitted to the DAMP lab and is awaiting review.";
-        const createText = "The job is currently being created.";
-        const acceptText = "The job was accepted by the DAMP Lab. The client will be asked to sign and return the SOW.";
-        const rejectText=  "The job was rejected by the DAMP Lab. The client will be asked to resubmit the job with changes.";
-        const closedText = "This job has been closed out. It is no longer active in the lab monitor.";
-        const changesText = technicianCustomerActionCopy(jobData);
-        const defaultText = "Invalid Case";
+    // Copy only: the pane's colour comes from jobStatusColor(), the one table
+    // shared with the Statement of Work.
+    const jobStatusText = (() => {
         switch (jobState) {
-            case 'SUBMITTED':
-                return ['rgba(256, 256, 0, 0.5)', submitText]
             case 'CREATING':
-                return ['rgba(256, 256, 0, 0.5)', createText]
-            case 'ACCEPTED':
-                return ['rgb(0, 256, 0, 0.5)', acceptText];
-            case 'REJECTED':
-                return ['rgb(256, 0, 0, 0.5)', rejectText];
-            case 'CLOSED':
-                return ['rgba(120, 120, 120, 0.35)', closedText];
+                return "The job is currently being created.";
+            case 'SUBMITTED':
+                return "The job was submitted to the DAMP lab and is awaiting review.";
             case 'CHANGES_REQUESTED':
-                return ['rgba(255, 152, 0, 0.4)', changesText];
+                return technicianCustomerActionCopy(jobData);
+            case 'ACCEPTED':
+                return "The job was accepted by the DAMP Lab. The client will be asked to sign and return the SOW.";
+            case 'WAITING_FOR_SOW':
+                return "The job is waiting on its Statement of Work before lab work can start.";
+            case 'QUEUED':
+                return "The job is queued for lab work.";
+            case 'IN_PROGRESS':
+                return "Lab work on this job is under way.";
+            case 'COMPLETE':
+                return "Lab work on this job is finished. It can be invoiced and closed out.";
+            case 'REJECTED':
+                return "The job was rejected by the DAMP Lab. The client will be asked to resubmit the job with changes.";
+            case 'CLOSED':
+                return "This job has been closed out. It is no longer active in the lab monitor.";
             default:
-                return ['rgb(0, 0, 0, 0)', defaultText];
+                return "This job's state is not recognised.";
         }
-    }
-    const jobStatusColor = jobStatus()[0];
-    const jobStatusText = jobStatus()[1];
+    })();
 
     const handleExportJobJson = () => {
         if (!id || !jobData) return;
@@ -423,7 +431,9 @@ export default function TechnicianView() {
         sowStatus.sow ? statusColor(sowStatus.active?.status ?? sowStatus.current?.status) : 'default'
     );
     const invoiceStatusPaneColor = chipStatusBackground(invoices.length ? 'info' : 'default');
-    const jobStatusPaneColor = jobData ? jobStatusColor : chipStatusBackground('default');
+    const jobStatusPaneColor = chipStatusBackground(jobData ? jobStatusColor(jobState) : 'default');
+    const biosecurity = PLACEHOLDER_BIOSECURITY;
+    const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
     const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
     const handleCustomerCategoryChange = async (nextCategory: string) => {
@@ -449,24 +459,6 @@ export default function TechnicianView() {
                 <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1 }}>
                     <Typography variant="h5" fontWeight="bold">
                         {jobName}
-                    </Typography>
-                    <FormControl size="small" sx={{ minWidth: 260 }} disabled={categoryUpdating || !jobData}>
-                        <InputLabel id="pricing-category-label">Pricing category</InputLabel>
-                        <Select
-                            labelId="pricing-category-label"
-                            value={currentCustomerCategory}
-                            label="Pricing category"
-                            onChange={(e) => handleCustomerCategoryChange(String(e.target.value))}
-                        >
-                            {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
-                                <MenuItem key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 250 }}>
-                        Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
                     </Typography>
                     <Box sx={{ flexGrow: 1 }} />
                     <Button
@@ -503,10 +495,35 @@ export default function TechnicianView() {
                         {jobState === 'CLOSED' ? 'Job closed' : closingJob ? 'Closing…' : 'Close job'}
                     </Button>
                 </Box>
-                <Box sx={{ mx: 3, fontSize: 13, mb: 2 }}>
-                    <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
-                    <p><b>User:</b> {jobUsername} ({jobEmail})</p>
-                    <p><b>Organization:</b> {jobInstitution}</p>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                    {/* Drop the stray top margin on the first <p> so this column starts
+                        flush, leaving the mt on the pricing control as the only offset. */}
+                    <Box sx={{ fontSize: 13, textAlign: 'left', '& p:first-of-type': { mt: 0 } }}>
+                        <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
+                        <p><b>User:</b> {submitter.user}</p>
+                        {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
+                        <p><b>Organization:</b> {submitter.organization}</p>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, mt: 1 }}>
+                        <FormControl size="small" sx={{ minWidth: 260 }} disabled={categoryUpdating || !jobData}>
+                            <InputLabel id="pricing-category-label">Pricing category</InputLabel>
+                            <Select
+                                labelId="pricing-category-label"
+                                value={currentCustomerCategory}
+                                label="Pricing category"
+                                onChange={(e) => handleCustomerCategoryChange(String(e.target.value))}
+                            >
+                                {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
+                                    <MenuItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 260, textAlign: 'right' }}>
+                            Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
+                        </Typography>
+                    </Box>
                 </Box>
 
                 {sowCreateError && (
@@ -524,23 +541,26 @@ export default function TechnicianView() {
                     staffBadge={jobParties.staff}
                     customerVersion={jobCustomerVersion}
                     staffVersion={jobStaffVersion}
-                    statusPaneSx={{ bgcolor: jobStatusPaneColor as string }}
+                    statusPaneSx={{ bgcolor: jobStatusPaneColor }}
                     statusPane={
                         jobData ? (
-                        <>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-                                <Typography variant="subtitle1" fontWeight={600}>{jobState}</Typography>
-                                <Typography variant="body2"><b>Job ID:</b> {id}</Typography>
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{jobStatusText}</Typography>
-                        </>
+                            <StatusPaneHeader
+                                status={jobStatusLabel(jobState)}
+                                chips={
+                                    // partyVersionLabel returns '—' when the customer has seen
+                                    // nothing yet; a chip reading "—" is worse than no chip.
+                                    jobCustomerVersion === '—' ? undefined : (
+                                        <Chip size="small" label={jobCustomerVersion} color={jobStatusColor(jobState)} />
+                                    )
+                                }
+                                reference={<><b>Job ID:</b> {jobData?.jobId ?? id}</>}
+                                description={jobStatusText}
+                            />
                         ) : (
-                            <Box>
-                                <Typography variant="subtitle1" fontWeight={600}>Job not loaded</Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    This job could not be loaded. Check the ID or try again.
-                                </Typography>
-                            </Box>
+                            <StatusPaneHeader
+                                status="Job not loaded"
+                                description="This job could not be loaded. Check the ID or try again."
+                            />
                         )
                     }
                     actions={
@@ -669,6 +689,44 @@ export default function TechnicianView() {
                 />
 
                 <ProcessCard
+                    title="Biosecurity"
+                    customerBadge={null}
+                    staffBadge={null}
+                    customerVersion="—"
+                    staffVersion="—"
+                    statusPaneSx={{ bgcolor: chipStatusBackground(biosecurityStatusColor(biosecurityComposite)) }}
+                    statusPane={
+                        <StatusPaneHeader
+                            status={biosecurityStatusLabel(biosecurityComposite)}
+                            description="Metadata, homology, and customer screening have not run yet."
+                        >
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
+                                {BIOSECURITY_SCREENINGS.map((screening) => (
+                                    <Chip
+                                        key={screening.key}
+                                        size="small"
+                                        variant="outlined"
+                                        color={biosecurityStatusColor(biosecurity[screening.key])}
+                                        label={`${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`}
+                                    />
+                                ))}
+                            </Box>
+                        </StatusPaneHeader>
+                    }
+                    actions={
+                        <Button variant="outlined" size="small" disabled sx={railBtnSx}>
+                            Run screening
+                        </Button>
+                    }
+                    details={
+                        <Typography variant="body2" color="text.secondary">
+                            Biosecurity screening is not wired up yet. Metadata, homology, and customer screening will
+                            report here once they run.
+                        </Typography>
+                    }
+                />
+
+                <ProcessCard
                     title="Statement of Work"
                     defaultExpanded={!isSowProcessSettled(sowStatus.active?.status ?? sowStatus.current?.status)}
                     customerBadge={sowParties.customer}
@@ -745,24 +803,22 @@ export default function TechnicianView() {
                     statusPaneSx={{ bgcolor: invoiceStatusPaneColor }}
                     statusPane={
                         invoices.length ? (
-                            <Box>
-                                <Typography variant="subtitle1" fontWeight={600}>
-                                    {invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Latest {invoiceLabel}
-                                    {invoices[invoices.length - 1]?.totalCost != null
-                                        ? ` · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
-                                        : ''}
-                                </Typography>
-                            </Box>
+                            <StatusPaneHeader
+                                status={invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
+                                reference={invoiceLabel !== '—' ? invoiceLabel : undefined}
+                                description={
+                                    // The number itself is in the reference slot now, so this
+                                    // line carries only what that does not say.
+                                    invoices[invoices.length - 1]?.totalCost != null
+                                        ? `Latest invoice · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
+                                        : undefined
+                                }
+                            />
                         ) : (
-                            <Box>
-                                <Typography variant="subtitle1" fontWeight={600}>No invoices yet</Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    Create an invoice from the Statement of Work services when you are ready to bill.
-                                </Typography>
-                            </Box>
+                            <StatusPaneHeader
+                                status="No invoices yet"
+                                description="Create an invoice from the Statement of Work services when you are ready to bill."
+                            />
                         )
                     }
                     actions={

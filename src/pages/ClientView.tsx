@@ -6,6 +6,7 @@ import { Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, ListIte
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
 import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '../gql/queries';
+import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import CollapsibleStatusCard      from '../components/CollapsibleStatusCard';
 import { CommentsSection }        from '../components/CommentsSection';
@@ -35,8 +36,7 @@ export default function Tracking() {
     const [workflowState,       setWorkflowState]       = useState('');
     const [jobName,             setJobName]             = useState('');
     const [jobTime,             setJobTime]             = useState('');
-    const [workflowUsername,    setWorkflowUsername]    = useState('');
-    const [workflowInstitution, setWorkflowInstitution] = useState('');
+    const [submitter, setSubmitter] = useState<JobSubmitterSummary>({ user: '', onBehalfOf: null, organization: '' });
     const [workflowEmail,       setWorkflowEmail]       = useState('');  // ▶ URLSearchParams {}
     const [workflows,           setWorklows]            = useState([]);  // ▶ URLSearchParams {}
     // The catalogue, for re-attaching parameter definitions to a version snapshot.
@@ -64,8 +64,7 @@ export default function Tracking() {
         if (!job) return;
         setJobName(job.name ?? '');
         setJobTime(job.submitted ?? '');
-        setWorkflowUsername(job.clientDisplayName || job.username || '');
-        setWorkflowInstitution(job.institute ?? '');
+        setSubmitter(summarizeJobSubmitter(job));
         setWorkflowEmail(job.email ?? '');
         setWorklows(job.workflows ?? []);
         setAttachments(job.attachments ?? []);
@@ -257,10 +256,11 @@ export default function Tracking() {
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}
                 </Typography>
-                <Box sx={{ mx: 3, fontSize: 13, mb: 2 }}>
-                    <p><b>Time:</b>         {jobTime.slice(0, 16).replace('T', ' ')}</p>
-                    <p><b>User:</b>         {workflowUsername} ({workflowEmail})</p>
-                    <p><b>Organization:</b> {workflowInstitution}</p>
+                <Box sx={{ fontSize: 13, mb: 2, textAlign: 'left' }}>
+                    <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
+                    <p><b>User:</b> {submitter.user}</p>
+                    {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
+                    <p><b>Organization:</b> {submitter.organization}</p>
                 </Box>
 
                 <CollapsibleStatusCard
