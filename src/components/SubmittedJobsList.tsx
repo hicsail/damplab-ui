@@ -113,8 +113,9 @@ export interface SubmittedJobsListProps {
   onScopeChange?: (value: JobScope) => void;
   /** Filter to one submitter. Rendered only with canViewAllJobs. */
   clientOptions?: JobFilterOption[];
-  createdBySub?: string;
-  onCreatedBySubChange?: (value: string) => void;
+  /** The selected client's `clientKey` from `jobClients` — their email, not a Keycloak sub: a job staff submitted for a client carries the staff sub, so a sub could never select it. */
+  createdByClient?: string;
+  onCreatedByClientChange?: (value: string) => void;
   /** Filter to one assignee. Rendered only with canViewAllJobs. */
   technicianOptions?: JobFilterOption[];
   assigneeId?: string;
@@ -151,8 +152,8 @@ export default function SubmittedJobsList({
   scope,
   onScopeChange,
   clientOptions,
-  createdBySub,
-  onCreatedBySubChange,
+  createdByClient,
+  onCreatedByClientChange,
   technicianOptions,
   assigneeId,
   onAssigneeIdChange,
@@ -277,10 +278,10 @@ export default function SubmittedJobsList({
             </Select>
           </FormControl>
         )}
-        {canViewAllJobs && clientOptions && onCreatedBySubChange && (
+        {canViewAllJobs && clientOptions && onCreatedByClientChange && (
           <FormControl size="small" sx={{ minWidth: 180 }}>
             <InputLabel>Client</InputLabel>
-            <Select value={createdBySub ?? ''} label="Client" onChange={(e) => onCreatedBySubChange(e.target.value)}>
+            <Select value={createdByClient ?? ''} label="Client" onChange={(e) => onCreatedByClientChange(e.target.value)}>
               <MenuItem value="">Any client</MenuItem>
               {clientOptions.map((option) => (
                 <MenuItem key={option.id} value={option.id}>

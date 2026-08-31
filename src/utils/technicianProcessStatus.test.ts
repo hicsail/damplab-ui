@@ -9,6 +9,8 @@ import {
   latestStaffVisibleSowVersion,
   isJobProcessSettled,
   isSowProcessSettled,
+  jobStatusColor,
+  jobStatusLabel,
   partyVersionLabel,
   sowPartyStatus
 } from './technicianProcessStatus';
@@ -145,8 +147,63 @@ describe('partyVersionLabel', () => {
 describe('chipStatusBackground', () => {
   it('returns a translucent tint for each chip color', () => {
     expect(chipStatusBackground('warning')).toMatch(/255,\s*152,\s*0/);
-    expect(chipStatusBackground('success')).toMatch(/46,\s*125,\s*50/);
+    expect(chipStatusBackground('success')).toMatch(/0,\s*255,\s*0/);
     expect(chipStatusBackground('default')).toMatch(/120,\s*120,\s*120/);
+  });
+});
+
+// Every JobState in damplab-backend/src/job/job.model.ts. Four of these used to
+// have no case at all and painted a transparent pane reading "Invalid Case".
+const JOB_STATES = [
+  'CREATING',
+  'SUBMITTED',
+  'CHANGES_REQUESTED',
+  'ACCEPTED',
+  'WAITING_FOR_SOW',
+  'QUEUED',
+  'IN_PROGRESS',
+  'COMPLETE',
+  'REJECTED',
+  'CLOSED'
+];
+
+describe('jobStatusColor', () => {
+  it('gives every job state a colour from the shared vocabulary', () => {
+    for (const state of JOB_STATES) {
+      expect(['default', 'info', 'warning', 'success', 'error']).toContain(jobStatusColor(state));
+    }
+  });
+
+  it('paints an accepted job the same green the SOW uses when finalized', () => {
+    expect(chipStatusBackground(jobStatusColor('ACCEPTED'))).toBe(chipStatusBackground('success'));
+  });
+
+  it('keeps rejection and requested changes distinguishable', () => {
+    expect(jobStatusColor('REJECTED')).toBe('error');
+    expect(jobStatusColor('CHANGES_REQUESTED')).toBe('warning');
+  });
+
+  it('falls back to neutral for an unknown or missing state', () => {
+    expect(jobStatusColor('NOT_A_STATE')).toBe('default');
+    expect(jobStatusColor(null)).toBe('default');
+  });
+});
+
+describe('jobStatusLabel', () => {
+  it('never leaks a raw enum for a known state', () => {
+    for (const state of JOB_STATES) {
+      expect(jobStatusLabel(state)).not.toBe(state);
+    }
+  });
+
+  it('reads as words', () => {
+    expect(jobStatusLabel('ACCEPTED')).toBe('Accepted');
+    expect(jobStatusLabel('CHANGES_REQUESTED')).toBe('Changes Requested');
+    expect(jobStatusLabel('WAITING_FOR_SOW')).toBe('Waiting for SOW');
+  });
+
+  it('falls back to an em dash when there is no state', () => {
+    expect(jobStatusLabel(null)).toBe('—');
   });
 });
 

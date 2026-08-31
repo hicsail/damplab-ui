@@ -447,7 +447,7 @@ export default function Checkout() {
       }}>
 
       {workflows.map((workflow, index) => (
-      <Grid item xs={12} md={5} space key={index}>
+      <Grid key={index}>
         <Item sx={{ minHeight: 'unset' }}>
           {/* Top row: Title with cost + actions */}
           <Box

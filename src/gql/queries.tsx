@@ -420,7 +420,7 @@ export const JOBS_FOR_VIEWER = gql`
 export const JOB_CLIENTS = gql`
   query JobClients {
     jobClients {
-      sub
+      clientKey
       displayName
     }
   }
