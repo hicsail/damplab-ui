@@ -85,11 +85,12 @@ export default function NotificationBell() {
     setAnchorEl(null);
   };
 
-  const handleClickNotification = async (n: NotificationItem) => {
+  const handleClickNotification = (n: NotificationItem) => {
     if (!n.readAt) {
-      await markRead({ variables: { id: n.id } });
-      refetchCount();
-      refetchList();
+      markRead({ variables: { id: n.id } }).then(() => {
+        refetchCount();
+        refetchList();
+      });
     }
     handleClose();
     if (n.link) {
