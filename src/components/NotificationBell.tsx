@@ -69,7 +69,15 @@ export default function NotificationBell() {
   const [markRead] = useMutation(MARK_NOTIFICATION_READ);
   const [markAllRead] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
 
-  const unreadCount: number = countData?.myUnreadNotificationCount ?? 0;
+  const serverCount: number = countData?.myUnreadNotificationCount ?? 0;
+  const [localCount, setLocalCount] = useState(0);
+
+  // Sync local count when server value changes (from polling or refetch).
+  useEffect(() => {
+    setLocalCount(serverCount);
+  }, [serverCount]);
+
+  const unreadCount = localCount;
   const notifications: NotificationItem[] =
     listData?.myNotifications?.items ?? [];
 
@@ -90,9 +98,9 @@ export default function NotificationBell() {
 
   const handleClickNotification = (n: NotificationItem) => {
     if (!n.readAt) {
+      setLocalCount((c) => Math.max(0, c - 1));
       markRead({ variables: { id: n.id } }).then(() => {
         refetchCount();
-        refetchList();
       });
     }
     handleClose();
@@ -106,6 +114,7 @@ export default function NotificationBell() {
   };
 
   const handleMarkAllRead = async () => {
+    setLocalCount(0);
     await markAllRead();
     refetchCount();
     refetchList();
