@@ -1,7 +1,7 @@
-import { Box, Breadcrumbs, Link, Typography } from '@mui/material';
-import HomeIcon from '@mui/icons-material/Home';
-import NavigateNextIcon from '@mui/icons-material/NavigateNext';
-import { Link as RouterLink, useLocation } from 'react-router';
+import { Box, Breadcrumbs, Link, Typography } from "@mui/material";
+import HomeIcon from "@mui/icons-material/Home";
+import NavigateNextIcon from "@mui/icons-material/NavigateNext";
+import { Link as RouterLink, useLocation } from "react-router";
 
 interface Crumb {
   label: string;
@@ -14,69 +14,87 @@ function pretty(s: string): string {
     .split(/[-_/]/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+    .join(" ");
 }
 
 /** One-level, static routes -> label. */
 const STATIC: Record<string, string> = {
   // /my_jobs redirects to /dashboard; the label survives for anyone landing on
   // the old path from a bookmark before the redirect fires.
-  '/my_jobs': 'Jobs',
-  '/services-catalog': 'Catalog',
-  '/admin/services-catalog': 'Catalog',
-  '/book-inventory': 'Book Inventory',
-  '/training': 'Learning Hub',
-  '/checkout': 'Checkout',
-  '/final_checkout': 'Final Checkout',
-  '/staff_submit': 'Staff Submit Job',
-  '/bugs': 'Bugs & Issues',
-  '/lab-status-tv': 'Lab Status TV',
-  '/lab-assistant': 'AI Lab Assistant',
-  '/technician_bench': 'My Bench',
-  '/inventory-calendar': 'Inventory Schedule',
-  '/usage-billing': 'Billing',
-  '/dashboard': 'Jobs',
-  '/customer-management': 'Customer Management',
-  '/api-keys': 'API Keys',
-  '/inventory': 'Inventory Availability',
-  '/edit': 'Catalog & Inventory Editor',
-  '/release_notes': 'Release Notes',
-  '/announcements': 'Announcements',
-  '/data_translation': 'Data Translation',
-  '/dominos': 'Dominos',
-  '/elabs': 'ELabs',
-  '/kernel': 'Kernel',
-  '/protocol-map': 'Protocol Library',
-  '/stations': 'Lab Layout',
-  '/backlog': 'Bug Backlog'
+  "/my_jobs": "Jobs",
+  "/services-catalog": "Catalog",
+  "/admin/services-catalog": "Catalog",
+  "/book-inventory": "Book Inventory",
+  "/training": "Learning Hub",
+  "/checkout": "Checkout",
+  "/final_checkout": "Final Checkout",
+  "/staff_submit": "Staff Submit Job",
+  "/bugs": "Bugs & Issues",
+  "/lab-status-tv": "Lab Status TV",
+  "/lab-assistant": "AI Lab Assistant",
+  "/technician_bench": "My Bench",
+  "/inventory-calendar": "Inventory Schedule",
+  "/usage-billing": "Billing",
+  "/dashboard": "Jobs",
+  "/customer-management": "Customer Management",
+  "/api-keys": "API Keys",
+  "/inventory": "Inventory Availability",
+  "/edit": "Catalog & Inventory Editor",
+  "/release_notes": "Release Notes",
+  "/announcements": "Announcements",
+  "/data_translation": "Data Translation",
+  "/dominos": "Dominos",
+  "/elabs": "ELabs",
+  "/kernel": "Kernel",
+  "/protocol-map": "Protocol Library",
+  "/stations": "Lab Layout",
+  "/backlog": "Bug Backlog",
+  "/notification-preferences": "Notification Preferences",
 };
 
-const EDIT: Crumb = { label: 'Catalog & Inventory Editor', to: '/edit' };
+const EDIT: Crumb = { label: "Catalog & Inventory Editor", to: "/edit" };
 
 /** Multi-level / dynamic routes -> explicit trail (below Home). Returns null if unmatched. */
 function dynamicTrail(path: string): Crumb[] | null {
   let m: RegExpMatchArray | null;
-  if ((m = path.match(/^\/edit\/services\/new$/))) return [EDIT, { label: 'New Service' }];
-  if ((m = path.match(/^\/edit\/services\/([^/]+)\/parameters$/))) return [EDIT, { label: 'Edit Service', to: `/edit/services/${m[1]}` }, { label: 'Parameters' }];
-  if ((m = path.match(/^\/edit\/services\/([^/]+)$/))) return [EDIT, { label: 'Edit Service' }];
-  if ((m = path.match(/^\/edit\/bundles\/new$/))) return [EDIT, { label: 'New Bundle' }];
-  if ((m = path.match(/^\/edit\/bundles\/([^/]+)$/))) return [EDIT, { label: 'Edit Bundle' }];
-  if ((m = path.match(/^\/edit\/inventory\/new$/))) return [EDIT, { label: 'New Inventory Item' }];
-  if ((m = path.match(/^\/edit\/inventory\/([^/]+)$/))) return [EDIT, { label: 'Edit Inventory Item' }];
+  if ((m = path.match(/^\/edit\/services\/new$/)))
+    return [EDIT, { label: "New Service" }];
+  if ((m = path.match(/^\/edit\/services\/([^/]+)\/parameters$/)))
+    return [
+      EDIT,
+      { label: "Edit Service", to: `/edit/services/${m[1]}` },
+      { label: "Parameters" },
+    ];
+  if ((m = path.match(/^\/edit\/services\/([^/]+)$/)))
+    return [EDIT, { label: "Edit Service" }];
+  if ((m = path.match(/^\/edit\/bundles\/new$/)))
+    return [EDIT, { label: "New Bundle" }];
+  if ((m = path.match(/^\/edit\/bundles\/([^/]+)$/)))
+    return [EDIT, { label: "Edit Bundle" }];
+  if ((m = path.match(/^\/edit\/inventory\/new$/)))
+    return [EDIT, { label: "New Inventory Item" }];
+  if ((m = path.match(/^\/edit\/inventory\/([^/]+)$/)))
+    return [EDIT, { label: "Edit Inventory Item" }];
   // Section keys are camelCase ("invoiceProcedures"); the dash makes pretty() split them.
-  if ((m = path.match(/^\/edit\/sow-sections\/([^/]+)$/))) return [EDIT, { label: pretty(m[1].replace(/([A-Z])/g, '-$1')) }];
-  if ((m = path.match(/^\/lab-monitor\/([^/]+)$/))) return [{ label: 'Lab Monitor' }, { label: pretty(m[1]) }];
-  if ((m = path.match(/^\/technician_view\/([^/]+)$/))) return [{ label: 'Jobs', to: '/dashboard' }, { label: 'Technician View' }];
-  if ((m = path.match(/^\/jobs\/([^/]+)$/))) return [{ label: 'Jobs', to: '/dashboard' }, { label: 'Job' }];
-  if ((m = path.match(/^\/client_view\/([^/]+)$/))) return [{ label: 'Jobs', to: '/dashboard' }, { label: 'Job Tracking' }];
-  if ((m = path.match(/^\/resubmission\/([^/]+)$/))) return [{ label: 'Resubmission' }];
+  if ((m = path.match(/^\/edit\/sow-sections\/([^/]+)$/)))
+    return [EDIT, { label: pretty(m[1].replace(/([A-Z])/g, "-$1")) }];
+  if ((m = path.match(/^\/lab-monitor\/([^/]+)$/)))
+    return [{ label: "Lab Monitor" }, { label: pretty(m[1]) }];
+  if ((m = path.match(/^\/technician_view\/([^/]+)$/)))
+    return [{ label: "Jobs", to: "/dashboard" }, { label: "Technician View" }];
+  if ((m = path.match(/^\/jobs\/([^/]+)$/)))
+    return [{ label: "Jobs", to: "/dashboard" }, { label: "Job" }];
+  if ((m = path.match(/^\/client_view\/([^/]+)$/)))
+    return [{ label: "Jobs", to: "/dashboard" }, { label: "Job Tracking" }];
+  if ((m = path.match(/^\/resubmission\/([^/]+)$/)))
+    return [{ label: "Resubmission" }];
   return null;
 }
 
 function buildCrumbs(pathname: string): Crumb[] {
-  const clean = pathname.replace(/\/+$/, '') || '/';
-  if (clean === '/') return []; // already home — nothing to show
-  const home: Crumb = { label: 'Home', to: '/' };
+  const clean = pathname.replace(/\/+$/, "") || "/";
+  if (clean === "/") return []; // already home — nothing to show
+  const home: Crumb = { label: "Home", to: "/" };
   const dyn = dynamicTrail(clean);
   if (dyn) return [home, ...dyn];
   if (STATIC[clean]) return [home, { label: STATIC[clean] }];
@@ -98,21 +116,34 @@ export default function AppBreadcrumbs() {
       sx={{
         px: { xs: 2, md: 3 },
         py: 1,
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        position: 'sticky',
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        bgcolor: "background.paper",
+        position: "sticky",
         top: 0,
-        zIndex: 1100
+        zIndex: 1100,
       }}
     >
-      <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />} aria-label="breadcrumb">
+      <Breadcrumbs
+        separator={<NavigateNextIcon fontSize="small" />}
+        aria-label="breadcrumb"
+      >
         {crumbs.map((c, i) => {
           const isLast = i === crumbs.length - 1;
-          const isHome = i === 0 && c.to === '/';
+          const isHome = i === 0 && c.to === "/";
           if (isLast || !c.to) {
             return (
-              <Typography key={i} color="text.primary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontWeight: 600, fontSize: 14 }}>
+              <Typography
+                key={i}
+                color="text.primary"
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  fontWeight: 600,
+                  fontSize: 14,
+                }}
+              >
                 {isHome && <HomeIcon fontSize="small" />}
                 {c.label}
               </Typography>
@@ -125,7 +156,12 @@ export default function AppBreadcrumbs() {
               to={c.to}
               underline="hover"
               color="inherit"
-              sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: 14 }}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+                fontSize: 14,
+              }}
             >
               {isHome && <HomeIcon fontSize="small" />}
               {c.label}

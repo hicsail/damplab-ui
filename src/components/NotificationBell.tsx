@@ -15,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { MY_UNREAD_NOTIFICATION_COUNT, MY_NOTIFICATIONS } from "../gql/queries";
 import {
   MARK_NOTIFICATION_READ,
@@ -245,6 +246,27 @@ export default function NotificationBell() {
             ))}
           </List>
         )}
+        <Divider />
+        <Box sx={{ px: 2, py: 1.5, textAlign: "center" }}>
+          <Typography
+            variant="body2"
+            color="primary"
+            sx={{
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 0.5,
+              "&:hover": { textDecoration: "underline" },
+            }}
+            onClick={() => {
+              handleClose();
+              navigate("/notification-preferences");
+            }}
+          >
+            <SettingsOutlinedIcon fontSize="small" />
+            Manage preferences
+          </Typography>
+        </Box>
       </Popover>
     </>
   );

@@ -1,4 +1,4 @@
-import { PERMISSIONS, PermissionName, canFor } from '../hooks/usePermissions';
+import { PERMISSIONS, PermissionName, canFor } from "../hooks/usePermissions";
 
 /**
  * The homepage menu, as data.
@@ -32,31 +32,32 @@ import { PERMISSIONS, PermissionName, canFor } from '../hooks/usePermissions';
  */
 
 export type HomeMenuItemId =
-  | 'order-services'
-  | 'catalog'
-  | 'book-inventory'
-  | 'learning-hub'
-  | 'bugs'
-  | 'bug-backlog'
-  | 'damplab-website'
-  | 'jobs'
-  | 'staff-submit-job'
-  | 'my-bench'
-  | 'inventory-availability'
-  | 'inventory-schedule'
-  | 'release-notes'
-  | 'catalog-inventory-editor'
-  | 'protocol-library'
-  | 'lab-layout'
-  | 'announcements'
-  | 'billing'
-  | 'ai-lab-assistant'
-  | 'customer-management'
-  | 'api-keys'
-  | 'data-translation'
-  | 'lab-monitor-north'
-  | 'lab-monitor-south'
-  | 'lab-status-tv';
+  | "order-services"
+  | "catalog"
+  | "book-inventory"
+  | "learning-hub"
+  | "bugs"
+  | "bug-backlog"
+  | "damplab-website"
+  | "jobs"
+  | "staff-submit-job"
+  | "my-bench"
+  | "inventory-availability"
+  | "inventory-schedule"
+  | "release-notes"
+  | "catalog-inventory-editor"
+  | "protocol-library"
+  | "lab-layout"
+  | "announcements"
+  | "billing"
+  | "ai-lab-assistant"
+  | "customer-management"
+  | "api-keys"
+  | "data-translation"
+  | "lab-monitor-north"
+  | "lab-monitor-south"
+  | "notification-preferences"
+  | "lab-status-tv";
 
 /** What a `visible` predicate is allowed to look at. */
 export interface HomeMenuUser {
@@ -77,9 +78,9 @@ export interface HomeMenuItemDef {
    * markJobsFeedViewed() before navigating — turning it into a plain `to` would
    * silently drop that mutation.
    */
-  action?: 'open-jobs-dashboard';
+  action?: "open-jobs-dashboard";
   /** Renders the icon inside a Badge driven by this flag. */
-  badge?: 'jobs-feed-unseen';
+  badge?: "jobs-feed-unseen";
   visible: (user: HomeMenuUser) => boolean;
 }
 
@@ -98,7 +99,7 @@ const needs =
 
 export const HOME_MENU: readonly HomeMenuSectionDef[] = [
   {
-    title: 'Client Tools',
+    title: "Client Tools",
     items: [
       // One button for what used to be "My Jobs" (Client Tools) and "Jobs"
       // (Technician Tools). The two pages rendered the same component; scope is
@@ -107,54 +108,186 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
       // The unseen-jobs badge rides along, but it is a jobs:view-all concept —
       // there is no shared feed for one client's own jobs — so Home skips the
       // query and the dot never shows below that permission.
-      { id: 'jobs', label: 'Jobs', action: 'open-jobs-dashboard', badge: 'jobs-feed-unseen', visible: needs(PERMISSIONS.JobsView) },
+      {
+        id: "jobs",
+        label: "Jobs",
+        action: "open-jobs-dashboard",
+        badge: "jobs-feed-unseen",
+        visible: needs(PERMISSIONS.JobsView),
+      },
       // The product is still called Canvas; only this button is renamed.
-      { id: 'order-services', label: 'Order Services', to: '/canvas', visible: everyone },
-      { id: 'catalog', label: 'Catalog', to: '/services-catalog', visible: needs(PERMISSIONS.CatalogView) },
-      { id: 'book-inventory', label: 'Book Inventory', to: '/book-inventory', visible: needs(PERMISSIONS.InventoryBook) },
-      { id: 'learning-hub', label: 'Learning Hub', to: '/training', visible: needs(PERMISSIONS.TrainingRead) },
-      { id: 'announcements', label: 'Announcements', to: '/announcements', visible: needs(PERMISSIONS.AnnouncementsRead) },
-      { id: 'bugs', label: 'Bugs', to: '/bugs', visible: needs(PERMISSIONS.BugsReport) },
-      { id: 'bug-backlog', label: 'Bug Backlog', to: '/backlog', visible: needs(PERMISSIONS.BugBacklogView) },
-      { id: 'damplab-website', label: 'DAMP Lab Website', href: 'https://www.damplab.org/services', visible: everyone },
+      {
+        id: "order-services",
+        label: "Order Services",
+        to: "/canvas",
+        visible: everyone,
+      },
+      {
+        id: "catalog",
+        label: "Catalog",
+        to: "/services-catalog",
+        visible: needs(PERMISSIONS.CatalogView),
+      },
+      {
+        id: "book-inventory",
+        label: "Book Inventory",
+        to: "/book-inventory",
+        visible: needs(PERMISSIONS.InventoryBook),
+      },
+      {
+        id: "learning-hub",
+        label: "Learning Hub",
+        to: "/training",
+        visible: needs(PERMISSIONS.TrainingRead),
+      },
+      {
+        id: "announcements",
+        label: "Announcements",
+        to: "/announcements",
+        visible: needs(PERMISSIONS.AnnouncementsRead),
+      },
+      {
+        id: "notification-preferences",
+        label: "Notification Preferences",
+        to: "/notification-preferences",
+        visible: everyone,
+      },
+      {
+        id: "bugs",
+        label: "Bugs",
+        to: "/bugs",
+        visible: needs(PERMISSIONS.BugsReport),
+      },
+      {
+        id: "bug-backlog",
+        label: "Bug Backlog",
+        to: "/backlog",
+        visible: needs(PERMISSIONS.BugBacklogView),
+      },
+      {
+        id: "damplab-website",
+        label: "DAMP Lab Website",
+        href: "https://www.damplab.org/services",
+        visible: everyone,
+      },
     ],
   },
   {
-    title: 'Technician Tools',
+    title: "Technician Tools",
     items: [
       // Q7: the matrix gives this to Equipment Users and not Technicians. It stays
       // filed here because the section is topical.
-      { id: 'staff-submit-job', label: 'Staff submit job', to: '/staff_submit', visible: needs(PERMISSIONS.JobSubmitForClient) },
-      { id: 'my-bench', label: 'My Bench', to: '/technician_bench', visible: needs(PERMISSIONS.BenchUse) },
+      {
+        id: "staff-submit-job",
+        label: "Staff submit job",
+        to: "/staff_submit",
+        visible: needs(PERMISSIONS.JobSubmitForClient),
+      },
+      {
+        id: "my-bench",
+        label: "My Bench",
+        to: "/technician_bench",
+        visible: needs(PERMISSIONS.BenchUse),
+      },
     ],
   },
   {
-    title: 'Operational Tools',
+    title: "Operational Tools",
     items: [
-      { id: 'inventory-availability', label: 'Inventory Availability', to: '/inventory', visible: needs(PERMISSIONS.InventoryRead) },
-      { id: 'inventory-schedule', label: 'Inventory Schedule', to: '/inventory-calendar', visible: needs(PERMISSIONS.InventorySchedule) },
+      {
+        id: "inventory-availability",
+        label: "Inventory Availability",
+        to: "/inventory",
+        visible: needs(PERMISSIONS.InventoryRead),
+      },
+      {
+        id: "inventory-schedule",
+        label: "Inventory Schedule",
+        to: "/inventory-calendar",
+        visible: needs(PERMISSIONS.InventorySchedule),
+      },
     ],
   },
   {
-    title: 'Admin Operational Tools',
+    title: "Admin Operational Tools",
     items: [
-      { id: 'release-notes', label: 'Release Notes', to: '/release_notes', visible: needs(PERMISSIONS.ReleaseNotesView) },
-      { id: 'catalog-inventory-editor', label: 'Catalog & Inventory Editor', to: '/edit', visible: needs(PERMISSIONS.CatalogEditorRead) },
-      { id: 'protocol-library', label: 'Protocol Library', to: '/protocol-map', visible: needs(PERMISSIONS.ProtocolLibraryRead) },
-      { id: 'lab-layout', label: 'Lab Layout', to: '/stations', visible: needs(PERMISSIONS.LabLayoutRead) },
-      { id: 'billing', label: 'Billing', to: '/usage-billing', visible: needs(PERMISSIONS.BillingView) },
-      { id: 'ai-lab-assistant', label: 'AI Lab Assistant', to: '/lab-assistant', visible: needs(PERMISSIONS.LabAssistantUse) },
+      {
+        id: "release-notes",
+        label: "Release Notes",
+        to: "/release_notes",
+        visible: needs(PERMISSIONS.ReleaseNotesView),
+      },
+      {
+        id: "catalog-inventory-editor",
+        label: "Catalog & Inventory Editor",
+        to: "/edit",
+        visible: needs(PERMISSIONS.CatalogEditorRead),
+      },
+      {
+        id: "protocol-library",
+        label: "Protocol Library",
+        to: "/protocol-map",
+        visible: needs(PERMISSIONS.ProtocolLibraryRead),
+      },
+      {
+        id: "lab-layout",
+        label: "Lab Layout",
+        to: "/stations",
+        visible: needs(PERMISSIONS.LabLayoutRead),
+      },
+      {
+        id: "billing",
+        label: "Billing",
+        to: "/usage-billing",
+        visible: needs(PERMISSIONS.BillingView),
+      },
+      {
+        id: "ai-lab-assistant",
+        label: "AI Lab Assistant",
+        to: "/lab-assistant",
+        visible: needs(PERMISSIONS.LabAssistantUse),
+      },
     ],
   },
   {
-    title: 'Admin Management Tools',
+    title: "Admin Management Tools",
     items: [
-      { id: 'customer-management', label: 'Customer Management', to: '/customer-management', visible: needs(PERMISSIONS.CustomersManage) },
-      { id: 'api-keys', label: 'API Keys', to: '/api-keys', visible: needs(PERMISSIONS.ApiKeysManage) },
-      { id: 'data-translation', label: 'Data Translation', to: '/data_translation', visible: needs(PERMISSIONS.DataTranslationUse) },
-      { id: 'lab-monitor-north', label: 'Lab Monitor North', to: '/lab-monitor/north', visible: needs(PERMISSIONS.LabMonitorView) },
-      { id: 'lab-monitor-south', label: 'Lab Monitor South', to: '/lab-monitor/south', visible: needs(PERMISSIONS.LabMonitorView) },
-      { id: 'lab-status-tv', label: 'Lab Status TV', to: '/lab-status-tv', visible: needs(PERMISSIONS.LabStatusTvView) },
+      {
+        id: "customer-management",
+        label: "Customer Management",
+        to: "/customer-management",
+        visible: needs(PERMISSIONS.CustomersManage),
+      },
+      {
+        id: "api-keys",
+        label: "API Keys",
+        to: "/api-keys",
+        visible: needs(PERMISSIONS.ApiKeysManage),
+      },
+      {
+        id: "data-translation",
+        label: "Data Translation",
+        to: "/data_translation",
+        visible: needs(PERMISSIONS.DataTranslationUse),
+      },
+      {
+        id: "lab-monitor-north",
+        label: "Lab Monitor North",
+        to: "/lab-monitor/north",
+        visible: needs(PERMISSIONS.LabMonitorView),
+      },
+      {
+        id: "lab-monitor-south",
+        label: "Lab Monitor South",
+        to: "/lab-monitor/south",
+        visible: needs(PERMISSIONS.LabMonitorView),
+      },
+      {
+        id: "lab-status-tv",
+        label: "Lab Status TV",
+        to: "/lab-status-tv",
+        visible: needs(PERMISSIONS.LabStatusTvView),
+      },
     ],
   },
 ];
@@ -169,5 +302,8 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
  * together.
  */
 export function visibleHomeMenu(user: HomeMenuUser): HomeMenuSectionDef[] {
-  return HOME_MENU.map((section) => ({ ...section, items: section.items.filter((item) => item.visible(user)) })).filter((section) => section.items.length > 0);
+  return HOME_MENU.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => item.visible(user)),
+  })).filter((section) => section.items.length > 0);
 }
