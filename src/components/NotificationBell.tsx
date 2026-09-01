@@ -87,9 +87,14 @@ export default function NotificationBell() {
 
   const handleClickNotification = (n: NotificationItem) => {
     if (!n.readAt) {
-      markRead({ variables: { id: n.id } }).then(() => {
-        refetchCount();
-        refetchList();
+      markRead({
+        variables: { id: n.id },
+        update(cache) {
+          cache.writeQuery({
+            query: MY_UNREAD_NOTIFICATION_COUNT,
+            data: { myUnreadNotificationCount: Math.max(0, unreadCount - 1) },
+          });
+        },
       });
     }
     handleClose();
