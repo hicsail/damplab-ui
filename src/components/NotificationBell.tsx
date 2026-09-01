@@ -78,8 +78,12 @@ export default function NotificationBell() {
   }, [serverCount]);
 
   const unreadCount = localCount;
-  const notifications: NotificationItem[] =
-    listData?.myNotifications?.items ?? [];
+  const [locallyRead, setLocallyRead] = useState<Set<string>>(new Set());
+  const notifications: NotificationItem[] = (
+    listData?.myNotifications?.items ?? []
+  ).map((n: NotificationItem) =>
+    locallyRead.has(n.id) ? { ...n, readAt: n.readAt ?? "optimistic" } : n,
+  );
 
   // Refetch list when popover opens.
   useEffect(() => {
@@ -99,6 +103,7 @@ export default function NotificationBell() {
   const handleClickNotification = (n: NotificationItem) => {
     if (!n.readAt) {
       setLocalCount((c) => Math.max(0, c - 1));
+      setLocallyRead((prev) => new Set(prev).add(n.id));
       markRead({ variables: { id: n.id } }).then(() => {
         refetchCount();
       });
@@ -115,6 +120,7 @@ export default function NotificationBell() {
 
   const handleMarkAllRead = async () => {
     setLocalCount(0);
+    setLocallyRead(new Set());
     await markAllRead();
     refetchCount();
     refetchList();
