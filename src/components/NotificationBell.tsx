@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useQuery, useMutation } from "@apollo/client/index.js";
+import { usePermissions, PERMISSIONS } from "../hooks/usePermissions";
 import {
   Badge,
   Box,
@@ -46,6 +47,8 @@ interface NotificationItem {
 
 export default function NotificationBell() {
   const navigate = useNavigate();
+  const { can } = usePermissions();
+  const canViewAllJobs = can(PERMISSIONS.JobsViewAll);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
 
@@ -94,7 +97,11 @@ export default function NotificationBell() {
     }
     handleClose();
     if (n.link) {
-      navigate(n.link);
+      const link =
+        canViewAllJobs && n.link.startsWith("/client_view/")
+          ? n.link.replace("/client_view/", "/technician_view/")
+          : n.link;
+      navigate(link);
     }
   };
 
