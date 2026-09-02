@@ -5,7 +5,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import { GET_SOW_EDITOR_STATE } from '../../gql/queries';
-import { SIGN_SOW } from '../../gql/mutations';
+import { DECLINE_SOW, SIGN_SOW } from '../../gql/mutations';
 import SowDiffText from './SowDiffText';
 import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
@@ -15,6 +15,8 @@ import { diffVersions, previousCustomerVersion } from '../../utils/sowDiff';
 import { GROUP_ORDER, SowEditorState, SowField, customerDocumentFields, customerSigningState, signingAgreementText, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 import { formatSOWInstant } from '../../utils/sowDateUtils';
 import { chipStatusBackground } from '../../utils/technicianProcessStatus';
+import { formatGqlError } from '../../utils/gqlError';
+import ReasonDialog from '../ReasonDialog';
 
 /**
  * The customer's view of a Statement of Work.
@@ -26,11 +28,14 @@ import { chipStatusBackground } from '../../utils/technicianProcessStatus';
 
 interface Props {
   jobId: string;
+  /** Lets the job page refresh alongside: declining moves the job's lifecycle too. */
+  onDeclined?: () => Promise<unknown> | void;
 }
 
-export default function SowCustomerView({ jobId }: Props): React.JSX.Element | null {
+export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX.Element | null {
   const { data, loading, refetch } = useQuery(GET_SOW_EDITOR_STATE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
   const [signSow] = useMutation(SIGN_SOW);
+  const [declineSow] = useMutation(DECLINE_SOW);
 
   const sow: SowEditorState | null = data?.sowByJobId ?? null;
   // The server returns only issued versions to a customer, so this history is
@@ -42,6 +47,7 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   const [initials, setInitials] = useState<Record<string, string>>({});
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const [banner, setBanner] = useState<{ severity: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   const activeNumber = sow?.activeVersionNumber ?? 0;
@@ -67,7 +73,11 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   // Only present in the single consent statement if the document actually
   // contains that kind of section — sent to the server as consentedGroups.
   const groups = useMemo(() => GROUP_ORDER.filter((g) => visible.some((f) => f.kind === g)), [visible]);
-  const sectionsNeedingInitials = useMemo(() => visible.filter((f) => f.requiresInitials), [visible]);
+  // `allowsInitials === false` is filtered here as well as server-side: a
+  // document saved before the flag existed can still carry requiresInitials on a
+  // section that cannot take it, and asking for initials the server will ignore
+  // would block signing on a box that does nothing.
+  const sectionsNeedingInitials = useMemo(() => visible.filter((f) => f.requiresInitials && f.allowsInitials !== false), [visible]);
 
   const isCurrent = !!version && version.versionNumber === activeNumber;
   const awaitingSignature = isCurrent && version?.status === 'SENT';
@@ -100,6 +110,23 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   const allInitialed = sectionsNeedingInitials.every((f) => (initials[f.key] ?? '').trim().length > 0);
   const canSign = signingState.enabled && agreed && allInitialed && name.trim().length > 0 && !busy;
 
+  const handleDecline = async (reason: string): Promise<void> => {
+    if (!sow) return;
+    setBusy(true);
+    setBanner(null);
+    try {
+      await declineSow({ variables: { sowId: sow.id, reason } });
+      await refetch();
+      await onDeclined?.();
+      setDeclining(false);
+      setBanner({ severity: 'info', text: 'The lab has been told you are not signing this version, and will follow up.' });
+    } catch (e: any) {
+      setBanner({ severity: 'error', text: formatGqlError(e, 'The Statement of Work could not be declined.') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSign = async (): Promise<void> => {
     if (!sow || !version || !signingState.enabled) return;
     setBusy(true);
@@ -127,6 +154,20 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
   };
 
   return (
+    <>
+    <ReasonDialog
+      open={declining}
+      title="Decline to sign this Statement of Work?"
+      warning={
+        'The lab will be told you are not signing this version, and it will stop being available to sign.\n\n' +
+        'This does not cancel your job — the lab can revise the Statement of Work and send you a new version.'
+      }
+      fieldLabel="Reason (the lab sees this)"
+      confirmLabel="Decline to sign"
+      busy={busy}
+      onCancel={() => setDeclining(false)}
+      onConfirm={handleDecline}
+    />
     <CollapsibleStatusCard
       title="Statement of Work"
       defaultExpanded
@@ -225,7 +266,7 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                 {visible.map((f) => {
                   const d = diffByKey.get(f.key);
                   const changed = d && d.kind !== 'unchanged';
-                  const askInitials = awaitingSignature && !signedName && f.requiresInitials;
+                  const askInitials = awaitingSignature && !signedName && f.requiresInitials && f.allowsInitials !== false;
                   return (
                     <Box key={f.key} sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider', borderLeft: '3px solid', borderLeftColor: changed ? 'info.main' : 'transparent', '&:last-of-type': { borderBottom: 'none' } }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -293,6 +334,12 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
                       <Button variant="contained" onClick={handleSign} disabled={!canSign}>
                         Sign
                       </Button>
+                      {/* Declining needs neither the agreement checkbox nor the
+                          initials — those gate agreeing, not refusing — and it
+                          stays available even when signing is blocked. */}
+                      <Button variant="outlined" color="warning" onClick={() => setDeclining(true)} disabled={busy || sow?.actionGate?.canDecline !== true}>
+                        Decline to sign
+                      </Button>
                     </Box>
                   </Box>
                   {!agreed && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Confirm the checkbox above to enable signing.</Typography>}
@@ -316,5 +363,6 @@ export default function SowCustomerView({ jobId }: Props): React.JSX.Element | n
         </>
       }
     />
+    </>
   );
 }

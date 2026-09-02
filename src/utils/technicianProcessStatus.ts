@@ -42,6 +42,7 @@ export function isJobProcessSettled(state?: string | null): boolean {
     case 'IN_PROGRESS':
     case 'COMPLETE':
     case 'CLOSED':
+    case 'CANCELLED':
       return true;
     default:
       return false;
@@ -155,7 +156,8 @@ const JOB_STATUS_COLORS: Record<string, ChipStatusColor> = {
   IN_PROGRESS: 'info',
   COMPLETE: 'success',
   REJECTED: 'error',
-  CLOSED: 'default'
+  CLOSED: 'default',
+  CANCELLED: 'error'
 };
 
 export function jobStatusColor(state?: string | null): ChipStatusColor {
@@ -173,7 +175,8 @@ const JOB_STATUS_LABELS: Record<string, string> = {
   IN_PROGRESS: 'In Progress',
   COMPLETE: 'Complete',
   REJECTED: 'Rejected',
-  CLOSED: 'Closed'
+  CLOSED: 'Closed',
+  CANCELLED: 'Cancelled by client'
 };
 
 export function jobStatusLabel(state?: string | null): string {

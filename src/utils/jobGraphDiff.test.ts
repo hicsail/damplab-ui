@@ -383,3 +383,48 @@ describe('event versions', () => {
     expect(baseline!.versionNumber).toBe(1);
   });
 });
+
+/**
+ * What a reader lands on after rejecting the lab's changes.
+ *
+ * The reject flow appends the customer's restored graph and then a state event
+ * on top of it, so the two job pages default to different rows — the staff page
+ * to the newest edit, the customer page to the newest row of any kind. Both have
+ * to end up comparing against the lab's version, which is the change being
+ * undone; landing on the restore's own predecessor would report nothing.
+ */
+describe('the default pair after a customer rejects the lab’s changes', () => {
+  const original = workflow([node('a')]);
+  const labEdit = workflow([node('a'), node('b')]);
+
+  const history: JobVersionLike[] = [
+    version(1000, 'CUSTOMER', [original]),
+    version(1001, 'STAFF', [labEdit]),
+    // The restore: the customer's graph again, as a new version.
+    version(1002, 'CUSTOMER', [original]),
+    { ...version(2000, 'CUSTOMER', [original]), isEvent: true, note: 'Rejected by the customer' }
+  ];
+
+  it('compares the staff page’s newest edit against the lab’s version', () => {
+    const latest = latestContentVersion(history)!;
+    expect(latest.versionNumber).toBe(1002);
+
+    const { current, baseline } = selectedDiffPair(history, latest.versionNumber, undefined);
+    expect({ current: current?.versionNumber, baseline: baseline?.versionNumber }).toEqual({ current: 1002, baseline: 1001 });
+  });
+
+  it('compares the customer page’s newest row against the lab’s version too', () => {
+    const latest = latestVersion(history)!;
+    expect(latest.versionNumber).toBe(2000);
+
+    const { current, baseline } = selectedDiffPair(history, latest.versionNumber, undefined);
+    expect({ current: current?.versionNumber, baseline: baseline?.versionNumber }).toEqual({ current: 2000, baseline: 1001 });
+  });
+
+  it('shows the lab’s node coming back out', () => {
+    const { current, baseline } = selectedDiffPair(history, 1002, undefined);
+    const diff = diffJobGraphs(baseline!.workflows, current!.workflows);
+    expect(diff.removed).toEqual(['b']);
+    expect(diff.byNodeId.get('b')!.kind).toBe('removed');
+  });
+});

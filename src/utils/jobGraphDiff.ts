@@ -418,6 +418,7 @@ export function jobStateColor(state?: string | null): 'default' | 'info' | 'succ
         case 'CLOSED':
             return 'success';
         case 'REJECTED':
+        case 'CANCELLED':
             return 'error';
         default:
             return 'default';

@@ -22,6 +22,7 @@ export type CustomerLifecycleKey =
   | 'IN_PROGRESS'
   | 'COMPLETE'
   | 'CLOSED'
+  | 'CANCELLED'
   | 'REJECTED'
   | 'UNKNOWN';
 
@@ -129,6 +130,8 @@ export function deriveCustomerLifecycle(input: CustomerLifecycleInput): Customer
       return result('COMPLETE', 'Work complete', 'The lab has completed the work for this job.');
     case 'CLOSED':
       return result('CLOSED', 'Job closed', 'This job has been closed.');
+    case 'CANCELLED':
+      return result('CANCELLED', 'Job cancelled', 'You cancelled this job. Contact the lab if you want to start it again.');
     case 'REJECTED':
       return result('REJECTED', 'Request not accepted', 'The lab could not accept this request.');
     default:

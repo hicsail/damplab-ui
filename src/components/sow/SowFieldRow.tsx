@@ -112,7 +112,7 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
             {diffKind && <Chip size="small" label={DIFF_CHIP[diffKind]} color="info" variant="outlined" />}
             {field.isOverridden && <Chip size="small" label="Raw Text Edited" color="warning" variant="outlined" />}
             {!field.isEnabled && <Chip size="small" label="Hidden from customer" variant="outlined" />}
-            {field.requiresInitials && <Chip size="small" label="Requires initials" color="secondary" variant="outlined" />}
+            {field.requiresInitials && field.allowsInitials !== false && <Chip size="small" label="Requires initials" color="secondary" variant="outlined" />}
           </Box>
           {!expanded && (
             <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.25 }} data-verbatim-text>
@@ -236,18 +236,24 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
             </Box>
           )}
 
-          <FormControlLabel
-            sx={{ mb: 1, display: 'flex' }}
-            control={
-              <Checkbox
-                size="small"
-                checked={field.requiresInitials}
-                disabled={readOnly}
-                onChange={(e) => changeField({ requiresInitials: e.target.checked })}
-              />
-            }
-            label={<Typography variant="body2">Ask the customer to initial this section when signing</Typography>}
-          />
+          {/* Not offered on Signatures: that section is the signature block, and
+              it is filtered out of the document the customer reads section by
+              section — so a flag here would demand initials for something they
+              are never shown, leaving a SOW nobody could sign. */}
+          {field.allowsInitials !== false && (
+            <FormControlLabel
+              sx={{ mb: 1, display: 'flex' }}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={field.requiresInitials}
+                  disabled={readOnly}
+                  onChange={(e) => changeField({ requiresInitials: e.target.checked })}
+                />
+              }
+              label={<Typography variant="body2">Ask the customer to initial this section when signing</Typography>}
+            />
+          )}
 
           {!editing && diff?.kind === 'changed' && diff.parts ? (
             <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>

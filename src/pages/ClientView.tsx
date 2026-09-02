@@ -1,16 +1,21 @@
 import React, { useState, useContext, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router';
-import { useQuery } from '@apollo/client';
-import { Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
+import { useMutation, useQuery } from '@apollo/client';
+import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
 import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '../gql/queries';
+import { CANCEL_JOB, REJECT_JOB_REVIEW } from '../gql/mutations';
+import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
+import { formatGqlError } from '../utils/gqlError';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import CollapsibleStatusCard      from '../components/CollapsibleStatusCard';
 import { CommentsSection }        from '../components/CommentsSection';
 import ResubmitJobModal          from '../components/ResubmitJobModal';
+import RequestEditAccessModal    from '../components/RequestEditAccessModal';
+import ReasonDialog              from '../components/ReasonDialog';
 import { diffJobGraphs, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
@@ -21,6 +26,9 @@ import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SendIcon from '@mui/icons-material/Send';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ThumbUpIcon from '@mui/icons-material/ThumbUpAltOutlined';
+import ThumbDownIcon from '@mui/icons-material/ThumbDownAltOutlined';
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { deriveCustomerLifecycle, validResponseAction } from '../utils/customerLifecycle';
 import type { CustomerActionRequired } from '../utils/jobReview';
@@ -73,8 +81,20 @@ export default function Tracking() {
             setWorkflowName(wfs[0].name ?? '');
             setWorkflowState(wfs[0].state ?? '');
         }
+        // Land on the newest version, with its default comparison, every time the
+        // job reloads. This was `prev ?? latest`, which pinned the view to
+        // whatever was newest on first load: acting on the job and refreshing
+        // left the reader still looking at a superseded version, and a baseline
+        // they had picked by hand stayed selected against it.
+        //
+        // Safe to reset unconditionally because nothing polls this query — the
+        // data only changes when the reader refreshes or acts on the job, and in
+        // both cases the newest version is what they are asking to see.
         const latest = latestVersion((job as any)?.versions ?? []);
-        if (latest) setViewingVersion((prev) => prev ?? latest.versionNumber);
+        if (latest) {
+            setViewingVersion(latest.versionNumber);
+            setBaselineVersionNumber(undefined);
+        }
     }, [data?.ownJobById]);
 
     const { data: sowByJobIdResult, refetch: refetchSow } = useQuery(GET_SOW_BY_JOB_ID, {
@@ -106,13 +126,60 @@ export default function Tracking() {
         signBlockers: sowFullData?.actionGate?.signBlockers
     });
 
+    // The three commands a customer can issue outside a prompt. Each owns only
+    // its dialog's open state; the payload builders and the mutations do the rest.
+    const [rejecting, setRejecting] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+    const [requestingEditAccess, setRequestingEditAccess] = useState(false);
+    const [commandBusy, setCommandBusy] = useState(false);
+    const [commandError, setCommandError] = useState<string | null>(null);
+    const [rejectJobReview] = useMutation(REJECT_JOB_REVIEW);
+    const [cancelJob] = useMutation(CANCEL_JOB);
+
     useEffect(() => {
         setResponseAction(null);
+        setCommandError(null);
     }, [id]);
 
     useEffect(() => {
         setResponseAction((current) => validResponseAction(current, lifecycle.primaryAction));
     }, [lifecycle.primaryAction]);
+
+    // A fresh operation id per dialog opening, so a retried submit resumes the
+    // same command and a second, deliberate one never does.
+    const commandOperationId = useRef<string | null>(null);
+    const runCommand = async (send: (operationId: string) => Promise<unknown>, close: () => void, failure: string): Promise<void> => {
+        setCommandBusy(true);
+        setCommandError(null);
+        try {
+            commandOperationId.current = retryOperationId(commandOperationId.current, { type: 'submit', candidate: crypto.randomUUID() });
+            await send(commandOperationId.current);
+            await refreshJobPage();
+            commandOperationId.current = retryOperationId(commandOperationId.current, { type: 'success' });
+            close();
+        } catch (err) {
+            commandOperationId.current = retryOperationId(commandOperationId.current, { type: 'failure' });
+            setCommandError(formatGqlError(err, failure));
+        } finally {
+            setCommandBusy(false);
+        }
+    };
+
+    const sowStatus = visibleActiveSow?.status ?? null;
+    // "Before the SOW is signed by both parties" — a document the client has
+    // signed but the lab has not is still not an agreement, so only FINAL closes
+    // the door. CLOSED and CANCELLED are already terminal.
+    const canCancelJob = !!job && job.state !== 'CLOSED' && job.state !== 'CANCELLED' && sowStatus !== 'FINAL';
+    // Tighter than cancelling on purpose: once the client has signed, the spec is
+    // what was priced, and reopening it is the lab's call via a withdrawal.
+    const canRequestEditAccess =
+        !!job &&
+        job.state !== 'CLOSED' &&
+        job.state !== 'CANCELLED' &&
+        sowStatus !== 'SIGNED' &&
+        sowStatus !== 'FINAL' &&
+        !(job.state === 'CHANGES_REQUESTED' && job.customerActionRequired === 'EDIT_WORKFLOW');
+    const editAccessRequested = !!job?.editAccessRequestedAt;
 
     if (skipQuery) return <p>Loading...</p>;
     if (loading) return <p>Loading...</p>;
@@ -231,14 +298,27 @@ export default function Tracking() {
                         </>
                     )}
                     {lifecycle.primaryAction === 'APPROVE_WORKFLOW' && (
-                        <Button
-                            variant="contained"
-                            startIcon={<ThumbUpIcon />}
-                            onClick={() => setResponseAction('APPROVE_WORKFLOW')}
-                            sx={{ textTransform: 'none' }}
-                        >
-                            Approve workflow
-                        </Button>
+                        <>
+                            <Button
+                                variant="contained"
+                                startIcon={<ThumbUpIcon />}
+                                onClick={() => setResponseAction('APPROVE_WORKFLOW')}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Approve workflow
+                            </Button>
+                            {/* Paired with Approve rather than hidden behind it: an
+                                approval request with only one answer is not a request. */}
+                            <Button
+                                variant="outlined"
+                                color="warning"
+                                startIcon={<ThumbDownIcon />}
+                                onClick={() => setRejecting(true)}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Reject
+                            </Button>
+                        </>
                     )}
                     {lifecycle.primaryAction === 'SIGN_SOW' && (
                         <Button
@@ -253,6 +333,42 @@ export default function Tracking() {
                         </Button>
                     )}
                 </Box>
+                {/* A second row, deliberately: these two are available across many
+                    states rather than answering the prompt above, and mixing them
+                    into the primary row would read as alternatives to it. */}
+                {(canRequestEditAccess || canCancelJob) && (
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 2 }}>
+                        {canRequestEditAccess && (
+                            <Button
+                                variant="text"
+                                size="small"
+                                startIcon={<EditNoteIcon />}
+                                onClick={() => setRequestingEditAccess(true)}
+                                disabled={editAccessRequested}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                {editAccessRequested ? 'Edit access requested' : 'Request Job Edit Access'}
+                            </Button>
+                        )}
+                        {canCancelJob && (
+                            <Button
+                                variant="text"
+                                size="small"
+                                color="error"
+                                startIcon={<CancelOutlinedIcon />}
+                                onClick={() => setCancelling(true)}
+                                sx={{ textTransform: 'none' }}
+                            >
+                                Cancel job
+                            </Button>
+                        )}
+                    </Box>
+                )}
+                {commandError && (
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCommandError(null)}>
+                        {commandError}
+                    </Alert>
+                )}
                 <Typography variant="h5" fontWeight="bold">
                     {jobName}
                 </Typography>
@@ -339,7 +455,7 @@ export default function Tracking() {
 
                 {visibleActiveSow && (
                     <Box ref={sowSectionRef} tabIndex={-1} sx={{ outline: 'none' }}>
-                        <SowCustomerView jobId={id || ''} />
+                        <SowCustomerView jobId={id || ''} onDeclined={refreshJobPage} />
                     </Box>
                 )}
 
@@ -432,6 +548,53 @@ export default function Tracking() {
                         }}
                     />
                 )}
+
+                <ReasonDialog
+                    open={rejecting}
+                    title="Reject this workflow?"
+                    warning={
+                        'The lab will be told you are not approving these changes, and the job goes back to them for revision.\n\n' +
+                        'This does not cancel your job.'
+                    }
+                    fieldLabel="Reason (the lab sees this)"
+                    confirmLabel="Reject workflow"
+                    busy={commandBusy}
+                    onCancel={() => setRejecting(false)}
+                    onConfirm={(reason) =>
+                        runCommand(
+                            (operationId) => rejectJobReview({ variables: { input: buildReasonedJobInput({ operationId, jobId: id || '', reason }, 'rejecting') } }),
+                            () => setRejecting(false),
+                            'Could not reject this workflow.'
+                        )
+                    }
+                />
+
+                <ReasonDialog
+                    open={cancelling}
+                    title="Cancel this job?"
+                    warning={
+                        'This ends the job. The lab stops work on it, any Statement of Work is cancelled with it, and you cannot undo this yourself.\n\n' +
+                        'If you only want changes made, use Request Job Edit Access instead.'
+                    }
+                    fieldLabel="Reason (the lab sees this)"
+                    confirmLabel="Cancel job"
+                    busy={commandBusy}
+                    onCancel={() => setCancelling(false)}
+                    onConfirm={(reason) =>
+                        runCommand(
+                            (operationId) => cancelJob({ variables: { input: buildReasonedJobInput({ operationId, jobId: id || '', reason }, 'cancelling') } }),
+                            () => setCancelling(false),
+                            'Could not cancel this job.'
+                        )
+                    }
+                />
+
+                <RequestEditAccessModal
+                    open={requestingEditAccess}
+                    onClose={() => setRequestingEditAccess(false)}
+                    jobId={id || ''}
+                    onRequested={refreshJobPage}
+                />
             </div>
         </div>
     )

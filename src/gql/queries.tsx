@@ -134,6 +134,7 @@ export const GET_JOB_BY_ID = gql`
       customerCategory
       state
       customerActionRequired
+      editAccessRequestedAt
       handoverVersionNumber
       acceptedJobVersionNumber
       acceptedBillingFingerprint
@@ -254,6 +255,7 @@ export const GET_OWN_JOB_BY_ID = gql`
       customerCategory
       state
       customerActionRequired
+      editAccessRequestedAt
       handoverVersionNumber
       acceptedJobVersionNumber
       acceptedBillingFingerprint
@@ -871,6 +873,9 @@ export const GET_SOW_BY_ID = gql`
         name
         description
         cost
+        unitCost
+        multiplier
+        runCount
         category
       }
       timeline {
@@ -927,7 +932,23 @@ export const GET_SOW_BY_JOB_ID = gql`
         name
         description
         cost
+        unitCost
+        multiplier
+        runCount
         category
+      }
+      # True when the job has moved since this document was issued, which is what
+      # makes the billed figures differ from the job's current ones.
+      documentStale
+      # What an invoice actually bills, in the order createInvoice indexes it.
+      # Distinct from the services field above, which is the live billing core:
+      # once a version is issued, invoices bill that frozen version instead, and
+      # the two disagreeing is exactly what documentStale reports.
+      billableServices {
+        serviceId
+        name
+        description
+        cost
       }
       timeline {
         startDate
@@ -968,6 +989,8 @@ export const GET_SOW_BY_JOB_ID = gql`
       actionGate {
         canSign
         signBlockers
+        canDecline
+        declineBlockers
       }
       clientSignature {
         name
@@ -1005,6 +1028,9 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         name
         description
         cost
+        unitCost
+        multiplier
+        runCount
         category
       }
       subtotal
@@ -1732,7 +1758,8 @@ export const SOW_VERSION_FIELDS = gql`
       isEnabled
       allowsTextOverride
       allowsEmpty
-      requiresInitials
+      allowsInitials
+    requiresInitials
     }
     inputs {
       projectManager
@@ -1797,6 +1824,8 @@ export const GET_SOW_EDITOR_STATE = gql`
         sendBlockers
         canSign
         signBlockers
+        canDecline
+        declineBlockers
         canCountersign
         countersignBlockers
         missingFields

@@ -26,6 +26,13 @@ export interface SowField {
   allowsTextOverride: boolean;
   /** False on fields the document cannot be sent to the customer without. */
   allowsEmpty: boolean;
+  /**
+   * False where asking for initials is meaningless — Signatures, which is not
+   * part of the section-by-section document the customer is shown. Optional so
+   * versions frozen before the flag existed read as "allowed", which is what
+   * every other section is.
+   */
+  allowsInitials?: boolean;
   /** Staff flag: when true, the customer must type their initials for this section before they can sign. */
   requiresInitials: boolean;
 }
@@ -265,6 +272,8 @@ export interface SowActionGate {
   sendBlockers: DocumentBlocker[];
   canSign: boolean;
   signBlockers: DocumentBlocker[];
+  canDecline: boolean;
+  declineBlockers: DocumentBlocker[];
   canCountersign: boolean;
   countersignBlockers: DocumentBlocker[];
   missingFields: string[];
