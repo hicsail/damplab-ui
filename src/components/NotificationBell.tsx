@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { useQuery, useMutation } from "@apollo/client/index.js";
+import { usePermissions, PERMISSIONS } from "../hooks/usePermissions";
 import {
   Badge,
   Box,
@@ -14,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { MY_UNREAD_NOTIFICATION_COUNT, MY_NOTIFICATIONS } from "../gql/queries";
 import {
   MARK_NOTIFICATION_READ,
@@ -46,6 +48,8 @@ interface NotificationItem {
 
 export default function NotificationBell() {
   const navigate = useNavigate();
+  const { can } = usePermissions();
+  const canViewAllJobs = can(PERMISSIONS.JobsViewAll);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
 
@@ -66,9 +70,21 @@ export default function NotificationBell() {
   const [markRead] = useMutation(MARK_NOTIFICATION_READ);
   const [markAllRead] = useMutation(MARK_ALL_NOTIFICATIONS_READ);
 
-  const unreadCount: number = countData?.myUnreadNotificationCount ?? 0;
-  const notifications: NotificationItem[] =
-    listData?.myNotifications?.items ?? [];
+  const serverCount: number = countData?.myUnreadNotificationCount ?? 0;
+  const [localCount, setLocalCount] = useState(0);
+
+  // Sync local count when server value changes (from polling or refetch).
+  useEffect(() => {
+    setLocalCount(serverCount);
+  }, [serverCount]);
+
+  const unreadCount = localCount;
+  const [locallyRead, setLocallyRead] = useState<Set<string>>(new Set());
+  const notifications: NotificationItem[] = (
+    listData?.myNotifications?.items ?? []
+  ).map((n: NotificationItem) =>
+    locallyRead.has(n.id) ? { ...n, readAt: n.readAt ?? "optimistic" } : n,
+  );
 
   // Refetch list when popover opens.
   useEffect(() => {
@@ -87,18 +103,25 @@ export default function NotificationBell() {
 
   const handleClickNotification = (n: NotificationItem) => {
     if (!n.readAt) {
+      setLocalCount((c) => Math.max(0, c - 1));
+      setLocallyRead((prev) => new Set(prev).add(n.id));
       markRead({ variables: { id: n.id } }).then(() => {
         refetchCount();
-        refetchList();
       });
     }
     handleClose();
     if (n.link) {
-      navigate(n.link);
+      const link =
+        canViewAllJobs && n.link.startsWith("/client_view/")
+          ? n.link.replace("/client_view/", "/technician_view/")
+          : n.link;
+      navigate(link);
     }
   };
 
   const handleMarkAllRead = async () => {
+    setLocalCount(0);
+    setLocallyRead(new Set());
     await markAllRead();
     refetchCount();
     refetchList();
@@ -223,6 +246,27 @@ export default function NotificationBell() {
             ))}
           </List>
         )}
+        <Divider />
+        <Box sx={{ px: 2, py: 1.5, textAlign: "center" }}>
+          <Typography
+            variant="body2"
+            color="primary"
+            sx={{
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 0.5,
+              "&:hover": { textDecoration: "underline" },
+            }}
+            onClick={() => {
+              handleClose();
+              navigate("/notification-preferences");
+            }}
+          >
+            <SettingsOutlinedIcon fontSize="small" />
+            Manage preferences
+          </Typography>
+        </Box>
       </Popover>
     </>
   );
