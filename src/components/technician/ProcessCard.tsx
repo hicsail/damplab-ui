@@ -14,13 +14,26 @@ interface Props {
   title: string;
   customerBadge: PartyBadge;
   staffBadge: PartyBadge;
-  customerVersion: string;
-  staffVersion: string;
+  /** Omitted on the customer's job page — see PartyStatusRail. */
+  customerVersion?: string;
+  staffVersion?: string;
   statusPane: React.ReactNode;
   statusPaneSx?: object;
   details: React.ReactNode;
-  actions: React.ReactNode;
+  /** Optional: a card whose only actions are staff ones has an empty rail for a customer. */
+  actions?: React.ReactNode;
   defaultExpanded?: boolean;
+  /**
+   * Whether the right column's details start open. Off for every staff card,
+   * where details are supporting material behind one more click. The customer's
+   * Statement of Work turns it on while a signature is outstanding: the signing
+   * form lives in `details`, and a card that hides it is a card they cannot act
+   * on — which is what the "Review and sign SOW" button scrolls them to.
+   */
+  defaultDetailsOpen?: boolean;
+  /** Extra content beside the title, e.g. a document's reference number. */
+  titleExtra?: React.ReactNode;
+  cardRef?: React.Ref<HTMLDivElement>;
 }
 
 export default function ProcessCard({
@@ -33,10 +46,13 @@ export default function ProcessCard({
   statusPaneSx,
   details,
   actions,
-  defaultExpanded = false
+  defaultExpanded = false,
+  defaultDetailsOpen = false,
+  titleExtra,
+  cardRef
 }: Props): React.JSX.Element {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(defaultDetailsOpen);
 
   useEffect(() => {
     setExpanded(defaultExpanded);
@@ -46,6 +62,13 @@ export default function ProcessCard({
     if (!expanded) setDetailsOpen(false);
   }, [expanded]);
 
+  // Declared after the collapse rule above so it wins on the render where both
+  // fire — the props settle together when the document finishes loading, and the
+  // rule above still sees the pre-update `expanded`.
+  useEffect(() => {
+    setDetailsOpen(defaultDetailsOpen);
+  }, [defaultDetailsOpen]);
+
   const toggleCard = () => setExpanded((open) => !open);
   const toggleDetails = (e: React.SyntheticEvent) => {
     e.stopPropagation();
@@ -53,7 +76,7 @@ export default function ProcessCard({
   };
 
   return (
-    <Card variant="outlined" sx={{ mb: 2 }}>
+    <Card ref={cardRef} variant="outlined" sx={{ mb: 2 }} tabIndex={-1}>
       <CardContent sx={{ pb: 2, '&:last-child': { pb: 2 } }}>
         <Box
           role="button"
@@ -78,6 +101,11 @@ export default function ProcessCard({
           <Typography variant="h6" sx={{ flex: 1 }}>
             {title}
           </Typography>
+          {titleExtra && (
+            <Box onClick={(e) => e.stopPropagation()} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mr: 1 }}>
+              {titleExtra}
+            </Box>
+          )}
           <ExpandMoreIcon
             sx={{
               flexShrink: 0,
@@ -97,11 +125,13 @@ export default function ProcessCard({
               customerVersion={customerVersion}
               staffVersion={staffVersion}
             />
-            <Collapse in={expanded} unmountOnExit={false}>
-              <Stack spacing={1} alignItems="stretch">
-                {actions}
-              </Stack>
-            </Collapse>
+            {actions && (
+              <Collapse in={expanded} unmountOnExit={false}>
+                <Stack spacing={1} alignItems="stretch">
+                  {actions}
+                </Stack>
+              </Collapse>
+            )}
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Box

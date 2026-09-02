@@ -10,11 +10,12 @@ import SowDiffText from './SowDiffText';
 import SowVersionHistory from './SowVersionHistory';
 import SowPdfDocument from './SowPdfDocument';
 import SowSignaturesSummary from './SowSignaturesSummary';
-import CollapsibleStatusCard from '../CollapsibleStatusCard';
+import ProcessCard from '../technician/ProcessCard';
+import StatusPaneHeader from '../technician/StatusPaneHeader';
 import { diffVersions, previousCustomerVersion } from '../../utils/sowDiff';
 import { GROUP_ORDER, SowEditorState, SowField, customerDocumentFields, customerSigningState, signingAgreementText, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
 import { formatSOWInstant } from '../../utils/sowDateUtils';
-import { chipStatusBackground } from '../../utils/technicianProcessStatus';
+import { chipStatusBackground, isSowProcessSettled, sowPartyStatus, sowPartyVersionLabel } from '../../utils/technicianProcessStatus';
 import { formatGqlError } from '../../utils/gqlError';
 import ReasonDialog from '../ReasonDialog';
 
@@ -24,6 +25,12 @@ import ReasonDialog from '../ReasonDialog';
  * Read-only by construction: there is no edit affordance anywhere, and the server
  * only ever hands this component versions that were actually issued. What the
  * customer can do is understand what changed, ask about it, and sign.
+ *
+ * It renders the same `ProcessCard` shell the staff job page uses, so the two
+ * pages read alike — but none of the staff *derivations*. In particular nothing
+ * here touches `useSowStaffStatus` or `currentVersionNumber`: both know about
+ * drafts above the version in force, and a draft the customer has not been sent
+ * is precisely what they must not be able to infer.
  */
 
 interface Props {
@@ -32,8 +39,18 @@ interface Props {
   onDeclined?: () => Promise<unknown> | void;
 }
 
-export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX.Element | null {
-  const { data, loading, refetch } = useQuery(GET_SOW_EDITOR_STATE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
+export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX.Element {
+  // Counts completed fetches rather than watching `data` identity. This query is
+  // cache-and-network, so `data` can be handed back a new object when some other
+  // query writes the same normalised records — and using that as the re-landing
+  // trigger below would yank a customer off a version they had just selected.
+  const [loadCount, setLoadCount] = useState(0);
+  const { data, loading, refetch } = useQuery(GET_SOW_EDITOR_STATE, {
+    variables: { jobId },
+    skip: !jobId,
+    fetchPolicy: 'cache-and-network',
+    onCompleted: () => setLoadCount((n) => n + 1)
+  });
   const [signSow] = useMutation(SIGN_SOW);
   const [declineSow] = useMutation(DECLINE_SOW);
 
@@ -51,10 +68,20 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
   const [banner, setBanner] = useState<{ severity: 'success' | 'error' | 'info'; text: string } | null>(null);
 
   const activeNumber = sow?.activeVersionNumber ?? 0;
+  // The newest version the customer holds. The server hands this component only
+  // issued versions, so this can never be a staff draft.
+  const newestIssued = useMemo(() => history.reduce((newest, v) => Math.max(newest, v.versionNumber), 0), [history]);
 
+  // Land on the version in force every time the document reloads — the same rule
+  // the job card above follows. Keying this on `activeNumber` alone meant paging
+  // back through the history and then refreshing left the reader on the
+  // superseded version, because the pointer had not moved. The fallback covers a
+  // withdrawal, which resets activeVersionNumber to 0 and used to leave the card
+  // showing nothing at all.
   useEffect(() => {
-    if (activeNumber) setViewing(activeNumber);
-  }, [activeNumber]);
+    const landing = activeNumber || newestIssued;
+    if (landing) setViewing(landing);
+  }, [loadCount, activeNumber, newestIssued]);
 
   const version = useMemo(() => history.find((v) => v.versionNumber === (viewing ?? activeNumber)) ?? null, [history, viewing, activeNumber]);
 
@@ -79,6 +106,13 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
   // would block signing on a box that does nothing.
   const sectionsNeedingInitials = useMemo(() => visible.filter((f) => f.requiresInitials && f.allowsInitials !== false), [visible]);
 
+  // Who holds the document, derived from the version in force alone. Passing the
+  // customer's own view in for both sides of `sowPartyStatus` is not a shortcut:
+  // for them the version in force *is* the current one, and feeding a staff
+  // "current" in would badge the lab as drafting something they cannot see.
+  const activeVersion = useMemo(() => history.find((v) => v.versionNumber === activeNumber) ?? null, [history, activeNumber]);
+  const parties = sowPartyStatus({ currentStatus: activeVersion?.status, activeStatus: activeVersion?.status });
+
   const isCurrent = !!version && version.versionNumber === activeNumber;
   const awaitingSignature = isCurrent && version?.status === 'SENT';
   const signingState = customerSigningState({
@@ -90,22 +124,26 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
   const signedName = version?.clientSignature?.name;
 
   const sowStatusLine = (() => {
-    if (sow && activeNumber === 0) return 'The lab is still preparing your Statement of Work.';
+    // One message for "no document" and "nothing issued from it". They are
+    // different server states, but only one of them is the customer's business:
+    // saying the lab is "still preparing" a Statement of Work discloses that a
+    // draft exists, which is the same thing the hidden version labels protect.
+    if (!sow || activeNumber === 0) return loading ? 'Loading…' : 'The lab has not sent you a Statement of Work for this job.';
     if (awaitingSignature && !signingState.enabled) return signingState.blockerMessage ?? 'Signing is temporarily unavailable.';
     if (awaitingSignature) return 'Review the issued Statement of Work and sign it when you are ready.';
     if (signedName) {
       return `Signed by ${signedName}${version?.staffSignature?.name ? `. Countersigned by ${version.staffSignature.name}.` : '.'}`;
     }
-    if (version) return `${versionDisplayLabel(version)} · ${sowStatusLabel(version.status)}`;
-    return 'No Statement of Work is available yet.';
+    // Not the version and status again — the chip beside this line already says
+    // both, exactly as the staff pane's does.
+    if (version) return isCurrent ? 'This is the version the lab last issued to you.' : 'An earlier version, kept for your records.';
+    return 'No version of this Statement of Work is available to you yet.';
   })();
 
   useEffect(() => {
     setAgreed(false);
     setInitials({});
   }, [version?.id]);
-
-  if (!loading && !sow) return null;
 
   const allInitialed = sectionsNeedingInitials.every((f) => (initials[f.key] ?? '').trim().length > 0);
   const canSign = signingState.enabled && agreed && allInitialed && name.trim().length > 0 && !busy;
@@ -168,40 +206,42 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
       onCancel={() => setDeclining(false)}
       onConfirm={handleDecline}
     />
-    <CollapsibleStatusCard
+    <ProcessCard
       title="Statement of Work"
-      defaultExpanded
-      titleExtra={
-        <>
-          {sow?.sowNumber && <Typography variant="body2" color="text.secondary">{sow.sowNumber}</Typography>}
-          {version && (
-            <PDFDownloadLink
-              document={<SowPdfDocument version={version} sowNumber={sow?.sowNumber} />}
-              fileName={`${(sow?.sowNumber ?? 'SOW').replace(/\s+/g, '-')}-v${versionDisplayLabel(version)}.pdf`}
-              style={{ textDecoration: 'none' }}
-            >
-              {({ loading: pdfLoading }) => (
-                <Button size="small" variant="outlined" disabled={pdfLoading} sx={{ textTransform: 'none' }}>
-                  {pdfLoading ? 'Preparing…' : 'Download a copy'}
-                </Button>
-              )}
-            </PDFDownloadLink>
-          )}
-        </>
-      }
+      // Collapsed once it is countersigned and there is nothing left to do,
+      // exactly as the staff card decides.
+      defaultExpanded={!isSowProcessSettled(version?.status)}
+      // The signing form is in `details`. Open it whenever there is a signature
+      // outstanding, so the header's "Review and sign SOW" lands on something to
+      // sign rather than on a collapsed pane.
+      defaultDetailsOpen={awaitingSignature}
+      customerBadge={parties.customer}
+      staffBadge={parties.staff}
+      // No version labels under the icons: the lab's slot would otherwise number
+      // a draft the customer was never sent.
       statusPaneSx={{ bgcolor: chipStatusBackground(version ? statusColor(version.status) : 'default') }}
       statusPane={
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-            <Typography variant="subtitle1" fontWeight={600}>
-              {version ? sowStatusLabel(version.status) : loading ? 'Loading' : 'Not available'}
-            </Typography>
-            {version && <Chip size="small" label={versionDisplayLabel(version)} color={statusColor(version.status)} />}
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {sowStatusLine}
-          </Typography>
-        </Box>
+        <StatusPaneHeader
+          status={version ? sowStatusLabel(version.status) : loading ? 'Loading' : 'Not sent yet'}
+          chips={version ? <Chip size="small" label={sowPartyVersionLabel(version)} color={statusColor(version.status)} /> : undefined}
+          reference={sow?.sowNumber}
+          description={sowStatusLine}
+        />
+      }
+      actions={
+        version ? (
+          <PDFDownloadLink
+            document={<SowPdfDocument version={version} sowNumber={sow?.sowNumber} />}
+            fileName={`${(sow?.sowNumber ?? 'SOW').replace(/\s+/g, '-')}-v${versionDisplayLabel(version)}.pdf`}
+            style={{ textDecoration: 'none', width: '100%' }}
+          >
+            {({ loading: pdfLoading }) => (
+              <Button size="small" variant="outlined" disabled={pdfLoading} sx={{ textTransform: 'none', width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' }}>
+                {pdfLoading ? 'Preparing…' : 'Download a copy'}
+              </Button>
+            )}
+          </PDFDownloadLink>
+        ) : undefined
       }
       details={
         <>
@@ -217,7 +257,11 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
             </Alert>
           )}
 
-          {sow && activeNumber === 0 && <Alert severity="info">The lab is still preparing your Statement of Work. You will be able to review and sign it here.</Alert>}
+          {!loading && activeNumber === 0 && (
+            <Alert severity="info">
+              The lab has not sent you a Statement of Work for this job. It will appear here, to review and sign, when they do.
+            </Alert>
+          )}
 
           {version && (
             <>
@@ -236,7 +280,9 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
                 </Box>
               )}
 
-              {!isCurrent && (
+              {/* Only when there *is* a current version to point at: a withdrawn
+                  document has none, and the sentence would name version "". */}
+              {!isCurrent && activeNumber > 0 && (
                 <Alert severity="info" sx={{ mb: 2 }}>
                   This is an earlier version, kept for your records. Version {versionDisplayLabel(history.find((v) => v.versionNumber === activeNumber))} is the current one.
                 </Alert>

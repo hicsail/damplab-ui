@@ -20,7 +20,7 @@ import { JobSubmitterSummary, summarizeJobSubmitter }                           
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import { diffJobGraphs, latestContentVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 
@@ -131,7 +131,14 @@ export default function TechnicianView() {
         // Safe to reset unconditionally because nothing polls this query — the
         // data only changes when the reader refreshes or acts on the job, and in
         // both cases the newest version is what they are asking to see.
-        const latest = latestContentVersion((job as any)?.versions ?? []);
+        //
+        // The newest *row*, not the newest edit: this was `latestContentVersion`,
+        // which skips state-change events, so a job whose last row is "Accepted"
+        // (5.3) reopened on the draft below it (5.1) and reported the job as still
+        // being drafted. Accepting is the thing the reader most wants to see, and
+        // the automatic baseline still skips events, so the diff below is
+        // unaffected — it resolves to the last version written by the other side.
+        const latest = latestVersion((job as any)?.versions ?? []);
         if (latest) {
             setViewingVersion(latest.versionNumber);
             setBaselineVersionNumber(undefined);
@@ -411,7 +418,12 @@ export default function TechnicianView() {
         : undefined;
 
     // Paging back shows that version's own graph; the newest one is the live job.
-    const latest = latestContentVersion(versions);
+    //
+    // Keyed off the same newest row the picker lands on. Keying it off the newest
+    // *content* version instead would flip every accepted job to "historic" the
+    // moment the default landed on its trailing event row, quietly swapping the
+    // live graph for a snapshot that only happens to match it.
+    const latest = latestVersion(versions);
     const isHistoricVersion = latest != null && viewingVersion != null && viewingVersion !== latest.versionNumber;
     const cardWorkflows = isHistoricVersion ? versionWorkflowsAsCards(currentVersion?.workflows, services ?? []) : workflows;
 

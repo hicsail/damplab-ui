@@ -406,6 +406,7 @@ export const JOBS_FOR_VIEWER = gql`
         archivedAt
         archivedBy
         archivedFromState
+        invoiceCount
         sow {
           id
           sowNumber

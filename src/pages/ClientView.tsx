@@ -1,17 +1,18 @@
 import React, { useState, useContext, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router';
-import { useMutation, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
-import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID } from '../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE } from '../gql/queries';
 import { CANCEL_JOB, REJECT_JOB_REVIEW } from '../gql/mutations';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
-import CollapsibleStatusCard      from '../components/CollapsibleStatusCard';
+import ProcessCard                from '../components/technician/ProcessCard';
+import StatusPaneHeader           from '../components/technician/StatusPaneHeader';
 import { CommentsSection }        from '../components/CommentsSection';
 import ResubmitJobModal          from '../components/ResubmitJobModal';
 import RequestEditAccessModal    from '../components/RequestEditAccessModal';
@@ -24,7 +25,6 @@ import { UserContext }            from '../contexts/UserContext';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import SendIcon from '@mui/icons-material/Send';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import ThumbUpIcon from '@mui/icons-material/ThumbUpAltOutlined';
 import ThumbDownIcon from '@mui/icons-material/ThumbDownAltOutlined';
 import EditNoteIcon from '@mui/icons-material/EditNote';
@@ -32,12 +32,13 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { deriveCustomerLifecycle, validResponseAction } from '../utils/customerLifecycle';
 import type { CustomerActionRequired } from '../utils/jobReview';
-import { chipStatusBackground, invoiceVersionLabel } from '../utils/technicianProcessStatus';
+import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, partyVersionLabel } from '../utils/technicianProcessStatus';
 
 export default function Tracking() {
 
     const { id }                                        = useParams();
     const navigate                                      = useNavigate();
+    const apolloClient                                  = useApolloClient();
     const userContext                                   = useContext(UserContext);
 
     const [workflowName,        setWorkflowName]        = useState('');
@@ -113,7 +114,15 @@ export default function Tracking() {
     const [refreshing, setRefreshing] = useState(false);
 
     const refreshJobPage = async () => {
-        await Promise.all([refetch(), refetchSow(), refetchInvoices()]);
+        await Promise.all([
+            refetch(),
+            refetchSow(),
+            refetchInvoices(),
+            // The SOW card runs its own query. Without this, Refresh Job reloaded
+            // the job and left the Statement of Work showing whatever it had —
+            // including a version that had since been superseded.
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] })
+        ]);
     };
 
     const job = data?.ownJobById;
@@ -212,6 +221,17 @@ export default function Tracking() {
         ? versionWorkflowsAsCards(current.workflows, services ?? [])
         : workflows;
 
+    // The same rail metrics the staff job page uses, so the two pages line up.
+    const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
+    // Who holds the job. Derived from its state alone — nothing here reads a
+    // version number, which is what keeps a staff draft invisible.
+    const jobParties = jobPartyStatus(job?.state);
+    // The chip in the status pane, from the same helper the staff card uses, so
+    // both pages name the same version. Safe to show: it is the newest version
+    // the *customer* can see, and the server has already filtered this list to
+    // exactly that. The rail labels stay hidden — those would name the lab's.
+    const customerJobVersion = partyVersionLabel(latestCustomerVisibleJobVersion(versions));
+
     const workflowCard = (
         <>
             {versions.length > 1 && (
@@ -238,11 +258,16 @@ export default function Tracking() {
         <div>
             <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
-                {/* View is permanent — the canvas is what a customer submitted, and
-                    there is no state in which they should have to take the lab's word
-                    for what it says. Every other affordance comes from the explicit
-                    lifecycle primary action. */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 1 }}>
+                {/* The job's name and the commands that act on it, on one line —
+                    the same header the staff page uses. Viewing the canvas is not
+                    here: it is permanent rather than a response to a prompt, so it
+                    lives in the Job card's rail. Everything in this row either
+                    reloads the page or answers the lifecycle's primary action. */}
+                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1 }}>
+                    <Typography variant="h5" fontWeight="bold">
+                        {jobName}
+                    </Typography>
+                    <Box sx={{ flexGrow: 1 }} />
                     <Button
                         variant="outlined"
                         startIcon={<RefreshIcon />}
@@ -259,14 +284,6 @@ export default function Tracking() {
                     >
                         {refreshing ? 'Refreshing…' : 'Refresh Job'}
                     </Button>
-                    <Button
-                        variant="outlined"
-                        startIcon={<VisibilityIcon />}
-                        onClick={() => navigate(`/job_editor/${id}`)}
-                        sx={{ textTransform: 'none' }}
-                    >
-                        View workflow
-                    </Button>
                     {lifecycle.primaryAction === 'REPLY' && (
                         <Button
                             variant="contained"
@@ -277,25 +294,17 @@ export default function Tracking() {
                             Reply to lab
                         </Button>
                     )}
+                    {/* Opening the editor is the Job card's rail button, which
+                        turns solid in this state; this row keeps the submit. */}
                     {lifecycle.primaryAction === 'EDIT_WORKFLOW' && (
-                        <>
-                            <Button
-                                variant="outlined"
-                                startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
-                                onClick={() => navigate(`/job_editor/${id}`)}
-                                sx={{ textTransform: 'none' }}
-                            >
-                                View/Edit Job
-                            </Button>
-                            <Button
-                                variant="contained"
-                                startIcon={<SendIcon />}
-                                onClick={() => setResponseAction('EDIT_WORKFLOW')}
-                                sx={{ textTransform: 'none' }}
-                            >
-                                Submit updated workflow
-                            </Button>
-                        </>
+                        <Button
+                            variant="contained"
+                            startIcon={<SendIcon />}
+                            onClick={() => setResponseAction('EDIT_WORKFLOW')}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            Submit updated workflow
+                        </Button>
                     )}
                     {lifecycle.primaryAction === 'APPROVE_WORKFLOW' && (
                         <>
@@ -332,69 +341,83 @@ export default function Tracking() {
                             Review and sign SOW
                         </Button>
                     )}
+                    {/* Standing commands rather than answers to the prompt above, so
+                        they come after it — but in the same row and at the same size.
+                        A second, smaller row read as a footnote and pushed the job's
+                        details away from its title. Cancel is last, where the staff
+                        header keeps Close job. */}
+                    {canRequestEditAccess && (
+                        <Button
+                            variant="outlined"
+                            startIcon={<EditNoteIcon />}
+                            onClick={() => setRequestingEditAccess(true)}
+                            disabled={editAccessRequested}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            {editAccessRequested ? 'Edit access requested' : 'Request Job Edit Access'}
+                        </Button>
+                    )}
+                    {canCancelJob && (
+                        <Button
+                            variant="outlined"
+                            color="error"
+                            startIcon={<CancelOutlinedIcon />}
+                            onClick={() => setCancelling(true)}
+                            sx={{ textTransform: 'none' }}
+                        >
+                            Cancel job
+                        </Button>
+                    )}
                 </Box>
-                {/* A second row, deliberately: these two are available across many
-                    states rather than answering the prompt above, and mixing them
-                    into the primary row would read as alternatives to it. */}
-                {(canRequestEditAccess || canCancelJob) && (
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mb: 2 }}>
-                        {canRequestEditAccess && (
-                            <Button
-                                variant="text"
-                                size="small"
-                                startIcon={<EditNoteIcon />}
-                                onClick={() => setRequestingEditAccess(true)}
-                                disabled={editAccessRequested}
-                                sx={{ textTransform: 'none' }}
-                            >
-                                {editAccessRequested ? 'Edit access requested' : 'Request Job Edit Access'}
-                            </Button>
-                        )}
-                        {canCancelJob && (
-                            <Button
-                                variant="text"
-                                size="small"
-                                color="error"
-                                startIcon={<CancelOutlinedIcon />}
-                                onClick={() => setCancelling(true)}
-                                sx={{ textTransform: 'none' }}
-                            >
-                                Cancel job
-                            </Button>
-                        )}
-                    </Box>
-                )}
                 {commandError && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCommandError(null)}>
                         {commandError}
                     </Alert>
                 )}
-                <Typography variant="h5" fontWeight="bold">
-                    {jobName}
-                </Typography>
-                <Box sx={{ fontSize: 13, mb: 2, textAlign: 'left' }}>
+                <Box sx={{ fontSize: 13, mb: 2, textAlign: 'left', '& p:first-of-type': { mt: 0 } }}>
                     <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
                     <p><b>User:</b> {submitter.user}</p>
                     {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
                     <p><b>Organization:</b> {submitter.organization}</p>
                 </Box>
 
-                <CollapsibleStatusCard
+                <ProcessCard
                     title="Job"
-                    titleExtra={id ? <Typography variant="body2" color="text.secondary">{id}</Typography> : undefined}
-                    statusPaneSx={{
-                        bgcolor: lifecycle.primaryAction
-                            ? 'rgba(255, 152, 0, 0.4)'
-                            : chipStatusBackground(job?.state === 'REJECTED' ? 'error' : 'info')
-                    }}
+                    defaultExpanded={!isJobProcessSettled(job?.state)}
+                    customerBadge={jobParties.customer}
+                    staffBadge={jobParties.staff}
+                    // Same status, same chip, same colour as the staff card. The two
+                    // pages were reporting this job differently — "Accepted / v5.3"
+                    // against "Statement of Work withdrawn / Accepted" — which makes
+                    // the lab and the client unable to describe a job to each other.
+                    // The lifecycle line survives as the description, which is the one
+                    // place the two pages should differ: it is addressed to the reader.
+                    statusPaneSx={{ bgcolor: chipStatusBackground(jobStatusColor(job?.state)) }}
                     statusPane={
-                        <Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                <Typography variant="subtitle1" fontWeight={600}>{lifecycle.title}</Typography>
-                                {job?.state && <Chip label={job.state} size="small" variant="outlined" />}
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{lifecycle.body}</Typography>
-                        </Box>
+                        <StatusPaneHeader
+                            status={jobStatusLabel(job?.state)}
+                            chips={
+                                customerJobVersion === '—' ? undefined : (
+                                    <Chip size="small" label={customerJobVersion} color={jobStatusColor(job?.state)} />
+                                )
+                            }
+                            reference={<><b>Job ID:</b> {job?.jobId ?? id}</>}
+                            description={lifecycle.body}
+                        />
+                    }
+                    actions={
+                        /* Contained, like the staff card's own View/Edit Job: it is the
+                           one thing this card does, and an outlined button alone in an
+                           otherwise empty rail reads as disabled. */
+                        <Button
+                            variant="contained"
+                            size="small"
+                            startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
+                            onClick={() => navigate(`/job_editor/${id}`)}
+                            sx={railBtnSx}
+                        >
+                            {lifecycle.primaryAction === 'EDIT_WORKFLOW' ? 'View/Edit Job' : 'View workflow'}
+                        </Button>
                     }
                     details={
                         <>
@@ -453,36 +476,61 @@ export default function Tracking() {
                     }
                 />
 
-                {visibleActiveSow && (
-                    <Box ref={sowSectionRef} tabIndex={-1} sx={{ outline: 'none' }}>
-                        <SowCustomerView jobId={id || ''} onDeclined={refreshJobPage} />
-                    </Box>
-                )}
+                {/* Always rendered, like the staff page's SOW card: "the lab has not
+                    sent you one" is a status, and a card that appears out of nowhere
+                    partway through a job is harder to follow than one that changes
+                    colour. No Biosecurity card — that one is staff-only. */}
+                <Box ref={sowSectionRef} tabIndex={-1} sx={{ outline: 'none' }}>
+                    <SowCustomerView jobId={id || ''} onDeclined={refreshJobPage} />
+                </Box>
 
-                <CollapsibleStatusCard
+                <ProcessCard
                     title="Invoices"
+                    defaultExpanded={invoices.length > 0}
+                    customerBadge={null}
+                    staffBadge={null}
                     statusPaneSx={{ bgcolor: chipStatusBackground(invoices.length ? 'info' : 'default') }}
                     statusPane={
                         invoices.length ? (
-                            <Box>
-                                <Typography variant="subtitle1" fontWeight={600}>
-                                    {invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                    Latest {invoiceVersionLabel(invoices)}
-                                    {invoices[invoices.length - 1]?.totalCost != null
-                                        ? ` · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
-                                        : ''}
-                                </Typography>
-                            </Box>
+                            <StatusPaneHeader
+                                status={invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
+                                reference={invoiceVersionLabel(invoices) !== '—' ? invoiceVersionLabel(invoices) : undefined}
+                                description={
+                                    invoices[invoices.length - 1]?.totalCost != null
+                                        ? `Latest invoice · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
+                                        : undefined
+                                }
+                            />
                         ) : (
-                            <Box>
-                                <Typography variant="subtitle1" fontWeight={600}>No invoices yet</Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                                    No invoices have been generated for this job yet.
-                                </Typography>
-                            </Box>
+                            <StatusPaneHeader
+                                status="No invoices yet"
+                                description="The lab has not invoiced this job yet. Invoices appear here when they do."
+                            />
                         )
+                    }
+                    actions={
+                        invoices.length && id && sowFullData ? (
+                            <PDFDownloadLink
+                                document={
+                                    <JobInvoiceDocument
+                                        jobId={id}
+                                        jobDisplayId={data?.ownJobById?.jobId ?? null}
+                                        jobName={jobName}
+                                        customerCategory={data?.ownJobById?.customerCategory ?? undefined}
+                                        sow={sowFullData}
+                                        invoice={invoices[invoices.length - 1]}
+                                    />
+                                }
+                                fileName={`Invoice-${(invoices[invoices.length - 1]?.invoiceNumber ?? id) || id}.pdf`}
+                                style={{ textDecoration: 'none', width: '100%' }}
+                            >
+                                {({ loading: pdfLoading }) => (
+                                    <Button size="small" variant="outlined" disabled={pdfLoading} sx={railBtnSx}>
+                                        {pdfLoading ? 'Loading invoice…' : 'Download Latest Invoice'}
+                                    </Button>
+                                )}
+                            </PDFDownloadLink>
+                        ) : undefined
                     }
                     details={
                         invoices.length ? (

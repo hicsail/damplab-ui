@@ -9,6 +9,12 @@ import { STATUS_PANE_MIN_HEIGHT } from '../CollapsibleStatusCard';
 /**
  * Customer vs DAMP Lab icons with a paper (holds it) or check (committed) badge
  * and the version that party can currently see.
+ *
+ * The versions are optional because the customer's own job page reuses this rail
+ * without them: telling a client that the lab is holding a version numbered
+ * above the one they were sent would leak an internal draft they are not meant
+ * to know exists. Omitting them leaves the badges, which say who holds the
+ * document without saying what.
  */
 
 const ICON_SIZE = 60;
@@ -16,8 +22,8 @@ const ICON_SIZE = 60;
 interface Props {
   customerBadge: PartyBadge;
   staffBadge: PartyBadge;
-  customerVersion: string;
-  staffVersion: string;
+  customerVersion?: string;
+  staffVersion?: string;
 }
 
 function PartyBadgeIcon({ badge }: { badge: PartyBadge }): React.JSX.Element | null {
@@ -37,7 +43,7 @@ function PartySlot({
   avatar
 }: {
   label: string;
-  version: string;
+  version?: string;
   badge: PartyBadge;
   avatar: React.ReactNode;
 }): React.JSX.Element {
@@ -65,9 +71,11 @@ function PartySlot({
       <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.15, textAlign: 'center', whiteSpace: 'nowrap' }}>
         {label}
       </Typography>
-      <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.15 }}>
-        {version}
-      </Typography>
+      {version != null && (
+        <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.15 }}>
+          {version}
+        </Typography>
+      )}
     </Box>
   );
 }

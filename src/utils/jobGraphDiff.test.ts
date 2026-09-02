@@ -388,10 +388,10 @@ describe('event versions', () => {
  * What a reader lands on after rejecting the lab's changes.
  *
  * The reject flow appends the customer's restored graph and then a state event
- * on top of it, so the two job pages default to different rows — the staff page
- * to the newest edit, the customer page to the newest row of any kind. Both have
- * to end up comparing against the lab's version, which is the change being
- * undone; landing on the restore's own predecessor would report nothing.
+ * on top of it. Both job pages land on the newest row of any kind — see the
+ * suite below — and both have to end up comparing against the lab's version,
+ * which is the change being undone; landing on the restore's own predecessor
+ * would report nothing.
  */
 describe('the default pair after a customer rejects the lab’s changes', () => {
   const original = workflow([node('a')]);
@@ -405,7 +405,7 @@ describe('the default pair after a customer rejects the lab’s changes', () => 
     { ...version(2000, 'CUSTOMER', [original]), isEvent: true, note: 'Rejected by the customer' }
   ];
 
-  it('compares the staff page’s newest edit against the lab’s version', () => {
+  it('compares the newest edit against the lab’s version when one is selected', () => {
     const latest = latestContentVersion(history)!;
     expect(latest.versionNumber).toBe(1002);
 
@@ -413,7 +413,7 @@ describe('the default pair after a customer rejects the lab’s changes', () => 
     expect({ current: current?.versionNumber, baseline: baseline?.versionNumber }).toEqual({ current: 1002, baseline: 1001 });
   });
 
-  it('compares the customer page’s newest row against the lab’s version too', () => {
+  it('compares the newest row — what both pages land on — against the lab’s version too', () => {
     const latest = latestVersion(history)!;
     expect(latest.versionNumber).toBe(2000);
 
@@ -426,5 +426,49 @@ describe('the default pair after a customer rejects the lab’s changes', () => 
     const diff = diffJobGraphs(baseline!.workflows, current!.workflows);
     expect(diff.removed).toEqual(['b']);
     expect(diff.byNodeId.get('b')!.kind).toBe('removed');
+  });
+});
+
+/**
+ * Where a job page lands when it loads or is refreshed.
+ *
+ * Both the staff and the customer job pages seed their picker from
+ * `latestVersion`, deliberately including state-change events. The reported
+ * failure was a job whose history ended "5.1 Draft, 5.3 Accepted": keying the
+ * default off `latestContentVersion` reopened it on 5.1 and reported an accepted
+ * job as still being drafted, even after a full page reload.
+ */
+describe('the version a job page lands on', () => {
+  const draft = workflow([node('a')]);
+  const edited = workflow([node('a'), node('b')]);
+
+  const history: JobVersionLike[] = [
+    version(5000, 'CUSTOMER', [draft]),
+    version(5001, 'STAFF', [edited]),
+    { ...version(5003, 'STAFF', [edited]), isEvent: true, jobState: 'ACCEPTED', note: 'Accepted' }
+  ];
+
+  it('lands on the trailing Accepted event, not the draft below it', () => {
+    expect(latestVersion(history)!.versionNumber).toBe(5003);
+    // What the old default did, kept here so the regression is legible.
+    expect(latestContentVersion(history)!.versionNumber).toBe(5001);
+  });
+
+  it('still compares that event against the last version from the other side', () => {
+    const landing = latestVersion(history)!.versionNumber;
+    const { current, baseline } = selectedDiffPair(history, landing, undefined);
+    expect({ current: current?.versionNumber, baseline: baseline?.versionNumber }).toEqual({ current: 5003, baseline: 5000 });
+  });
+
+  it('shows the lab’s edit against the customer’s submission from the landing pair', () => {
+    const landing = latestVersion(history)!.versionNumber;
+    const { current, baseline } = selectedDiffPair(history, landing, undefined);
+    expect(diffJobGraphs(baseline!.workflows, current!.workflows).added).toEqual(['b']);
+  });
+
+  it('is unchanged on a history that ends in an edit', () => {
+    const noEvent = history.slice(0, 2);
+    expect(latestVersion(noEvent)!.versionNumber).toBe(5001);
+    expect(latestContentVersion(noEvent)!.versionNumber).toBe(5001);
   });
 });
