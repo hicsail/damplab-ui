@@ -7,6 +7,8 @@ describe('jobReviewLabels', () => {
     expect(labels.acceptOption).toBe('Accept job (ready to proceed)');
     expect(labels.acceptButton).toBe('Accept Job');
     expect(labels.acceptNote).toBeNull();
+    // The one case with no red warning: this is the customer's own spec.
+    expect(labels.onCustomersBehalf).toBe(false);
   });
 
   it('calls out acceptance on the customer behalf while the job sits with them', () => {
@@ -24,6 +26,50 @@ describe('jobReviewLabels', () => {
   it('treats an unknown or missing state as acceptance on the customer behalf', () => {
     for (const state of [undefined, null, '', 'QUEUED']) {
       expect(jobReviewLabels(state).acceptOption).toContain("customer's behalf");
+    }
+  });
+
+  describe('a submitted job the lab has since edited', () => {
+    // The gap this closes: staff edit a SUBMITTED job and accept it without ever
+    // handing it back, so the customer is contractually bound to a spec they
+    // have not seen. The state alone cannot tell you — it is still SUBMITTED.
+    const labels = () => jobReviewLabels('SUBMITTED', true);
+
+    it('is acceptance on the customer behalf, not a plain accept', () => {
+      expect(labels().acceptOption).toBe("Accept on the customer's behalf (ready to proceed)");
+      expect(labels().acceptButton).toBe('Accept Job');
+    });
+
+    it('says the customer has not seen the edits', () => {
+      expect(labels().acceptNote).toMatch(/not seen/i);
+    });
+
+    it('does not claim the job is open in their editor, because it is not', () => {
+      // That is the CHANGES_REQUESTED wording, and it would be false here.
+      expect(labels().acceptNote).not.toMatch(/closes their editor/i);
+    });
+  });
+
+  it('leaves a job the customer last touched alone', () => {
+    // A resubmission after staff edits makes the newest content version theirs
+    // again, so there is nothing unseen and nothing to warn about.
+    expect(jobReviewLabels('SUBMITTED', false).acceptNote).toBeNull();
+  });
+
+  it('flags every acceptance that commits the customer to something they did not submit', () => {
+    // Drives the red banner. The three cases are: the job is open with them, it
+    // was already accepted, or the lab has edited it since they submitted.
+    expect(jobReviewLabels('CHANGES_REQUESTED').onCustomersBehalf).toBe(true);
+    expect(jobReviewLabels('ACCEPTED').onCustomersBehalf).toBe(true);
+    expect(jobReviewLabels('SUBMITTED', true).onCustomersBehalf).toBe(true);
+    expect(jobReviewLabels('SUBMITTED', false).onCustomersBehalf).toBe(false);
+  });
+
+  it('keeps the wording for the other states, edited or not', () => {
+    // CHANGES_REQUESTED and ACCEPTED already say "on the customer's behalf"; an
+    // unseen staff edit does not change what those two mean.
+    for (const state of ['CHANGES_REQUESTED', 'ACCEPTED']) {
+      expect(jobReviewLabels(state, true)).toEqual(jobReviewLabels(state, false));
     }
   });
 });
@@ -64,6 +110,12 @@ describe('reviewDecisions', () => {
     const accept = reviewDecision('accept', 'ACCEPTED');
     expect(accept.optionLabel).toBe(jobReviewLabels('ACCEPTED').acceptOption);
     expect(accept.buttonLabel).toBe('Re-accept');
+  });
+
+  it('carries the unseen-edits warning through to the decision list', () => {
+    const accept = reviewDecision('accept', 'SUBMITTED', true);
+    expect(accept.optionLabel).toBe(jobReviewLabels('SUBMITTED', true).acceptOption);
+    expect(accept.note).toMatch(/not seen/i);
   });
 
   it('exposes the decision values as a stable list', () => {

@@ -63,20 +63,21 @@ describe('homepage sections match the access matrix', () => {
     expect(labelsBySection(STAFF)).toEqual({
       // "My Jobs" and "Jobs" merged into one button in Client Tools: the two pages
       // rendered the same component, and scope is enforced server-side now.
-      'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
+      'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
       'Technician Tools': ['Staff submit job', 'My Bench'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
       // "Edit Announcements" is gone: /edit_announcements merged into /announcements,
       // whose editing controls are gated inside the page on announcements:write.
       'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'Billing', 'AI Lab Assistant'],
-      'Admin Management Tools': ['Customer Management', 'API Keys', 'Data Translation', 'Lab Monitor North', 'Lab Monitor South', 'Lab Status TV'],
+      'Admin Management Tools': ['User Management', 'API Keys', 'Data Translation', 'Lab Monitor North', 'Lab Monitor South', 'Lab Status TV'],
     });
   });
 
-  it('has 25 buttons: the two announcement buttons collapsed into one', () => {
-    // Was 26. "Edit Announcements" left when the editor merged into the feed, the
-    // same way "My Jobs" left when the two jobs pages merged.
-    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(25);
+  it('has 26 buttons', () => {
+    // 25 until Notification Preferences arrived. Before that it was 26, then
+    // "Edit Announcements" left when the editor merged into the feed, the same
+    // way "My Jobs" left when the two jobs pages merged.
+    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(26);
   });
 
   it('has exactly one jobs button, keyed on the baseline permission', () => {
@@ -108,14 +109,14 @@ describe('homepage sections match the access matrix', () => {
 describe('what each role sees', () => {
   it('shows a plain client only the baseline buttons — no Book Inventory, no Bug Backlog', () => {
     expect(labelsBySection(CLIENT)).toEqual({
-      'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Learning Hub', 'Announcements', 'Bugs', 'DAMP Lab Website'],
+      'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'DAMP Lab Website'],
       'Admin Operational Tools': ['Release Notes'],
     });
   });
 
   it('shows a technician their operational set, and Technician Tools without Staff submit job (Q7)', () => {
     expect(labelsBySection(TECHNICIAN)).toEqual({
-      'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
+      'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
       'Technician Tools': ['My Bench'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
       'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'AI Lab Assistant'],
@@ -125,7 +126,7 @@ describe('what each role sees', () => {
 
   it('shows an equipment user My Bench and the Inventory Schedule, per the matrix amendment', () => {
     expect(labelsBySection(EQUIPMENT_USER)).toEqual({
-      'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Bugs', 'DAMP Lab Website'],
+      'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'DAMP Lab Website'],
       // Q7 still holds: an equipment user may submit for a client, a technician may not.
       'Technician Tools': ['Staff submit job', 'My Bench'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
@@ -135,7 +136,7 @@ describe('what each role sees', () => {
   });
 
   it('shows an administrator everything', () => {
-    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(25);
+    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(26);
   });
 
   it('gates each button on what its destination needs, not what its label resembles', () => {
@@ -167,13 +168,13 @@ describe('what each role sees', () => {
 describe('degraded mode: the permissions fetch failed', () => {
   it('falls back to the legacy staff boolean rather than hiding everything from staff', () => {
     const staffWithoutPermissions: HomeMenuUser = { permissions: [], permissionsLoaded: false, isDamplabStaff: true };
-    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(25);
+    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(26);
   });
 
   it('leaves a client with only the two unpermissioned buttons — the cost of the fallback, stated', () => {
     const clientWithoutPermissions: HomeMenuUser = { permissions: [], permissionsLoaded: false, isDamplabStaff: false };
     expect(labelsBySection(clientWithoutPermissions)).toEqual({
-      'Client Tools': ['Order Services', 'DAMP Lab Website'],
+      'Client Tools': ['Order Services', 'Notification Preferences', 'DAMP Lab Website'],
     });
   });
 });

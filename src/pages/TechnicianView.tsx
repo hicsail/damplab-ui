@@ -20,7 +20,7 @@ import { JobSubmitterSummary, summarizeJobSubmitter }                           
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import { diffJobGraphs, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, hasUnseenStaffEdits, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 
@@ -425,6 +425,10 @@ export default function TechnicianView() {
     // live graph for a snapshot that only happens to match it.
     const latest = latestVersion(versions);
     const isHistoricVersion = latest != null && viewingVersion != null && viewingVersion !== latest.versionNumber;
+
+    // Whether accepting would bind the customer to edits they have never seen.
+    // The three conditions this turns on are spelled out at hasUnseenStaffEdits.
+    const customerHasNotSeenEdits = hasUnseenStaffEdits(versions);
     const cardWorkflows = isHistoricVersion ? versionWorkflowsAsCards(currentVersion?.workflows, services ?? []) : workflows;
 
     const workflowCard = (
@@ -990,6 +994,7 @@ export default function TechnicianView() {
                     jobInstitution={jobInstitution}
                     jobTime={jobTime}
                     jobState={jobState}
+                    customerHasNotSeenEdits={customerHasNotSeenEdits}
                 />
                 <SowEditorModal
                     open={sowModalOpen}

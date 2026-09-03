@@ -26,7 +26,10 @@ import { SowField, SowVersionInputs, isCustomField } from './sowTypes';
 interface Props {
   field: SowField;
   inputs: SowVersionInputs;
-  staff: Array<{ id: string; displayName: string }>;
+  /** Administrators only, for the Project Manager select. Threaded straight through. */
+  administrators: Array<{ id: string; displayName: string }>;
+  /** Administrators and Technicians, for the Project Lead select. Threaded straight through. */
+  projectLeads: Array<{ id: string; displayName: string }>;
   readOnly?: boolean;
   expanded: boolean;
   /** Keyed by field key so the parent can pass one stable function for every row. */
@@ -60,7 +63,7 @@ function firstLine(text: string): string {
   return line.replace(/^-\s*/, '');
 }
 
-function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, liveCustomerCategory, liveServices, stale, onRecalculate }: Props): React.JSX.Element {
+function SowFieldRow({ field, inputs, administrators, projectLeads, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, liveCustomerCategory, liveServices, stale, onRecalculate }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const key = field.key;
 
@@ -227,7 +230,8 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
               <SowFieldSourceControls
                 fieldKey={field.key}
                 inputs={inputs}
-                staff={staff}
+                administrators={administrators}
+                projectLeads={projectLeads}
                 disabled={readOnly || editing}
                 onChange={onChangeInputs}
                 liveCustomerCategory={liveCustomerCategory}

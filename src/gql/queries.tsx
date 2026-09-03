@@ -213,6 +213,7 @@ export const GET_JOB_BY_ID = gql`
         isEvent
         createdAt
         createdByName
+        createdByOrg
         note
         workflows {
           workflowId
@@ -333,6 +334,7 @@ export const GET_OWN_JOB_BY_ID = gql`
         isEvent
         createdAt
         createdByName
+        createdByOrg
         note
         workflows {
           workflowId
@@ -552,8 +554,8 @@ export const GET_WORKFLOWS_FOR_LAB_MONITOR = gql`
 
 // Lab monitor: only approved-job workflows, with nodes and service names (for service-level cards)
 export const GET_LAB_MONITOR_OPERATIONS = gql`
-  query GetLabMonitorOperations($state: WorkflowState!) {
-    getWorkflowsByStateForLabMonitor(state: $state) {
+  query GetLabMonitorOperations($state: WorkflowState!, $includeUnsignedSow: Boolean) {
+    getWorkflowsByStateForLabMonitor(state: $state, includeUnsignedSow: $includeUnsignedSow) {
       id
       state
       job {
@@ -583,8 +585,9 @@ export const GET_LAB_MONITOR_NODES = gql`
   query GetLabMonitorNodes(
     $nodeState: WorkflowNodeState!
     $archiveFilter: NodeArchiveFilter
+    $includeUnsignedSow: Boolean
   ) {
-    getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter) {
+    getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter, includeUnsignedSow: $includeUnsignedSow) {
       _id
       id
       label
@@ -618,6 +621,36 @@ export const GET_LAB_MONITOR_NODES = gql`
 export const GET_LAB_MONITOR_STAFF_LIST = gql`
   query GetLabMonitorStaffList {
     getLabMonitorStaffList {
+      id
+      displayName
+    }
+  }
+`;
+
+/**
+ * Administrators only, for the Statement of Work's Project Manager field.
+ *
+ * Its own query rather than a filter over GET_LAB_MONITOR_STAFF_LIST: that list
+ * is configurable (KEYCLOAK_LAB_STAFF_GROUP_NAMES, which includes technicians by
+ * default) and also fills the lab monitor's assignee dropdown, so narrowing it
+ * would have emptied that dropdown of every technician.
+ */
+export const GET_ADMINISTRATOR_STAFF_LIST = gql`
+  query AdministratorStaffList {
+    administratorStaffList {
+      id
+      displayName
+    }
+  }
+`;
+
+/**
+ * Administrators and Technicians, for the Statement of Work's Project Lead field.
+ * One tier wider than Project Manager, and narrower than the lab-staff list.
+ */
+export const GET_PROJECT_LEAD_STAFF_LIST = gql`
+  query ProjectLeadStaffList {
+    projectLeadStaffList {
       id
       displayName
     }
@@ -1079,6 +1112,8 @@ export const GET_ASSIGNED_OPERATIONS = gql`
       id
       label
       state
+      workflowId
+      isReadyToStart
       startedAt
       completedSteps
       additionalInstructions

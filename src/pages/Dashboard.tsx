@@ -57,6 +57,10 @@ export default function Dashboard() {
   const [stateFilter, setStateFilter] = React.useState<string>(STATE_OPTIONS[0]);
   const [hasSowFilter, setHasSowFilter] = React.useState<'all' | 'yes' | 'no'>('all');
   const [archiveFilter, setArchiveFilter] = React.useState<ArchiveFilter>('ACTIVE');
+  // Closed-out jobs are hidden by default. Separate from archiveFilter, which is
+  // about a job being shelved rather than finished, and from COMPLETE, which stays
+  // visible because a job's lab work ending is not the job being done with.
+  const [includeClosed, setIncludeClosed] = React.useState(false);
   // Default scope: everything for someone who can see everything, otherwise their
   // own. The server would force the latter anyway; this keeps the control honest.
   const [scope, setScope] = React.useState<JobScope>(canViewAllJobs ? 'ALL' : 'CREATED_BY_ME');
@@ -78,6 +82,7 @@ export default function Dashboard() {
       sortOrder: 'DESC',
       archiveFilter,
       scope,
+      includeClosed,
     };
     if (search.trim()) inp.search = search.trim();
     if (stateFilter) inp.state = stateFilter;
@@ -85,7 +90,7 @@ export default function Dashboard() {
     if (createdByClient) inp.createdByClient = createdByClient;
     if (assigneeId) inp.assigneeId = assigneeId;
     return inp;
-  }, [page, limit, search, stateFilter, hasSowFilter, archiveFilter, scope, createdByClient, assigneeId]);
+  }, [page, limit, search, stateFilter, hasSowFilter, archiveFilter, includeClosed, scope, createdByClient, assigneeId]);
 
   const { data, loading, error, refetch } = useQuery(JOBS_FOR_VIEWER, {
     variables: { input },
@@ -243,6 +248,11 @@ export default function Dashboard() {
       onArchiveToggle={handleArchiveToggle}
       archiveFilter={archiveFilter}
       onArchiveFilterChange={handleArchiveFilterChange}
+      includeClosed={includeClosed}
+      onIncludeClosedChange={(value) => {
+        setIncludeClosed(value);
+        setPage(1);
+      }}
       scope={scope}
       onScopeChange={(value) => {
         setScope(value);
@@ -312,7 +322,7 @@ export default function Dashboard() {
             onClick={() => navigate('/customer-management')}
             sx={{ textTransform: 'none' }}
           >
-            Customer Management
+            User Management
           </Button>
         </Stack>
       </Stack>

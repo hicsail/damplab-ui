@@ -78,6 +78,18 @@ export default function StaffJobSubmit() {
     return <Navigate to="/checkout" replace />;
   }
 
+  /**
+   * Where to land after submitting for a client: the job that was just created,
+   * not the empty canvas.
+   *
+   * Which job page depends on the submitter. `/technician_view/:id` is gated by
+   * `jobs:view-all`, and an Equipment User holds `job:submit-for-client` without
+   * it (Q7 again) — sending them there would bounce them straight back out. The
+   * client-facing tracking page is reachable by everyone authenticated.
+   */
+  const jobPageFor = (jobId: string): string =>
+    can(PERMISSIONS.JobsViewAll) ? `/technician_view/${jobId}` : `/client_view/${jobId}`;
+
   const handleInputChange =
     (field: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement>) => {
       setFormData((prev) => ({ ...prev, [field]: e.target.value }));
@@ -139,6 +151,7 @@ export default function StaffJobSubmit() {
   };
 
   const handleSuccessDismiss = () => {
+    const submittedId = lastSubmittedJob?.id;
     setSuccessDialogOpen(false);
     setLastSubmittedJob(null);
     // Clear the canvas only after the success dialog is dismissed.
@@ -148,7 +161,7 @@ export default function StaffJobSubmit() {
     val.setEdges([]);
     localStorage.removeItem(CANVAS_AUTOSAVE_KEY);
     localStorage.setItem('CurrentCanvas', '');
-    navigate('/canvas');
+    navigate(submittedId ? jobPageFor(submittedId) : '/canvas');
   };
 
   if (workflows.length === 0 && !successDialogOpen) {
@@ -307,7 +320,7 @@ export default function StaffJobSubmit() {
         <DialogTitle>Job submitted successfully</DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: lastSubmittedJob ? 1 : 0 }}>
-            The job was submitted and will follow the normal lab pipeline.
+            The job was submitted and will follow the normal lab pipeline. Continuing opens it, and clears the canvas.
           </Typography>
           {lastSubmittedJob && (
             <Typography variant="body2" color="text.secondary">
@@ -317,7 +330,7 @@ export default function StaffJobSubmit() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button variant="contained" onClick={handleSuccessDismiss}>
-            Return to empty canvas
+            Go to job
           </Button>
         </DialogActions>
       </Dialog>

@@ -272,7 +272,7 @@ export default function CustomerManagement() {
       </Stack>
 
       <Typography variant="h4" gutterBottom>
-        Customer Management
+        User Management
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Search Keycloak users by name, username, or email, then set either of two independent things: their{' '}

@@ -42,7 +42,10 @@ interface StaffOption {
 interface Props {
   fieldKey: string;
   inputs: SowVersionInputs;
-  staff: StaffOption[];
+  /** Administrators only. Fills Project Manager — see the comment on that Select. */
+  administrators: StaffOption[];
+  /** Administrators and Technicians. Fills Project Lead. */
+  projectLeads: StaffOption[];
   disabled?: boolean;
   onChange: (patch: Partial<SowVersionInputs>) => void;
   /** feeSchedule only: the job's current pricing category (read-only context). */
@@ -227,7 +230,7 @@ function PeriodListEditor({ periods, disabled, onChange }: { periods: SowPeriod[
   );
 }
 
-export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabled, onChange, liveCustomerCategory, liveServices }: Props): React.JSX.Element | null {
+export default function SowFieldSourceControls({ fieldKey, inputs, administrators, projectLeads, disabled, onChange, liveCustomerCategory, liveServices }: Props): React.JSX.Element | null {
   // The document's own figures, not the job's. A version is a static record:
   // these move only when staff hit Recalculate, which patches them locally and
   // marks the save as a refresh.
@@ -245,24 +248,47 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
         </Box>
       );
 
-    case 'engagementResources':
+    case 'engagementResources': {
+      /**
+       * Someone saved before these restrictions — or since moved off the tier —
+       * is kept as a disabled option. Without it the Select's value matches
+       * nothing and renders blank, which reads as "not assigned" and would be
+       * silently saved as one on the next edit.
+       */
+      const withSavedName = (eligible: StaffOption[], saved: string | undefined, tier: string): Array<StaffOption & { stale: boolean; tier: string }> => {
+        const options = eligible.map((s) => ({ ...s, stale: false, tier }));
+        const name = saved?.trim();
+        if (name && !eligible.some((s) => s.displayName === name)) {
+          options.unshift({ id: `stale:${name}`, displayName: name, stale: true, tier });
+        }
+        return options;
+      };
+      const projectManagerOptions = withSavedName(administrators, inputs.projectManager, 'an administrator');
+      const projectLeadOptions = withSavedName(projectLeads, inputs.projectLead, 'an administrator or technician');
+
       return (
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <Box sx={{ minWidth: 220, flex: 1 }}>
             <Typography variant="caption" sx={labelSx}>
               Project manager
             </Typography>
+            {/* Administrators only, unlike Project Lead beside it. Sourced from
+                its own query rather than by filtering the lab-staff list: that
+                list is configurable (KEYCLOAK_LAB_STAFF_GROUP_NAMES) and also
+                feeds the lab monitor's assignee dropdown, so it is not a
+                reliable stand-in for the access tier. */}
             <Select size="small" fullWidth displayEmpty value={inputs.projectManager ?? ''} disabled={disabled} onChange={(e) => {
               const name = String(e.target.value);
-              const match = staff.find((s) => s.displayName === name);
+              const match = administrators.find((s) => s.displayName === name);
               onChange({ projectManager: name, projectManagerId: match?.id ?? undefined });
             }}>
               <MenuItem value="">
                 <em>Not assigned</em>
               </MenuItem>
-              {staff.map((s) => (
-                <MenuItem key={s.id} value={s.displayName}>
+              {projectManagerOptions.map((s) => (
+                <MenuItem key={s.id} value={s.displayName} disabled={s.stale}>
                   {s.displayName}
+                  {s.stale ? ` (no longer ${s.tier})` : ''}
                 </MenuItem>
               ))}
             </Select>
@@ -271,17 +297,21 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
             <Typography variant="caption" sx={labelSx}>
               Project lead
             </Typography>
+            {/* One tier wider than Project Manager: Administrators and
+                Technicians. Not the lab-staff list, which is whatever groups
+                KEYCLOAK_LAB_STAFF_GROUP_NAMES currently points at. */}
             <Select size="small" fullWidth displayEmpty value={inputs.projectLead ?? ''} disabled={disabled} onChange={(e) => {
               const name = String(e.target.value);
-              const match = staff.find((s) => s.displayName === name);
+              const match = projectLeads.find((s) => s.displayName === name);
               onChange({ projectLead: name, projectLeadId: match?.id ?? undefined });
             }}>
               <MenuItem value="">
                 <em>Not assigned</em>
               </MenuItem>
-              {staff.map((s) => (
-                <MenuItem key={s.id} value={s.displayName}>
+              {projectLeadOptions.map((s) => (
+                <MenuItem key={s.id} value={s.displayName} disabled={s.stale}>
                   {s.displayName}
+                  {s.stale ? ` (no longer ${s.tier})` : ''}
                 </MenuItem>
               ))}
             </Select>
@@ -291,6 +321,7 @@ export default function SowFieldSourceControls({ fieldKey, inputs, staff, disabl
           </Typography>
         </Box>
       );
+    }
 
     case 'periodOfPerformance':
       return <PeriodListEditor periods={inputs.periods ?? []} disabled={disabled} onChange={(periods) => onChange({ periods })} />;

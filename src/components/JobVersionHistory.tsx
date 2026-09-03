@@ -28,9 +28,19 @@ function when(iso?: string): string {
     return iso ? formatSOWInstant(iso, 'datetime') : '';
 }
 
-/** Who wrote it, in the reader's terms rather than the enum's. */
+/**
+ * Who wrote it, in the reader's terms rather than the enum's, qualified by the
+ * org stamped at write time — the staff member's access tier, or the job's
+ * institute for a customer edit.
+ *
+ * Falls back to the side alone when there is no org, which is every version
+ * written before the field existed. Those rows are deliberately not backfilled:
+ * a tier that was never recorded should not be invented after the fact.
+ */
 function authorLabel(version: JobVersionLike): string {
-    return version.authorRole === 'STAFF' ? 'DAMP Lab' : 'Customer';
+    const side = version.authorRole === 'STAFF' ? 'DAMP Lab' : 'Customer';
+    const org = version.createdByOrg?.trim();
+    return org ? `${side} · ${org}` : side;
 }
 
 function describe(version: JobVersionLike): string {

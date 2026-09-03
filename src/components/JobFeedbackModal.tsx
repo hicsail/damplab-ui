@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useMutation } from '@apollo/client';
-import { Alert, Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
+import { Alert, AlertTitle, Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import { styled } from "@mui/system";
 
 import { REVIEW_JOB } from '../gql/mutations';
-import { reviewDecisions, type ReviewDecisionValue } from './jobReviewLabels';
+import { jobReviewLabels, reviewDecisions, type ReviewDecisionValue } from './jobReviewLabels';
 import { buildReviewInput, retryOperationId } from '../utils/jobReview';
 
 
@@ -32,7 +32,7 @@ const FeedbackField = styled(TextField)`
 
 
 export default function JobFeedbackModal(props: any) {
-  const { open, onClose, onSubmitted, id, jobName, jobUsername, jobEmail, jobInstitution, jobTime, jobState } = props;
+  const { open, onClose, onSubmitted, id, jobName, jobUsername, jobEmail, jobInstitution, jobTime, jobState, customerHasNotSeenEdits } = props;
 
   const [decision,        setDecision]        = useState<ReviewDecisionValue | ''>('');
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -47,8 +47,23 @@ export default function JobFeedbackModal(props: any) {
   // Staff reach re-acceptance here rather than from the SOW card so that "send
   // it back to the customer" stays an equally available choice at the same
   // moment.
-  const decisions = reviewDecisions(jobState);
+  /**
+   * The job as it was when this modal opened, frozen for as long as it stays open.
+   *
+   * Submitting refetches the job, and the refetch lands while the modal is still
+   * mounted: the state moves to CHANGES_REQUESTED and the version history gains
+   * the decision's entry. Reading those live repainted the modal against the
+   * *outcome* of the decision in the instant before it closed — the red banner
+   * appeared for a frame on a submit that had shown no banner while it was being
+   * made, and the radio labels rewrote themselves underneath the reader.
+   *
+   * `open` alone drives this. It is set once per opening, before any submit.
+   */
+  const [snapshot, setSnapshot] = useState<{ jobState: string | null; unseenEdits: boolean }>({ jobState: null, unseenEdits: false });
+
+  const decisions = reviewDecisions(snapshot.jobState, snapshot.unseenEdits);
   const chosen = decisions.find((d) => d.value === decision) ?? null;
+  const accept = jobReviewLabels(snapshot.jobState, snapshot.unseenEdits);
 
   // TechnicianView keeps this modal mounted and only toggles `open`, so nothing
   // clears the form between openings. The page reload used to do it by
@@ -59,8 +74,12 @@ export default function JobFeedbackModal(props: any) {
       setDecision('');
       setFeedbackMessage('');
       setSubmitError(null);
+      setSnapshot({ jobState: jobState ?? null, unseenEdits: customerHasNotSeenEdits === true });
       operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'reopen' });
     }
+    // Intentionally keyed on `open` alone: see the comment on `snapshot`. Adding
+    // the job fields here would reintroduce exactly the repaint it prevents.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleDecisionChange = (event: any) => {
@@ -142,6 +161,18 @@ export default function JobFeedbackModal(props: any) {
           </Box>
         )}
 
+        {/* Shown before a decision is made, not after one is chosen. This used to
+            appear only once the accept radio was selected — by which point the
+            reader had already decided. An Alert rather than bare red text so the
+            warning does not rest on colour alone: it carries an icon and a role
+            as well. */}
+        {accept.onCustomersBehalf && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <AlertTitle sx={{ fontWeight: 700 }}>Accepting commits the customer to this job on their behalf.</AlertTitle>
+            {accept.acceptNote}
+          </Alert>
+        )}
+
         <FormControl component="fieldset" sx={{width: '100%'}} disabled={submitting}>
 
           <RadioGroup onChange={handleDecisionChange} value={decision} name="feedback-type" aria-label="feedback-type">
@@ -150,7 +181,9 @@ export default function JobFeedbackModal(props: any) {
                 <FormControlLabel control={<Radio disabled={submitting} />} value={option.value} label={option.optionLabel} />
                 {decision === option.value && (
                   <Box sx={{ ml: 4, mb: 1 }}>
-                    {option.note && (
+                    {/* Already spelled out above for accept; repeating it here
+                        would read as two different warnings. */}
+                    {option.note && option.value !== 'accept' && (
                       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
                         {option.note}
                       </Typography>

@@ -20,6 +20,14 @@ import { formatGqlError } from '../../utils/gqlError';
 import ReasonDialog from '../ReasonDialog';
 
 /**
+ * The ground behind the two things the customer has to act on: the initials
+ * boxes, and the signing block. Faint enough to sit under body text, and a hue
+ * nothing else on the page uses — the diff markers are `info`, the status chips
+ * carry their own colours.
+ */
+const HIGHLIGHT = '#fff8e1';
+
+/**
  * The customer's view of a Statement of Work.
  *
  * Read-only by construction: there is no edit affordance anywhere, and the server
@@ -145,7 +153,8 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
     setInitials({});
   }, [version?.id]);
 
-  const allInitialed = sectionsNeedingInitials.every((f) => (initials[f.key] ?? '').trim().length > 0);
+  const outstandingInitials = sectionsNeedingInitials.filter((f) => !(initials[f.key] ?? '').trim());
+  const allInitialed = outstandingInitials.length === 0;
   const canSign = signingState.enabled && agreed && allInitialed && name.trim().length > 0 && !busy;
 
   const handleDecline = async (reason: string): Promise<void> => {
@@ -329,16 +338,21 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
                         </Box>
                       )}
                       {askInitials && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1.5 }}>
+                        /* A faint yellow ground, not a border: the coloured left
+                           border above already means "this section changed", and a
+                           second border here would read as a diff marker rather
+                           than something to do. */
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 1.5, p: 1.5, borderRadius: 1, backgroundColor: HIGHLIGHT }}>
                           <TextField
                             size="small"
-                            label="Initials"
+                            required
+                            label="Your initials"
                             value={initials[f.key] ?? ''}
                             onChange={(e) => setInitials((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                            sx={{ width: 120 }}
+                            sx={{ width: 140, backgroundColor: 'background.paper' }}
                             disabled={busy || !signingState.enabled}
                           />
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="body2">
                             Please initial to confirm you have read this section.
                           </Typography>
                         </Box>
@@ -355,13 +369,26 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
               )}
 
               {awaitingSignature && !signedName && (
-                <Box sx={{ mt: 3 }}>
+                /* The same faint yellow ground as the initials boxes, so the
+                   parts of this page the customer has to act on read as one set
+                   rather than as more document. */
+                <Box sx={{ mt: 3, p: 2.5, borderRadius: 1, backgroundColor: HIGHLIGHT }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                     Signing
                   </Typography>
                   {sectionsNeedingInitials.length > 0 && (
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                       Initial the flagged sections above, then agree and type your full name.
+                    </Typography>
+                  )}
+                  {/* Said before the checkbox rather than after it. The old hint
+                      only appeared once `agreed` was ticked, so a customer stuck
+                      on a missing initial had no way to find what was blocking. */}
+                  {!allInitialed && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                      {outstandingInitials.length} of {sectionsNeedingInitials.length} highlighted section
+                      {sectionsNeedingInitials.length === 1 ? '' : 's'} still need your initials
+                      {outstandingInitials.length <= 3 ? `: ${outstandingInitials.map((f) => f.label).join(', ')}` : ''}.
                     </Typography>
                   )}
 
@@ -388,8 +415,9 @@ export default function SowCustomerView({ jobId, onDeclined }: Props): React.JSX
                       </Button>
                     </Box>
                   </Box>
+                  {/* The missing initials are already stated above, before the
+                      checkbox, so this only covers the checkbox itself. */}
                   {!agreed && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Confirm the checkbox above to enable signing.</Typography>}
-                  {agreed && !allInitialed && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>Initial every flagged section above to enable signing.</Typography>}
                 </Box>
               )}
 

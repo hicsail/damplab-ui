@@ -7,6 +7,7 @@ import {
   CardContent,
   Chip,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   InputLabel,
@@ -15,6 +16,7 @@ import {
   Select,
   Skeleton,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -58,6 +60,14 @@ const PAGE_SIZE_OPTIONS = [10, 20, 25, 50] as const;
  */
 const CHIP_COLUMN_MIN_HEIGHT = 96;
 export const STATE_OPTIONS = ['', 'SUBMITTED', 'QUEUED', 'IN_PROGRESS', 'COMPLETE'];
+/**
+ * The states the list hides by default, mirroring the server's own set.
+ *
+ * Offered in the Status dropdown as well, because the toggle alone would hide
+ * them with no way to ask for one specifically — an explicit `state` filter
+ * overrides the exclusion server-side.
+ */
+export const CLOSED_STATE_OPTIONS = ['CLOSED', 'CANCELLED', 'REJECTED'];
 export type ArchiveFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
 export type JobScope = 'ALL' | 'CREATED_BY_ME' | 'WORKED_BY_ME';
 export const SCOPE_LABELS: Record<JobScope, string> = {
@@ -93,6 +103,9 @@ export interface SubmittedJobsListProps {
   onStateFilterChange: (value: string) => void;
   hasSowFilter: 'all' | 'yes' | 'no';
   onHasSowFilterChange: (value: 'all' | 'yes' | 'no') => void;
+  /** Closed-out jobs (CLOSED, CANCELLED, REJECTED) are hidden unless this is on. COMPLETE is unaffected. */
+  includeClosed?: boolean;
+  onIncludeClosedChange?: (value: boolean) => void;
   showHasSowFilter?: boolean;
   getJobLink: (job: JobListItem) => string;
   /**
@@ -162,6 +175,8 @@ export default function SubmittedJobsList({
   onArchiveToggle,
   archiveFilter,
   onArchiveFilterChange,
+  includeClosed,
+  onIncludeClosedChange,
   scope,
   onScopeChange,
   clientOptions,
@@ -259,7 +274,7 @@ export default function SubmittedJobsList({
           <InputLabel>Status</InputLabel>
           <Select value={stateFilter} label="Status" onChange={handleStateChange}>
             <MenuItem value="">All</MenuItem>
-            {STATE_OPTIONS.slice(1).map((s) => (
+            {[...STATE_OPTIONS.slice(1), ...CLOSED_STATE_OPTIONS].map((s) => (
               <MenuItem key={s} value={s}>
                 {s.replace('_', ' ')}
               </MenuItem>
@@ -316,6 +331,15 @@ export default function SubmittedJobsList({
               ))}
             </Select>
           </FormControl>
+        )}
+        {/* A visible control, not just a changed default: without it a closed
+            job would be unreachable from this page. */}
+        {onIncludeClosedChange && (
+          <FormControlLabel
+            sx={{ ml: 0 }}
+            control={<Switch size="small" checked={includeClosed === true} onChange={(e) => onIncludeClosedChange(e.target.checked)} />}
+            label={<Typography variant="body2">Show closed jobs</Typography>}
+          />
         )}
         {canArchive && archiveFilter && onArchiveFilterChange && (
           <FormControl size="small" sx={{ minWidth: 140 }}>
