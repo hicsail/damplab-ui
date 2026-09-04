@@ -6,7 +6,7 @@ import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, 
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
 import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE } from '../gql/queries';
-import { CANCEL_JOB, REJECT_JOB_REVIEW } from '../gql/mutations';
+import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutations';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
@@ -17,7 +17,8 @@ import { CommentsSection }        from '../components/CommentsSection';
 import ResubmitJobModal          from '../components/ResubmitJobModal';
 import RequestEditAccessModal    from '../components/RequestEditAccessModal';
 import ReasonDialog              from '../components/ReasonDialog';
-import { diffJobGraphs, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { canRevertVersions } from '../utils/jobEditing';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 import { AppContext } from '../contexts/App';
@@ -125,7 +126,34 @@ export default function Tracking() {
         ]);
     };
 
+    const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
+    const [restoringVersion, setRestoringVersion] = useState(false);
+
     const job = data?.ownJobById;
+
+    /**
+     * Restore the version being viewed. Offered only while the lab has actually
+     * handed the job back for editing — `canRevertVersions` mirrors the server
+     * gate, which is what decides whether the save is accepted at all.
+     *
+     * No picker bookkeeping afterwards: the effect on `data.ownJobById` snaps the
+     * view to the newest allowed row on every refetch.
+     */
+    const handleRestoreVersion = async () => {
+        if (!id || viewingVersion == null) return;
+        const label = jobVersionDisplayLabel(viewingVersion);
+        if (!window.confirm(`Restore version ${label}? This becomes the current workflow, saved as a new version. Nothing already in the history is lost.`)) return;
+        setRestoringVersion(true);
+        try {
+            await restoreJobVersion({ variables: { jobId: id, versionNumber: viewingVersion, note: `Restored version ${label}` } });
+            await refreshJobPage();
+        } catch (e: any) {
+            window.alert(formatGqlError(e, 'Could not restore that version.'));
+        } finally {
+            setRestoringVersion(false);
+        }
+    };
+
     const activeSow = sowFullData?.activeVersion ?? null;
     const visibleActiveSow = activeSow?.visibleToCustomer === true ? activeSow : null;
     const lifecycle = deriveCustomerLifecycle({
@@ -245,6 +273,8 @@ export default function Tracking() {
                             setBaselineVersionNumber(undefined);
                         }}
                         onBaselineChange={setBaselineVersionNumber}
+                        onRestore={canRevertVersions(job, false) ? handleRestoreVersion : undefined}
+                        restoring={restoringVersion}
                     />
                 </Box>
             )}

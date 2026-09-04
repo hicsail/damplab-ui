@@ -261,20 +261,17 @@ export const addNodesAndEdgesFromServiceIds = (
         return;
     }
 
-    const dedupedServices: any[] = [];
-    const seen = new Set<string>();
-    validServices.forEach((service) => {
-        if (seen.has(service.id)) return;
-        seen.add(service.id);
-        dedupedServices.push(service);
-    });
-
-    // loop over valid serviceIds
+    // Deliberately not de-duplicated by service id.
+    //
+    // Repeats used to be collapsed here, so a bundle that ran an operation at two
+    // points in its sequence dropped one of them — silently, and after the
+    // sequence had already been authored. A bundle is an ordered list of steps
+    // now, and two steps naming the same operation mean two nodes.
     let previousNodeId : any = null;
     let baseX = dropPosition?.x ?? 0;
     let baseY = dropPosition?.y ?? 0;
-    
-    dedupedServices.forEach((service: any, index: number) => {
+
+    validServices.forEach((service: any, index: number) => {
         // if index === 0, add node to canvas with edge
         if (index === 0) {
             // calculate random position on canvas
@@ -292,7 +289,13 @@ export const addNodesAndEdgesFromServiceIds = (
     });
 }
 
-// TODO: Change bundle data structure to preserve service order!  Needing to check bundles.tsx just to get the correct service order...
+/**
+ * Drop a whole bundle onto the canvas as a chain of nodes.
+ *
+ * Order comes from the stored array, which the backend resolves one entry at a
+ * time (`DampLabServices.findByIds`) and therefore keeps in order and with
+ * repeats intact. The static `bundles.tsx` list is no longer consulted for it.
+ */
 export const addNodesAndEdgesFromBundle = (
     bundle: any,
     services: any,
@@ -305,7 +308,6 @@ export const addNodesAndEdgesFromBundle = (
         return;
     }
 
-    // Use runtime bundle service order from DB; fallback conversion handled per item.
     addNodesAndEdgesFromServiceIds(services, bundle.services, setNodes, setEdges, dropPosition);
 }
 

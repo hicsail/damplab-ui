@@ -8,7 +8,7 @@ import PictureAsPdfIcon                               from '@mui/icons-material/
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
 import EditNoteIcon                                   from '@mui/icons-material/EditNote';
-import { allLineIndexes, buildInvoiceServiceSelections, toggleLineIndex, type BillableServiceLine } from '../utils/invoiceSelection';
+import { billedLineIndexes, buildInvoiceServiceSelections, toggleLineIndex, unbilledLineIndexes, type BillableServiceLine } from '../utils/invoiceSelection';
 import { formatGqlError } from '../utils/gqlError';
 import UndoIcon                                       from '@mui/icons-material/Undo';
 import CancelIcon                                     from '@mui/icons-material/Cancel';
@@ -17,15 +17,15 @@ import RefreshIcon                                    from '@mui/icons-material/
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
+import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import { diffJobGraphs, hasUnseenStaffEdits, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
-import { technicianCustomerActionCopy } from '../utils/jobEditing';
+import { canRevertVersions, technicianCustomerActionCopy } from '../utils/jobEditing';
 import JobPDFDocument             from '../components/JobPDFDocument';
 import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SowEditorModal             from '../components/sow/SowEditorModal';
@@ -172,6 +172,8 @@ export default function TechnicianView() {
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
     const [withdrawFromCustomer] = useMutation(WITHDRAW_JOB_FROM_CUSTOMER);
     const [withdrawAcceptance] = useMutation(WITHDRAW_JOB_ACCEPTANCE);
+    const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
+    const [restoringVersion, setRestoringVersion] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
 
     /**
@@ -226,6 +228,29 @@ export default function TechnicianView() {
         } catch (e) {
             console.error('Failed to close job:', e);
             window.alert('Could not close the job. Please try again.');
+        }
+    };
+
+    /**
+     * Restore the version currently being viewed.
+     *
+     * Server-side, like the editor's copy: withdrawing a job from the customer
+     * restores the same way, and the gate deciding who may write lives there.
+     * No picker bookkeeping afterwards — the effect on `data.jobById` already
+     * snaps the view to the newest row on every refetch.
+     */
+    const handleRestoreVersion = async () => {
+        if (!id || viewingVersion == null) return;
+        const label = jobVersionDisplayLabel(viewingVersion);
+        if (!window.confirm(`Restore version ${label}? This becomes the current workflow, saved as a new version. Nothing already in the history is lost.`)) return;
+        setRestoringVersion(true);
+        try {
+            await restoreJobVersion({ variables: { jobId: id, versionNumber: viewingVersion, note: `Restored version ${label}` } });
+            await refreshJobPage();
+        } catch (e: any) {
+            window.alert(e?.message ?? 'Could not restore that version.');
+        } finally {
+            setRestoringVersion(false);
         }
     };
 
@@ -302,9 +327,15 @@ export default function TechnicianView() {
     // live `services` above can have drifted from the version in force.
     const billableServices: BillableServiceLine[] = sowFullData?.billableServices ?? [];
 
+    // Lines an earlier invoice for this job already covers. The server refuses a
+    // second invoice for the same line — billing it twice also credited the
+    // discount twice — so the picker shows them rather than letting staff walk
+    // into the refusal.
+    const billedLines = billedLineIndexes(invoices, sowFullData?.activeVersion?.versionNumber ?? null);
+
     useEffect(() => {
-        setSelectedInvoiceLines(allLineIndexes(billableServices));
-    }, [sowFullData?.billableServices]);
+        setSelectedInvoiceLines(unbilledLineIndexes(billableServices, billedLineIndexes(invoices, sowFullData?.activeVersion?.versionNumber ?? null)));
+    }, [sowFullData?.billableServices, sowFullData?.activeVersion?.versionNumber, invoices]);
 
     const openInvoiceDialog = () => {
         if (!sowFullData) return;
@@ -444,6 +475,8 @@ export default function TechnicianView() {
                             setBaselineVersionNumber(undefined);
                         }}
                         onBaselineChange={setBaselineVersionNumber}
+                        onRestore={canRevertVersions(jobData, true) ? handleRestoreVersion : undefined}
+                        restoring={restoringVersion}
                     />
                 </Box>
             )}
@@ -953,7 +986,22 @@ export default function TechnicianView() {
                                                 )
                                             }
                                             secondary={
-                                                `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
+                                                <>
+                                                    {`${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`}
+                                                    {/* Overlaps the server could prove are refused outright. These
+                                                        are the ones it could not check — an earlier invoice that
+                                                        predates line tracking, or one billed from a different
+                                                        version — where silence would imply a guarantee nobody made. */}
+                                                    {Array.isArray(inv.billingWarnings) && inv.billingWarnings.length > 0 && (
+                                                        <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
+                                                            {inv.billingWarnings.map((warning: string, i: number) => (
+                                                                <Typography key={i} component="span" variant="caption" color="warning.main" sx={{ display: 'block' }}>
+                                                                    {warning}
+                                                                </Typography>
+                                                            ))}
+                                                        </Box>
+                                                    )}
+                                                </>
                                             }
                                         />
                                     </ListItem>
@@ -1028,18 +1076,22 @@ export default function TechnicianView() {
                         )}
                         {billableServices.map((s: BillableServiceLine, idx: number) => {
                             const checked = selectedInvoiceLines.includes(idx);
+                            const billedOn = billedLines.get(idx);
                             // Keyed on position, not on serviceId — two lines of the
                             // same service share an id and would collide as keys.
                             return (
                                 <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
                                     <FormControlLabel
-                                        control={<Checkbox checked={checked} onChange={() => toggleInvoiceService(idx)} />}
+                                        control={<Checkbox checked={checked} disabled={billedOn !== undefined} onChange={() => toggleInvoiceService(idx)} />}
                                         label={
                                             <Box>
-                                                <Typography variant="subtitle2">{s?.name ?? 'Service'}</Typography>
+                                                <Typography variant="subtitle2" color={billedOn !== undefined ? 'text.disabled' : undefined}>
+                                                    {s?.name ?? 'Service'}
+                                                </Typography>
                                                 <Typography variant="body2" color="text.secondary">
                                                     {s?.description ?? ''}
                                                     {s?.cost != null ? ` • $${Number(s.cost).toFixed(2)}` : ''}
+                                                    {billedOn !== undefined ? ` • already invoiced${billedOn ? ` on ${billedOn}` : ''}` : ''}
                                                 </Typography>
                                             </Box>
                                         }

@@ -54,7 +54,7 @@ export function jobReviewLabels(jobState: string | null | undefined, customerHas
         acceptOption: "Accept on the customer's behalf (ready to proceed)",
         acceptButton: 'Accept Job',
         acceptNote:
-          'The lab has edited this job since the customer submitted it, and they have not seen those edits. Accepting commits them to the workflow as it now stands. To let them see it first, request approval of edits below.',
+          'The lab edited the job since submission. Only accept it on their behalf if you have clearly communicated with the customer.',
         onCustomersBehalf: true
       };
     }
@@ -82,7 +82,7 @@ export function jobReviewLabels(jobState: string | null | undefined, customerHas
     acceptOption: "Accept on the customer's behalf (ready to proceed)",
     acceptButton: 'Accept Job',
     acceptNote:
-      'The customer still has this job open for editing, whether or not they have resubmitted it. Accepting takes it back and closes their editor. If the change should be their call, request edits below instead.',
+      'The customer may still be making changes to the job.  Only accept it on their behalf if you have clearly communicated with the customer.',
     onCustomersBehalf: true
   };
 }
@@ -127,7 +127,7 @@ export function reviewDecisions(jobState: string | null | undefined, customerHas
       decision: 'REQUEST_CLARIFICATION',
       optionLabel: 'Request clarification',
       buttonLabel: 'Submit Decision',
-      note: 'The customer will be asked to reply. They can view the workflow but cannot edit it.',
+      note: 'The customer will be asked to reply. They can view the job but not edit it. **NOTE**: If they already have edit access, this option will revoke it.',
       messageRequired: true
     },
     {
@@ -135,7 +135,7 @@ export function reviewDecisions(jobState: string | null | undefined, customerHas
       decision: 'REQUEST_EDITS',
       optionLabel: 'Request design edits',
       buttonLabel: 'Submit Decision',
-      note: 'The customer can edit the workflow and submit the updated workflow for review.',
+      note: 'The customer can edit the job and submit the updated job for review.',
       messageRequired: true
     },
     {
@@ -143,7 +143,7 @@ export function reviewDecisions(jobState: string | null | undefined, customerHas
       decision: 'REQUEST_APPROVAL',
       optionLabel: 'Request approval of edits',
       buttonLabel: 'Request Approval',
-      note: 'The customer can view and approve the lab’s edits, but cannot edit the workflow.',
+      note: 'The customer can view & approve the lab’s edits but cannot edit the job. **NOTE**: If they already have edit access, this option will revoke it.',
       messageRequired: true
     }
   ];

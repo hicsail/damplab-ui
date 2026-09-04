@@ -56,3 +56,52 @@ export function buildInvoiceServiceSelections(lines: readonly BillableServiceLin
     return { index, serviceId };
   });
 }
+
+/** An invoice already generated for this job, as the picker needs to read it. */
+export interface BilledInvoiceLike {
+  invoiceNumber?: string | null;
+  sowVersionNumber?: number | null;
+  services?: ReadonlyArray<{ sourceIndex?: number | null }> | null;
+}
+
+/**
+ * Which lines earlier invoices for this job already cover, mapped to the invoice
+ * that covers them.
+ *
+ * Positions only mean something within one SOW version — a re-synced document
+ * can reorder its lines — so an invoice billed from a different version is not
+ * comparable and is left out. So is one written before positions were recorded.
+ * Those cases are not silently treated as "unbilled": the server refuses a
+ * provable overlap and records a warning on the invoice for everything it could
+ * not prove, and this list only drives what the dialog ticks by default.
+ */
+export function billedLineIndexes(
+  invoices: readonly BilledInvoiceLike[] | null | undefined,
+  sowVersionNumber: number | null | undefined
+): Map<number, string> {
+  const billed = new Map<number, string>();
+  if (sowVersionNumber == null) return billed;
+
+  for (const invoice of invoices ?? []) {
+    if (invoice?.sowVersionNumber !== sowVersionNumber) continue;
+    for (const line of invoice.services ?? []) {
+      if (typeof line?.sourceIndex !== 'number') continue;
+      if (!billed.has(line.sourceIndex)) billed.set(line.sourceIndex, String(invoice.invoiceNumber ?? ''));
+    }
+  }
+  return billed;
+}
+
+/**
+ * What the dialog should tick when it opens: everything not already invoiced.
+ *
+ * An invoice usually covers the whole job, which is why this used to be simply
+ * every line. Once a job has been part-invoiced, "every line" is the one
+ * selection guaranteed to be refused.
+ */
+export function unbilledLineIndexes(
+  lines: readonly BillableServiceLine[] | null | undefined,
+  billed: ReadonlyMap<number, string>
+): number[] {
+  return allLineIndexes(lines).filter((index) => !billed.has(index));
+}

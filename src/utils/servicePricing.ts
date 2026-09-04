@@ -260,10 +260,23 @@ export const calculateParameterCostWithCategory = (
       continue;
     }
 
-    // Fallback: original parameter-level pricing behavior.
     const unitPrice = resolveCategoryPrice(param, customerCategory);
     if (unitPrice === undefined) continue;
 
+    // A multiplier parameter that carries its own price is billed `price x value`
+    // and is excluded from the line's global multiplier below — otherwise the
+    // hours would scale every other parameter too. Mirrors
+    // calculateParameterCostWithCategory in the backend's service-pricing.util.ts,
+    // which is the source of truth; the canvas has to agree with it or the price
+    // shown while building a job differs from the one the SOW bills.
+    if (param.isPriceMultiplier === true && entry.id !== RUN_COUNT_PARAM_ID) {
+      const qty = resolveQty(entry.value);
+      if (qty === undefined || qty === 0) continue;
+      total += unitPrice * qty;
+      continue;
+    }
+
+    // Fallback: original parameter-level pricing behavior.
     const count = countValue(entry.value, multiValueParamIds.has(entry.id));
     total += unitPrice * count;
   }
@@ -289,7 +302,11 @@ const resolveQty = (rawValue: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const getMultiplier = (parameters: unknown, rawFormData: unknown): number => {
+const getMultiplier = (
+  parameters: unknown,
+  rawFormData: unknown,
+  opts?: { skipSelfPriced?: boolean; customerCategory?: CustomerCategory }
+): number => {
   const multiValueParamIds = getMultiValueParamIds(parameters, rawFormData);
   const formData = normalizeFormDataToArray(rawFormData, multiValueParamIds);
   const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
@@ -313,6 +330,10 @@ const getMultiplier = (parameters: unknown, rawFormData: unknown): number => {
       if (param.isPriceMultiplier !== true) continue;
       const id = typeof param.id === 'string' ? param.id : undefined;
       if (!id || id === RUN_COUNT_PARAM_ID) continue;
+
+      // Already billed as `price x value` in the base — see the note in
+      // calculateParameterCostWithCategory above.
+      if (opts?.skipSelfPriced && resolveCategoryPrice(param, opts.customerCategory) !== undefined) continue;
 
       const rawValue = formDataMap.get(id);
       if (rawValue === null || rawValue === undefined) continue;
@@ -364,6 +385,11 @@ export const calculateServiceCost = (
     }
   }
 
-  const multiplier = getMultiplier(service?.parameters, rawFormData);
+  const multiplier = getMultiplier(service?.parameters, rawFormData, {
+    // Only PARAMETER mode reads a parameter's own price, so only there can one
+    // already have been billed into the base.
+    skipSelfPriced: pricingMode === 'PARAMETER',
+    customerCategory
+  });
   return baseCost * (Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1);
 };

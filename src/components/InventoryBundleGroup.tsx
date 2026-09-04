@@ -120,7 +120,9 @@ export default function InventoryBundleGroup({
           <Box sx={{ mb: 2 }}>
             <Typography variant='caption' color='text.secondary'>
               Services without inventory requirements:{' '}
-              {unmappedServices.map((s) => s.name).join(', ')}
+              {/* Named once each: this says which operations lack requirements,
+                  not how many steps of the bundle run them. */}
+              {[...new Set(unmappedServices.map((s) => s.name))].join(', ')}
             </Typography>
           </Box>
         )}

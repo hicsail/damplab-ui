@@ -1066,6 +1066,13 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         multiplier
         runCount
         category
+        sourceIndex
+        pricingDetails {
+          label
+          quantity
+          unitPrice
+          total
+        }
       }
       subtotal
       adjustments {
@@ -1077,6 +1084,8 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         prorationFactor
       }
       totalCost
+      sowVersionNumber
+      billingWarnings
       createdAt
     }
   }

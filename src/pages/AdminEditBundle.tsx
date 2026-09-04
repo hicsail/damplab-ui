@@ -1,24 +1,5 @@
 import { useApolloClient } from '@apollo/client';
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  FormControl,
-  IconButton,
-  InputLabel,
-  ListItemText,
-  MenuItem,
-  OutlinedInput,
-  Paper,
-  Select,
-  Stack,
-  TextField,
-  Typography
-} from '@mui/material';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { Alert, Box, Button, Stack, TextField, Typography } from '@mui/material';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { AppContext } from '../contexts/App';
@@ -26,15 +7,8 @@ import { UPDATE_BUNDLE } from '../gql/queries';
 import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { formatSaveError } from '../utils/gqlError';
-
-const MENU_PROPS = {
-  PaperProps: {
-    style: {
-      maxHeight: 320,
-      width: 300
-    }
-  }
-};
+import BundleStepsEditor from '../components/edit/BundleStepsEditor';
+import { BundleStep, firstEmptyStepIndex, serviceIdsFromSteps, stepsFromServiceIds } from '../components/edit/bundleSteps';
 
 export default function AdminEditBundle() {
   const { bundleId } = useParams<{ bundleId: string }>();
@@ -49,7 +23,7 @@ export default function AdminEditBundle() {
 
   const [label, setLabel] = useState('');
   const [icon, setIcon] = useState('');
-  const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [steps, setSteps] = useState<BundleStep[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const { can } = usePermissions();
@@ -59,38 +33,14 @@ export default function AdminEditBundle() {
     () => services.map((service: any) => ({ id: String(service.id), name: String(service.name) })),
     [services]
   );
-  const serviceNameById = useMemo(
-    () => new Map(availableServices.map((service) => [service.id, service.name] as const)),
-    [availableServices]
-  );
-
-  const handleServiceSelectionChange = (selected: string[]) => {
-    setServiceIds((old) => {
-      const kept = old.filter((id) => selected.includes(id));
-      const added = selected.filter((id) => !kept.includes(id));
-      return [...kept, ...added];
-    });
-  };
-
-  const moveService = (index: number, direction: -1 | 1) => {
-    setServiceIds((old) => {
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= old.length) return old;
-      const next = [...old];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next;
-    });
-  };
-
-  const removeService = (id: string) => {
-    setServiceIds((old) => old.filter((serviceId) => serviceId !== id));
-  };
 
   useEffect(() => {
     if (!bundle) return;
     setLabel(bundle.label ?? '');
     setIcon(bundle.icon ?? '');
-    setServiceIds((bundle.services ?? []).map((service: any) => String(service.id)));
+    // The resolver returns one entry per stored id, in order, repeats included —
+    // so a bundle that runs an operation twice hydrates as two steps.
+    setSteps(stepsFromServiceIds((bundle.services ?? []).map((service: any) => String(service.id))));
   }, [bundle]);
 
   const handleSave = async () => {
@@ -98,6 +48,13 @@ export default function AdminEditBundle() {
     setErrorMessage(null);
     if (!label.trim()) {
       setErrorMessage('Bundle name is required.');
+      return;
+    }
+    // An unfilled step would otherwise be dropped silently on save, leaving a
+    // bundle shorter than the one on screen.
+    const emptyStep = firstEmptyStepIndex(steps);
+    if (emptyStep !== -1) {
+      setErrorMessage(`Step ${emptyStep + 1} has no operation selected.`);
       return;
     }
     try {
@@ -109,7 +66,7 @@ export default function AdminEditBundle() {
           changes: {
             label: label.trim(),
             icon: icon.trim(),
-            services: serviceIds
+            services: serviceIdsFromSteps(steps)
           }
         }
       });
@@ -142,75 +99,10 @@ export default function AdminEditBundle() {
         helperText='Keep blank unless you use bundle icons.'
       />
 
-      <FormControl>
-        <InputLabel id='edit-bundle-services-label'>Services in this bundle</InputLabel>
-        <Select
-          labelId='edit-bundle-services-label'
-          multiple
-          value={serviceIds}
-          label='Services in this bundle'
-          onChange={(event) => handleServiceSelectionChange(event.target.value as string[])}
-          input={<OutlinedInput label='Services in this bundle' />}
-          renderValue={(selected) => {
-            const selectedIds = selected as string[];
-            return availableServices
-              .filter((service) => selectedIds.includes(service.id))
-              .map((service) => service.name)
-              .join(', ');
-          }}
-          MenuProps={MENU_PROPS}
-        >
-          {availableServices.map((service) => (
-            <MenuItem key={service.id} value={service.id}>
-              <Checkbox checked={serviceIds.includes(service.id)} />
-              <ListItemText primary={service.name} />
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-
-      <Box>
-        <Typography variant='subtitle1' sx={{ mb: 1 }}>
-          Service order in this bundle
-        </Typography>
-        <Paper variant='outlined' sx={{ p: 1.5 }}>
-          {serviceIds.length === 0 ? (
-            <Typography variant='body2' color='text.secondary'>
-              Select services first, then order them here.
-            </Typography>
-          ) : (
-            <Stack spacing={1}>
-              {serviceIds.map((id, index) => (
-                <Box
-                  key={id}
-                  sx={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 1, alignItems: 'center' }}
-                >
-                  <Typography variant='body2'>
-                    {index + 1}. {serviceNameById.get(id) ?? id}
-                  </Typography>
-                  <IconButton size='small' onClick={() => moveService(index, -1)} disabled={index === 0}>
-                    <ArrowUpwardIcon fontSize='small' />
-                  </IconButton>
-                  <IconButton
-                    size='small'
-                    onClick={() => moveService(index, 1)}
-                    disabled={index === serviceIds.length - 1}
-                  >
-                    <ArrowDownwardIcon fontSize='small' />
-                  </IconButton>
-                  <IconButton size='small' color='error' onClick={() => removeService(id)}>
-                    <DeleteIcon fontSize='small' />
-                  </IconButton>
-                </Box>
-              ))}
-            </Stack>
-          )}
-        </Paper>
-      </Box>
+      <BundleStepsEditor steps={steps} onChange={setSteps} availableServices={availableServices} disabled={isSaving || !canWrite} />
 
       </ReadOnlyFieldset>
 
-      {/* Outside the fieldset — see ReadOnlyFieldset. */}
       <Box>
         <Stack direction='row' spacing={2}>
           <Button variant='outlined' onClick={() => navigate('/edit')} disabled={isSaving}>

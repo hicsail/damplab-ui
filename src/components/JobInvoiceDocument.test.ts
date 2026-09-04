@@ -34,3 +34,36 @@ describe('buildInvoicePricingNote', () => {
     expect(buildInvoicePricingNote({ unitCost: 10, multiplier: 2.5, cost: 25 })).toBe('$10.00 x 2.5 = $25.00');
   });
 });
+
+describe('buildInvoicePricingNote: parameter-priced lines', () => {
+  const details = [
+    { label: 'Instrument: Bioanalyzer', quantity: 1, unitPrice: 100, total: 100 },
+    { label: 'Hours in use', quantity: 3, unitPrice: 40, total: 120 }
+  ];
+
+  it('itemises the selections on a line with no multiplier to describe', () => {
+    // The gap this closes: multiplier 1 suppressed the "x N =" form, so the
+    // customer saw a bare $220.00 and no indication of what drove it.
+    expect(buildInvoicePricingNote({ cost: 220, unitCost: 220, multiplier: 1, pricingDetails: details })).toBe(
+      'Instrument: Bioanalyzer — 1 x $100.00 = $100.00\nHours in use — 3 x $40.00 = $120.00'
+    );
+  });
+
+  it('shows the itemisation above the multiplier when a line has both', () => {
+    const note = buildInvoicePricingNote({ cost: 440, unitCost: 220, multiplier: 2, pricingDetails: details });
+    expect(note.split('\n')).toEqual([
+      'Instrument: Bioanalyzer — 1 x $100.00 = $100.00',
+      'Hours in use — 3 x $40.00 = $120.00',
+      '$220.00 x 2 = $440.00'
+    ]);
+  });
+
+  it('says nothing at all for a line with neither, exactly as before', () => {
+    expect(buildInvoicePricingNote({ cost: 350, unitCost: 350, multiplier: 1 })).toBe('');
+    expect(buildInvoicePricingNote({ cost: 350, unitCost: 350, multiplier: 1, pricingDetails: [] })).toBe('');
+  });
+
+  it('skips a row with no label rather than printing a dangling dash', () => {
+    expect(buildInvoicePricingNote({ cost: 10, multiplier: 1, pricingDetails: [{ label: '  ', quantity: 1, unitPrice: 10, total: 10 }] })).toBe('');
+  });
+});

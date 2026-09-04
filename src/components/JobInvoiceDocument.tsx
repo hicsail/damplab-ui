@@ -245,25 +245,42 @@ function splitAddressLines(addr: string | undefined | null): { line1: string; li
  *
  * The two documents describe the same figures, so they have to describe them the
  * same way: buildFeeSchedule (damplab-backend/src/sow/sow-field-calculator.ts)
- * prints "$50.00 x 4 = $200.00", and so does this.
- *
- * The null guard is the important half. `unitCost` and `multiplier` are optional
- * on both the SOW line and the invoice line — absent on anything written before
- * unit prices were recorded — and a unit price of 0 is legitimate, so "absent"
- * and "free" must stay distinguishable. A line with no breakdown quotes its
- * total and says nothing more, rather than deriving a unit price by dividing and
- * inventing a figure no document ever stated.
+ * prints "$50.00 x 4 = $200.00" and itemises a parameter-priced line beneath it,
+ * and so does this.
  */
 export function buildInvoicePricingNote(row: any): string {
+  const lines: string[] = [];
+
+  // What the unit price was made of, for a parameter-priced line.
+  //
+  // The multiplier form below is suppressed at a multiplier of 1, which is the
+  // normal case for a service priced off its selected options — so such a line
+  // printed its total and nothing else, and the customer could not see what they
+  // were being billed for. These rows say the same thing the SOW's Fee Schedule
+  // now says, in the same order.
+  const details = Array.isArray(row?.pricingDetails) ? row.pricingDetails : [];
+  for (const detail of details) {
+    const label = String(detail?.label ?? '').trim();
+    if (!label) continue;
+    lines.push(`${label} — ${formatMultiplier(Number(detail?.quantity) || 0)} x ${formatCurrency(Number(detail?.unitPrice) || 0)} = ${formatCurrency(Number(detail?.total) || 0)}`);
+  }
+
+  // The null guard is the important half. `unitCost` and `multiplier` are optional
+  // on both the SOW line and the invoice line — absent on anything written before
+  // unit prices were recorded — and a unit price of 0 is legitimate, so "absent"
+  // and "free" must stay distinguishable. A line with no breakdown quotes its
+  // total and says nothing more, rather than deriving a unit price by dividing and
+  // inventing a figure no document ever stated.
   const unitCost = row?.unitCost;
   const multiplier = Number(row?.multiplier);
-  if (unitCost == null || !Number.isFinite(multiplier) || multiplier === 1) return '';
+  if (unitCost != null && Number.isFinite(multiplier) && multiplier !== 1) {
+    lines.push(`${formatCurrency(Number(unitCost))} x ${formatMultiplier(multiplier)} = ${formatCurrency(Number(row?.cost) || 0)}`);
+    // The run count is the commonest multiplier by far, and naming it is the
+    // difference between "x 4" and "x 4 runs".
+    const runCount = Number(row?.runCount);
+    if (Number.isFinite(runCount) && runCount > 1) lines.push(`${RUN_COUNT_PARAM_NAME}: ${runCount}`);
+  }
 
-  const lines = [`${formatCurrency(Number(unitCost))} x ${formatMultiplier(multiplier)} = ${formatCurrency(Number(row?.cost) || 0)}`];
-  // The run count is the commonest multiplier by far, and naming it is the
-  // difference between "x 4" and "x 4 runs".
-  const runCount = Number(row?.runCount);
-  if (Number.isFinite(runCount) && runCount > 1) lines.push(`${RUN_COUNT_PARAM_NAME}: ${runCount}`);
   return lines.join('\n');
 }
 
@@ -289,10 +306,8 @@ export interface JobInvoiceDocumentProps {
       description?: string | null;
       cost: number;
       category?: string | null;
-      pricingMode?: 'SERVICE' | 'PARAMETER' | null;
-      parameters?: any;
-      formData?: any;
-      pricingDetails?: Array<{ label: string; quantity: number; unitPrice: number; total: number }>;
+      /** How the unit price was arrived at, for a parameter-priced line. */
+      pricingDetails?: Array<{ label: string; quantity: number; unitPrice: number; total: number }> | null;
     }>;
     subtotal?: number | null;
     adjustments?: Array<{

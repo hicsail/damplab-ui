@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Chip, Divider, ListItemText, MenuItem, Select, Typography } from '@mui/material';
+import { Box, Button, Chip, Divider, ListItemText, MenuItem, Select, Typography } from '@mui/material';
 import { JobVersionLike, jobStateColor, jobVersionChip, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
 import { formatSOWInstant } from '../utils/sowDateUtils';
 
@@ -21,6 +21,21 @@ interface Props {
     onBaselineChange: (versionNumber: number | null) => void;
     /** Compact spacing for the canvas panel, where horizontal room is scarce. */
     dense?: boolean;
+    /**
+     * Restore the version being viewed, or undefined to offer no such button.
+     *
+     * Whether restoring is allowed at all is the caller's to decide — it turns on
+     * job state and role (`canRevertVersions`), which this component has no view
+     * of. Whether the *viewed* version is old enough to restore is decided here,
+     * from the same `viewing` number the picker renders, so the two can never
+     * disagree. That matters on the job pages, which pass
+     * `viewingVersion ?? latest?.versionNumber` rather than seeding state: a
+     * caller comparing its own raw `viewingVersion` against the latest would show
+     * the button on first paint and hide it after the first interaction.
+     */
+    onRestore?: () => void;
+    /** True while a restore is in flight, so the button can say so and refuse a second click. */
+    restoring?: boolean;
 }
 
 /** Lab-timezone date and clock time, matching SowVersionHistory. */
@@ -72,7 +87,7 @@ function VersionChips({ version }: { version: JobVersionLike }): React.JSX.Eleme
     );
 }
 
-export default function JobVersionHistory({ versions, viewing, baseline, onViewingChange, onBaselineChange, dense }: Props): React.JSX.Element | null {
+export default function JobVersionHistory({ versions, viewing, baseline, onViewingChange, onBaselineChange, dense, onRestore, restoring }: Props): React.JSX.Element | null {
     if (!versions.length) return null;
 
     const ordered = [...versions].sort((a, b) => b.versionNumber - a.versionNumber);
@@ -83,6 +98,11 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
     // Render it as "Nothing" rather than letting the Select go blank on a value
     // it cannot match.
     const selectableBaseline = older.some((v) => v.versionNumber === baseline) ? baseline : null;
+
+    // Restoring the newest version is a no-op that would still append a version,
+    // so the button appears only on a prior one — every prior one, events and
+    // drafts alike.
+    const canRestoreViewed = onRestore != null && ordered.length > 0 && ordered[0].versionNumber !== viewing;
 
     return (
         <Box sx={{ display: 'flex', gap: dense ? 0.75 : 1, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -115,6 +135,20 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
                     </MenuItem>
                 ))}
             </Select>
+
+            {/* Restoring is a contract write like any other, so it is offered only
+                where the server would accept the save — see canRevertVersions. */}
+            {canRestoreViewed && (
+                <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={restoring}
+                    onClick={onRestore}
+                    sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}
+                >
+                    {restoring ? 'Restoring…' : 'Restore this version'}
+                </Button>
+            )}
 
             <Divider orientation="vertical" flexItem />
             <Typography variant="body2" color="text.secondary">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allLineIndexes, buildInvoiceServiceSelections, toggleLineIndex } from './invoiceSelection';
+import { allLineIndexes, billedLineIndexes, buildInvoiceServiceSelections, toggleLineIndex, unbilledLineIndexes } from './invoiceSelection';
 
 // Two lines share a serviceId at different prices — the shape that used to gang
 // the checkboxes together and collapse onto one line server-side.
@@ -57,5 +57,37 @@ describe('buildInvoiceServiceSelections', () => {
 
   it('refuses a line with no identifier to check against', () => {
     expect(() => buildInvoiceServiceSelections([{ name: 'Mystery' }], [0])).toThrow(/no identifier/);
+  });
+});
+
+describe('lines an earlier invoice already covers', () => {
+  const priorInvoice = { invoiceNumber: '04217-001', sowVersionNumber: 1000, services: [{ sourceIndex: 0 }, { sourceIndex: 2 }] };
+
+  it('maps each billed position to the invoice that billed it', () => {
+    const billed = billedLineIndexes([priorInvoice], 1000);
+    expect([...billed.entries()]).toEqual([
+      [0, '04217-001'],
+      [2, '04217-001']
+    ]);
+  });
+
+  it('ticks only what is left when it opens', () => {
+    // "Every line" is the one selection guaranteed to be refused once a job has
+    // been part-invoiced.
+    expect(unbilledLineIndexes(lines, billedLineIndexes([priorInvoice], 1000))).toEqual([1]);
+  });
+
+  it('ignores an invoice billed from a different SOW version, because positions are not comparable', () => {
+    expect(billedLineIndexes([priorInvoice], 2000).size).toBe(0);
+    expect(unbilledLineIndexes(lines, billedLineIndexes([priorInvoice], 2000))).toEqual(allLineIndexes(lines));
+  });
+
+  it('ignores an invoice written before positions were recorded', () => {
+    const legacy = { invoiceNumber: '04217-000', sowVersionNumber: 1000, services: [{ serviceId: 'a' } as any] };
+    expect(billedLineIndexes([legacy], 1000).size).toBe(0);
+  });
+
+  it('treats a SOW with no version in force as nothing proven', () => {
+    expect(billedLineIndexes([priorInvoice], null).size).toBe(0);
   });
 });
