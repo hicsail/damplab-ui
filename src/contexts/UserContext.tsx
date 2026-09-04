@@ -66,23 +66,43 @@ async function fetchPermissions(
    * boolean — so the authenticated path deliberately does not ask for it.
    */
   includeRoles = false
-): Promise<{ effective: string[]; asCustomer: string[]; roles: string[] } | null> {
+): Promise<{ effective: string[]; asCustomer: string[]; roles: string[]; customerCategory?: CustomerCategory } | null> {
   const endpoint = import.meta.env.VITE_BACKEND;
   if (!endpoint) return null;
-  try {
+
+  const ask = async (withCustomerCategory: boolean): Promise<any | null> => {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ query: `{ myPermissions { effective asCustomer${includeRoles ? ' roles' : ''} } }` }),
+      body: JSON.stringify({
+        query: `{ myPermissions { effective asCustomer${includeRoles ? ' roles' : ''}${withCustomerCategory ? ' customerCategory' : ''} } }`,
+      }),
     });
     if (!res.ok) return null;
     const body = await res.json();
-    const permissions = body?.data?.myPermissions;
+    // An unknown field fails the whole query, not just that field — which would
+    // drop the caller to the legacy staff boolean. Treat any error as "this
+    // backend may be older" and let the caller retry without the new field.
+    if (body?.errors?.length) return null;
+    return body?.data?.myPermissions ?? null;
+  };
+
+  try {
+    // `customerCategory` is newer than some deployed backends. Asking for it and
+    // falling back keeps a UI that reaches an older server from losing its
+    // permissions entirely, which is the failure the `roles` field is gated
+    // against above.
+    const permissions = (await ask(true)) ?? (await ask(false));
     if (!permissions) return null;
-    return { effective: permissions.effective ?? [], asCustomer: permissions.asCustomer ?? [], roles: permissions.roles ?? [] };
+    return {
+      effective: permissions.effective ?? [],
+      asCustomer: permissions.asCustomer ?? [],
+      roles: permissions.roles ?? [],
+      customerCategory: permissions.customerCategory ?? undefined,
+    };
   } catch (error) {
     console.error('Failed to fetch permissions:', error);
     return null;
@@ -188,10 +208,20 @@ async function initKeycloak(): Promise<UserProps | null> {
     const allGroupLikeClaims = [...roles, ...groups];
     const isInternalCustomer = isInternalCustomerClaims(allGroupLikeClaims);
     const isExternalCustomer = isExternalCustomerClaims(allGroupLikeClaims);
-    const customerCategory = deriveCustomerCategory(allGroupLikeClaims);
+    const tokenCustomerCategory = deriveCustomerCategory(allGroupLikeClaims);
     // Same top-level await as the Keycloak init, so permissions are known before
     // any component renders and the route guards stay two-state.
     const permissions = keycloak.authenticated ? await fetchPermissions(keycloak.token) : null;
+    // The server's answer wins.
+    //
+    // Pricing lives on Keycloak *groups*, and groups reach a token only when the
+    // realm's client carries a Group Membership mapper — nothing in either
+    // package configures or can verify that. Deriving from the token alone
+    // therefore showed, say, an academic customer the fallback price on the
+    // canvas while the SOW billed them correctly, because the server resolves the
+    // same question against the Admin API. The token derivation stays as the
+    // fallback for an older backend that cannot answer.
+    const customerCategory = permissions?.customerCategory ?? tokenCustomerCategory;
     return {
       isAuthenticated: keycloak.authenticated,
       isDamplabStaff: keycloak.realmAccess?.roles.includes("damplab-staff"),

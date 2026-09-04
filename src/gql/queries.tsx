@@ -1830,6 +1830,13 @@ export const SOW_VERSION_FIELDS = gql`
         unitCost
         multiplier
         runCount
+        category
+        pricingDetails {
+          label
+          quantity
+          unitPrice
+          total
+        }
       }
       adjustments {
         type
@@ -1863,6 +1870,13 @@ export const GET_SOW_EDITOR_STATE = gql`
         unitCost
         multiplier
         runCount
+        category
+        pricingDetails {
+          label
+          quantity
+          unitPrice
+          total
+        }
       }
       actionGate {
         canSend

@@ -94,6 +94,7 @@ export default function Dashboard() {
 
   const { data, loading, error, refetch } = useQuery(JOBS_FOR_VIEWER, {
     variables: { input },
+    fetchPolicy: 'cache-and-network',
   });
 
   // Filter sources. Both are jobs:view-all queries, so skipped for a client —

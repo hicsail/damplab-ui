@@ -61,6 +61,10 @@ export interface SowVersionService {
   multiplier?: number | null;
   /** The run count alone. Superseded by `multiplier`; still returned for older documents. */
   runCount?: number | null;
+  /** Category of the service, carried so an invoice billed from a version can state it. */
+  category?: string | null;
+  /** How `unitCost` was arrived at, for a parameter-priced line. Rendered under the line on both documents. */
+  pricingDetails?: Array<{ label: string; quantity: number; unitPrice: number; total: number }> | null;
 }
 
 /** The multiplier a line actually applies, defaulting to 1 on anything unset or nonsensical. */
