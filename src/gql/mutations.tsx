@@ -204,6 +204,40 @@ export const RESPOND_TO_JOB_REVIEW = gql`
   }
 `;
 
+/** Job owner only. Decline the workflow the lab asked you to approve. Returns the job to the lab; not terminal. */
+export const REJECT_JOB_REVIEW = gql`
+  mutation RejectJobReview($input: RejectJobReviewInput!) {
+    rejectJobReview(input: $input) {
+      id
+      state
+      customerActionRequired
+    }
+  }
+`;
+
+/** Job owner only. Cancel the job outright. Allowed until the SOW is countersigned. */
+export const CANCEL_JOB = gql`
+  mutation CancelJob($input: CancelJobInput!) {
+    cancelJob(input: $input) {
+      id
+      state
+      customerActionRequired
+    }
+  }
+`;
+
+/** Job owner only. Ask the lab for edit access. Grants nothing — staff still decide. */
+export const REQUEST_JOB_EDIT_ACCESS = gql`
+  mutation RequestJobEditAccess($input: RequestJobEditAccessInput!) {
+    requestJobEditAccess(input: $input) {
+      id
+      state
+      customerActionRequired
+      editAccessRequestedAt
+    }
+  }
+`;
+
 export const WITHDRAW_JOB_FROM_CUSTOMER = gql`
   mutation WithdrawJobFromCustomer($input: WithdrawJobInput!) {
     withdrawJobFromCustomer(input: $input) {
@@ -243,6 +277,18 @@ export const RESTORE_JOB_VERSION = gql`
 export const WITHDRAW_SOW_FROM_CUSTOMER = gql`
   mutation WithdrawSowFromCustomer($sowId: ID!, $reason: String!) {
     withdrawSowFromCustomer(sowId: $sowId, reason: $reason) {
+      id
+      status
+      currentVersionNumber
+      activeVersionNumber
+    }
+  }
+`;
+
+/** Job owner only. Decline to sign the SOW in force; it returns to the lab as an editable draft. */
+export const DECLINE_SOW = gql`
+  mutation DeclineSow($sowId: ID!, $reason: String!) {
+    declineSow(sowId: $sowId, reason: $reason) {
       id
       status
       currentVersionNumber

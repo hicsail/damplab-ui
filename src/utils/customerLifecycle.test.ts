@@ -88,7 +88,7 @@ describe('deriveCustomerLifecycle', () => {
   it.each([
     ['SIGNED', 'SOW_SIGNED'],
     ['FINAL', 'SOW_FINALIZED'],
-    ['CANCELLED', 'SOW_WITHDRAWN']
+    ['CANCELLED', 'SOW_CANCELLED']
   ] as const)('maps active %s to %s without an action', (status, key) => {
     expect(
       deriveCustomerLifecycle({
@@ -97,6 +97,19 @@ describe('deriveCustomerLifecycle', () => {
         signBlockers: []
       })
     ).toMatchObject({ key, primaryAction: null });
+  });
+
+  it('calls a cancelled Statement of Work cancelled, not withdrawn', () => {
+    // Withdrawing and cancelling are different operations, and the Statement of
+    // Work card labels this status "Cancelled" on both the staff and the client
+    // page. The Job card above it has to agree.
+    const result = deriveCustomerLifecycle({
+      state: 'ACCEPTED',
+      activeSow: { status: 'CANCELLED', visibleToCustomer: true },
+      signBlockers: []
+    });
+    expect(result.title).toMatch(/cancelled/i);
+    expect(`${result.title} ${result.body}`).not.toMatch(/withdrawn/i);
   });
 
   it('states that the lab could not accept a rejected request', () => {

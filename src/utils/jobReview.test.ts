@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildEditAccessRequestInput,
+  buildReasonedJobInput,
   buildReviewInput,
   buildReviewResponseInput,
   refreshReviewSurfaces,
@@ -146,5 +148,45 @@ describe('refreshReviewSurfaces', () => {
     releaseEditorState();
     await refresh;
     expect(completed).toBe(true);
+  });
+});
+
+describe('buildReasonedJobInput', () => {
+  it('trims the identifiers and the reason', () => {
+    expect(buildReasonedJobInput({ operationId: '  reject-1 ', jobId: ' job-1  ', reason: '  The volumes are wrong.  ' }, 'rejecting')).toEqual({
+      operationId: 'reject-1',
+      jobId: 'job-1',
+      reason: 'The volumes are wrong.'
+    });
+  });
+
+  it.each(['rejecting', 'cancelling'] as const)('requires a nonblank reason when %s', (action) => {
+    for (const reason of [undefined, null, '', '   ']) {
+      expect(() => buildReasonedJobInput({ operationId: 'op-1', jobId: 'job-1', reason }, action)).toThrow(/reason is required/i);
+    }
+  });
+
+  it('names the action in the error, so the dialog can surface it as-is', () => {
+    expect(() => buildReasonedJobInput({ operationId: 'op-1', jobId: 'job-1', reason: ' ' }, 'cancelling')).toThrow(/cancelling/);
+  });
+});
+
+describe('buildEditAccessRequestInput', () => {
+  it('omits the message entirely when none was typed — asking is not a justification', () => {
+    for (const message of [undefined, null, '', '   ']) {
+      expect(buildEditAccessRequestInput({ operationId: 'op-1', jobId: 'job-1', message })).toEqual({ operationId: 'op-1', jobId: 'job-1' });
+    }
+  });
+
+  it('trims and keeps a message that was typed', () => {
+    expect(buildEditAccessRequestInput({ operationId: 'op-1', jobId: 'job-1', message: '  add a sample ' })).toEqual({
+      operationId: 'op-1',
+      jobId: 'job-1',
+      message: 'add a sample'
+    });
+  });
+
+  it('still requires the identifiers', () => {
+    expect(() => buildEditAccessRequestInput({ operationId: '  ', jobId: 'job-1' })).toThrow(/Operation ID/);
   });
 });

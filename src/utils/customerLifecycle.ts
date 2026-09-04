@@ -14,7 +14,7 @@ export type CustomerLifecycleKey =
   | 'SOW_STATUS_UNAVAILABLE'
   | 'SOW_SIGNED'
   | 'SOW_FINALIZED'
-  | 'SOW_WITHDRAWN'
+  | 'SOW_CANCELLED'
   | 'CREATING'
   | 'SUBMITTED'
   | 'WAITING_FOR_SOW'
@@ -22,6 +22,7 @@ export type CustomerLifecycleKey =
   | 'IN_PROGRESS'
   | 'COMPLETE'
   | 'CLOSED'
+  | 'CANCELLED'
   | 'REJECTED'
   | 'UNKNOWN';
 
@@ -95,7 +96,12 @@ function activeSowLifecycle(input: CustomerLifecycleInput): CustomerLifecycleRes
     case 'FINAL':
       return result('SOW_FINALIZED', 'Statement of Work finalized', 'The Statement of Work has been finalized.');
     case 'CANCELLED':
-      return result('SOW_WITHDRAWN', 'Statement of Work withdrawn', 'This Statement of Work was withdrawn and is not available to sign.');
+      // "Cancelled", not "withdrawn": both are real operations here, and they are
+      // not the same one — withdrawing pulls a version back for revision, and the
+      // client is told to expect a new one. Calling a cancellation a withdrawal
+      // left the Job card contradicting the Statement of Work card directly below
+      // it, which labels this same status "Cancelled" on both pages.
+      return result('SOW_CANCELLED', 'Statement of Work cancelled', 'This Statement of Work was cancelled and is no longer available to sign.');
     default:
       return result('SOW_STATUS_UNAVAILABLE', 'Statement of Work status unavailable', 'The Statement of Work status is unavailable. Reload this job before continuing.');
   }
@@ -129,6 +135,8 @@ export function deriveCustomerLifecycle(input: CustomerLifecycleInput): Customer
       return result('COMPLETE', 'Work complete', 'The lab has completed the work for this job.');
     case 'CLOSED':
       return result('CLOSED', 'Job closed', 'This job has been closed.');
+    case 'CANCELLED':
+      return result('CANCELLED', 'Job cancelled', 'You cancelled this job. Contact the lab if you want to start it again.');
     case 'REJECTED':
       return result('REJECTED', 'Request not accepted', 'The lab could not accept this request.');
     default:

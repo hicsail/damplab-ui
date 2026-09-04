@@ -26,7 +26,10 @@ import { SowField, SowVersionInputs, isCustomField } from './sowTypes';
 interface Props {
   field: SowField;
   inputs: SowVersionInputs;
-  staff: Array<{ id: string; displayName: string }>;
+  /** Administrators only, for the Project Manager select. Threaded straight through. */
+  administrators: Array<{ id: string; displayName: string }>;
+  /** Administrators and Technicians, for the Project Lead select. Threaded straight through. */
+  projectLeads: Array<{ id: string; displayName: string }>;
   readOnly?: boolean;
   expanded: boolean;
   /** Keyed by field key so the parent can pass one stable function for every row. */
@@ -60,7 +63,7 @@ function firstLine(text: string): string {
   return line.replace(/^-\s*/, '');
 }
 
-function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, liveCustomerCategory, liveServices, stale, onRecalculate }: Props): React.JSX.Element {
+function SowFieldRow({ field, inputs, administrators, projectLeads, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, liveCustomerCategory, liveServices, stale, onRecalculate }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const key = field.key;
 
@@ -112,7 +115,7 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
             {diffKind && <Chip size="small" label={DIFF_CHIP[diffKind]} color="info" variant="outlined" />}
             {field.isOverridden && <Chip size="small" label="Raw Text Edited" color="warning" variant="outlined" />}
             {!field.isEnabled && <Chip size="small" label="Hidden from customer" variant="outlined" />}
-            {field.requiresInitials && <Chip size="small" label="Requires initials" color="secondary" variant="outlined" />}
+            {field.requiresInitials && field.allowsInitials !== false && <Chip size="small" label="Requires initials" color="secondary" variant="outlined" />}
           </Box>
           {!expanded && (
             <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.25 }} data-verbatim-text>
@@ -227,7 +230,8 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
               <SowFieldSourceControls
                 fieldKey={field.key}
                 inputs={inputs}
-                staff={staff}
+                administrators={administrators}
+                projectLeads={projectLeads}
                 disabled={readOnly || editing}
                 onChange={onChangeInputs}
                 liveCustomerCategory={liveCustomerCategory}
@@ -236,18 +240,24 @@ function SowFieldRow({ field, inputs, staff, readOnly, expanded, onToggleExpand,
             </Box>
           )}
 
-          <FormControlLabel
-            sx={{ mb: 1, display: 'flex' }}
-            control={
-              <Checkbox
-                size="small"
-                checked={field.requiresInitials}
-                disabled={readOnly}
-                onChange={(e) => changeField({ requiresInitials: e.target.checked })}
-              />
-            }
-            label={<Typography variant="body2">Ask the customer to initial this section when signing</Typography>}
-          />
+          {/* Not offered on Signatures: that section is the signature block, and
+              it is filtered out of the document the customer reads section by
+              section — so a flag here would demand initials for something they
+              are never shown, leaving a SOW nobody could sign. */}
+          {field.allowsInitials !== false && (
+            <FormControlLabel
+              sx={{ mb: 1, display: 'flex' }}
+              control={
+                <Checkbox
+                  size="small"
+                  checked={field.requiresInitials}
+                  disabled={readOnly}
+                  onChange={(e) => changeField({ requiresInitials: e.target.checked })}
+                />
+              }
+              label={<Typography variant="body2">Ask the customer to initial this section when signing</Typography>}
+            />
+          )}
 
           {!editing && diff?.kind === 'changed' && diff.parts ? (
             <Box sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>

@@ -15,6 +15,20 @@ export interface ReviewResponseInput {
   message?: string;
 }
 
+/** Reject and cancel both carry a required, customer-authored reason. */
+export interface ReasonedJobInput {
+  operationId: string;
+  jobId: string;
+  reason: string;
+}
+
+/** Asking for edit access; the note is optional because this is a question, not a justification. */
+export interface EditAccessRequestInput {
+  operationId: string;
+  jobId: string;
+  message?: string;
+}
+
 export type RetryOperationEvent =
   | { type: 'submit'; candidate: string }
   | { type: 'failure' }
@@ -144,6 +158,35 @@ export function buildReviewResponseInput(args: BuildReviewResponseInputArgs): Re
   // The action is explicit at this boundary so validation cannot infer it from
   // the editing flag. The backend input intentionally derives the authoritative
   // action from the job and accepts only operationId, jobId, and message.
+  return {
+    operationId: requiredId(args.operationId, 'Operation ID'),
+    jobId: requiredId(args.jobId, 'Job ID'),
+    ...(message ? { message } : {})
+  };
+}
+
+
+/**
+ * The two customer commands that refuse something.
+ *
+ * A reason is mandatory for both, and for the same reason a staff withdrawal
+ * needs one: the act hands work back to someone else and is posted into the
+ * shared comment thread, where an unexplained refusal is worse than none. The
+ * server enforces this too — this is the copy of the rule that lets the dialog
+ * disable its own confirm button rather than validating on click.
+ */
+export function buildReasonedJobInput(args: { operationId: string; jobId: string; reason?: string | null }, action: 'rejecting' | 'cancelling'): ReasonedJobInput {
+  const reason = optionalMessage(args.reason);
+  if (!reason) throw new Error(`A reason is required when ${action} this job.`);
+  return {
+    operationId: requiredId(args.operationId, 'Operation ID'),
+    jobId: requiredId(args.jobId, 'Job ID'),
+    reason
+  };
+}
+
+export function buildEditAccessRequestInput(args: { operationId: string; jobId: string; message?: string | null }): EditAccessRequestInput {
+  const message = optionalMessage(args.message);
   return {
     operationId: requiredId(args.operationId, 'Operation ID'),
     jobId: requiredId(args.jobId, 'Job ID'),

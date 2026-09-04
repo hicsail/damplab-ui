@@ -7,6 +7,9 @@ import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, 
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
+import EditNoteIcon                                   from '@mui/icons-material/EditNote';
+import { allLineIndexes, buildInvoiceServiceSelections, toggleLineIndex, type BillableServiceLine } from '../utils/invoiceSelection';
+import { formatGqlError } from '../utils/gqlError';
 import UndoIcon                                       from '@mui/icons-material/Undo';
 import CancelIcon                                     from '@mui/icons-material/Cancel';
 import ReceiptLongIcon                                from '@mui/icons-material/ReceiptLong';
@@ -17,7 +20,7 @@ import { JobSubmitterSummary, summarizeJobSubmitter }                           
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import { diffJobGraphs, latestContentVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, hasUnseenStaffEdits, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 
@@ -119,8 +122,27 @@ export default function TechnicianView() {
             setWorkflowName(wfs[0].name ?? '');
             setWorkflowState(wfs[0].state ?? '');
         }
-        const latest = latestContentVersion((job as any)?.versions ?? []);
-        if (latest) setViewingVersion((prev) => prev ?? latest.versionNumber);
+        // Land on the newest version, with its default comparison, every time the
+        // job reloads. This was `prev ?? latest`, which pinned the view to
+        // whatever was newest on first load: acting on the job and refreshing
+        // left the reader still looking at a superseded version, and a baseline
+        // they had picked by hand stayed selected against it.
+        //
+        // Safe to reset unconditionally because nothing polls this query — the
+        // data only changes when the reader refreshes or acts on the job, and in
+        // both cases the newest version is what they are asking to see.
+        //
+        // The newest *row*, not the newest edit: this was `latestContentVersion`,
+        // which skips state-change events, so a job whose last row is "Accepted"
+        // (5.3) reopened on the draft below it (5.1) and reported the job as still
+        // being drafted. Accepting is the thing the reader most wants to see, and
+        // the automatic baseline still skips events, so the diff below is
+        // unaffected — it resolves to the last version written by the other side.
+        const latest = latestVersion((job as any)?.versions ?? []);
+        if (latest) {
+            setViewingVersion(latest.versionNumber);
+            setBaselineVersionNumber(undefined);
+        }
     }, [data?.jobById]);
 
     const { data: sowByJobIdResult, loading: sowLoading, refetch: refetchSow } = useQuery(GET_SOW_BY_JOB_ID, {
@@ -271,36 +293,44 @@ export default function TechnicianView() {
     };
 
     const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-    const [selectedInvoiceServiceIds, setSelectedInvoiceServiceIds] = useState<string[]>([]);
+    // Positions in billableServices, not service ids: a job can use the same
+    // service twice, and those two lines have to be tickable independently.
+    const [selectedInvoiceLines, setSelectedInvoiceLines] = useState<number[]>([]);
+    const [invoiceError, setInvoiceError] = useState<string | null>(null);
+
+    // The lines the server will bill, which is what the picker has to list — the
+    // live `services` above can have drifted from the version in force.
+    const billableServices: BillableServiceLine[] = sowFullData?.billableServices ?? [];
 
     useEffect(() => {
-        const svcIds = (sowFullData?.services ?? []).map((s: any) => String(s?.id ?? '')).filter(Boolean);
-        setSelectedInvoiceServiceIds(svcIds);
-    }, [sowFullData?.services]);
+        setSelectedInvoiceLines(allLineIndexes(billableServices));
+    }, [sowFullData?.billableServices]);
 
     const openInvoiceDialog = () => {
         if (!sowFullData) return;
+        setInvoiceError(null);
         setInvoiceDialogOpen(true);
     };
     const closeInvoiceDialog = () => setInvoiceDialogOpen(false);
 
-    const toggleInvoiceService = (serviceId: string) => {
-        setSelectedInvoiceServiceIds((prev) =>
-            prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId]
-        );
+    const toggleInvoiceService = (index: number) => {
+        setSelectedInvoiceLines((prev) => toggleLineIndex(prev, index));
     };
 
     const submitCreateInvoice = async () => {
-        if (!id) return;
-        const serviceIds = selectedInvoiceServiceIds.filter(Boolean);
-        if (serviceIds.length === 0) return;
-        await createInvoice({
-            variables: {
-                input: { jobId: id as string, serviceIds }
-            }
-        });
-        await refetchInvoices();
-        setInvoiceDialogOpen(false);
+        if (!id || selectedInvoiceLines.length === 0) return;
+        setInvoiceError(null);
+        try {
+            const services = buildInvoiceServiceSelections(billableServices, selectedInvoiceLines);
+            await createInvoice({ variables: { input: { jobId: id as string, services } } });
+            await refetchInvoices();
+            setInvoiceDialogOpen(false);
+        } catch (err) {
+            // The server refuses a selection it cannot place exactly — most often
+            // because a workflow edit re-synced the SOW while this was open.
+            setInvoiceError(formatGqlError(err, 'Could not create the invoice.'));
+            await refetchSow();
+        }
     };
 
     const getParameterFiles = () => getJobParameterFiles(workflows);
@@ -342,6 +372,8 @@ export default function TechnicianView() {
                 return "The job was rejected by the DAMP Lab. The client will be asked to resubmit the job with changes.";
             case 'CLOSED':
                 return "This job has been closed out. It is no longer active in the lab monitor.";
+            case 'CANCELLED':
+                return "The client cancelled this job. Any Statement of Work was cancelled with it, and it is no longer active in the lab monitor.";
             default:
                 return "This job's state is not recognised.";
         }
@@ -386,8 +418,17 @@ export default function TechnicianView() {
         : undefined;
 
     // Paging back shows that version's own graph; the newest one is the live job.
-    const latest = latestContentVersion(versions);
+    //
+    // Keyed off the same newest row the picker lands on. Keying it off the newest
+    // *content* version instead would flip every accepted job to "historic" the
+    // moment the default landed on its trailing event row, quietly swapping the
+    // live graph for a snapshot that only happens to match it.
+    const latest = latestVersion(versions);
     const isHistoricVersion = latest != null && viewingVersion != null && viewingVersion !== latest.versionNumber;
+
+    // Whether accepting would bind the customer to edits they have never seen.
+    // The three conditions this turns on are spelled out at hasUnseenStaffEdits.
+    const customerHasNotSeenEdits = hasUnseenStaffEdits(versions);
     const cardWorkflows = isHistoricVersion ? versionWorkflowsAsCards(currentVersion?.workflows, services ?? []) : workflows;
 
     const workflowCard = (
@@ -489,7 +530,7 @@ export default function TechnicianView() {
                         variant="outlined"
                         color="warning"
                         onClick={handleCloseJob}
-                        disabled={!jobData || jobState === 'CLOSED' || closingJob}
+                        disabled={!jobData || jobState === 'CLOSED' || jobState === 'CANCELLED' || closingJob}
                         sx={{ textTransform: 'none' }}
                     >
                         {jobState === 'CLOSED' ? 'Job closed' : closingJob ? 'Closing…' : 'Close job'}
@@ -570,7 +611,7 @@ export default function TechnicianView() {
                                 size="small"
                                 startIcon={<AccountTreeIcon sx={{ transform: 'rotate(90deg) scaleY(-1)' }} />}
                                 onClick={() => navigate(`/job_editor/${id}`)}
-                                disabled={jobState === 'CLOSED'}
+                                disabled={jobState === 'CLOSED' || jobState === 'CANCELLED'}
                                 sx={railBtnSx}
                             >
                                 View/Edit Job
@@ -586,6 +627,20 @@ export default function TechnicianView() {
                             >
                                 Review Job
                             </Button>
+                            {/* The client asked for the editor. Granting it is an
+                                ordinary review decision (Request edits), so this
+                                only says a request is outstanding — it is cleared
+                                by the next decision, whatever that decision is. */}
+                            {jobData?.editAccessRequestedAt && (
+                                <Chip
+                                    size="small"
+                                    color="warning"
+                                    variant="outlined"
+                                    icon={<EditNoteIcon />}
+                                    label="Client requested edit access"
+                                    sx={{ alignSelf: 'stretch' }}
+                                />
+                            )}
                             {jobState === 'CHANGES_REQUESTED' && (
                                 <Button variant="contained" size="small" color="warning" startIcon={<UndoIcon />} onClick={() => setWithdrawKind('customer')} disabled={withdrawing} sx={railBtnSx}>
                                     {withdrawing ? 'Withdrawing…' : 'Withdraw from customer'}
@@ -939,6 +994,7 @@ export default function TechnicianView() {
                     jobInstitution={jobInstitution}
                     jobTime={jobTime}
                     jobState={jobState}
+                    customerHasNotSeenEdits={customerHasNotSeenEdits}
                 />
                 <SowEditorModal
                     open={sowModalOpen}
@@ -953,13 +1009,31 @@ export default function TechnicianView() {
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                             Choose which SOW services to include on this invoice. This will create a saved invoice visible to the client.
                         </Typography>
-                        {(sowFullData?.services ?? []).map((s: any, idx: number) => {
-                            const sid = String(s?.id ?? '');
-                            const checked = selectedInvoiceServiceIds.includes(sid);
+                        {/* The prices below come from the Statement of Work in force
+                            with the client, which is what an invoice bills. When the
+                            job has been edited since, they will not match the Fee
+                            Schedule figures shown elsewhere on this page. */}
+                        {sowFullData?.documentStale && (
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                The job has changed since this Statement of Work was issued. These are the figures the client agreed to, which is what the invoice bills — not the job&rsquo;s current prices.
+                            </Alert>
+                        )}
+                        {invoiceError && (
+                            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setInvoiceError(null)}>
+                                {invoiceError}
+                            </Alert>
+                        )}
+                        {billableServices.length === 0 && (
+                            <Alert severity="warning">This Statement of Work has no service lines to invoice.</Alert>
+                        )}
+                        {billableServices.map((s: BillableServiceLine, idx: number) => {
+                            const checked = selectedInvoiceLines.includes(idx);
+                            // Keyed on position, not on serviceId — two lines of the
+                            // same service share an id and would collide as keys.
                             return (
-                                <Box key={sid || idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
+                                <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
                                     <FormControlLabel
-                                        control={<Checkbox checked={checked} onChange={() => toggleInvoiceService(sid)} />}
+                                        control={<Checkbox checked={checked} onChange={() => toggleInvoiceService(idx)} />}
                                         label={
                                             <Box>
                                                 <Typography variant="subtitle2">{s?.name ?? 'Service'}</Typography>
@@ -979,7 +1053,7 @@ export default function TechnicianView() {
                         <Button
                             variant="contained"
                             onClick={submitCreateInvoice}
-                            disabled={creatingInvoice || selectedInvoiceServiceIds.length === 0}
+                            disabled={creatingInvoice || selectedInvoiceLines.length === 0}
                         >
                             {creatingInvoice ? 'Creating...' : 'Create Invoice'}
                         </Button>

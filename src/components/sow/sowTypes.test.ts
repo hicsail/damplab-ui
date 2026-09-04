@@ -48,6 +48,8 @@ describe('SOW contract repair types', () => {
       sendBlockers: ['NO_DRAFT_TO_SEND'],
       canSign: true,
       signBlockers: [],
+      canDecline: true,
+      declineBlockers: [],
       canCountersign: false,
       countersignBlockers: ['AWAITING_CUSTOMER_SIGNATURE'],
       missingFields: []

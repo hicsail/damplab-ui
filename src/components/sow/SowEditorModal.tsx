@@ -8,7 +8,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_LAB_MONITOR_STAFF_LIST, GET_SOW_TEXT_PRESETS } from '../../gql/queries';
+import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_ADMINISTRATOR_STAFF_LIST, GET_PROJECT_LEAD_STAFF_LIST, GET_SOW_TEXT_PRESETS } from '../../gql/queries';
 import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW, RESTORE_SOW_SIGNED_VERSION } from '../../gql/mutations';
 import SowFieldRow from './SowFieldRow';
 import { SowTextPresetOption } from './SowPresetPicker';
@@ -115,8 +115,14 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     skip: !open || !jobId,
     fetchPolicy: 'network-only'
   });
-  const { data: staffData } = useQuery(GET_LAB_MONITOR_STAFF_LIST, { skip: !open });
-  const staff = staffData?.getLabMonitorStaffList ?? [];
+  // Both assignee fields are gated on access tier, not on the configurable
+  // lab-staff list (KEYCLOAK_LAB_STAFF_GROUP_NAMES, which also feeds the lab
+  // monitor's assignee dropdown): Project Manager is Administrators, Project
+  // Lead is Administrators and Technicians.
+  const { data: administratorData } = useQuery(GET_ADMINISTRATOR_STAFF_LIST, { skip: !open });
+  const administrators = administratorData?.administratorStaffList ?? [];
+  const { data: projectLeadData } = useQuery(GET_PROJECT_LEAD_STAFF_LIST, { skip: !open });
+  const projectLeads = projectLeadData?.projectLeadStaffList ?? [];
 
   // The whole library in one round-trip rather than one query per prose section.
   const { data: presetData } = useQuery(GET_SOW_TEXT_PRESETS, { skip: !open });
@@ -651,7 +657,8 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                     key={f.key}
                     field={f}
                     inputs={(onScreen?.inputs ?? inputs) as SowVersionInputs}
-                    staff={staff}
+                    administrators={administrators}
+                    projectLeads={projectLeads}
                     readOnly={readOnly}
                     expanded={expandedKey === f.key}
                     onToggleExpand={toggleExpand}

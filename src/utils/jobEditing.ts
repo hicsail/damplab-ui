@@ -76,6 +76,8 @@ export function editingBlockedMessage(job: JobEditingFacts | null | undefined): 
             return `Editing is not enabled for this job. ${seeComments}`;
         case 'CLOSED':
             return `This job is closed and can no longer be edited. ${seeComments}`;
+        case 'CANCELLED':
+            return `You cancelled this job, so it can no longer be edited. ${seeComments}`;
         default:
             return `This job is no longer open for edits. ${seeComments}`;
     }
@@ -105,6 +107,8 @@ export function staffEditBlockedReason(job: JobEditingFacts | null | undefined):
             return 'This job has been accepted and its Statement of Work is priced against that spec. Withdraw the acceptance before editing.';
         case 'CLOSED':
             return 'This job is closed and can no longer be edited.';
+        case 'CANCELLED':
+            return 'This job was cancelled by the client and can no longer be edited.';
         case 'REJECTED':
             return 'This job was not accepted and can no longer be edited.';
         default:
@@ -120,7 +124,7 @@ export function staffEditBlockedReason(job: JobEditingFacts | null | undefined):
  * assertWorkInFlightUntouched would refuse to re-service a started node.
  */
 export function canRevertVersions(job: JobEditingFacts | null | undefined, isStaff: boolean): boolean {
-    const started = ['QUEUED', 'IN_PROGRESS', 'COMPLETE', 'CLOSED', 'REJECTED'];
+    const started = ['QUEUED', 'IN_PROGRESS', 'COMPLETE', 'CLOSED', 'REJECTED', 'CANCELLED'];
     if (!job?.state || started.includes(job.state)) return false;
     return isStaff ? staffMayEdit(job) : customerMayEdit(job);
 }

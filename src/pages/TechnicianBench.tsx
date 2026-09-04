@@ -10,8 +10,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  FormControlLabel,
   Link as MuiLink,
   Stack,
+  Switch,
   Typography
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -50,6 +52,43 @@ const STATE_COLOR: Record<StateName, 'default' | 'warning' | 'success'> = {
 // Show in-progress first, then queued, then complete.
 const STATE_SORT: Record<StateName, number> = { IN_PROGRESS: 0, QUEUED: 1, COMPLETE: 2 };
 
+/** Remembers the "next only" choice across visits; the page has no other persisted state. */
+const NEXT_ONLY_KEY = 'bench:nextOnly';
+
+function readNextOnlyPreference(): boolean {
+  // Defaults to on: the whole point is that an unfiltered bench buries the one
+  // operation you can actually start.
+  try {
+    return localStorage.getItem(NEXT_ONLY_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * The operations to show when "next only" is on: per workflow, the earliest
+ * outstanding work that nothing upstream is blocking.
+ *
+ * `isReadyToStart` is resolved server-side over the whole workflow, because a
+ * blocking predecessor is routinely assigned to somebody else and so is absent
+ * from this list. An operation from a workflow the server did not answer for
+ * (`isReadyToStart` undefined — an older backend, or a node with no workflow) is
+ * kept rather than hidden: showing too much is a nuisance, hiding someone's work
+ * with no explanation is not.
+ */
+export function nextOperationsPerWorkflow(operations: any[]): any[] {
+  const taken = new Set<string>();
+  return operations.filter((op) => {
+    if (stateName(op.state) === 'COMPLETE') return false;
+    if (op.isReadyToStart === false) return false;
+    const key = op.workflowId ?? null;
+    if (key == null || op.isReadyToStart == null) return true;
+    if (taken.has(key)) return false;
+    taken.add(key);
+    return true;
+  });
+}
+
 /** Build a paramId -> display name lookup from a service's parameter definitions. */
 function paramNameLookup(parameters: any): Record<string, string> {
   const out: Record<string, string> = {};
@@ -85,11 +124,26 @@ export default function TechnicianBench() {
   // Optimistic per-node step overrides (nodeId -> stepIds). Falls back to server value.
   const [stepOverrides, setStepOverrides] = useState<Record<string, string[]>>({});
 
-  const operations: any[] = useMemo(() => {
+  const [nextOnly, setNextOnly] = useState(readNextOnlyPreference);
+  const handleNextOnlyChange = (value: boolean): void => {
+    setNextOnly(value);
+    try {
+      localStorage.setItem(NEXT_ONLY_KEY, String(value));
+    } catch {
+      // A browser refusing storage is not a reason to refuse the filter.
+    }
+  };
+
+  const allOperations: any[] = useMemo(() => {
     const ops = Array.isArray(data?.assignedOperations) ? [...data.assignedOperations] : [];
     ops.sort((a, b) => STATE_SORT[stateName(a.state)] - STATE_SORT[stateName(b.state)]);
     return ops;
   }, [data]);
+
+  // Sorted before filtering, so "the next one" in a workflow is the in-progress
+  // operation where there is one, and the queued one otherwise.
+  const operations = useMemo(() => (nextOnly ? nextOperationsPerWorkflow(allOperations) : allOperations), [allOperations, nextOnly]);
+  const hiddenCount = allOperations.length - operations.length;
 
   const handleStateChange = async (nodeId: string, newState: StateName) => {
     try {
@@ -124,6 +178,10 @@ export default function TechnicianBench() {
             Operations assigned to you. Open the linked protocol, check off steps, record notes and files, and mark work complete as you go.
           </Typography>
         </Box>
+        <FormControlLabel
+          control={<Switch size="small" checked={nextOnly} onChange={(e) => handleNextOnlyChange(e.target.checked)} />}
+          label={<Typography variant="body2">Next step only</Typography>}
+        />
         <Button variant="outlined" size="small" onClick={() => refetch()} sx={{ textTransform: 'none' }}>
           Refresh
         </Button>
@@ -143,8 +201,18 @@ export default function TechnicianBench() {
 
       {!loading && operations.length === 0 && (
         <Alert severity="info">
-          You have no operations assigned to you right now. Operations are assigned from the Lab Monitor.
+          {allOperations.length > 0
+            ? 'Nothing on your bench is ready to start — every operation assigned to you is waiting on earlier work, or is already complete. Turn off “Next step only” to see them all.'
+            : 'You have no operations assigned to you right now. Operations are assigned from the Lab Monitor.'}
         </Alert>
+      )}
+
+      {/* Says what the filter is holding back, so an unexpectedly short bench is
+          explained rather than mysterious. */}
+      {nextOnly && hiddenCount > 0 && operations.length > 0 && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          {hiddenCount} other operation{hiddenCount === 1 ? '' : 's'} hidden — completed work, and steps waiting on earlier ones.
+        </Typography>
       )}
 
       <Stack spacing={1.5}>

@@ -254,7 +254,7 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
     items: [
       {
         id: "customer-management",
-        label: "Customer Management",
+        label: "User Management",
         to: "/customer-management",
         visible: needs(PERMISSIONS.CustomersManage),
       },

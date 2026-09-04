@@ -134,6 +134,7 @@ export const GET_JOB_BY_ID = gql`
       customerCategory
       state
       customerActionRequired
+      editAccessRequestedAt
       handoverVersionNumber
       acceptedJobVersionNumber
       acceptedBillingFingerprint
@@ -212,6 +213,7 @@ export const GET_JOB_BY_ID = gql`
         isEvent
         createdAt
         createdByName
+        createdByOrg
         note
         workflows {
           workflowId
@@ -254,6 +256,7 @@ export const GET_OWN_JOB_BY_ID = gql`
       customerCategory
       state
       customerActionRequired
+      editAccessRequestedAt
       handoverVersionNumber
       acceptedJobVersionNumber
       acceptedBillingFingerprint
@@ -331,6 +334,7 @@ export const GET_OWN_JOB_BY_ID = gql`
         isEvent
         createdAt
         createdByName
+        createdByOrg
         note
         workflows {
           workflowId
@@ -404,6 +408,7 @@ export const JOBS_FOR_VIEWER = gql`
         archivedAt
         archivedBy
         archivedFromState
+        invoiceCount
         sow {
           id
           sowNumber
@@ -549,8 +554,8 @@ export const GET_WORKFLOWS_FOR_LAB_MONITOR = gql`
 
 // Lab monitor: only approved-job workflows, with nodes and service names (for service-level cards)
 export const GET_LAB_MONITOR_OPERATIONS = gql`
-  query GetLabMonitorOperations($state: WorkflowState!) {
-    getWorkflowsByStateForLabMonitor(state: $state) {
+  query GetLabMonitorOperations($state: WorkflowState!, $includeUnsignedSow: Boolean) {
+    getWorkflowsByStateForLabMonitor(state: $state, includeUnsignedSow: $includeUnsignedSow) {
       id
       state
       job {
@@ -580,8 +585,9 @@ export const GET_LAB_MONITOR_NODES = gql`
   query GetLabMonitorNodes(
     $nodeState: WorkflowNodeState!
     $archiveFilter: NodeArchiveFilter
+    $includeUnsignedSow: Boolean
   ) {
-    getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter) {
+    getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter, includeUnsignedSow: $includeUnsignedSow) {
       _id
       id
       label
@@ -615,6 +621,36 @@ export const GET_LAB_MONITOR_NODES = gql`
 export const GET_LAB_MONITOR_STAFF_LIST = gql`
   query GetLabMonitorStaffList {
     getLabMonitorStaffList {
+      id
+      displayName
+    }
+  }
+`;
+
+/**
+ * Administrators only, for the Statement of Work's Project Manager field.
+ *
+ * Its own query rather than a filter over GET_LAB_MONITOR_STAFF_LIST: that list
+ * is configurable (KEYCLOAK_LAB_STAFF_GROUP_NAMES, which includes technicians by
+ * default) and also fills the lab monitor's assignee dropdown, so narrowing it
+ * would have emptied that dropdown of every technician.
+ */
+export const GET_ADMINISTRATOR_STAFF_LIST = gql`
+  query AdministratorStaffList {
+    administratorStaffList {
+      id
+      displayName
+    }
+  }
+`;
+
+/**
+ * Administrators and Technicians, for the Statement of Work's Project Lead field.
+ * One tier wider than Project Manager, and narrower than the lab-staff list.
+ */
+export const GET_PROJECT_LEAD_STAFF_LIST = gql`
+  query ProjectLeadStaffList {
+    projectLeadStaffList {
       id
       displayName
     }
@@ -871,6 +907,9 @@ export const GET_SOW_BY_ID = gql`
         name
         description
         cost
+        unitCost
+        multiplier
+        runCount
         category
       }
       timeline {
@@ -927,7 +966,23 @@ export const GET_SOW_BY_JOB_ID = gql`
         name
         description
         cost
+        unitCost
+        multiplier
+        runCount
         category
+      }
+      # True when the job has moved since this document was issued, which is what
+      # makes the billed figures differ from the job's current ones.
+      documentStale
+      # What an invoice actually bills, in the order createInvoice indexes it.
+      # Distinct from the services field above, which is the live billing core:
+      # once a version is issued, invoices bill that frozen version instead, and
+      # the two disagreeing is exactly what documentStale reports.
+      billableServices {
+        serviceId
+        name
+        description
+        cost
       }
       timeline {
         startDate
@@ -968,6 +1023,8 @@ export const GET_SOW_BY_JOB_ID = gql`
       actionGate {
         canSign
         signBlockers
+        canDecline
+        declineBlockers
       }
       clientSignature {
         name
@@ -1005,6 +1062,9 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         name
         description
         cost
+        unitCost
+        multiplier
+        runCount
         category
       }
       subtotal
@@ -1052,6 +1112,8 @@ export const GET_ASSIGNED_OPERATIONS = gql`
       id
       label
       state
+      workflowId
+      isReadyToStart
       startedAt
       completedSteps
       additionalInstructions
@@ -1732,7 +1794,8 @@ export const SOW_VERSION_FIELDS = gql`
       isEnabled
       allowsTextOverride
       allowsEmpty
-      requiresInitials
+      allowsInitials
+    requiresInitials
     }
     inputs {
       projectManager
@@ -1797,6 +1860,8 @@ export const GET_SOW_EDITOR_STATE = gql`
         sendBlockers
         canSign
         signBlockers
+        canDecline
+        declineBlockers
         canCountersign
         countersignBlockers
         missingFields

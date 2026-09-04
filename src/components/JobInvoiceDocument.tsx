@@ -1,7 +1,7 @@
 import React from 'react';
 import { Document, Page, StyleSheet, View, Text, Image, Font } from '@react-pdf/renderer';
 import type { SOWData } from '../types/SOWTypes';
-import { RUN_COUNT_PARAM_ID, RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
+import { RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
 import type { CustomerCategory } from '../utils/customerCategory';
 
 Font.register({ family: 'Courier-New', fonts: [{ src: '/fonts/Courier-New.ttf' }] });
@@ -240,117 +240,36 @@ function splitAddressLines(addr: string | undefined | null): { line1: string; li
   return { line1: parts[0] ?? '', line2: parts.slice(1).join(', ') };
 }
 
-function normalizePricingMode(v: unknown): 'SERVICE' | 'PARAMETER' {
-  if (typeof v === 'string' && v.toUpperCase() === 'PARAMETER') return 'PARAMETER';
-  return 'SERVICE';
+/**
+ * The line's pricing basis, worded exactly as the SOW's Fee Schedule words it.
+ *
+ * The two documents describe the same figures, so they have to describe them the
+ * same way: buildFeeSchedule (damplab-backend/src/sow/sow-field-calculator.ts)
+ * prints "$50.00 x 4 = $200.00", and so does this.
+ *
+ * The null guard is the important half. `unitCost` and `multiplier` are optional
+ * on both the SOW line and the invoice line — absent on anything written before
+ * unit prices were recorded — and a unit price of 0 is legitimate, so "absent"
+ * and "free" must stay distinguishable. A line with no breakdown quotes its
+ * total and says nothing more, rather than deriving a unit price by dividing and
+ * inventing a figure no document ever stated.
+ */
+export function buildInvoicePricingNote(row: any): string {
+  const unitCost = row?.unitCost;
+  const multiplier = Number(row?.multiplier);
+  if (unitCost == null || !Number.isFinite(multiplier) || multiplier === 1) return '';
+
+  const lines = [`${formatCurrency(Number(unitCost))} x ${formatMultiplier(multiplier)} = ${formatCurrency(Number(row?.cost) || 0)}`];
+  // The run count is the commonest multiplier by far, and naming it is the
+  // difference between "x 4" and "x 4 runs".
+  const runCount = Number(row?.runCount);
+  if (Number.isFinite(runCount) && runCount > 1) lines.push(`${RUN_COUNT_PARAM_NAME}: ${runCount}`);
+  return lines.join('\n');
 }
 
-function formDataToMap(formData: unknown): Map<string, unknown> {
-  const m = new Map<string, unknown>();
-  if (Array.isArray(formData)) {
-    for (const e of formData as Array<{ id?: string; value?: unknown }>) {
-      if (e && typeof e.id === 'string') m.set(e.id, e.value);
-    }
-  } else if (formData && typeof formData === 'object') {
-    for (const [k, v] of Object.entries(formData as Record<string, unknown>)) {
-      m.set(k, v);
-    }
-  }
-  return m;
-}
-
-/** Price multiplier params: show entered value(s); if all numeric, note combined × factor like pricing engine. */
-function formatMultiplierNotes(parameters: any[] | undefined, formData: unknown): string[] {
-  const lines: string[] = [];
-  const map = formDataToMap(formData);
-
-  // The run count is composed onto nodes client-side and never stored in the
-  // service's own `parameters`, so the loop below cannot see it. Without this the
-  // invoice total is right but never says a line was multiplied — the same gap
-  // extractRunCount was written to close for the SOW view.
-  const runCount = map.get(RUN_COUNT_PARAM_ID);
-  const runCountNum = typeof runCount === 'number' ? runCount : typeof runCount === 'string' && runCount.trim() !== '' ? Number(runCount) : NaN;
-  const reportedRunCount = Number.isFinite(runCountNum) && runCountNum > 1;
-  if (reportedRunCount) lines.push(`${RUN_COUNT_PARAM_NAME}: ${runCountNum}`);
-
-  if (!Array.isArray(parameters)) return lines;
-  for (const p of parameters) {
-    // A service that declares the run count itself would otherwise be listed twice.
-    if (reportedRunCount && p?.id === RUN_COUNT_PARAM_ID) continue;
-    if (!p || p.isPriceMultiplier !== true || typeof p.id !== 'string') continue;
-    const raw = map.get(p.id);
-    if (raw === undefined || raw === null || raw === '') continue;
-    const label = typeof p.name === 'string' && p.name.trim() ? p.name.trim() : p.id;
-    const allowMulti = p.allowMultipleValues === true;
-    if (Array.isArray(raw)) {
-      const strs = raw.map((v) => (v === null || v === undefined ? '' : String(v))).filter((s) => s !== '');
-      if (!strs.length) continue;
-      const nums = raw.map((v) =>
-        typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN
-      );
-      const allNum = nums.every((n) => Number.isFinite(n));
-      if (allowMulti && allNum && nums.length > 1) {
-        const sum = nums.reduce((a, b) => a + b, 0);
-        lines.push(`${label}: ${strs.join(', ')} (×${sum} applied)`);
-      } else {
-        const multiNote = allowMulti && strs.length > 1 ? ' (multiple values)' : '';
-        lines.push(`${label}: ${strs.join(', ')}${multiNote}`);
-      }
-    } else {
-      lines.push(`${label}: ${String(raw)}`);
-    }
-  }
-  return lines;
-}
-
-function formatParameterPricingLines(
-  details:
-    | Array<{ label: string; quantity: number; unitPrice: number; total: number; kind?: 'option' | 'multiplier' }>
-    | undefined
-): string[] {
-  if (!Array.isArray(details) || !details.length) return [];
-  // Multiplier-kind entries are surfaced separately via formatMultiplierNotes
-  // (which has richer formatting for array/multi-value cases) — skip them here
-  // to avoid double-rendering in the invoice.
-  return details
-    .filter((d) => d.kind !== 'multiplier')
-    .map((d) => {
-      if (d.quantity > 1) {
-        return `${d.label}: ${d.quantity} × ${formatCurrency(d.unitPrice)} = ${formatCurrency(d.total)}`;
-      }
-      return `${d.label}: ${formatCurrency(d.total)}`;
-    });
-}
-
-/** PARAMETER mode: priced parameter lines + any multiplier params. SERVICE mode: multiplier lines only, or empty. */
-function buildInvoicePricingNote(row: any): string {
-  const mode = normalizePricingMode(row?.pricingMode);
-  const multLines = formatMultiplierNotes(row?.parameters, row?.formData);
-  if (mode === 'PARAMETER') {
-    const paramLines = formatParameterPricingLines(row?.pricingDetails);
-    return [...paramLines, ...multLines].join('\n').trim();
-  }
-  return multLines.join('\n').trim();
-}
-
-function matchSowService(invoiceLine: any, index: number, sowServices: any[] | undefined): any | null {
-  if (!Array.isArray(sowServices) || !sowServices.length) return null;
-  const sid = invoiceLine?.serviceId ?? invoiceLine?.id;
-  const byId = sowServices.find((s) => s && (String(s.id) === String(sid)));
-  if (byId) return byId;
-  return sowServices[index] ?? null;
-}
-
-function mergeLineForPricing(invoiceLine: any, index: number, sow: SOWData | null): any {
-  const sowSvc = sow?.services ? matchSowService(invoiceLine, index, sow.services as any[]) : null;
-  if (!sowSvc) return invoiceLine;
-  return {
-    ...invoiceLine,
-    pricingMode: sowSvc.pricingMode ?? invoiceLine.pricingMode,
-    parameters: sowSvc.parameters ?? invoiceLine.parameters,
-    formData: sowSvc.formData ?? invoiceLine.formData,
-    pricingDetails: sowSvc.pricingDetails ?? invoiceLine.pricingDetails,
-  };
+/** Trailing zeros off a multiplier, so "x 4" does not print as "x 4.00". */
+function formatMultiplier(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
 }
 
 export interface JobInvoiceDocumentProps {
@@ -533,7 +452,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
           </View>
 
           {services.map((s, idx) => {
-            const row = mergeLineForPricing(s, idx, sow);
+            const row = s;
             const rate = Number(row.cost) || 0;
             const amount = rate;
             const pricingNote = buildInvoicePricingNote(row);

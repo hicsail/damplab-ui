@@ -220,9 +220,9 @@ function nodesToItems(nodes: LabMonitorNode[]): LabMonitorItem[] {
   }));
 }
 
-function useLabMonitorNodes(nodeState: WorkflowNodeState, archiveFilter: 'ACTIVE' | 'ALL') {
+function useLabMonitorNodes(nodeState: WorkflowNodeState, archiveFilter: 'ACTIVE' | 'ALL', includeUnsignedSow: boolean) {
   const { data, loading, error } = useQuery<GetLabMonitorNodesResponse>(GET_LAB_MONITOR_NODES, {
-    variables: { nodeState, archiveFilter },
+    variables: { nodeState, archiveFilter, includeUnsignedSow },
     pollInterval: 15000,
   });
   const items = React.useMemo(
@@ -239,9 +239,9 @@ function useLabMonitorStaffList() {
   return data?.getLabMonitorStaffList ?? [];
 }
 
-function useWorkflows(state: WorkflowState) {
+function useWorkflows(state: WorkflowState, includeUnsignedSow: boolean) {
   const ops = useQuery<LabMonitorOpsResponse>(GET_LAB_MONITOR_OPERATIONS, {
-    variables: { state },
+    variables: { state, includeUnsignedSow },
     pollInterval: 15000,
   });
   const withJob = useQuery<WorkflowsResponse>(GET_WORKFLOWS_FOR_LAB_MONITOR, {
@@ -814,15 +814,27 @@ export default function LabMonitor() {
   const [showArchived, setShowArchived] = React.useState(false);
   const archiveFilter: 'ACTIVE' | 'ALL' = canArchive && showArchived ? 'ALL' : 'ACTIVE';
 
-  const nodeQueued = useLabMonitorNodes('QUEUED', archiveFilter);
-  const nodeRunning = useLabMonitorNodes('IN_PROGRESS', archiveFilter);
-  const nodeCompleted = useLabMonitorNodes('COMPLETE', archiveFilter);
+  /**
+   * The board shows only jobs whose Statement of Work is signed, so the lab never
+   * starts work the customer has not contracted for. Jobs with no SOW at all are
+   * hidden on the same reasoning — from the board's point of view "no contract"
+   * and "contract unsigned" are the same fact.
+   *
+   * This toggle is the way back to them. It exists because a job that never gets
+   * an SOW would otherwise be invisible here forever. The unattended Lab Status TV
+   * has no equivalent: there is nobody standing at it to turn it on.
+   */
+  const [showUnsignedSow, setShowUnsignedSow] = React.useState(false);
+
+  const nodeQueued = useLabMonitorNodes('QUEUED', archiveFilter, showUnsignedSow);
+  const nodeRunning = useLabMonitorNodes('IN_PROGRESS', archiveFilter, showUnsignedSow);
+  const nodeCompleted = useLabMonitorNodes('COMPLETE', archiveFilter, showUnsignedSow);
   const useNodeBased =
     !nodeQueued.error && !nodeRunning.error && !nodeCompleted.error;
 
-  const fallbackQueued = useWorkflows('QUEUED');
-  const fallbackRunning = useWorkflows('IN_PROGRESS');
-  const fallbackCompleted = useWorkflows('COMPLETE');
+  const fallbackQueued = useWorkflows('QUEUED', showUnsignedSow);
+  const fallbackRunning = useWorkflows('IN_PROGRESS', showUnsignedSow);
+  const fallbackCompleted = useWorkflows('COMPLETE', showUnsignedSow);
 
   const queued = useNodeBased
     ? { items: nodeQueued.items, loading: nodeQueued.loading, error: nodeQueued.error }
@@ -846,9 +858,9 @@ export default function LabMonitor() {
     () =>
       (['QUEUED', 'IN_PROGRESS', 'COMPLETE'] as const).map((nodeState) => ({
         query: GET_LAB_MONITOR_NODES,
-        variables: { nodeState, archiveFilter },
+        variables: { nodeState, archiveFilter, includeUnsignedSow: showUnsignedSow },
       })),
-    [archiveFilter],
+    [archiveFilter, showUnsignedSow],
   );
 
   const [changeNodeState] = useMutation(MUTATE_NODE_STATUS, {
@@ -1010,6 +1022,13 @@ export default function LabMonitor() {
                 label={<Typography variant="body2">Show archived</Typography>}
               />
             )}
+            {/* Offered to everyone who can see the board: a technician looking for
+                a job that is not here needs to be able to find out why. */}
+            <FormControlLabel
+              sx={{ mr: 1 }}
+              control={<Switch size="small" checked={showUnsignedSow} onChange={(e) => setShowUnsignedSow(e.target.checked)} />}
+              label={<Typography variant="body2">Show unsigned SOW</Typography>}
+            />
             <AccessTimeIcon sx={{ fontSize: 20 }} />
             <Typography variant="body2" sx={{ fontWeight: 500 }}>
               {time}

@@ -3,13 +3,19 @@ import type { JobReviewDecision } from '../utils/jobReview';
 /**
  * Wording for the accept option in the staff Review Job modal.
  *
- * Two independent facts about the job decide it:
+ * Three independent facts about the job decide it:
  *
  *  - *Whose spec is this?* SUBMITTED is the only state a job reaches because
  *    the customer affirmatively put a spec forward — it is what an initial
  *    submit and a resubmit both produce. From anywhere else staff are accepting
  *    on the customer's behalf: a job sitting in CHANGES_REQUESTED may hold
  *    edits the customer is still working on and has not handed back.
+ *  - *Has the lab edited it since?* A SUBMITTED job whose newest content version
+ *    is STAFF-authored is still, by its state, the customer's spec — but it is
+ *    no longer the spec they last saw. Staff can edit a submitted job without
+ *    handing it back, and accepting it then binds the customer to changes they
+ *    have never been shown. The state cannot express this, so the caller passes
+ *    it in; see `latestContentVersion` in utils/jobGraphDiff.
  *  - *Has it been accepted before?* Re-accepting an ACCEPTED job re-stamps the
  *    billing fingerprint that the SOW send gate compares against, which is how
  *    staff release a send that a later job edit locked.
@@ -21,20 +27,42 @@ export interface JobReviewLabels {
   acceptButton: string;
   /** Shown under the accept option to spell out its consequences, or null when there are none worth calling out. */
   acceptNote: string | null;
+  /**
+   * True when accepting would commit the customer to something they have not
+   * themselves put forward. The modal states this in red, above the choices,
+   * because it is the fact staff most need before deciding — not after.
+   */
+  onCustomersBehalf: boolean;
 }
 
 /** The state in which the job on screen is the spec the customer last put forward. */
 const CUSTOMER_SUBMITTED = 'SUBMITTED';
 
-export function jobReviewLabels(jobState: string | null | undefined): JobReviewLabels {
+/**
+ * @param customerHasNotSeenEdits True when the newest *content* version of a
+ *   SUBMITTED job was written by staff, i.e. the lab has edited it since the
+ *   customer last put it forward. Ignored in the other states, which already say
+ *   the acceptance is on the customer's behalf.
+ */
+export function jobReviewLabels(jobState: string | null | undefined, customerHasNotSeenEdits = false): JobReviewLabels {
   const onCustomersBehalf = jobState !== CUSTOMER_SUBMITTED;
   const isReAccept = jobState === 'ACCEPTED';
 
   if (!onCustomersBehalf) {
+    if (customerHasNotSeenEdits) {
+      return {
+        acceptOption: "Accept on the customer's behalf (ready to proceed)",
+        acceptButton: 'Accept Job',
+        acceptNote:
+          'The lab has edited this job since the customer submitted it, and they have not seen those edits. Accepting commits them to the workflow as it now stands. To let them see it first, request approval of edits below.',
+        onCustomersBehalf: true
+      };
+    }
     return {
       acceptOption: 'Accept job (ready to proceed)',
       acceptButton: 'Accept Job',
-      acceptNote: null
+      acceptNote: null,
+      onCustomersBehalf: false
     };
   }
 
@@ -43,7 +71,8 @@ export function jobReviewLabels(jobState: string | null | undefined): JobReviewL
       acceptOption: "Re-accept on the customer's behalf (ready to proceed)",
       acceptButton: 'Re-accept',
       acceptNote:
-        'Confirms the job as it now stands, without asking the customer again. This unlocks sending the Statement of Work. If the change should be the customer’s call, request edits below instead.'
+        'Confirms the job as it now stands, without asking the customer again. This unlocks sending the Statement of Work. If the change should be the customer’s call, request edits below instead.',
+      onCustomersBehalf: true
     };
   }
 
@@ -53,7 +82,8 @@ export function jobReviewLabels(jobState: string | null | undefined): JobReviewL
     acceptOption: "Accept on the customer's behalf (ready to proceed)",
     acceptButton: 'Accept Job',
     acceptNote:
-      'The customer still has this job open for editing, whether or not they have resubmitted it. Accepting takes it back and closes their editor. If the change should be their call, request edits below instead.'
+      'The customer still has this job open for editing, whether or not they have resubmitted it. Accepting takes it back and closes their editor. If the change should be their call, request edits below instead.',
+    onCustomersBehalf: true
   };
 }
 
@@ -80,8 +110,8 @@ export interface ReviewDecisionSpec {
   messageRequired: boolean;
 }
 
-export function reviewDecisions(jobState: string | null | undefined): ReviewDecisionSpec[] {
-  const accept = jobReviewLabels(jobState);
+export function reviewDecisions(jobState: string | null | undefined, customerHasNotSeenEdits = false): ReviewDecisionSpec[] {
+  const accept = jobReviewLabels(jobState, customerHasNotSeenEdits);
 
   return [
     {
@@ -119,8 +149,8 @@ export function reviewDecisions(jobState: string | null | undefined): ReviewDeci
   ];
 }
 
-export function reviewDecision(value: ReviewDecisionValue, jobState: string | null | undefined): ReviewDecisionSpec {
-  const found = reviewDecisions(jobState).find((d) => d.value === value);
+export function reviewDecision(value: ReviewDecisionValue, jobState: string | null | undefined, customerHasNotSeenEdits = false): ReviewDecisionSpec {
+  const found = reviewDecisions(jobState, customerHasNotSeenEdits).find((d) => d.value === value);
   if (!found) throw new Error(`Unknown review decision: ${value}`);
   return found;
 }

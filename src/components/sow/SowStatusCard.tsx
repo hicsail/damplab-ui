@@ -9,6 +9,10 @@ import SowPdfDocument from './SowPdfDocument';
 import SowSignaturesSummary from './SowSignaturesSummary';
 import StatusPaneHeader from '../technician/StatusPaneHeader';
 import { blockerStep, type DocumentBlocker, SowEditorState, sowStatusLabel, statusColor, versionDisplayLabel } from './sowTypes';
+// `v2`, not `2` — the status pane reads the prefix as part of the version, and
+// the customer's card labels its chip through the same function so the two pages
+// cannot drift apart on how a version is spelled.
+import { sowPartyVersionLabel as versionChipLabel } from '../../utils/technicianProcessStatus';
 import { cancelIsOffered, statusCardRepair } from './sowEditorView';
 import ReasonDialog from '../ReasonDialog';
 
@@ -111,13 +115,6 @@ export function useSowStaffStatus(jobId: string) {
     requestCancel: () => setConfirming('cancel'),
     dialog
   };
-}
-
-/** `v2`, not `2` — the status pane reads the prefix as part of the version. */
-function versionChipLabel(version: { versionNumber: number; displayVersion?: string | null } | null | undefined): string {
-  const label = version ? versionDisplayLabel(version) : '';
-  if (!label) return '—';
-  return label.startsWith('v') ? label : `v${label}`;
 }
 
 export function SowStatusSummary({

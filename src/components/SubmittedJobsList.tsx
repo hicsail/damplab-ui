@@ -7,6 +7,7 @@ import {
   CardContent,
   Chip,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   InputLabel,
@@ -15,6 +16,7 @@ import {
   Select,
   Skeleton,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -26,7 +28,7 @@ import FiberNewIcon from '@mui/icons-material/FiberNew';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
 import UnarchiveOutlinedIcon from '@mui/icons-material/UnarchiveOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
-import { sowStatusLabel } from './sow/sowTypes';
+import { jobListSectionChips } from '../utils/jobListSections';
 
 export interface JobListItem {
   id: string;
@@ -34,6 +36,12 @@ export interface JobListItem {
   state: string;
   submitted: string;
   sow?: { id: string; sowNumber: string; sowTitle?: string; status: string } | null;
+  /**
+   * Resolved server-side per row. Optional on the type, not on the wire: a
+   * backend without the field fails the whole query, so the caller has to be
+   * running one that has it.
+   */
+  invoiceCount?: number | null;
   username?: string;
   institute?: string;
   email?: string;
@@ -44,7 +52,22 @@ export interface JobListItem {
 }
 
 const PAGE_SIZE_OPTIONS = [10, 20, 25, 50] as const;
+
+/**
+ * Keeps a row tall enough for its section chips even when the left column is
+ * short — a client's rows carry no submitter lines, so without this the card
+ * shrank to the chips and they crowded the archive button.
+ */
+const CHIP_COLUMN_MIN_HEIGHT = 96;
 export const STATE_OPTIONS = ['', 'SUBMITTED', 'QUEUED', 'IN_PROGRESS', 'COMPLETE'];
+/**
+ * The states the list hides by default, mirroring the server's own set.
+ *
+ * Offered in the Status dropdown as well, because the toggle alone would hide
+ * them with no way to ask for one specifically — an explicit `state` filter
+ * overrides the exclusion server-side.
+ */
+export const CLOSED_STATE_OPTIONS = ['CLOSED', 'CANCELLED', 'REJECTED'];
 export type ArchiveFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
 export type JobScope = 'ALL' | 'CREATED_BY_ME' | 'WORKED_BY_ME';
 export const SCOPE_LABELS: Record<JobScope, string> = {
@@ -80,6 +103,9 @@ export interface SubmittedJobsListProps {
   onStateFilterChange: (value: string) => void;
   hasSowFilter: 'all' | 'yes' | 'no';
   onHasSowFilterChange: (value: 'all' | 'yes' | 'no') => void;
+  /** Closed-out jobs (CLOSED, CANCELLED, REJECTED) are hidden unless this is on. COMPLETE is unaffected. */
+  includeClosed?: boolean;
+  onIncludeClosedChange?: (value: boolean) => void;
   showHasSowFilter?: boolean;
   getJobLink: (job: JobListItem) => string;
   /**
@@ -149,6 +175,8 @@ export default function SubmittedJobsList({
   onArchiveToggle,
   archiveFilter,
   onArchiveFilterChange,
+  includeClosed,
+  onIncludeClosedChange,
   scope,
   onScopeChange,
   clientOptions,
@@ -246,7 +274,7 @@ export default function SubmittedJobsList({
           <InputLabel>Status</InputLabel>
           <Select value={stateFilter} label="Status" onChange={handleStateChange}>
             <MenuItem value="">All</MenuItem>
-            {STATE_OPTIONS.slice(1).map((s) => (
+            {[...STATE_OPTIONS.slice(1), ...CLOSED_STATE_OPTIONS].map((s) => (
               <MenuItem key={s} value={s}>
                 {s.replace('_', ' ')}
               </MenuItem>
@@ -303,6 +331,15 @@ export default function SubmittedJobsList({
               ))}
             </Select>
           </FormControl>
+        )}
+        {/* A visible control, not just a changed default: without it a closed
+            job would be unreachable from this page. */}
+        {onIncludeClosedChange && (
+          <FormControlLabel
+            sx={{ ml: 0 }}
+            control={<Switch size="small" checked={includeClosed === true} onChange={(e) => onIncludeClosedChange(e.target.checked)} />}
+            label={<Typography variant="body2">Show closed jobs</Typography>}
+          />
         )}
         {canArchive && archiveFilter && onArchiveFilterChange && (
           <FormControl size="small" sx={{ minWidth: 140 }}>
@@ -379,40 +416,49 @@ export default function SubmittedJobsList({
                         </>
                       )}
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      {isJobNew?.(job) ? (
-                        <Chip
-                          icon={<FiberNewIcon sx={{ fontSize: 16 }} />}
-                          label="New"
-                          size="small"
-                          color="error"
-                          variant="outlined"
-                        />
-                      ) : null}
-                      {job.isArchived && (
-                        <Chip
-                          icon={<Inventory2OutlinedIcon sx={{ fontSize: 16 }} />}
-                          label="Archived"
-                          size="small"
-                          color="warning"
-                          variant="outlined"
-                        />
-                      )}
-                      <Chip
-                        label={job.state ?? '—'}
-                        size="small"
-                        color="default"
-                        variant="outlined"
-                      />
-                      {job.sow && (
-                        <Chip
-                          icon={<DescriptionIcon sx={{ fontSize: 16 }} />}
-                          label={`SOW - ${sowStatusLabel(job.sow.status)}`}
-                          size="small"
-                          color="success"
-                          variant="outlined"
-                        />
-                      )}
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                      {/* One chip per card on the job page, stacked in the same
+                          order and colours, so a row and the page it opens read
+                          the same way. */}
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'stretch',
+                          justifyContent: 'center',
+                          gap: 0.75,
+                          minHeight: CHIP_COLUMN_MIN_HEIGHT
+                        }}
+                      >
+                        {isJobNew?.(job) ? (
+                          <Chip
+                            icon={<FiberNewIcon sx={{ fontSize: 16 }} />}
+                            label="New"
+                            size="small"
+                            color="error"
+                            variant="outlined"
+                          />
+                        ) : null}
+                        {job.isArchived && (
+                          <Chip
+                            icon={<Inventory2OutlinedIcon sx={{ fontSize: 16 }} />}
+                            label="Archived"
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                          />
+                        )}
+                        {jobListSectionChips(job).map((chip) => (
+                          <Chip
+                            key={chip.key}
+                            icon={chip.key === 'sow' ? <DescriptionIcon sx={{ fontSize: 16 }} /> : undefined}
+                            label={chip.label}
+                            size="small"
+                            color={chip.color}
+                            variant="outlined"
+                          />
+                        ))}
+                      </Box>
                       {canArchive && onArchiveToggle && (
                         <Tooltip title={job.isArchived ? 'Restore job' : 'Archive job'}>
                           <IconButton

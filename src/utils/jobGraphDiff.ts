@@ -43,6 +43,8 @@ export interface JobVersionLike {
     workflows?: SnapshotWorkflow[];
     createdAt?: string;
     createdByName?: string;
+    /** The author's org or team, stamped when the version was written. Empty on rows predating the field. */
+    createdByOrg?: string | null;
     note?: string | null;
     /** The job's state when the version was written. Absent on versions predating the field. */
     jobState?: string | null;
@@ -257,6 +259,33 @@ export function diffJobGraphs(before: SnapshotWorkflow[] | undefined, after: Sna
 }
 
 /**
+ * Whether accepting this job would bind the customer to lab edits they have
+ * never been shown.
+ *
+ * Three facts have to line up, and each one is there because the obvious rule —
+ * "the newest content version is staff-authored" — is wrong without it:
+ *
+ *  1. The newest *content* version is staff-authored. Event versions are skipped
+ *     because every review decision appends one; counting those would flip the
+ *     warning on after each decision regardless of what changed.
+ *  2. That version is not visible to the customer. A withdrawal restores the
+ *     customer's own graph as a staff-authored version, and acceptance publishes
+ *     staff edits — both are staff-authored content the customer has seen, and
+ *     both would otherwise warn. A missing flag reads as visible, matching
+ *     `JobVersionService.isVisibleToCustomer`, so legacy rows stay quiet.
+ * Deliberately *not* also requiring that the customer has submitted something at
+ * some point. A job staff created through /staff_submit has no customer-authored
+ * version at all, and that is the case where accepting is most plainly on the
+ * customer's behalf — they have seen none of it. An earlier draft excluded those
+ * jobs and the result was a warning that never appeared on them.
+ */
+export function hasUnseenStaffEdits(versions: JobVersionLike[]): boolean {
+    const newest = latestContentVersion(versions.filter((v) => v.isEvent !== true));
+    if (!newest || newest.authorRole !== 'STAFF') return false;
+    return newest.visibleToCustomer === false;
+}
+
+/**
  * The version `versionNumber` should be compared against.
  *
  * Keys off the author of the version being viewed, not off the viewer, so both
@@ -418,6 +447,7 @@ export function jobStateColor(state?: string | null): 'default' | 'info' | 'succ
         case 'CLOSED':
             return 'success';
         case 'REJECTED':
+        case 'CANCELLED':
             return 'error';
         default:
             return 'default';
