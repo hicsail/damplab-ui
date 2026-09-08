@@ -1086,6 +1086,9 @@ export const GET_INVOICES_BY_JOB_ID = gql`
       totalCost
       sowVersionNumber
       billingWarnings
+      voidedAt
+      voidedBy
+      voidReason
       createdAt
     }
   }

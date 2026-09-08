@@ -90,4 +90,19 @@ describe('lines an earlier invoice already covers', () => {
   it('treats a SOW with no version in force as nothing proven', () => {
     expect(billedLineIndexes([priorInvoice], null).size).toBe(0);
   });
+
+  it('releases the lines of a voided invoice', () => {
+    // Voiding is what makes the server's double-billing guard recoverable: it
+    // skips voided invoices, so the picker must too, or it would keep showing
+    // the released lines as billed and refuse to tick them.
+    const voided = { ...priorInvoice, voidedAt: '2026-09-08T00:00:00.000Z' };
+    expect(billedLineIndexes([voided], 1000).size).toBe(0);
+    expect(unbilledLineIndexes(lines, billedLineIndexes([voided], 1000))).toEqual(allLineIndexes(lines));
+  });
+
+  it('still holds a line covered by a second, live invoice', () => {
+    const voided = { ...priorInvoice, voidedAt: '2026-09-08T00:00:00.000Z' };
+    const live = { invoiceNumber: '04217-002', sowVersionNumber: 1000, services: [{ sourceIndex: 0 }] };
+    expect([...billedLineIndexes([voided, live], 1000).entries()]).toEqual([[0, '04217-002']]);
+  });
 });

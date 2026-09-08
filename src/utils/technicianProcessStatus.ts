@@ -183,8 +183,47 @@ export function jobStatusLabel(state?: string | null): string {
   return (state && JOB_STATUS_LABELS[state]) || (state ?? '—');
 }
 
+/** The shape `latestInvoice` orders by. Everything else on an invoice is the caller's. */
+export interface DatedInvoiceLike {
+  invoiceNumber?: string | null;
+  invoiceDate?: string | Date | null;
+  createdAt?: string | Date | null;
+}
+
+/**
+ * The most recently generated invoice.
+ *
+ * Ordered here rather than assumed from the array: `invoicesByJobId` sorts
+ * `createdAt: -1`, so the newest invoice is the **first** element, and three call
+ * sites were reading `invoices[invoices.length - 1]` — the oldest — under the label
+ * "Latest". On a job with one invoice the two agree, which is why it went unnoticed;
+ * a second invoice made "Latest invoice · $X" quote the first one's total and
+ * "Download Latest Invoice" hand over the first one's PDF.
+ *
+ * Voiding is what makes this worth fixing rather than noting: "void the wrong
+ * invoice, generate the right one" is now the ordinary two-invoice case, and it is
+ * exactly the case where the old reading returns the voided one.
+ *
+ * Sorting by date rather than trusting the query's order keeps this correct if that
+ * sort ever changes. `createdAt` is preferred over `invoiceDate` because the latter
+ * is the document's own date and two invoices can share one.
+ *
+ * When nothing carries a usable date — which the real query never produces, since
+ * `createdAt` is required on the model and always selected — the **first** element
+ * wins, matching that newest-first sort. Ties resolve the same way.
+ */
+export function latestInvoice<T extends DatedInvoiceLike>(invoices: readonly T[] | null | undefined): T | null {
+  const rows = invoices ?? [];
+  if (rows.length === 0) return null;
+  const at = (inv: T): number => {
+    const value = inv.createdAt ?? inv.invoiceDate;
+    const time = value ? new Date(value).getTime() : NaN;
+    return Number.isNaN(time) ? -Infinity : time;
+  };
+  return rows.reduce((newest, candidate) => (at(candidate) > at(newest) ? candidate : newest), rows[0]);
+}
+
 export function invoiceVersionLabel(invoices: Array<{ invoiceNumber?: string | null }>): string {
   if (!invoices.length) return '—';
-  const latest = invoices[invoices.length - 1];
-  return latest?.invoiceNumber?.trim() || '—';
+  return latestInvoice(invoices as DatedInvoiceLike[])?.invoiceNumber?.trim() || '—';
 }

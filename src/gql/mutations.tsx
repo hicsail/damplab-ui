@@ -566,6 +566,26 @@ export const CREATE_INVOICE = gql`
   }
 `;
 
+/**
+ * Void an invoice — the record is kept, its service lines are released.
+ *
+ * Never a delete: invoice numbers are derived from a per-job count, so removing a
+ * document would hand its number to the next invoice. Returns the same fields
+ * GET_INVOICES_BY_JOB_ID selects for a row, so Apollo updates the cached invoice
+ * in place and the list re-renders it struck through without a refetch.
+ */
+export const VOID_INVOICE = gql`
+  mutation VoidInvoice($invoiceId: ID!, $reason: String!) {
+    voidInvoice(invoiceId: $invoiceId, reason: $reason) {
+      id
+      invoiceNumber
+      voidedAt
+      voidedBy
+      voidReason
+    }
+  }
+`;
+
 // Comments Mutations (TODO: Uncomment once backend is ready)
 export const CREATE_COMMENT = gql`
   mutation CreateComment($input: CreateCommentInput!) {

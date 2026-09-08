@@ -35,6 +35,7 @@ export const PERMISSIONS = {
   LabStatusTvView: 'labstatustv:view',
   BenchUse: 'bench:use',
   BillingView: 'billing:view',
+  BillingWrite: 'billing:write',
   CustomersManage: 'customers:manage',
   ApiKeysManage: 'apikeys:manage',
   DataTranslationUse: 'datatranslation:use',

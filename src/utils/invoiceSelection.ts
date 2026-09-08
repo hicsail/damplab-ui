@@ -62,6 +62,8 @@ export interface BilledInvoiceLike {
   invoiceNumber?: string | null;
   sowVersionNumber?: number | null;
   services?: ReadonlyArray<{ sourceIndex?: number | null }> | null;
+  /** Set once the invoice has been voided. A voided invoice holds no lines. */
+  voidedAt?: string | Date | null;
 }
 
 /**
@@ -74,6 +76,11 @@ export interface BilledInvoiceLike {
  * Those cases are not silently treated as "unbilled": the server refuses a
  * provable overlap and records a warning on the invoice for everything it could
  * not prove, and this list only drives what the dialog ticks by default.
+ *
+ * **Voided invoices hold nothing.** Voiding releases an invoice's lines back for
+ * re-invoicing (the server's prior-invoice scan skips voided documents), so a
+ * voided invoice left in here would show released lines as billed and keep the
+ * dialog from ticking the very lines staff voided it to free.
  */
 export function billedLineIndexes(
   invoices: readonly BilledInvoiceLike[] | null | undefined,
@@ -83,6 +90,7 @@ export function billedLineIndexes(
   if (sowVersionNumber == null) return billed;
 
   for (const invoice of invoices ?? []) {
+    if (invoice?.voidedAt) continue;
     if (invoice?.sowVersionNumber !== sowVersionNumber) continue;
     for (const line of invoice.services ?? []) {
       if (typeof line?.sourceIndex !== 'number') continue;

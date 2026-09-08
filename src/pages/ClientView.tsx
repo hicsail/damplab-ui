@@ -33,7 +33,7 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { deriveCustomerLifecycle, validResponseAction } from '../utils/customerLifecycle';
 import type { CustomerActionRequired } from '../utils/jobReview';
-import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, partyVersionLabel } from '../utils/technicianProcessStatus';
+import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestInvoice, partyVersionLabel } from '../utils/technicianProcessStatus';
 
 export default function Tracking() {
 
@@ -112,6 +112,14 @@ export default function Tracking() {
         fetchPolicy: 'network-only',
     });
     const invoices = invoicesResult?.invoicesByJobId ?? [];
+    // Newest first from the server, so the last element is the OLDEST — see latestInvoice.
+    //
+    // Two bindings, because "most recent record" and "the figure that stands" stop
+    // being the same thing once an invoice can be voided. The summary's dollar
+    // amount and the Download button must never quote a voided invoice: on the
+    // client's page that line reads as what they owe.
+    const liveInvoices = invoices.filter((inv: any) => !inv?.voidedAt);
+    const newestLiveInvoice = latestInvoice<any>(liveInvoices);
     const [refreshing, setRefreshing] = useState(false);
 
     const refreshJobPage = async () => {
@@ -519,16 +527,21 @@ export default function Tracking() {
                     defaultExpanded={invoices.length > 0}
                     customerBadge={null}
                     staffBadge={null}
-                    statusPaneSx={{ bgcolor: chipStatusBackground(invoices.length ? 'info' : 'default') }}
+                    statusPaneSx={{ bgcolor: chipStatusBackground(liveInvoices.length ? 'info' : 'default') }}
                     statusPane={
                         invoices.length ? (
                             <StatusPaneHeader
                                 status={invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
-                                reference={invoiceVersionLabel(invoices) !== '—' ? invoiceVersionLabel(invoices) : undefined}
+                                reference={invoiceVersionLabel(liveInvoices) !== '—' ? invoiceVersionLabel(liveInvoices) : undefined}
                                 description={
-                                    invoices[invoices.length - 1]?.totalCost != null
-                                        ? `Latest invoice · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
-                                        : undefined
+                                    // Quotes the newest invoice that still stands. This line
+                                    // reads as "what you owe" to a client, so a voided figure
+                                    // must never reach it.
+                                    newestLiveInvoice?.totalCost != null
+                                        ? `Latest invoice · $${Number(newestLiveInvoice.totalCost).toFixed(2)}`
+                                        : liveInvoices.length === 0
+                                          ? 'Voided — nothing is currently payable'
+                                          : undefined
                                 }
                             />
                         ) : (
@@ -539,7 +552,9 @@ export default function Tracking() {
                         )
                     }
                     actions={
-                        invoices.length && id && sowFullData ? (
+                        // A standing invoice, not merely any invoice: with none, the
+                        // document would fall back to the SOW's own services.
+                        liveInvoices.length > 0 && id && sowFullData ? (
                             <PDFDownloadLink
                                 document={
                                     <JobInvoiceDocument
@@ -548,10 +563,10 @@ export default function Tracking() {
                                         jobName={jobName}
                                         customerCategory={data?.ownJobById?.customerCategory ?? undefined}
                                         sow={sowFullData}
-                                        invoice={invoices[invoices.length - 1]}
+                                        invoice={newestLiveInvoice}
                                     />
                                 }
-                                fileName={`Invoice-${(invoices[invoices.length - 1]?.invoiceNumber ?? id) || id}.pdf`}
+                                fileName={`Invoice-${(newestLiveInvoice?.invoiceNumber ?? id) || id}.pdf`}
                                 style={{ textDecoration: 'none', width: '100%' }}
                             >
                                 {({ loading: pdfLoading }) => (
@@ -566,8 +581,12 @@ export default function Tracking() {
                         invoices.length ? (
                             <List dense>
                                 {invoices.map((inv: any, idx: number) => (
-                                    <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
+                                    /* A voided invoice stays in the client's list rather than vanishing
+                                       from it — they may already hold the copy that was sent — so it has
+                                       to read as void here and in the PDF itself. */
+                                    <ListItem key={inv.id || idx} sx={{ pl: 0, opacity: inv.voidedAt ? 0.6 : 1 }}>
                                         <ListItemText
+                                            slotProps={inv.voidedAt ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
                                             primary={
                                                 id && sowFullData ? (
                                                     <PDFDownloadLink
@@ -592,7 +611,14 @@ export default function Tracking() {
                                                 )
                                             }
                                             secondary={
-                                                `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
+                                                <>
+                                                    {`${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`}
+                                                    {inv.voidedAt && (
+                                                        <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
+                                                            {`VOID — this invoice is not payable${inv.voidReason ? `. ${inv.voidReason}` : ''}`}
+                                                        </Typography>
+                                                    )}
+                                                </>
                                             }
                                         />
                                     </ListItem>

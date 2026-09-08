@@ -4,6 +4,7 @@ import {
   invoiceVersionLabel,
   jobPartyStatus,
   latestCustomerVisibleJobVersion,
+  latestInvoice,
   latestCustomerVisibleSowVersion,
   latestStaffVisibleJobVersion,
   latestStaffVisibleSowVersion,
@@ -213,6 +214,47 @@ describe('invoiceVersionLabel', () => {
   });
 
   it('returns the latest invoice number for both parties', () => {
-    expect(invoiceVersionLabel([{ invoiceNumber: 'INV-1' }, { invoiceNumber: 'INV-2' }])).toBe('INV-2');
+    // Dated deliberately. This used to read the last element, which matched the
+    // fixture's order but not the server's: invoicesByJobId sorts `createdAt: -1`,
+    // so the last element is the oldest invoice.
+    expect(
+      invoiceVersionLabel([
+        { invoiceNumber: 'INV-2', createdAt: '2026-09-05T10:00:00.000Z' },
+        { invoiceNumber: 'INV-1', createdAt: '2026-09-01T10:00:00.000Z' }
+      ] as never)
+    ).toBe('INV-2');
+  });
+
+  it('falls back to the first element when nothing carries a date, matching the newest-first sort', () => {
+    expect(invoiceVersionLabel([{ invoiceNumber: 'INV-2' }, { invoiceNumber: 'INV-1' }])).toBe('INV-2');
+  });
+});
+
+describe('latestInvoice', () => {
+  // invoicesByJobId sorts `createdAt: -1`, so the newest invoice arrives FIRST.
+  // Three call sites used to read the last element and call it "Latest".
+  const older = { invoiceNumber: '04217-001', createdAt: '2026-09-01T10:00:00.000Z', totalCost: 100 };
+  const newer = { invoiceNumber: '04217-002', createdAt: '2026-09-05T10:00:00.000Z', totalCost: 250 };
+
+  it('picks the newest, not the last element', () => {
+    expect(latestInvoice([newer, older])?.invoiceNumber).toBe('04217-002');
+  });
+
+  it('picks the newest whichever way the list is ordered', () => {
+    expect(latestInvoice([older, newer])?.invoiceNumber).toBe('04217-002');
+  });
+
+  it.each([null, undefined, []])('is null for %p', (input) => {
+    expect(latestInvoice(input as never)).toBeNull();
+  });
+
+  it('falls back to invoiceDate when createdAt is absent', () => {
+    const a = { invoiceNumber: '04217-001', invoiceDate: '2026-09-01T10:00:00.000Z' };
+    const b = { invoiceNumber: '04217-002', invoiceDate: '2026-09-05T10:00:00.000Z' };
+    expect(latestInvoice([a, b])?.invoiceNumber).toBe('04217-002');
+  });
+
+  it('labels the newest invoice number', () => {
+    expect(invoiceVersionLabel([newer, older])).toBe('04217-002');
   });
 });

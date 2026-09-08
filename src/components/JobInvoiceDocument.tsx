@@ -35,6 +35,35 @@ const styles = StyleSheet.create({
     fontWeight: 800,
     marginBottom: 6,
   },
+  /**
+   * The VOID treatment. Deliberately three signals, not one: a diagonal watermark
+   * across the page, a banner in the flow, and the reason in words. A voided
+   * invoice remains downloadable so a client can retrieve the copy they were sent,
+   * which makes "obviously not payable" the whole job of this styling — and colour
+   * alone would not survive a greyscale print.
+   */
+  voidWatermark: {
+    position: 'absolute',
+    top: 300,
+    left: 60,
+    fontSize: 90,
+    fontWeight: 800,
+    color: '#d32f2f',
+    opacity: 0.16,
+    transform: 'rotate(-30deg)',
+  },
+  voidBanner: {
+    borderWidth: 2,
+    borderColor: '#d32f2f',
+    padding: 6,
+    marginBottom: 10,
+  },
+  voidBannerTitle: {
+    fontSize: 14,
+    fontWeight: 800,
+    color: '#d32f2f',
+    marginBottom: 2,
+  },
   monoBold: {
     fontWeight: 800,
   },
@@ -248,6 +277,29 @@ function splitAddressLines(addr: string | undefined | null): { line1: string; li
  * prints "$50.00 x 4 = $200.00" and itemises a parameter-priced line beneath it,
  * and so does this.
  */
+/**
+ * What the VOID banner says, as text.
+ *
+ * Extracted so it can be tested: react-pdf primitives do not render under the unit
+ * suite, and a voided invoice stays downloadable, so "does this document actually
+ * say it is void" is the one thing about it worth pinning.
+ *
+ * Returns null when the invoice is live — the caller renders nothing at all then,
+ * rather than an empty banner.
+ */
+export function buildVoidNotice(invoice: { voidedAt?: string | Date | null; voidedBy?: string | null; voidReason?: string | null } | null | undefined): { title: string; attribution: string; reason: string } | null {
+  if (!invoice?.voidedAt) return null;
+  const at = safeParseISODate(toIsoStringSafe(invoice.voidedAt));
+  const by = invoice.voidedBy?.trim();
+  return {
+    title: 'VOID — THIS INVOICE IS NOT PAYABLE',
+    attribution: `Voided${at ? ` on ${formatMMDDYYYY(at)}` : ''}${by ? ` by ${by}` : ''}.`,
+    // Never blank: an unexplained VOID reads as a rendering fault rather than a
+    // decision. The mutation requires a reason, so this only covers legacy rows.
+    reason: `Reason: ${invoice.voidReason?.trim() || 'not recorded'}`
+  };
+}
+
 export function buildInvoicePricingNote(row: any): string {
   const lines: string[] = [];
 
@@ -322,6 +374,14 @@ export interface JobInvoiceDocumentProps {
     billedToName?: string | null;
     billedToEmail?: string | null;
     billedToAddress?: string | null;
+    /**
+     * Set once the invoice has been voided. Voiding never deletes the document —
+     * invoice numbers are derived from a per-job count — and the copy already sent
+     * to a client stays downloadable, so this file has to say so unmistakably.
+     */
+    voidedAt?: string | Date | null;
+    voidedBy?: string | null;
+    voidReason?: string | null;
   } | null;
 }
 
@@ -372,9 +432,19 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
   };
   const pricingCategoryLabel = getCustomerCategoryLabel(customerCategory);
 
+  const voidNotice = buildVoidNotice(invoice);
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        {voidNotice && <Text style={styles.voidWatermark} fixed>VOID</Text>}
+        {voidNotice && (
+          <View style={styles.voidBanner}>
+            <Text style={styles.voidBannerTitle}>{voidNotice.title}</Text>
+            <Text style={styles.text}>{voidNotice.attribution}</Text>
+            <Text style={styles.text}>{voidNotice.reason}</Text>
+          </View>
+        )}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>{isInternal ? 'INTERNAL INVOICE' : 'EXTERNAL INVOICE'}</Text>

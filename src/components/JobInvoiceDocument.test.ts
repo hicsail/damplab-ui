@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildInvoicePricingNote } from './JobInvoiceDocument';
+import { buildInvoicePricingNote, buildVoidNotice } from './JobInvoiceDocument';
 
 /**
  * The invoice has to state the same pricing basis the SOW's Fee Schedule does.
@@ -65,5 +65,38 @@ describe('buildInvoicePricingNote: parameter-priced lines', () => {
 
   it('skips a row with no label rather than printing a dangling dash', () => {
     expect(buildInvoicePricingNote({ cost: 10, multiplier: 1, pricingDetails: [{ label: '  ', quantity: 1, unitPrice: 10, total: 10 }] })).toBe('');
+  });
+});
+
+
+describe('buildVoidNotice', () => {
+  // A voided invoice stays downloadable — the client may already hold the copy
+  // that was sent — so the document itself has to say it is not payable.
+  const voided = { voidedAt: '2026-09-08T15:00:00.000Z', voidedBy: 'tech@bu.edu', voidReason: 'Billed the wrong customer' };
+
+  it('renders nothing for a live invoice', () => {
+    expect(buildVoidNotice({ voidedAt: null })).toBeNull();
+    expect(buildVoidNotice(null)).toBeNull();
+    expect(buildVoidNotice(undefined)).toBeNull();
+  });
+
+  it('says the invoice is not payable, in words', () => {
+    expect(buildVoidNotice(voided)?.title).toBe('VOID — THIS INVOICE IS NOT PAYABLE');
+  });
+
+  it('records who voided it and when', () => {
+    expect(buildVoidNotice(voided)?.attribution).toBe('Voided on 09/08/2026 by tech@bu.edu.');
+  });
+
+  it('prints the reason the client will read', () => {
+    expect(buildVoidNotice(voided)?.reason).toBe('Reason: Billed the wrong customer');
+  });
+
+  it('never leaves the reason blank, which would read as a rendering fault', () => {
+    expect(buildVoidNotice({ voidedAt: voided.voidedAt, voidReason: '   ' })?.reason).toBe('Reason: not recorded');
+  });
+
+  it('omits the attribution parts it does not have', () => {
+    expect(buildVoidNotice({ voidedAt: voided.voidedAt })?.attribution).toBe('Voided on 09/08/2026.');
   });
 });

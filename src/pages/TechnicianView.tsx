@@ -17,7 +17,7 @@ import RefreshIcon                                    from '@mui/icons-material/
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
+import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION, VOID_INVOICE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -32,11 +32,13 @@ import SowEditorModal             from '../components/sow/SowEditorModal';
 import { SowPdfDownloadButton, SowStatusDetails, SowStatusSummary, useSowStaffStatus } from '../components/sow/SowStatusCard';
 import ProcessCard                from '../components/technician/ProcessCard';
 import ReasonDialog               from '../components/ReasonDialog';
+import Can                        from '../components/PermissionGate';
+import { PERMISSIONS }            from '../hooks/usePermissions';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
 import { CUSTOMER_CATEGORY_OPTIONS, statusColor } from '../components/sow/sowTypes';
-import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
+import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestInvoice, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
 import StatusPaneHeader from '../components/technician/StatusPaneHeader';
 import { BIOSECURITY_SCREENINGS, PLACEHOLDER_BIOSECURITY, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus } from '../components/technician/biosecurityStatus';
 
@@ -157,6 +159,14 @@ export default function TechnicianView() {
         fetchPolicy: 'network-only',
     });
     const invoices = invoicesResult?.invoicesByJobId ?? [];
+    // Newest first from the server, so the last element is the OLDEST — see latestInvoice.
+    //
+    // Two bindings, because "most recent record" and "the figure that stands" stop
+    // being the same thing once an invoice can be voided. The summary's dollar
+    // amount and the Download button must never quote a voided invoice: on the
+    // client's page that line reads as what they owe.
+    const liveInvoices = invoices.filter((inv: any) => !inv?.voidedAt);
+    const newestLiveInvoice = latestInvoice<any>(liveInvoices);
     const sowStatus = useSowStaffStatus(id || '');
 
     // Derive from Apollo cache so refetches (e.g. after SOW upsert) update without a full page reload.
@@ -255,6 +265,38 @@ export default function TechnicianView() {
     };
 
     const [createInvoice, { loading: creatingInvoice }] = useMutation(CREATE_INVOICE);
+
+    /**
+     * Voiding an invoice.
+     *
+     * The double-billing guard refuses a line an earlier invoice already covers,
+     * which without a void makes a mis-generated invoice permanent. Voiding keeps
+     * the record — numbering is derived from a per-job count, so nothing may ever
+     * be deleted — and releases its lines back into the picker.
+     *
+     * Held by id rather than by a boolean: the list can show several invoices, and
+     * the dialog has to know which one it is confirming.
+     */
+    const [voidInvoice] = useMutation(VOID_INVOICE);
+    const [voidTarget, setVoidTarget] = useState<{ id: string; invoiceNumber: string } | null>(null);
+    const [voiding, setVoiding] = useState(false);
+
+    const handleVoidInvoice = async (reason: string) => {
+        if (!voidTarget) return;
+        setVoiding(true);
+        try {
+            await voidInvoice({ variables: { invoiceId: voidTarget.id, reason } });
+            // Refetched rather than relying on the cache write: voiding changes
+            // which lines the Create Invoice dialog may tick, and that is computed
+            // from this same list.
+            await refetchInvoices();
+            setVoidTarget(null);
+        } catch (err: any) {
+            window.alert(formatGqlError(err, 'Could not void the invoice.'));
+        } finally {
+            setVoiding(false);
+        }
+    };
 
     const [modalOpen, setModalOpen] = useState(false);
     const [sowModalOpen, setSowModalOpen] = useState(false);
@@ -500,11 +542,13 @@ export default function TechnicianView() {
     const jobStaffVersion = partyVersionLabel(latestStaffVisibleJobVersion(versions));
     const sowCustomerVersion = sowPartyVersionLabel(latestCustomerVisibleSowVersion(sowStatus.sow?.versions ?? []));
     const sowStaffVersion = sowPartyVersionLabel(latestStaffVisibleSowVersion(sowStatus.sow?.versions ?? []));
-    const invoiceLabel = invoiceVersionLabel(invoices);
+    const invoiceLabel = invoiceVersionLabel(liveInvoices);
     const sowStatusPaneColor = chipStatusBackground(
         sowStatus.sow ? statusColor(sowStatus.active?.status ?? sowStatus.current?.status) : 'default'
     );
-    const invoiceStatusPaneColor = chipStatusBackground(invoices.length ? 'info' : 'default');
+    // Keyed on standing invoices: a job whose only invoice was voided has not been
+    // billed, and an info-coloured pane saying "1 invoice" would imply it had.
+    const invoiceStatusPaneColor = chipStatusBackground(liveInvoices.length ? 'info' : 'default');
     const jobStatusPaneColor = chipStatusBackground(jobData ? jobStatusColor(jobState) : 'default');
     const biosecurity = PLACEHOLDER_BIOSECURITY;
     const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
@@ -896,10 +940,17 @@ export default function TechnicianView() {
                                 reference={invoiceLabel !== '—' ? invoiceLabel : undefined}
                                 description={
                                     // The number itself is in the reference slot now, so this
-                                    // line carries only what that does not say.
-                                    invoices[invoices.length - 1]?.totalCost != null
-                                        ? `Latest invoice · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
-                                        : undefined
+                                    // line carries only what that does not say — and it quotes
+                                    // the newest invoice that still stands, never a voided one.
+                                    // A job whose invoices have all been voided says so rather
+                                    // than falling silent, which would read as "not yet billed".
+                                    newestLiveInvoice?.totalCost != null
+                                        ? `Latest invoice · $${Number(newestLiveInvoice.totalCost).toFixed(2)}`
+                                        : liveInvoices.length === 0
+                                          ? invoices.length === 1
+                                              ? 'Voided — no invoice stands for this job'
+                                              : 'All voided — no invoice stands for this job'
+                                          : undefined
                                 }
                             />
                         ) : (
@@ -922,7 +973,10 @@ export default function TechnicianView() {
                             >
                                 Create Invoice
                             </Button>
-                            {invoices?.length && id && sowFullData ? (
+                            {/* Gated on a *standing* invoice: with none, `invoice` would be
+                                null and the document would fall back to the SOW's own services,
+                                printing a total with no adjustments applied. */}
+                            {liveInvoices.length > 0 && id && sowFullData ? (
                                 <PDFDownloadLink
                                     document={
                                         <JobInvoiceDocument
@@ -931,10 +985,10 @@ export default function TechnicianView() {
                                             jobName={jobName}
                                             customerCategory={jobData?.customerCategory ?? undefined}
                                             sow={sowFullData}
-                                            invoice={invoices[invoices.length - 1]}
+                                            invoice={newestLiveInvoice}
                                         />
                                     }
-                                    fileName={`Invoice-${(invoices[invoices.length - 1]?.invoiceNumber ?? id) || id}.pdf`}
+                                    fileName={`Invoice-${(newestLiveInvoice?.invoiceNumber ?? id) || id}.pdf`}
                                     style={{ textDecoration: 'none', width: '100%' }}
                                 >
                                     {({ loading }) => (
@@ -958,8 +1012,31 @@ export default function TechnicianView() {
                         ) : (
                             <List dense>
                                 {invoices.map((inv: any, idx: number) => (
-                                    <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
+                                    /* A voided invoice stays listed and stays numbered — deleting one
+                                       would hand its number to the next invoice, since numbering is a
+                                       per-job count. It is still downloadable, stamped VOID, because
+                                       the copy already sent to a client has to remain retrievable. */
+                                    <ListItem
+                                        key={inv.id || idx}
+                                        sx={{ pl: 0, opacity: inv.voidedAt ? 0.6 : 1 }}
+                                        secondaryAction={
+                                            inv.voidedAt ? null : (
+                                                <Can permission={PERMISSIONS.BillingWrite}>
+                                                    <Button
+                                                        size="small"
+                                                        color="warning"
+                                                        startIcon={<CancelIcon />}
+                                                        disabled={voiding}
+                                                        onClick={() => setVoidTarget({ id: String(inv.id), invoiceNumber: String(inv.invoiceNumber ?? inv.id ?? '') })}
+                                                    >
+                                                        Void
+                                                    </Button>
+                                                </Can>
+                                            )
+                                        }
+                                    >
                                         <ListItemText
+                                            slotProps={inv.voidedAt ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
                                             primary={
                                                 id && sowFullData ? (
                                                     <PDFDownloadLink
@@ -988,6 +1065,15 @@ export default function TechnicianView() {
                                             secondary={
                                                 <>
                                                     {`${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`}
+                                                    {/* Says VOID in words, not by the strikethrough alone —
+                                                        the reason is the part staff actually need. */}
+                                                    {inv.voidedAt && (
+                                                        <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
+                                                            {`VOID — ${inv.voidReason || 'no reason recorded'}`}
+                                                            {inv.voidedBy ? ` (${inv.voidedBy}` : ''}
+                                                            {inv.voidedBy && inv.voidedAt ? `, ${new Date(inv.voidedAt).toLocaleDateString()})` : inv.voidedBy ? ')' : ''}
+                                                        </Typography>
+                                                    )}
                                                     {/* Overlaps the server could prove are refused outright. These
                                                         are the ones it could not check — an earlier invoice that
                                                         predates line tracking, or one billed from a different
@@ -1029,6 +1115,24 @@ export default function TechnicianView() {
                         busy={withdrawing}
                         onCancel={() => setWithdrawKind(null)}
                         onConfirm={handleWithdraw}
+                    />
+                )}
+                {voidTarget && (
+                    <ReasonDialog
+                        open
+                        title={`Void invoice ${voidTarget.invoiceNumber}?`}
+                        warning={
+                            'The invoice is kept and keeps its number — nothing is deleted, so a later invoice can never reuse it.\n\n' +
+                            'Its services become available to invoice again. The client sees the invoice marked VOID in their list, and the reason you give below is printed on the invoice itself.'
+                        }
+                        // ReasonDialog's default wording, deliberately: the reason is
+                        // printed in the client's invoice list AND in the VOID banner on
+                        // the downloadable PDF. Labelling it "recorded on the invoice"
+                        // invites an internal note into a field the customer reads.
+                        confirmLabel="Void invoice"
+                        busy={voiding}
+                        onCancel={() => setVoidTarget(null)}
+                        onConfirm={handleVoidInvoice}
                     />
                 )}
                 <JobFeedbackModal
