@@ -159,7 +159,7 @@ export default function JobVersionHistory({ versions, viewing, baseline, onViewi
                 value={selectableBaseline ?? ''}
                 displayEmpty
                 sx={{ minWidth: dense ? 190 : 230, backgroundColor: 'background.paper' }}
-                onChange={(e) => onBaselineChange(e.target.value === '' ? null : Number(e.target.value))}
+                onChange={(e) => onBaselineChange(String(e.target.value) === '' ? null : Number(e.target.value))}
                 renderValue={(val) => {
                     if (val == null || String(val) === '') return <em>Nothing</em>;
                     const v = versions.find((x) => x.versionNumber === Number(val));

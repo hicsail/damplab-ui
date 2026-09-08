@@ -10,14 +10,13 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "@graphql-typed-document-node/core": "^3.2.0",
     "@mui/icons-material": "^7.0.2",
     "@mui/material": "^7.0.2",
     "@mui/system": "^7.0.2",
     "@mui/x-data-grid": "^7.28.3",
     "@mui/x-date-pickers": "^8.12.0",
     "@react-pdf/renderer": "^4.3.2",
-    "@react-router/node": "^7.5.3",
+    "@react-router/node": "^7.18.3",
     "@types/xlsx": "^0.0.36",
     "date-fns": "^4.1.0",
     "deep-chat-react": "^2.4.2",
@@ -29,7 +28,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
-    "react-router": "^7.5.3",
+    "react-router": "^7.18.3",
     "reactflow": "^11.11.4",
     "seqparse": "^0.2.1",
     "uuid": "^11.1.0",
@@ -39,8 +38,10 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
+    "start": "react-router dev",
     "codegen": "graphql-codegen --config codegen.ts",
-    "test": "node ./node_modules/vitest/vitest.mjs run"
+    "test": "node ./node_modules/vitest/vitest.mjs run",
+    "typecheck": "tsc --noEmit"
   },
   "eslintConfig": {
     "extends": [
@@ -62,8 +63,8 @@
   },
   "devDependencies": {
     "@graphql-codegen/cli": "^5.0.5",
-    "@graphql-codegen/client-preset": "^4.8.0",
-    "@react-router/dev": "^7.5.3",
+    "@graphql-codegen/typescript": "^4.1.6",
+    "@react-router/dev": "^7.18.3",
     "@types/diff": "^7.0.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.14.1",
