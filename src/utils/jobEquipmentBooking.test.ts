@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockedMessage, bookingsForWeek, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES } from './jobEquipmentBooking';
+import { blockedMessage, bookingsForWeek, defaultSlotFor, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES, spansForWeek } from './jobEquipmentBooking';
 
 describe('formatBookingWindow', () => {
   it('prints a closed window as a range', () => {
@@ -63,5 +63,59 @@ describe('bookingsForWeek', () => {
     const map = bookingsForWeek([later, earlier, outside], weekStart);
     expect(map.get('2026-01-06')).toEqual([earlier, later]);
     expect(map.has('2026-01-20')).toBe(false);
+  });
+});
+
+describe('spansForWeek', () => {
+  const week = new Date(2026, 0, 5); // Monday 5 Jan 2026, local time
+  const range = (r: { s: string; e: string }) => ({ start: r.s, end: r.e });
+
+  it('clips a multi-day range into one segment per day it covers', () => {
+    const map = spansForWeek([{ s: '2026-01-06T22:00:00', e: '2026-01-08T03:00:00' }], week, range);
+    expect([...map.keys()].sort()).toEqual(['2026-01-06', '2026-01-07', '2026-01-08']);
+    const tue = map.get('2026-01-06')![0];
+    expect(tue.start).toEqual(new Date(2026, 0, 6, 22));
+    expect(tue.end).toEqual(new Date(2026, 0, 7));
+    expect(tue.continuesBefore).toBe(false);
+    expect(tue.continuesAfter).toBe(true);
+    const wed = map.get('2026-01-07')![0];
+    expect(wed.start).toEqual(new Date(2026, 0, 7));
+    expect(wed.continuesBefore).toBe(true);
+    expect(wed.continuesAfter).toBe(true);
+    const thu = map.get('2026-01-08')![0];
+    expect(thu.end).toEqual(new Date(2026, 0, 8, 3));
+    expect(thu.continuesAfter).toBe(false);
+  });
+
+  it('drops ranges outside the week and ranges without both bounds', () => {
+    const map = spansForWeek([{ s: '2025-12-30T10:00:00', e: '2025-12-30T11:00:00' }, { s: '', e: '2026-01-06T11:00:00' }], week, range);
+    expect(map.size).toBe(0);
+  });
+
+  it('sorts a day’s segments by start', () => {
+    const map = spansForWeek(
+      [
+        { s: '2026-01-06T14:00:00', e: '2026-01-06T15:00:00' },
+        { s: '2026-01-06T09:00:00', e: '2026-01-06T10:00:00' }
+      ],
+      week,
+      range
+    );
+    expect(map.get('2026-01-06')!.map((x) => x.start.getHours())).toEqual([9, 14]);
+  });
+});
+
+describe('defaultSlotFor', () => {
+  it('starts at 9:00 on a future day and lasts an hour', () => {
+    const { start, end } = defaultSlotFor(new Date(2030, 5, 10), new Date(2026, 0, 1, 12));
+    expect(start).toEqual(new Date(2030, 5, 10, 9));
+    expect(end).toEqual(new Date(2030, 5, 10, 10));
+  });
+
+  it('starts at the next full hour when the day is today and 9:00 has passed', () => {
+    const now = new Date(2026, 0, 6, 13, 20);
+    const { start, end } = defaultSlotFor(new Date(2026, 0, 6), now);
+    expect(start).toEqual(new Date(2026, 0, 6, 14));
+    expect(end).toEqual(new Date(2026, 0, 6, 15));
   });
 });

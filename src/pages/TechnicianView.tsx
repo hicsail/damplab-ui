@@ -17,7 +17,7 @@ import CancelIcon                                     from '@mui/icons-material/
 import ReceiptLongIcon                                from '@mui/icons-material/ReceiptLong';
 import RefreshIcon                                    from '@mui/icons-material/Refresh';
 
-import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
 import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION, VOID_INVOICE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
@@ -319,7 +319,7 @@ export default function TechnicianView() {
             refetchJob(),
             refetchSow(),
             refetchInvoices(),
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] })
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY] })
         ]);
     };
 
@@ -582,7 +582,7 @@ export default function TechnicianView() {
             await Promise.all([
                 refetchJob(),
                 refetchSow(),
-                apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] }),
+                apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY] }),
             ]);
         } catch (e) {
             console.error('Failed to update job customer category:', e);

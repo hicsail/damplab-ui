@@ -95,3 +95,62 @@ export function bookingsForWeek<T extends { startTime?: string | null }>(booking
   }
   return map;
 }
+
+/** One piece of a time range, clipped to a single calendar day. */
+export interface DaySpan<T> {
+  item: T;
+  start: Date;
+  end: Date;
+  /** The range began on an earlier day. */
+  continuesBefore: boolean;
+  /** The range runs on past this day. */
+  continuesAfter: boolean;
+}
+
+/**
+ * Bucket time ranges into the seven days of a week, clipping each to the days it
+ * covers — unlike `bookingsForWeek`, a range that spans several days appears on
+ * every one of them. That is what makes a multi-day hold visible: a grid that
+ * pinned it to its start day alone would show a free-looking day the server
+ * refuses to book.
+ */
+export function spansForWeek<T>(
+  items: T[],
+  weekStart: Date,
+  range: (item: T) => { start?: string | Date | null; end?: string | Date | null }
+): Map<string, DaySpan<T>[]> {
+  const map = new Map<string, DaySpan<T>[]>();
+  const first = startOfDay(weekStart);
+  for (const item of items) {
+    const r = range(item);
+    if (!r.start || !r.end) continue;
+    const s = new Date(r.start).getTime();
+    const e = new Date(r.end).getTime();
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+    for (let i = 0; i < 7; i++) {
+      const dayStart = addDays(first, i);
+      const dayEnd = addDays(first, i + 1);
+      const from = Math.max(s, dayStart.getTime());
+      const to = Math.min(e, dayEnd.getTime());
+      if (to <= from) continue;
+      const key = format(dayStart, 'yyyy-MM-dd');
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ item, start: new Date(from), end: new Date(to), continuesBefore: s < dayStart.getTime(), continuesAfter: e > dayEnd.getTime() });
+    }
+  }
+  for (const list of map.values()) list.sort((a, b) => a.start.getTime() - b.start.getTime());
+  return map;
+}
+
+/**
+ * The slot a click on a day card proposes: nine o'clock for a future day, the
+ * next full hour when the day is today and nine has passed, one hour long.
+ */
+export function defaultSlotFor(day: Date, now: Date = new Date()): { start: Date; end: Date } {
+  const nine = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9);
+  let start = nine;
+  if (startOfDay(day).getTime() === startOfDay(now).getTime() && now.getTime() >= nine.getTime()) {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
+  }
+  return { start, end: new Date(start.getTime() + 3_600_000) };
+}

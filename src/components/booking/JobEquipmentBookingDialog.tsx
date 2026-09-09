@@ -18,6 +18,8 @@ interface Props {
   items: BookingDialogItem[];
   /** Set when editing: the item is fixed and the picker is hidden. */
   fixedItemId?: string;
+  /** The item the caller had selected on the grid, so the dialog opens on it. */
+  initialItemId?: string;
   initialStart?: Date | null;
   initialEnd?: Date | null;
   initialNotes?: string;
@@ -42,6 +44,7 @@ export default function JobEquipmentBookingDialog({
   window: estimatedWindow,
   items,
   fixedItemId,
+  initialItemId,
   initialStart,
   initialEnd,
   initialNotes,
@@ -60,7 +63,7 @@ export default function JobEquipmentBookingDialog({
   // be submitted against the next booking.
   useEffect(() => {
     if (!open) return;
-    setItemId(fixedItemId ?? schedulable[0]?.id ?? '');
+    setItemId(fixedItemId ?? (initialItemId && schedulable.some((i) => i.id === initialItemId) ? initialItemId : schedulable[0]?.id) ?? '');
     setStart(initialStart ?? null);
     setEnd(initialEnd ?? null);
     setNotes(initialNotes ?? '');
