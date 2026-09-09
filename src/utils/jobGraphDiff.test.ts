@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { diffJobGraphs, pickJobDiffBaseline, currentDiffPair, selectedDiffPair, latestContentVersion, latestVersion, jobStateLabel, jobStateColor, jobVersionDisplayLabel, jobVersionChip, JobVersionLike, SnapshotWorkflow } from './jobGraphDiff';
-import { EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_OPEN_END_PARAM_ID, EQUIPMENT_START_PARAM_ID } from './servicePricing';
+import { EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_OPEN_END_PARAM_ID, EQUIPMENT_START_PARAM_ID, RUN_COUNT_PARAM_ID } from './servicePricing';
 
 function node(id: string, params: Record<string, any> = {}, over: Record<string, any> = {}) {
   return {
@@ -514,5 +514,42 @@ describe('diffJobGraphs — equipment parameters', () => {
     const before = [workflow([node('a', { [EQUIPMENT_OPEN_END_PARAM_ID]: false })])];
     const after = [workflow([node('a', { [EQUIPMENT_OPEN_END_PARAM_ID]: true })])];
     expect(diffJobGraphs(before, after).byNodeId.get('a')!.paramDiffs.map((p) => p.id)).toEqual([EQUIPMENT_OPEN_END_PARAM_ID]);
+  });
+});
+
+describe('diffJobGraphs — reserved parameter own names (R4)', () => {
+  // The shared node() fixture always stamps name: pid, which can't express a
+  // present entry with a genuine custom name (or none at all) — so these build
+  // the formData entry by hand instead of going through node().
+  const rawNode = (id: string, formData: Array<{ id: string; name?: any; value: any }>) => ({
+    id,
+    label: `Service ${id}`,
+    serviceId: `svc-${id}`,
+    additionalInstructions: '',
+    formData
+  });
+
+  it('surfaces a service-defined label instead of the fixed one', () => {
+    const before = [workflow([rawNode('a', [{ id: EQUIPMENT_START_PARAM_ID, name: 'Kickoff', value: '2026-01-01' }])])];
+    const after = [workflow([rawNode('a', [{ id: EQUIPMENT_START_PARAM_ID, name: 'Kickoff', value: '2026-02-01' }])])];
+    const diff = diffJobGraphs(before, after).byNodeId.get('a')!;
+
+    expect(diff.paramDiffs[0].name).toBe('Kickoff');
+  });
+
+  it('falls back to the fixed label when the entry\'s name is just its own id', () => {
+    const before = [workflow([rawNode('a', [{ id: EQUIPMENT_END_PARAM_ID, name: EQUIPMENT_END_PARAM_ID, value: '2026-01-01' }])])];
+    const after = [workflow([rawNode('a', [{ id: EQUIPMENT_END_PARAM_ID, name: EQUIPMENT_END_PARAM_ID, value: '2026-02-01' }])])];
+    const diff = diffJobGraphs(before, after).byNodeId.get('a')!;
+
+    expect(diff.paramDiffs[0].name).toBe('End Date');
+  });
+
+  it('keeps a custom run-count label, e.g. "Number of plates"', () => {
+    const before = [workflow([rawNode('a', [{ id: RUN_COUNT_PARAM_ID, name: 'Number of plates', value: 2 }])])];
+    const after = [workflow([rawNode('a', [{ id: RUN_COUNT_PARAM_ID, name: 'Number of plates', value: 5 }])])];
+    const diff = diffJobGraphs(before, after).byNodeId.get('a')!;
+
+    expect(diff.paramDiffs[0].name).toBe('Number of plates');
   });
 });

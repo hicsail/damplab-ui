@@ -162,6 +162,15 @@ const INJECTED_PARAM_DEFAULTS: Array<{ id: string; value: any }> = [
     { id: EQUIPMENT_BOOKERS_PARAM_ID, value: [] }
 ];
 
+/**
+ * Whether a formData entry for a reserved id (run count or one of the five
+ * equipment parameters) carries a real label of its own, rather than needing
+ * the fixed one substituted in. A `__…` id is never a real label — the shared
+ * test fixture stamps every entry's `name` as its own id, and R4 treats that
+ * the same as no name at all.
+ */
+const hasOwnName = (name: any, id: string): boolean => typeof name === 'string' && name.trim() !== '' && name !== id;
+
 const paramEntries = (formData: any): Map<string, any> => {
     const entries = new Map<string, any>();
     if (Array.isArray(formData)) {
@@ -172,14 +181,23 @@ const paramEntries = (formData: any): Map<string, any> => {
     // An absent run count or equipment parameter means the default value, so a
     // snapshot taken before the universal run-count entry (or the equipment
     // parameters) existed must compare equal to one that spells the default
-    // out. Mirrors paramValuesById on the backend. The name is fixed for these
-    // ids regardless of whether the entry is present — formData's own `name`
-    // is stripped by the backend on submitted jobs (see resolveParameterName),
-    // and even when present client-side it must not shadow the reserved label.
+    // out. Mirrors paramValuesById on the backend. A present entry keeps its
+    // own name — a service can define __equipStart as "Kickoff", or its run
+    // count as "Number of plates" (see resolveParameterName in servicePricing.ts
+    // and withRunCountParam/withEquipmentParams in ReactFlowEvents.tsx) — and
+    // only falls back to the fixed label when the entry carries no name of its
+    // own: absent, not a string, blank after trimming, or equal to the id
+    // itself (a `__…` id is never a real label).
     for (const def of INJECTED_PARAM_DEFAULTS) {
-        const name = def.id === RUN_COUNT_PARAM_ID ? 'Number of runs' : EQUIPMENT_PARAM_NAMES[def.id];
+        const fixedName = def.id === RUN_COUNT_PARAM_ID ? 'Number of runs' : EQUIPMENT_PARAM_NAMES[def.id];
         const existing = entries.get(def.id);
-        entries.set(def.id, existing ? { ...existing, name } : { id: def.id, name, value: def.value });
+        if (!existing) {
+            entries.set(def.id, { id: def.id, name: fixedName, value: def.value });
+            continue;
+        }
+        if (!hasOwnName(existing.name, def.id)) {
+            entries.set(def.id, { ...existing, name: fixedName });
+        }
     }
     return entries;
 };
