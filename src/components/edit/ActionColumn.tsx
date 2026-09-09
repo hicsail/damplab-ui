@@ -23,8 +23,11 @@ export const getActionsColumn: (params: GetActionsColumnProps) => GridColDef = (
     headerName: 'Actions',
     width: 100,
     cellClassName: 'actions',
-    getActions: ({ id }) => {
-      if (!params.canWrite) {
+    getActions: ({ id, row }) => {
+      // `__reserved` is only ever set by EditParametersTable's five injected
+      // equipment rows; every other caller's rows leave it undefined, so this
+      // is a no-op for them.
+      if (!params.canWrite || (row as any)?.__reserved === true) {
         return [];
       }
 

@@ -23,6 +23,7 @@ export const GET_SERVICES = gql`
       }
       pricingMode
       allowMultipleRuns
+      equipmentUse
       icon
       parameters
       description
@@ -760,6 +761,7 @@ export const UPDATE_SERVICE = gql`
       }
       pricingMode
       allowMultipleRuns
+      equipmentUse
       icon
       deliverables
       notes
@@ -789,6 +791,7 @@ export const CREATE_SERVICE = gql`
       }
       pricingMode
       allowMultipleRuns
+      equipmentUse
       icon
       parameters
       description

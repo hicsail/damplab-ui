@@ -33,6 +33,7 @@ import { DeliverablesEditor } from '../components/edit/DeliverablesEditor';
 import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { formatSaveError } from '../utils/gqlError';
+import { EQUIPMENT_USE_NEEDS_BOOKABLE_MESSAGE } from '../utils/equipmentParams';
 
 const MENU_PROPS = {
   PaperProps: {
@@ -62,6 +63,7 @@ export default function AdminEditService() {
   const [unit, setUnit] = useState('');
   const [pricingMode, setPricingMode] = useState<'SERVICE' | 'PARAMETER'>('SERVICE');
   const [allowMultipleRuns, setAllowMultipleRuns] = useState(false);
+  const [equipmentUse, setEquipmentUse] = useState(false);
   const [internalPrice, setInternalPrice] = useState('');
   const [externalAcademicPrice, setExternalAcademicPrice] = useState('');
   const [externalMarketPrice, setExternalMarketPrice] = useState('');
@@ -70,10 +72,23 @@ export default function AdminEditService() {
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([]);
   const [inventoryRequirementIds, setInventoryRequirementIds] = useState<string[]>([]);
   const { data: inventoryData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
-  const inventoryOptions: Array<{ id: string; name: string; type?: string }> = useMemo(
-    () => (inventoryData?.activeInventoryItems ?? []).map((i: any) => ({ id: String(i.id), name: i.name, type: i.type })),
+  const inventoryOptions: Array<{ id: string; name: string; type?: string; bookable?: boolean }> = useMemo(
+    () => (inventoryData?.activeInventoryItems ?? []).map((i: any) => ({ id: String(i.id), name: i.name, type: i.type, bookable: i.bookable === true })),
     [inventoryData]
   );
+  /**
+   * The editor's copy of the server's rule, shown before the save rather than after
+   * it. The save is not disabled — the server is the authority and refuses the write
+   * with the same sentence.
+   */
+  const equipmentUseWarning = useMemo(
+    () =>
+      equipmentUse && !inventoryOptions.some((i) => i.bookable === true && inventoryRequirementIds.includes(i.id))
+        ? EQUIPMENT_USE_NEEDS_BOOKABLE_MESSAGE
+        : null,
+    [equipmentUse, inventoryOptions, inventoryRequirementIds]
+  );
+
   const [deliverables, setDeliverables] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [protocolIds, setProtocolIds] = useState<string[]>([]);
@@ -103,6 +118,7 @@ export default function AdminEditService() {
     setUnit(row.unit ?? '');
     setPricingMode(row.pricingMode ?? 'SERVICE');
     setAllowMultipleRuns(row.allowMultipleRuns === true);
+    setEquipmentUse(row.equipmentUse === true);
     setInternalPrice(
       pricing.internal != null ? String(pricing.internal) : row.internalPrice != null ? String(row.internalPrice) : ''
     );
@@ -244,6 +260,7 @@ export default function AdminEditService() {
       },
       pricingMode,
       allowMultipleRuns,
+      equipmentUse,
       parameters: row.parameters ?? [],
       paramGroups: row.paramGroups ?? [],
       allowedConnections: allowedConnectionIds,
@@ -473,6 +490,18 @@ export default function AdminEditService() {
         Adds a &ldquo;Number of runs&rdquo; count to this service&rsquo;s canvas nodes and multiplies the price by it. Leave off for
         operations that only ever run once. Jobs already submitted keep the run count they were priced with either way.
       </FormHelperText>
+
+      <FormControlLabel
+        control={<Checkbox checked={equipmentUse} onChange={(event) => setEquipmentUse(event.target.checked)} />}
+        label="Equipment use"
+      />
+      <FormHelperText sx={{ mt: -1.5, ml: 4 }}>
+        Marks this as an equipment-booking operation. Its canvas nodes gain Start Date, End Date, Open End Date?,
+        Projected Hours per Week and Authorized booker emails, and its SOW line is estimated as the hourly rate
+        multiplied by hours per week and the number of weeks. Requires at least one bookable item under Required
+        inventory. Operations already on submitted jobs are unaffected.
+      </FormHelperText>
+      {equipmentUseWarning ? <Alert severity="warning">{equipmentUseWarning}</Alert> : null}
 
       <Box
         sx={{

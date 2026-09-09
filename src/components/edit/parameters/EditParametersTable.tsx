@@ -13,7 +13,7 @@ import {
   useGridApiRef
 } from '@mui/x-data-grid';
 import { getActionsColumn } from '../ActionColumn';
-import { MutableRefObject, useState } from 'react';
+import { MutableRefObject, useMemo, useState } from 'react';
 import { GridApiCommunity } from '@mui/x-data-grid/internals';
 import { GridToolBar } from '../GridToolBar';
 import {
@@ -46,6 +46,7 @@ import {
 } from './ParameterFieldViewCells';
 import {validateParameter} from './ParameterValidation';
 import { PERMISSIONS, usePermissions } from '../../../hooks/usePermissions';
+import { EQUIPMENT_PARAM_DEFS } from '../../../controllers/ReactFlowEvents';
 
 const TYPE_LABELS: Record<string, string> = {
   string: 'Text',
@@ -53,7 +54,9 @@ const TYPE_LABELS: Record<string, string> = {
   file: 'File upload',
   boolean: 'Yes/No',
   dropdown: 'Pick from list',
-  table: 'Table'
+  table: 'Table',
+  date: 'Date',
+  emails: 'Email addresses'
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -68,6 +71,13 @@ interface EditParametersTableProps {
   viewParams: GridRenderCellParams | null;
   editParams: GridRenderEditCellParams | null;
   gridRef: MutableRefObject<GridApiCommunity>;
+  /**
+   * Whether the owning service is flagged for equipment use. When true, the five
+   * reserved equipment parameters (Task 7's EQUIPMENT_PARAM_DEFS) are shown pinned
+   * at the top of the grid, read-only — no edit or delete action, and never part
+   * of what gets written back to the service's own `parameters`.
+   */
+  equipmentUse?: boolean;
 }
 
 export const EditParametersTable: React.FC<EditParametersTableProps> = (props) => {
@@ -78,6 +88,22 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const isEdit = !!props.editParams;
   const [rows, setRows] = useState<any[]>(props.viewParams ? props.viewParams.value : props.editParams!.value);
+  // The five reserved defs, prepended read-only when the service is flagged for
+  // equipment use. Never merged into `rows` — that state is what gets written
+  // back to the service's own `parameters`, so keeping the defs out of it is what
+  // guarantees they can never be persisted there. A def the service already
+  // declares itself is left alone, mirroring withEquipmentParams's own rule.
+  const equipmentRows = useMemo(
+    () =>
+      props.equipmentUse
+        ? EQUIPMENT_PARAM_DEFS.filter((def) => !rows.some((row: any) => row?.id === def.id)).map((def) => ({
+            ...def,
+            __reserved: true
+          }))
+        : [],
+    [props.equipmentUse, rows]
+  );
+  const displayRows = equipmentRows.length ? [...equipmentRows, ...rows] : rows;
   const [optionDialogOpen, setOptionDialogOpen] = useState<boolean>(false);
   const [optionViewProps, setOptionViewProps] = useState<GridRenderCellParams | null>(null);
   const [optionEditProps, setOptionEditProps] = useState<GridRenderEditCellParams | null>(null);
@@ -403,7 +429,11 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     }
   ];
 
+  const isReservedRow = (id: GridRowId) => displayRows.find((row: any) => row.id === id)?.__reserved === true;
+
   const handleDeletion = async (id: GridRowId) => {
+    if (isReservedRow(id)) return; // Reserved rows have no delete action.
+
     // Filter out the grid
     const filtered = rows.filter((parameter: any) => parameter.id != id);
 
@@ -425,6 +455,10 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   };
 
   const handleUpdate = (newRow: GridRowModel) => {
+    // Reserved rows are not editable (isCellEditable blocks it below); guard here
+    // too so one can never be written back into the service's own parameters.
+    if ((newRow as any).__reserved === true) return newRow;
+
     // Validate new row
     const paramValidationErrors = validateParameter(newRow);
     if (paramValidationErrors.length > 0) {
@@ -463,7 +497,10 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
     columns.push(
       getActionsColumn({
         handleDelete: (id) => handleDeletion(id),
-        handleEdit: (id) => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } }),
+        handleEdit: (id) => {
+          if (isReservedRow(id)) return; // Reserved rows have no edit action.
+          setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
+        },
         handleCancel: (id) => setRowModesModel({
           ...rowModesModel,
           [id]: { mode: GridRowModes.View, ignoreModifications: true }
@@ -478,11 +515,12 @@ export const EditParametersTable: React.FC<EditParametersTableProps> = (props) =
   return (
     <>
       <DataGrid
-        rows={rows}
+        rows={displayRows}
         columns={columns}
         sx={{ width: '100%' }}
         processRowUpdate={handleUpdate}
         editMode="row"
+        isCellEditable={(params) => params.row.__reserved !== true}
         rowModesModel={rowModesModel}
         onRowModesModelChange={(newMode) => setRowModesModel(newMode)}
         onRowEditStop={handleRowEditStop}
