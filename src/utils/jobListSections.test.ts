@@ -32,7 +32,7 @@ describe('jobListSectionChips', () => {
   });
 
   it('reads a job state rather than printing the raw enum', () => {
-    expect(chipsByKey({ state: 'CHANGES_REQUESTED' }).job.label).toBe('Changes Requested');
+    expect(chipsByKey({ state: 'CHANGES_REQUESTED' }).job.label).toBe('Job · Changes Requested');
   });
 
   it('does not colour an unsent draft the same as a countersigned document', () => {
