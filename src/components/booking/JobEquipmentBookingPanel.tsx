@@ -27,7 +27,7 @@ import { addDays, format, isSameDay, startOfWeek } from 'date-fns';
 import { GET_JOB_EQUIPMENT_BOOKING } from '../../gql/queries';
 import { CANCEL_BOOKING, CREATE_JOB_EQUIPMENT_BOOKING, SET_JOB_BOOKING_BLOCK, UPDATE_JOB_EQUIPMENT_BOOKING } from '../../gql/mutations';
 import { blockedMessage, bookingsForWeek, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES } from '../../utils/jobEquipmentBooking';
-import { formatSaveError } from '../../utils/gqlError';
+import { formatGqlError, formatSaveError } from '../../utils/gqlError';
 import ReasonDialog from '../ReasonDialog';
 import JobEquipmentBookingDialog from './JobEquipmentBookingDialog';
 
@@ -54,7 +54,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   const [actionError, setActionError] = useState<string | null>(null);
   const [pausing, setPausing] = useState(false);
 
-  const { data, loading, refetch } = useQuery(GET_JOB_EQUIPMENT_BOOKING, {
+  const { data, loading, error, refetch } = useQuery(GET_JOB_EQUIPMENT_BOOKING, {
     variables: { jobId },
     skip: !jobId,
     fetchPolicy: 'cache-and-network'
@@ -79,6 +79,20 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
       </Box>
     );
   }
+  // Only bail out to the error card when there is nothing cached to fall back on — a
+  // failed background revalidate on cache-and-network shouldn't blow away a working
+  // calendar, and shouldn't turn a HIDDEN user's blip into a visible error card.
+  if (error && !view) {
+    return (
+      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
+          Equipment booking
+        </Typography>
+        <Alert severity="error">{formatGqlError(error, 'Could not load equipment booking.')}</Alert>
+      </Paper>
+    );
+  }
+
   // HIDDEN renders nothing at all — not an empty card, not a "no access" notice.
   if (!access || access.status === 'HIDDEN') return null;
 
