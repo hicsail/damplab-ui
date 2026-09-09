@@ -1,6 +1,16 @@
 
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
-import { RUN_COUNT_PARAM_ID, RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
+import {
+    RUN_COUNT_PARAM_ID,
+    RUN_COUNT_PARAM_NAME,
+    EQUIPMENT_BOOKERS_PARAM_ID,
+    EQUIPMENT_END_PARAM_ID,
+    EQUIPMENT_HOURS_PER_WEEK_PARAM_ID,
+    EQUIPMENT_OPEN_END_PARAM_ID,
+    EQUIPMENT_PARAM_IDS,
+    EQUIPMENT_PARAM_NAMES,
+    EQUIPMENT_START_PARAM_ID
+} from '../utils/servicePricing';
 
 
 /**
@@ -31,6 +41,115 @@ export const RUN_COUNT_PARAM_DEF = {
     allowMultipleValues: false,
 };
 
+/**
+ * Whether this service's canvas nodes book lab equipment.
+ *
+ * Opt-in per service in the catalog editor, and read only at node creation:
+ * turning it on never touches a node that already exists (behaviour 4).
+ */
+export const serviceIsEquipmentUse = (service: any): boolean => service?.equipmentUse === true;
+
+/**
+ * The five reserved equipment parameters as the sidebar's parameter list sees them.
+ *
+ * Deliberately not stored on the service: they are identical for every operation
+ * that books equipment, and the ids are the lookup keys the booking and invoicing
+ * runs will read. Labels are fixed; no price fields, so the client-facing catalog
+ * view is unchanged.
+ */
+export const EQUIPMENT_PARAM_DEFS: any[] = [
+    {
+        id                 : EQUIPMENT_START_PARAM_ID,
+        name               : EQUIPMENT_PARAM_NAMES[EQUIPMENT_START_PARAM_ID],
+        type               : 'date',
+        required           : true,
+        description        : 'First day of the booking window.',
+        paramType          : 'input',
+        options            : null,
+        allowMultipleValues: false,
+    },
+    {
+        id                 : EQUIPMENT_END_PARAM_ID,
+        name               : EQUIPMENT_PARAM_NAMES[EQUIPMENT_END_PARAM_ID],
+        type               : 'date',
+        required           : true,
+        description        : 'Last day of the booking window. Must be on or after the start.',
+        paramType          : 'input',
+        options            : null,
+        allowMultipleValues: false,
+    },
+    {
+        id                 : EQUIPMENT_OPEN_END_PARAM_ID,
+        name               : EQUIPMENT_PARAM_NAMES[EQUIPMENT_OPEN_END_PARAM_ID],
+        type               : 'boolean',
+        required           : false,
+        description        : 'Tick if the end date is a best guess rather than a hard stop.',
+        paramType          : 'input',
+        options            : null,
+        allowMultipleValues: false,
+    },
+    {
+        id                 : EQUIPMENT_HOURS_PER_WEEK_PARAM_ID,
+        name               : EQUIPMENT_PARAM_NAMES[EQUIPMENT_HOURS_PER_WEEK_PARAM_ID],
+        type               : 'number',
+        required           : true,
+        description        : 'Estimate = hourly rate x this x the number of weeks in the window.',
+        paramType          : 'input',
+        options            : null,
+        allowMultipleValues: false,
+    },
+    {
+        id                 : EQUIPMENT_BOOKERS_PARAM_ID,
+        name               : EQUIPMENT_PARAM_NAMES[EQUIPMENT_BOOKERS_PARAM_ID],
+        type               : 'emails',
+        required           : false,
+        description        : 'Who else may book this equipment against this job. Optional.',
+        paramType          : 'input',
+        options            : null,
+        allowMultipleValues: false,
+    },
+];
+
+/** The value an equipment form entry starts life with, per reserved id. */
+const EQUIPMENT_INITIAL_VALUES: Record<string, any> = {
+    [EQUIPMENT_START_PARAM_ID]        : '',
+    [EQUIPMENT_END_PARAM_ID]          : '',
+    [EQUIPMENT_OPEN_END_PARAM_ID]     : false,
+    [EQUIPMENT_HOURS_PER_WEEK_PARAM_ID]: '',
+    [EQUIPMENT_BOOKERS_PARAM_ID]      : [],
+};
+
+/** The same five as form entries, which is where pricing and validation read them from. */
+const equipmentFormEntries = (nodeId: string): NodeParameter[] =>
+    EQUIPMENT_PARAM_DEFS.map((def) => ({
+        id                 : def.id,
+        nodeId             : nodeId,
+        name               : def.name,
+        type               : def.type,
+        options            : undefined,
+        description        : def.description,
+        paramType          : 'input',
+        resultParamValue   : '',
+        value              : EQUIPMENT_INITIAL_VALUES[def.id],
+        required           : def.required,
+        dynamicAdd         : false,
+        allowMultipleValues: undefined,
+        tableData          : null,
+    }));
+
+/**
+ * The sidebar's parameter list, with the five appended when the node has them.
+ * RightSidebar reads this list to pin the group to the top, so a node whose formData
+ * carries them but whose parameter list does not gets them buried at the bottom.
+ */
+export const withEquipmentParams = (serviceParams: any[], include: boolean): any[] => {
+    if (!include) return serviceParams;
+    // A service that declares one of the ids itself keeps its own definition, for the
+    // same reason the run count does: duplicating it would double-count in pricing.
+    const missing = EQUIPMENT_PARAM_DEFS.filter((def) => !serviceParams.some((p: any) => p?.id === def.id));
+    return missing.length ? [...serviceParams, ...missing] : serviceParams;
+};
+
 /** The same field as a form entry, which is where pricing actually reads it from. */
 const runCountFormEntry = (nodeId: string): NodeParameter => ({
     id                 : RUN_COUNT_PARAM_ID,
@@ -49,7 +168,7 @@ const runCountFormEntry = (nodeId: string): NodeParameter => ({
     isPriceMultiplier  : true,
 });
 
-export const generateFormDataFromParams = (paramsData: any, nodeId: string, options: { includeRunCount?: boolean } = {}): NodeParameter[] => {
+export const generateFormDataFromParams = (paramsData: any, nodeId: string, options: { includeRunCount?: boolean; includeEquipment?: boolean } = {}): NodeParameter[] => {
 
     const formData : NodeParameter[] = [];
 
@@ -82,6 +201,12 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string, opti
         formData.push(runCountFormEntry(nodeId));
     }
 
+    if (options.includeEquipment) {
+        for (const entry of equipmentFormEntries(nodeId)) {
+            if (!formData.some((p) => p.id === entry.id)) formData.push(entry);
+        }
+    }
+
     return formData;
 }
 
@@ -100,10 +225,11 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string, opti
 export const buildNodeParameters = (service: any, nodeId: string): { formData: NodeParameter[]; parameters: any[] } => {
     const serviceParams = service?.parameters ?? [];
     const includeRunCount = serviceAllowsMultipleRuns(service);
+    const includeEquipment = serviceIsEquipmentUse(service);
 
     return {
-        formData: generateFormDataFromParams(serviceParams, nodeId, { includeRunCount }),
-        parameters: withRunCountParam(serviceParams, includeRunCount)
+        formData: generateFormDataFromParams(serviceParams, nodeId, { includeRunCount, includeEquipment }),
+        parameters: withEquipmentParams(withRunCountParam(serviceParams, includeRunCount), includeEquipment)
     };
 }
 
