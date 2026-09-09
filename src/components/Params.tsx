@@ -5,8 +5,10 @@ import {
   AccordionDetails,
   AccordionSummary,
   Alert,
+  Checkbox,
   Chip,
   FormControl,
+  FormControlLabel,
   FormHelperText,
   IconButton,
   InputLabel,
@@ -22,8 +24,12 @@ import {
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { DeleteForeverSharp, PlusOne } from "@mui/icons-material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import ParamTableOnForm from "./ParamTableOnForm";
 import { CanvasContext } from "../contexts/Canvas";
+import { normalizeBookerEmails, validateEquipmentValues } from "../utils/equipmentParams";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -154,6 +160,12 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
         }
       }
     });
+
+    // The reserved equipment parameters carry rules the generic required-field pass
+    // cannot express: a date pair that must not invert, an integer floor, and a list of
+    // addresses. Returns nothing at all for a node that has none of them.
+    Object.assign(errors, validateEquipmentValues(values));
+
     setParamErrors(errors);
     return errors;
   };
@@ -260,6 +272,96 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
         <div className="input-params" style={{ marginLeft: 8 }}>
           {activeNode.data.formData.map((param: any) => wrapChanged(param, (() => {
             if (param.paramType !== "result") {
+              if (param.type === "date") {
+                const raw = formik.values[param.id];
+                const parsed = typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+                  ? new Date(`${raw}T00:00:00`)
+                  : null;
+                return (
+                  <div key={param.id} style={{ marginTop: 24 }}>
+                    <LocalizationProvider dateAdapter={AdapterDateFns}>
+                      <DatePicker
+                        label={param.name}
+                        value={parsed}
+                        readOnly={readOnly}
+                        onChange={(next: Date | null) => {
+                          // Stored as a date-only string: the value is a calendar day, and a
+                          // timestamp would shift it across a timezone or a DST boundary.
+                          if (!next || Number.isNaN(next.getTime())) {
+                            formik.setFieldValue(param.id, "");
+                            return;
+                          }
+                          const y = next.getFullYear();
+                          const m = String(next.getMonth() + 1).padStart(2, "0");
+                          const d = String(next.getDate()).padStart(2, "0");
+                          formik.setFieldValue(param.id, `${y}-${m}-${d}`);
+                        }}
+                        slotProps={{
+                          textField: {
+                            size: "small",
+                            sx: { width: "26ch" },
+                            error: Boolean(formik.errors[param.id]),
+                            helperText: formik.errors[param.id]
+                              ? String(formik.errors[param.id])
+                              : (param.description ? param.description : null),
+                          },
+                        }}
+                      />
+                    </LocalizationProvider>
+                  </div>
+                );
+              }
+              if (param.type === "boolean") {
+                // There is no boolean branch below: an untyped fallback would render this
+                // as <TextField type="boolean">, i.e. a text box. Stored as a real boolean
+                // so the pricer, the diff seed and the PDF all read the same value.
+                return (
+                  <div key={param.id} style={{ marginTop: 16 }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={formik.values[param.id] === true}
+                          disabled={readOnly}
+                          onChange={(e) => formik.setFieldValue(param.id, e.target.checked)}
+                        />
+                      }
+                      label={param.name}
+                    />
+                    {param.description ? <FormHelperText sx={{ ml: 4, mt: -0.5 }}>{param.description}</FormHelperText> : null}
+                  </div>
+                );
+              }
+              if (param.type === "emails") {
+                const emails: string[] = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [];
+                return (
+                  <div key={param.id} style={{ marginTop: 24 }}>
+                    <TextField
+                      size="small"
+                      label={param.name}
+                      placeholder="name@example.com, other@example.com"
+                      defaultValue={emails.join(", ")}
+                      onBlur={(e) => formik.setFieldValue(param.id, normalizeBookerEmails(e.target.value.split(",")))}
+                      sx={{ width: "36ch" }}
+                      InputLabelProps={{ shrink: true }}
+                      InputProps={{ readOnly }}
+                      error={Boolean(formik.errors[param.id])}
+                      helperText={formik.errors[param.id]
+                        ? String(formik.errors[param.id])
+                        : (param.description ? param.description : "Comma-separated. Optional.")}
+                    />
+                    <Box sx={{ mt: 0.5, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {emails.map((email) => (
+                        <Chip
+                          key={email}
+                          label={email}
+                          size="small"
+                          onDelete={readOnly ? undefined : () => formik.setFieldValue(param.id, emails.filter((e) => e !== email))}
+                        />
+                      ))}
+                    </Box>
+                  </div>
+                );
+              }
               if (param.type === "table") {
                 return (
                   <div key={param.id}>
