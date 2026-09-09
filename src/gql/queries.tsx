@@ -1494,6 +1494,16 @@ export const GET_JOB_EQUIPMENT_BOOKING = gql`
         createdBySub
         createdByName
         notes
+        history {
+          at
+          action
+          bySub
+          byName
+          reason
+          previousStartTime
+          previousEndTime
+          previousNotes
+        }
       }
     }
   }

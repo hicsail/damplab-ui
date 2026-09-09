@@ -41,7 +41,8 @@ export default function JobEquipmentBookingCalendar({ jobId }: Props): React.JSX
   const view = data?.jobEquipmentBooking;
   const access = view?.access;
   const operations: any[] = view?.operations ?? [];
-  const bookings: any[] = view?.bookings ?? [];
+  // The view carries every booking ever made on the job; only live ones are slots.
+  const bookings: any[] = (view?.bookings ?? []).filter((b: any) => b.status !== 'CANCELLED');
   const open = access?.status === 'OPEN';
 
   // The shared pool for the visible grid. `inventoryAvailability` needs
@@ -92,11 +93,13 @@ export default function JobEquipmentBookingCalendar({ jobId }: Props): React.JSX
     setDialogError(null);
   };
 
-  const submitBooking = async (values: { inventoryItemId: string; startTime: Date; endTime: Date; notes: string }): Promise<void> => {
+  const submitBooking = async (values: { inventoryItemId: string; startTime: Date; endTime: Date; notes: string; reason?: string }): Promise<void> => {
     setDialogError(null);
     try {
       if (editing) {
-        await updateBooking({ variables: { id: editing._id, input: { startTime: values.startTime, endTime: values.endTime, notes: values.notes || undefined } } });
+        await updateBooking({
+          variables: { id: editing._id, input: { startTime: values.startTime, endTime: values.endTime, notes: values.notes || undefined, reason: values.reason } }
+        });
       } else {
         await createBooking({
           variables: {

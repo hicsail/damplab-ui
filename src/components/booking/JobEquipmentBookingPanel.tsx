@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { useNavigate } from 'react-router';
-import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, FormControlLabel, IconButton, Stack, Switch, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Collapse, FormControlLabel, IconButton, Stack, Switch, Tooltip, Typography } from '@mui/material';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CloseIcon from '@mui/icons-material/Close';
+import HistoryIcon from '@mui/icons-material/History';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { format } from 'date-fns';
 import { GET_JOB_EQUIPMENT_BOOKING } from '../../gql/queries';
 import { CANCEL_BOOKING, SET_JOB_BOOKING_BLOCK } from '../../gql/mutations';
@@ -22,25 +24,62 @@ interface Props {
 
 const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
-const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success' | 'info'> = {
+const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success' | 'info' | 'error'> = {
   RESERVED: 'warning',
   IN_USE: 'warning',
-  COMPLETED: 'success'
+  COMPLETED: 'success',
+  CANCELLED: 'default'
 };
+
+const ACTION_LABEL: Record<string, string> = { CREATED: 'Booked', UPDATED: 'Changed', CANCELLED: 'Cancelled' };
+
+const slot = (start?: string | null, end?: string | null): string =>
+  `${start ? format(new Date(start), 'MMM d, h:mm a') : ''} – ${end ? format(new Date(end), 'MMM d, h:mm a') : ''}`;
+
+/** One booking's audit trail, oldest first; the job page is the only place it is shown. */
+function BookingHistory({ entries }: { entries: any[] }): React.JSX.Element {
+  return (
+    <Stack spacing={0.75} sx={{ mt: 1, pl: 1, borderLeft: '2px solid', borderColor: 'divider' }}>
+      {entries.map((h, i) => (
+        <Box key={i}>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            <b>{ACTION_LABEL[h.action] ?? h.action}</b> · {h.at ? format(new Date(h.at), 'MMM d, yyyy h:mm a') : ''}
+            {h.byName ? ` · ${h.byName}` : ''}
+          </Typography>
+          {h.action === 'UPDATED' && (h.previousStartTime || h.previousEndTime) && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              Was {slot(h.previousStartTime, h.previousEndTime)}
+              {h.previousNotes ? ` · “${h.previousNotes}”` : ''}
+            </Typography>
+          )}
+          {h.reason && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              Reason: {h.reason}
+            </Typography>
+          )}
+        </Box>
+      ))}
+    </Stack>
+  );
+}
 
 /**
  * The job page's equipment-booking card: the same shape as the Job, SOW and
- * Invoices cards — party rail, status pane, actions, details — listing the
- * bookings already in place. Booking itself happens on the Book inventory page,
- * which the customer's action button opens on this job.
+ * Invoices cards — party rail, status pane, actions, details — and the record of
+ * every booking ever made on the job, cancelled ones included, each with its
+ * history. Booking itself happens on the Book inventory page, which the
+ * customer's action button opens on this job.
  *
  * Every gate has a server-side twin — `jobEquipmentBooking` returns HIDDEN and no
- * data to a caller who is not on the job, and the mutations re-check.
+ * data to a caller who is not on the job, and the mutations re-check. Cancel is
+ * offered to every customer on the job; the server's own rule (creator, client
+ * email, listed booker of that operation) refuses the rest with its message.
  */
 export default function JobEquipmentBookingPanel({ jobId, staffView = false }: Props): React.JSX.Element | null {
   const navigate = useNavigate();
   const [actionError, setActionError] = useState<string | null>(null);
   const [pausing, setPausing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState<Record<string, boolean>>({});
 
   const { data, loading, error, refetch } = useQuery(GET_JOB_EQUIPMENT_BOOKING, {
     variables: { jobId },
@@ -54,6 +93,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   const access = view?.access;
   const operations: any[] = view?.operations ?? [];
   const bookings: any[] = [...(view?.bookings ?? [])].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  const live = bookings.filter((b) => b.status !== 'CANCELLED');
 
   if (!jobId) return null;
   if (loading && !data) {
@@ -88,10 +128,10 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
         : paused
           ? blockedMessage(access.reason)
           : null;
-  const hours = bookedHours(bookings);
-  const upcoming = bookings.find((b) => new Date(b.endTime).getTime() > Date.now());
+  const hours = bookedHours(live);
+  const upcoming = live.find((b) => new Date(b.endTime).getTime() > Date.now());
   const operationLabel = (b: any): string => operations.find((op) => op.nodeId === b.nodeId)?.label ?? '';
-  const mayCancel = (b: any): boolean => !staffView && b.billingStatus !== 'BILLED' && !!operations.find((op) => op.nodeId === b.nodeId)?.canBook;
+  const mayCancel = (b: any): boolean => !staffView && b.status !== 'CANCELLED' && b.billingStatus !== 'BILLED';
 
   const doCancel = async (id: string): Promise<void> => {
     if (!window.confirm('Cancel this booking?')) return;
@@ -103,12 +143,12 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
     }
   };
 
-  const status = bookings.length === 0 ? 'No bookings yet' : `${bookings.length} booking${bookings.length === 1 ? '' : 's'} · ${hours} hrs`;
+  const status = live.length === 0 ? 'No bookings in place' : `${live.length} booking${live.length === 1 ? '' : 's'} · ${hours} hrs`;
   const description = locked
     ? locked
     : upcoming
       ? `Next: ${upcoming.notes || upcoming.inventoryName} · ${format(new Date(upcoming.startTime), 'MMM d, h:mm a')}`
-      : bookings.length === 0
+      : live.length === 0
         ? 'Time booked against this job is billed to it at the operation’s rate.'
         : 'No upcoming bookings.';
 
@@ -155,11 +195,11 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
       <ProcessCard
         title="Equipment Booking"
         defaultExpanded={bookings.length > 0}
-        customerBadge={bookings.length > 0 ? 'check' : null}
+        customerBadge={live.length > 0 ? 'check' : null}
         staffBadge={paused ? 'paper' : open ? 'check' : null}
         customerVersion={`${hours} hrs booked`}
         staffVersion={paused ? 'Paused' : open ? 'Bookable' : 'Not open'}
-        statusPaneSx={{ bgcolor: chipStatusBackground(paused ? 'warning' : open && bookings.length > 0 ? 'success' : 'default') }}
+        statusPaneSx={{ bgcolor: chipStatusBackground(paused ? 'warning' : open && live.length > 0 ? 'success' : 'default') }}
         statusPane={
           <StatusPaneHeader
             status={status}
@@ -181,38 +221,61 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
             </Typography>
           ) : (
             <Stack spacing={1}>
-              {bookings.map((b) => (
-                <Card key={b._id} variant="outlined">
-                  <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                    <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ fontWeight: 600 }} noWrap title={b.notes || b.inventoryName}>
-                          {b.notes || b.inventoryName}
+              {bookings.map((b) => {
+                const cancelled = b.status === 'CANCELLED';
+                const history: any[] = b.history ?? [];
+                const showHistory = !!historyOpen[b._id];
+                return (
+                  <Card key={b._id} variant="outlined" sx={{ opacity: cancelled ? 0.7 : 1 }}>
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 600, textDecoration: cancelled ? 'line-through' : 'none' }} noWrap title={b.notes || b.inventoryName}>
+                            {b.notes || b.inventoryName}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" noWrap>
+                            {b.inventoryName}
+                            {operationLabel(b) ? ` · ${operationLabel(b)}` : ''}
+                            {b.createdByName ? ` · booked by ${b.createdByName}` : ''}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          size="small"
+                          label={cancelled ? 'Cancelled' : b.usageConfirmed ? 'Confirmed' : b.status}
+                          color={cancelled ? 'default' : b.usageConfirmed ? 'success' : (STATUS_COLOR[b.status] ?? 'default')}
+                          variant={cancelled ? 'outlined' : 'filled'}
+                        />
+                        {b.billingStatus === 'BILLED' && <Chip size="small" label="Billed" color="info" variant="outlined" />}
+                        <Box sx={{ flex: 1 }} />
+                        <Typography variant="body2" color="text.secondary" sx={{ textDecoration: cancelled ? 'line-through' : 'none' }}>
+                          {slot(b.startTime, b.endTime)}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" noWrap>
-                          {b.inventoryName}
-                          {operationLabel(b) ? ` · ${operationLabel(b)}` : ''}
-                          {b.createdByName ? ` · booked by ${b.createdByName}` : ''}
-                        </Typography>
-                      </Box>
-                      <Chip size="small" label={b.usageConfirmed ? 'Confirmed' : b.status} color={b.usageConfirmed ? 'success' : (STATUS_COLOR[b.status] ?? 'default')} />
-                      {b.billingStatus === 'BILLED' && <Chip size="small" label="Billed" color="info" variant="outlined" />}
-                      <Box sx={{ flex: 1 }} />
-                      <Typography variant="body2" color="text.secondary">
-                        {b.startTime ? format(new Date(b.startTime), 'MMM d, h:mm a') : ''} – {b.endTime ? format(new Date(b.endTime), 'MMM d, h:mm a') : ''}
-                      </Typography>
-                      {b.cost != null && <Typography variant="body2">${Number(b.cost).toFixed(2)}</Typography>}
-                      {mayCancel(b) && (
-                        <Tooltip title="Cancel booking">
-                          <IconButton size="small" color="error" onClick={() => doCancel(b._id)}>
-                            <CloseIcon fontSize="inherit" />
-                          </IconButton>
-                        </Tooltip>
+                        {b.cost != null && !cancelled && <Typography variant="body2">${Number(b.cost).toFixed(2)}</Typography>}
+                        {history.length > 0 && (
+                          <Tooltip title={showHistory ? 'Hide history' : `History (${history.length})`}>
+                            <IconButton size="small" onClick={() => setHistoryOpen((s) => ({ ...s, [b._id]: !showHistory }))} aria-expanded={showHistory}>
+                              <HistoryIcon fontSize="inherit" />
+                              <ExpandMoreIcon sx={{ fontSize: 14, transform: showHistory ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {mayCancel(b) && (
+                          <Tooltip title="Cancel booking">
+                            <IconButton size="small" color="error" onClick={() => doCancel(b._id)}>
+                              <CloseIcon fontSize="inherit" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Stack>
+                      {history.length > 0 && (
+                        <Collapse in={showHistory} unmountOnExit>
+                          <BookingHistory entries={history} />
+                        </Collapse>
                       )}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </Stack>
           )
         }

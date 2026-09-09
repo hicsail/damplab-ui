@@ -26,7 +26,7 @@ interface Props {
   busy?: boolean;
   error?: string | null;
   onCancel: () => void;
-  onConfirm: (values: { inventoryItemId: string; startTime: Date; endTime: Date; notes: string }) => void;
+  onConfirm: (values: { inventoryItemId: string; startTime: Date; endTime: Date; notes: string; reason?: string }) => void;
 }
 
 const HOUR_MS = 3_600_000;
@@ -58,6 +58,8 @@ export default function JobEquipmentBookingDialog({
   const [start, setStart] = useState<Date | null>(null);
   const [end, setEnd] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
+  const [reason, setReason] = useState('');
+  const editing = !!fixedItemId && !!initialStart;
 
   // Each opening starts from the caller's values, so an abandoned edit can never
   // be submitted against the next booking.
@@ -67,6 +69,7 @@ export default function JobEquipmentBookingDialog({
     setStart(initialStart ?? null);
     setEnd(initialEnd ?? null);
     setNotes(initialNotes ?? '');
+    setReason('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -76,7 +79,7 @@ export default function JobEquipmentBookingDialog({
     if (value && (!end || end <= value)) setEnd(new Date(value.getTime() + HOUR_MS));
   };
 
-  const invalid = !itemId || !start || !end || end <= start;
+  const invalid = !itemId || !start || !end || end <= start || (editing && !reason.trim());
   const outside = !invalid && isOutsideWindow(estimatedWindow, start as Date, end as Date);
 
   return (
@@ -105,6 +108,17 @@ export default function JobEquipmentBookingDialog({
             <DateTimePicker label="Start" value={start} onChange={pickStart} slotProps={{ textField: { size: 'small', fullWidth: true } }} />
             <DateTimePicker label="End" value={end} onChange={setEnd} slotProps={{ textField: { size: 'small', fullWidth: true } }} />
             <TextField size="small" fullWidth label="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            {editing && (
+              <TextField
+                size="small"
+                fullWidth
+                required
+                label="Reason for the change"
+                helperText="Recorded in the booking’s history on the job page."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+            )}
             {outside && (
               <Alert severity="warning">
                 This slot is outside the estimated window. You can still book it — the lab bills actual hours, so the estimate and the schedule are allowed to
@@ -125,7 +139,7 @@ export default function JobEquipmentBookingDialog({
         <Button
           variant="contained"
           disabled={invalid || busy}
-          onClick={() => onConfirm({ inventoryItemId: itemId, startTime: start as Date, endTime: end as Date, notes: notes.trim() })}
+          onClick={() => onConfirm({ inventoryItemId: itemId, startTime: start as Date, endTime: end as Date, notes: notes.trim(), reason: editing ? reason.trim() : undefined })}
         >
           {busy ? 'Saving…' : 'Save booking'}
         </Button>
