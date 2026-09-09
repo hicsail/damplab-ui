@@ -3,13 +3,15 @@ import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel } from '@mui/material';
+import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel, Tooltip } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
 import EditNoteIcon                                   from '@mui/icons-material/EditNote';
 import { billedLineIndexes, buildInvoiceServiceSelections, toggleLineIndex, unbilledLineIndexes, type BillableServiceLine } from '../utils/invoiceSelection';
 import { formatGqlError } from '../utils/gqlError';
+import { invoiceCountLabel } from '../utils/invoiceCounts';
+import { invoiceBlockedMessage } from '../utils/invoiceGate';
 import UndoIcon                                       from '@mui/icons-material/Undo';
 import CancelIcon                                     from '@mui/icons-material/Cancel';
 import ReceiptLongIcon                                from '@mui/icons-material/ReceiptLong';
@@ -549,6 +551,22 @@ export default function TechnicianView() {
     // Keyed on standing invoices: a job whose only invoice was voided has not been
     // billed, and an info-coloured pane saying "1 invoice" would imply it had.
     const invoiceStatusPaneColor = chipStatusBackground(liveInvoices.length ? 'info' : 'default');
+
+    /**
+     * Why Create Invoice is unavailable, or null when it is not.
+     *
+     * The server refuses an invoice against anything but a countersigned SOW.
+     * `useSowStaffStatus` already holds the state that decides it and drives the
+     * SOW card above; the button used to ignore it entirely, so staff reached the
+     * refusal by clicking through a dialog and picking service lines first.
+     */
+    const invoiceBlocked = invoiceBlockedMessage(sowFullData ? { activeStatus: sowStatus.active?.status ?? null, versions: sowStatus.sow?.versions ?? [] } : null);
+    // Computed unconditionally so a not-yet-loaded SOW is blocked rather than
+    // offered, which is the direction `invoiceGate.ts` documents. The *reason* is
+    // held back while loading, though: before the query answers, `sowFullData` is
+    // undefined and the reason reads "this job has no Statement of Work yet" —
+    // true of a job that has none, and wrong about every job that does.
+    const showInvoiceBlockedReason = !sowLoading && !sowStatus.loading && !!invoiceBlocked;
     const jobStatusPaneColor = chipStatusBackground(jobData ? jobStatusColor(jobState) : 'default');
     const biosecurity = PLACEHOLDER_BIOSECURITY;
     const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
@@ -936,21 +954,16 @@ export default function TechnicianView() {
                     statusPane={
                         invoices.length ? (
                             <StatusPaneHeader
-                                status={invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
+                                status={invoiceCountLabel(invoices)}
                                 reference={invoiceLabel !== '—' ? invoiceLabel : undefined}
                                 description={
-                                    // The number itself is in the reference slot now, so this
-                                    // line carries only what that does not say — and it quotes
-                                    // the newest invoice that still stands, never a voided one.
-                                    // A job whose invoices have all been voided says so rather
-                                    // than falling silent, which would read as "not yet billed".
+                                    // The number is in the reference slot and the voided state is
+                                    // in the status, so this line carries only the figure — and it
+                                    // quotes the newest invoice that still stands, never a voided
+                                    // one.
                                     newestLiveInvoice?.totalCost != null
                                         ? `Latest invoice · $${Number(newestLiveInvoice.totalCost).toFixed(2)}`
-                                        : liveInvoices.length === 0
-                                          ? invoices.length === 1
-                                              ? 'Voided — no invoice stands for this job'
-                                              : 'All voided — no invoice stands for this job'
-                                          : undefined
+                                        : undefined
                                 }
                             />
                         ) : (
@@ -962,17 +975,28 @@ export default function TechnicianView() {
                     }
                     actions={
                         <>
-                            <Button
-                                color={sowFullData ? 'primary' : 'secondary'}
-                                variant="contained"
-                                size="small"
-                                startIcon={<ReceiptLongIcon />}
-                                disabled={!sowFullData || sowLoading}
-                                onClick={openInvoiceDialog}
-                                sx={railBtnSx}
-                            >
-                                Create Invoice
-                            </Button>
+                            <Tooltip title={showInvoiceBlockedReason ? invoiceBlocked : ''} disableHoverListener={!showInvoiceBlockedReason}>
+                                {/* A span, because MUI cannot attach a tooltip to a disabled
+                                    button — and the reason is the whole point of disabling it. */}
+                                <span style={{ display: 'block' }}>
+                                    <Button
+                                        color={sowFullData && !invoiceBlocked ? 'primary' : 'secondary'}
+                                        variant="contained"
+                                        size="small"
+                                        startIcon={<ReceiptLongIcon />}
+                                        disabled={!sowFullData || sowLoading || sowStatus.loading || !!invoiceBlocked}
+                                        onClick={openInvoiceDialog}
+                                        sx={{ ...railBtnSx, width: '100%' }}
+                                    >
+                                        Create Invoice
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                            {showInvoiceBlockedReason && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                    {invoiceBlocked}
+                                </Typography>
+                            )}
                             {/* Gated on a *standing* invoice: with none, `invoice` would be
                                 null and the document would fall back to the SOW's own services,
                                 printing a total with no adjustments applied. */}

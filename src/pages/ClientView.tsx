@@ -9,6 +9,7 @@ import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_E
 import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutations';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
+import { invoiceCountLabel } from '../utils/invoiceCounts';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import ProcessCard                from '../components/technician/ProcessCard';
@@ -531,16 +532,17 @@ export default function Tracking() {
                     statusPane={
                         invoices.length ? (
                             <StatusPaneHeader
-                                status={invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
+                                status={invoiceCountLabel(invoices)}
                                 reference={invoiceVersionLabel(liveInvoices) !== '—' ? invoiceVersionLabel(liveInvoices) : undefined}
                                 description={
                                     // Quotes the newest invoice that still stands. This line
                                     // reads as "what you owe" to a client, so a voided figure
-                                    // must never reach it.
+                                    // must never reach it — and when nothing stands it says so
+                                    // in those terms, which the status's bare "voided" does not.
                                     newestLiveInvoice?.totalCost != null
                                         ? `Latest invoice · $${Number(newestLiveInvoice.totalCost).toFixed(2)}`
                                         : liveInvoices.length === 0
-                                          ? 'Voided — nothing is currently payable'
+                                          ? 'Nothing is currently payable'
                                           : undefined
                                 }
                             />

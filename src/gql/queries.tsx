@@ -931,10 +931,6 @@ export const GET_SOW_BY_ID = gql`
           reason
         }
         totalCost
-        discount {
-          amount
-          reason
-        }
       }
       terms
       additionalInformation
@@ -1003,10 +999,6 @@ export const GET_SOW_BY_JOB_ID = gql`
           reason
         }
         totalCost
-        discount {
-          amount
-          reason
-        }
       }
       terms
       additionalInformation

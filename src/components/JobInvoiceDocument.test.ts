@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildInvoicePricingNote, buildVoidNotice } from './JobInvoiceDocument';
+import { billedCustomerCategory, buildInvoicePricingNote, buildVoidNotice, invoiceMoney } from './JobInvoiceDocument';
 
 /**
  * The invoice has to state the same pricing basis the SOW's Fee Schedule does.
@@ -98,5 +98,59 @@ describe('buildVoidNotice', () => {
 
   it('omits the attribution parts it does not have', () => {
     expect(buildVoidNotice({ voidedAt: voided.voidedAt })?.attribution).toBe('Voided on 09/08/2026.');
+  });
+});
+
+describe('billedCustomerCategory', () => {
+  // Not cosmetic: this decides INTERNAL vs EXTERNAL in the header and which
+  // payment block prints. Reading the live job made a re-categorised job reprint
+  // an old invoice telling an external customer to file an internal ISR.
+  it('prefers what the invoice recorded over what the job says today', () => {
+    expect(billedCustomerCategory({ customerCategory: 'EXTERNAL_CUSTOMER_ACADEMIC' }, 'INTERNAL_CUSTOMERS')).toBe('EXTERNAL_CUSTOMER_ACADEMIC');
+  });
+
+  it('falls back to the live job for an invoice written before this was recorded', () => {
+    expect(billedCustomerCategory({}, 'INTERNAL_CUSTOMERS')).toBe('INTERNAL_CUSTOMERS');
+    expect(billedCustomerCategory(null, 'INTERNAL_CUSTOMERS')).toBe('INTERNAL_CUSTOMERS');
+  });
+
+  it('treats an empty recorded category as absent rather than as a category', () => {
+    expect(billedCustomerCategory({ customerCategory: '   ' }, 'INTERNAL_CUSTOMERS')).toBe('INTERNAL_CUSTOMERS');
+  });
+
+  it('is null when neither knows, so the caller renders the external default', () => {
+    expect(billedCustomerCategory({}, null)).toBeNull();
+    expect(billedCustomerCategory({}, undefined)).toBeNull();
+  });
+});
+
+describe('invoiceMoney: an invoice prints only its own lines', () => {
+  it('uses the invoice’s own figures when it has them', () => {
+    const money = invoiceMoney({ services: [{ cost: 100 }, { cost: 50 }], subtotal: 150, totalCost: 120 });
+    expect(money).toMatchObject({ lineItemSum: 150, subtotal: 150, total: 120 });
+  });
+
+  it('renders an empty legacy invoice as zero rather than borrowing the SOW’s lines', () => {
+    // The removed fallback fed the TOTALS, not just the line list, so an invoice
+    // with no services printed the SOW's raw line sum — the discount dropped.
+    // There is now no shape of input that can make this read anything but zero.
+    expect(invoiceMoney({ services: [] })).toMatchObject({ services: [], lineItemSum: 0, subtotal: 0, total: 0 });
+    expect(invoiceMoney({})).toMatchObject({ services: [], subtotal: 0, total: 0 });
+    expect(invoiceMoney(null)).toMatchObject({ services: [], subtotal: 0, total: 0 });
+  });
+
+  it('falls back to the line sum for invoices predating adjustments, staying within its own figures', () => {
+    const money = invoiceMoney({ services: [{ cost: 100 }, { cost: 50 }] });
+    expect(money).toMatchObject({ subtotal: 150, total: 150 });
+  });
+
+  it('keeps a genuine zero total rather than treating it as absent', () => {
+    // An over-large discount floors the total at zero server-side; `!= null` is
+    // what stops that becoming the line sum again.
+    expect(invoiceMoney({ services: [{ cost: 100 }], subtotal: 100, totalCost: 0 }).total).toBe(0);
+  });
+
+  it('ignores a line whose cost is missing or unparseable', () => {
+    expect(invoiceMoney({ services: [{ cost: 100 }, { cost: null }, { cost: 'x' }, {}] }).lineItemSum).toBe(100);
   });
 });

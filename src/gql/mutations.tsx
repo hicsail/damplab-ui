@@ -420,10 +420,6 @@ export const CREATE_SOW = gql`
           reason
         }
         totalCost
-        discount {
-          amount
-          reason
-        }
       }
       terms
       additionalInformation
@@ -475,10 +471,6 @@ export const UPDATE_SOW = gql`
           reason
         }
         totalCost
-        discount {
-          amount
-          reason
-        }
       }
       terms
       additionalInformation

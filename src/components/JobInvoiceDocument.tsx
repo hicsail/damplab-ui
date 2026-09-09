@@ -300,6 +300,53 @@ export function buildVoidNotice(invoice: { voidedAt?: string | Date | null; void
   };
 }
 
+/**
+ * The lines and the money an invoice prints — from the invoice, and only the invoice.
+ *
+ * This used to fall back to `sow.services` when the invoice carried none, and the
+ * fallback fed the totals rather than merely the line list: a document that took it
+ * printed the SOW's raw line sum with **every adjustment dropped**, i.e. a total
+ * with the discount silently removed. All four call sites sit inside
+ * `invoices.length` guards, but a legacy invoice with an empty `services` array
+ * reaches it, and that is the document where being wrong matters most.
+ *
+ * `subtotal` and `totalCost` still fall back to the line sum, because invoices
+ * generated before adjustments were carried across genuinely have neither — that
+ * fallback stays within the invoice's own figures, which is the difference.
+ */
+export function invoiceMoney(invoice: { services?: unknown[] | null; subtotal?: number | null; totalCost?: number | null } | null | undefined): {
+  services: any[];
+  lineItemSum: number;
+  subtotal: number;
+  total: number;
+} {
+  const services = (invoice?.services ?? []) as any[];
+  const lineItemSum = services.reduce((sum, s) => sum + (Number((s as any)?.cost) || 0), 0);
+  return {
+    services,
+    lineItemSum,
+    subtotal: invoice?.subtotal != null ? Number(invoice.subtotal) : lineItemSum,
+    total: invoice?.totalCost != null ? Number(invoice.totalCost) : lineItemSum
+  };
+}
+
+/**
+ * Which customer category an invoice was billed under.
+ *
+ * The invoice's own frozen record wins; the live job is only the fallback, for
+ * invoices written before the backend recorded this. Exported so the choice is
+ * testable — it decides INTERNAL vs EXTERNAL in the header and which payment
+ * instructions print, which is the part a re-categorised job used to get wrong.
+ */
+export function billedCustomerCategory(
+  invoice: { customerCategory?: string | null } | null | undefined,
+  liveJobCategory: string | null | undefined
+): string | null {
+  const frozen = invoice?.customerCategory?.trim();
+  if (frozen) return frozen;
+  return liveJobCategory?.trim() || null;
+}
+
 export function buildInvoicePricingNote(row: any): string {
   const lines: string[] = [];
 
@@ -346,6 +393,14 @@ export interface JobInvoiceDocumentProps {
   jobDisplayId?: string | null;
   jobName: string;
   customerCategory?: CustomerCategory | null;
+  /**
+   * The Statement of Work, for context this invoice does not carry itself:
+   * `timeline.startDate` (the fiscal-year label) and the bill-to fallbacks.
+   *
+   * **Never for line items or money.** The invoice is the record of what was
+   * billed; reading figures from the live SOW here is what printed a total with
+   * no adjustments applied.
+   */
   sow: SOWData | null;
   invoice?: {
     id: string;
@@ -382,6 +437,13 @@ export interface JobInvoiceDocumentProps {
     voidedAt?: string | Date | null;
     voidedBy?: string | null;
     voidReason?: string | null;
+    /**
+     * The category these lines were BILLED under, frozen at generation. Preferred
+     * over the `customerCategory` prop, which every call site fills from the *live*
+     * job — so re-categorising a job used to rewrite the header and the payment
+     * instructions on invoices already issued under the old category.
+     */
+    customerCategory?: string | null;
   } | null;
 }
 
@@ -398,24 +460,30 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
   const billedToEmail = invoice?.billedToEmail ?? sow?.clientEmail ?? '';
   const { line1, line2 } = splitAddressLines(invoice?.billedToAddress ?? sow?.clientAddress ?? '');
 
-  const services = (invoice?.services?.length ? invoice.services : (sow?.services ?? [])) as any[];
-  const lineItemSum = services.reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
-  // `subtotal` is absent on invoices generated before adjustments were carried
-  // across, so fall back to the line-item sum for those historical documents.
-  const subtotal = invoice?.subtotal != null ? Number(invoice.subtotal) : lineItemSum;
+  const { services, subtotal } = invoiceMoney(invoice);
   // Only adjustments that actually move money get a row; SPECIAL_TERM is a note
   // (appliedAmount 0) and is listed separately below the total.
   const allAdjustments = Array.isArray(invoice?.adjustments) ? invoice!.adjustments! : [];
   const monetaryAdjustments = allAdjustments.filter((a) => Number(a?.appliedAmount) !== 0);
   const noteAdjustments = allAdjustments.filter((a) => Number(a?.appliedAmount) === 0 && (a?.description || a?.reason));
-  const invoiceTotal = invoice?.totalCost != null ? Number(invoice.totalCost) : lineItemSum;
+  const invoiceTotal = invoiceMoney(invoice).total;
   // True when the adjustment was scaled because this invoice covers only part of the job.
   const isProrated = monetaryAdjustments.some((a) => {
     const f = Number(a?.prorationFactor);
     return Number.isFinite(f) && f > 0 && f < 0.999;
   });
 
-  const isInternal = customerCategory === 'INTERNAL_CUSTOMERS';
+  /**
+   * The invoice's own record first, the live job only as a fallback.
+   *
+   * This is not cosmetic. It decides INTERNAL vs EXTERNAL in the header and which
+   * payment block prints — an internal ISR or an external remittance address — so
+   * reading the live job made a re-categorised job reprint an old invoice telling
+   * an external customer to file an internal ISR. The prop stays as the fallback
+   * for invoices written before the backend started recording this.
+   */
+  const billedCategory = billedCustomerCategory(invoice, customerCategory) as CustomerCategory | null;
+  const isInternal = billedCategory === 'INTERNAL_CUSTOMERS';
   const getCustomerCategoryLabel = (category?: JobInvoiceDocumentProps['customerCategory']): string => {
     switch (category) {
       case 'INTERNAL_CUSTOMERS':
@@ -430,7 +498,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
         return 'Customer category';
     }
   };
-  const pricingCategoryLabel = getCustomerCategoryLabel(customerCategory);
+  const pricingCategoryLabel = getCustomerCategoryLabel(billedCategory);
 
   const voidNotice = buildVoidNotice(invoice);
 
