@@ -1,7 +1,7 @@
-import { generateFormDataFromParams, createNodeObject, serviceAllowsMultipleRuns, withRunCountParam } from './ReactFlowEvents';
+import { generateFormDataFromParams, createNodeObject, serviceAllowsMultipleRuns, withRunCountParam, withEquipmentParams } from './ReactFlowEvents';
 import { getWorkflowsFromGraph } from './GraphHelpers';
 import { NodeParameter } from '../types/CanvasTypes';
-import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 import { applyNodeChanges, NodeChange } from 'reactflow';
 
 /**
@@ -21,6 +21,10 @@ import { applyNodeChanges, NodeChange } from 'reactflow';
 
 const NODE_SPACING_Y = 150;
 const WORKFLOW_SPACING_X = 400;
+
+const EQUIPMENT_ID_SET = new Set<string>(EQUIPMENT_PARAM_IDS);
+/** Whether a node's rebuilt formData ended up carrying the reserved equipment entries. */
+const carriesEquipment = (formData: NodeParameter[]): boolean => formData.some((p) => typeof p.id === 'string' && EQUIPMENT_ID_SET.has(p.id));
 
 export interface HydratedGraph {
     nodes: any[];
@@ -47,7 +51,13 @@ export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId
     // multiplies by, so dropping it here would quietly reprice the job the next
     // time it was saved.
     const includeRunCount = serviceAllowsMultipleRuns(service) || savedById.has(RUN_COUNT_PARAM_ID);
-    const fresh = generateFormDataFromParams(parameters ?? [], nodeId, { includeRunCount });
+    // Unlike the run count, this is saved-side only: a node keeps the reserved
+    // entries only when its saved formData already carries them. A service
+    // flagged after the job was saved must not put them on an older node
+    // (behaviour 4), and a node created after flagging always has them saved
+    // (Task 7 injects them at drag time and the canvas autosaves formData).
+    const includeEquipment = EQUIPMENT_PARAM_IDS.some((id) => savedById.has(id));
+    const fresh = generateFormDataFromParams(parameters ?? [], nodeId, { includeRunCount, includeEquipment });
 
     return fresh.map((param, index) => {
         const matched = savedById.has(param.id) ? savedById.get(param.id) : savedList[index]?.value;
@@ -168,7 +178,10 @@ export const hydrateJobGraph = (job: any, services: any[]): HydratedGraph => {
             // Keep the sidebar's parameter list in step with what formData
             // actually holds, so a run count that survived hydration is still
             // pinned to the top rather than buried under the service's own fields.
-            const parameters = withRunCountParam(service.parameters ?? [], formData.some((p) => p.id === RUN_COUNT_PARAM_ID));
+            const parameters = withEquipmentParams(
+                withRunCountParam(service.parameters ?? [], formData.some((p) => p.id === RUN_COUNT_PARAM_ID)),
+                carriesEquipment(formData)
+            );
             const stored = node?.reactNode?.position;
             const position =
                 stored && typeof stored.x === 'number' && typeof stored.y === 'number' ? { x: stored.x, y: stored.y } : fallback.get(node.id) ?? { x: 0, y: 0 };
@@ -297,7 +310,10 @@ export const hydrateVersionGraph = (versionWorkflows: any[] | undefined, service
                 description: service?.description ?? '',
                 allowedConnections: service?.allowedConnections ?? [],
                 icon: service?.icon ?? '',
-                parameters: withRunCountParam(service?.parameters ?? [], formData.some((p) => p.id === RUN_COUNT_PARAM_ID)),
+                parameters: withEquipmentParams(
+                    withRunCountParam(service?.parameters ?? [], formData.some((p) => p.id === RUN_COUNT_PARAM_ID)),
+                    carriesEquipment(formData)
+                ),
                 additionalInstructions: snapshot.additionalInstructions ?? '',
                 formData,
                 serviceId: snapshot.serviceId,
