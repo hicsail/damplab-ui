@@ -85,6 +85,11 @@ export default function JobEquipmentBookingDialog({
       <DialogContent>
         <LocalizationProvider dateAdapter={AdapterDateFns}>
           <Stack spacing={2} sx={{ mt: 1 }}>
+            {(fixedItemId || schedulable.length === 1) && (
+              <Typography variant="body2">
+                <b>Equipment:</b> {items.find((i) => i.id === (fixedItemId ?? itemId))?.name ?? '—'}
+              </Typography>
+            )}
             {!fixedItemId && schedulable.length > 1 && (
               <FormControl size="small" fullWidth>
                 <InputLabel id="job-booking-item">Equipment</InputLabel>

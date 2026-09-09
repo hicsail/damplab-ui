@@ -31,6 +31,7 @@ import { CANCEL_BOOKING, CONFIRM_BOOKING_USAGE } from '../gql/mutations';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { formatSaveError } from '../utils/gqlError';
+import { spansForWeek } from '../utils/jobEquipmentBooking';
 
 const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success'> = {
   RESERVED: 'warning',
@@ -39,10 +40,20 @@ const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success'> = {
   CANCELLED: 'default'
 };
 
-function bookingDay(b: any): Date | null {
-  const d = b.kind === 'TIMED' ? b.startTime : b.usedOn;
-  return d ? new Date(d) : null;
+/**
+ * A timed booking spans its slot; a consumable is a point on the day it was used.
+ * Both go through `spansForWeek`, so a multi-day reservation shows on every day it
+ * covers rather than only the day it began.
+ */
+function bookingRange(b: any): { start?: string | Date | null; end?: string | Date | null } {
+  if (b.kind === 'TIMED') return { start: b.startTime, end: b.endTime };
+  if (!b.usedOn) return {};
+  const at = new Date(b.usedOn);
+  return { start: at, end: new Date(at.getTime() + 60_000) };
 }
+
+/** Two lines at most, then an ellipsis; the tooltip carries the whole text. */
+const clamp = { overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, wordBreak: 'break-word' as const };
 
 export default function InventoryCalendar() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -96,24 +107,7 @@ export default function InventoryCalendar() {
   const bookings: any[] = useMemo(() => (data?.bookings ?? []).filter((b: any) => b.status !== 'CANCELLED'), [data]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, any[]>();
-    for (const b of bookings) {
-      const d = bookingDay(b);
-      if (!d) continue;
-      const key = format(d, 'yyyy-MM-dd');
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(b);
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => {
-        const da = bookingDay(a)?.getTime() ?? 0;
-        const db = bookingDay(b)?.getTime() ?? 0;
-        return da - db;
-      });
-    }
-    return map;
-  }, [bookings]);
+  const byDay = useMemo(() => spansForWeek(bookings, weekStart, bookingRange), [bookings, weekStart]);
 
   const openConfirm = (b: any) => {
     setConfirmTarget(b);
@@ -179,7 +173,7 @@ export default function InventoryCalendar() {
       {actionError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError(null)}>{actionError}</Alert>}
       {loading && !data && <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(7, 1fr)' }, gap: 1, alignItems: 'start' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(7, minmax(0, 1fr))' }, gap: 1, alignItems: 'start' }}>
         {days.map((day) => {
           const key = format(day, 'yyyy-MM-dd');
           const list = byDay.get(key) ?? [];
@@ -191,20 +185,24 @@ export default function InventoryCalendar() {
               </Typography>
               <Stack spacing={0.75}>
                 {list.length === 0 && <Typography variant="caption" color="text.secondary">—</Typography>}
-                {list.map((b) => (
-                  <Box key={b._id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75, bgcolor: 'background.paper' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>{b.inventoryName}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                      {b.kind === 'TIMED'
-                        ? `${b.startTime ? format(new Date(b.startTime), 'h:mm a') : ''}–${b.endTime ? format(new Date(b.endTime), 'h:mm a') : ''}`
-                        : `${b.quantity} units`}
-                    </Typography>
-                    {/* A job-scoped booking's `notes` is already "Job #NNNNN ·
-                        <operation>" — the server writes it that way — so the job
-                        line needs no second source of truth. */}
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
-                      {b.jobId ? b.notes || 'Job booking' : b.ownerName || b.ownerEmail}
-                    </Typography>
+                {list.map((span) => {
+                  const b: any = span.item;
+                  const time =
+                    b.kind === 'TIMED'
+                      ? `${span.continuesBefore ? 'start' : format(span.start, 'h:mm a')} – ${span.continuesAfter ? 'end of day' : format(span.end, 'h:mm a')}`
+                      : `${b.quantity} units`;
+                  // A job-scoped booking's `notes` is already "Job #NNNNN · <operation>"
+                  // — the server writes it that way — so the note is the title and the
+                  // job line needs no second source of truth.
+                  const title = b.notes || b.inventoryName;
+                  const who = b.ownerName || b.ownerEmail || '';
+                  return (
+                  <Tooltip key={`${b._id}-${key}`} title={`${title} · ${b.inventoryName} · ${time}${who ? ` · ${who}` : ''}`}>
+                  <Box sx={{ minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75, bgcolor: 'background.paper' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2, ...clamp }}>{title}</Typography>
+                    {b.notes && <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{b.inventoryName}</Typography>}
+                    <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{time}</Typography>
+                    {!b.jobId && who && <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{who}</Typography>}
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
                       <Chip size="small" label={b.usageConfirmed ? 'Confirmed' : b.status} color={b.usageConfirmed ? 'success' : STATUS_COLOR[b.status] ?? 'default'} sx={{ height: 18 }} />
                       {b.cost != null && <Typography variant="caption">${Number(b.cost).toFixed(2)}</Typography>}
@@ -221,7 +219,9 @@ export default function InventoryCalendar() {
                       )}
                     </Stack>
                   </Box>
-                ))}
+                  </Tooltip>
+                  );
+                })}
               </Stack>
             </Box>
           );

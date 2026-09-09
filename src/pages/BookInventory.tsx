@@ -1,5 +1,6 @@
 import { useContext, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
+import { useNavigate, useSearchParams } from 'react-router';
 import {
   Alert,
   Box,
@@ -18,20 +19,21 @@ import {
   Typography
 } from '@mui/material';
 import ScienceIcon from '@mui/icons-material/Science';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { addDays, format, startOfWeek } from 'date-fns';
+import { addDays, format, startOfMonth } from 'date-fns';
 import { GET_ACTIVE_INVENTORY_ITEMS, GET_INVENTORY_AVAILABILITY, GET_MY_BOOKINGS, OWN_JOBS } from '../gql/queries';
 import { CANCEL_BOOKING, CREATE_BOOKING } from '../gql/mutations';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { defaultSlotFor } from '../utils/jobEquipmentBooking';
 import { formatSaveError } from '../utils/gqlError';
-import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
+import JobEquipmentBookingCalendar from '../components/booking/JobEquipmentBookingCalendar';
 import JobEquipmentBookingDialog from '../components/booking/JobEquipmentBookingDialog';
-import BookingWeekGrid, { BusySlot } from '../components/booking/BookingWeekGrid';
+import BookingMonthGrid, { BusySlot, monthGrid } from '../components/booking/BookingMonthGrid';
 
 /** Resolve the $/hr or $/unit rate for the current user's category. */
 function resolveRate(pricing: any, category?: string): number | undefined {
@@ -69,6 +71,12 @@ export default function BookInventory() {
   const userContext = useContext(UserContext) as UserContextProps;
   const customerCategory = userContext.userProps?.customerCategory;
   const { can } = usePermissions();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The job page's Book Time button lands here with `?job=<id>`; the dropdown keeps
+  // the URL in step so the back link and a reload both return to the same job.
+  const jobId = searchParams.get('job') ?? '';
+  const setJobId = (id: string): void => setSearchParams(id ? { job: id } : {}, { replace: true });
 
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
   const { data: myData, loading: myLoading, refetch } = useQuery(GET_MY_BOOKINGS, { fetchPolicy: 'cache-and-network' });
@@ -78,8 +86,8 @@ export default function BookInventory() {
 
   const bookable = useMemo(() => (invData?.activeInventoryItems ?? []).filter((i: any) => i.bookable), [invData]);
   const bookableJobs = useMemo(() => (jobsData?.ownJobs?.items ?? []).filter((j: any) => j.sow && SIGNED.has(j.sow.status)), [jobsData]);
+  const jobInList = !jobId || bookableJobs.some((j: any) => j.id === jobId);
 
-  const [jobId, setJobId] = useState('');
   const [itemId, setItemId] = useState('');
   const [start, setStart] = useState<Date | null>(null);
   const [end, setEnd] = useState<Date | null>(null);
@@ -88,7 +96,7 @@ export default function BookInventory() {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [proposed, setProposed] = useState<{ start: Date; end: Date } | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
@@ -108,11 +116,13 @@ export default function BookInventory() {
     return Math.round(qty * rate * 100) / 100;
   }, [item, rate, timed, start, end, quantity]);
 
-  // The shared pool for the visible week, so a day the lab already holds looks held.
-  const weekEnd = useMemo(() => addDays(weekStart, 7), [weekStart]);
+  // The shared pool for the visible month, so a day the lab already holds looks held.
+  const { first, dayCount } = useMemo(() => monthGrid(month), [month]);
+  const gridEnd = useMemo(() => addDays(first, dayCount), [first, dayCount]);
+  const canReadPool = can(PERMISSIONS.InventoryRead);
   const { data: availData, refetch: refetchAvailability } = useQuery(GET_INVENTORY_AVAILABILITY, {
-    variables: { from: weekStart, to: weekEnd },
-    skip: !item || !timed || !can(PERMISSIONS.InventoryRead),
+    variables: { from: first, to: gridEnd },
+    skip: !!jobId || !item || !timed || !canReadPool,
     fetchPolicy: 'cache-and-network'
   });
 
@@ -134,7 +144,7 @@ export default function BookInventory() {
   }, [availData, item, myOnItem]);
 
   const reload = async (): Promise<void> => {
-    await Promise.all([refetch(), item && timed && can(PERMISSIONS.InventoryRead) ? refetchAvailability() : Promise.resolve()]);
+    await Promise.all([refetch(), !jobId && item && timed && canReadPool ? refetchAvailability() : Promise.resolve()]);
   };
 
   const submitWalkUp = async (values: { startTime?: Date; endTime?: Date; notes: string }): Promise<void> => {
@@ -192,10 +202,13 @@ export default function BookInventory() {
     }
   };
 
+  const jobPagePath = can(PERMISSIONS.JobsViewAll) ? `/technician_view/${jobId}` : `/client_view/${jobId}`;
+  const selectedJob = bookableJobs.find((j: any) => j.id === jobId);
+
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box sx={{ p: 3, maxWidth: 1000 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+      <Box sx={{ p: 3, maxWidth: 1100 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
           <ScienceIcon color="primary" />
           <Box>
             <Typography variant="h4" sx={{ fontWeight: 700 }}>
@@ -205,6 +218,12 @@ export default function BookInventory() {
               Reserve equipment by the hour or request consumables by quantity. You'll be billed for confirmed usage.
             </Typography>
           </Box>
+          <Box sx={{ flex: 1 }} />
+          {jobId && (
+            <Button variant="outlined" size="small" startIcon={<ArrowBackIcon />} onClick={() => navigate(jobPagePath)} sx={{ textTransform: 'none' }}>
+              Back to job{selectedJob?.name ? `: ${selectedJob.name}` : ''}
+            </Button>
+          )}
         </Stack>
 
         {!!error && (
@@ -223,7 +242,7 @@ export default function BookInventory() {
             <Stack spacing={2}>
               <FormControl fullWidth>
                 <InputLabel id="book-job-label">Book against a job</InputLabel>
-                <Select labelId="book-job-label" label="Book against a job" value={jobId} onChange={(e) => setJobId(e.target.value)}>
+                <Select labelId="book-job-label" label="Book against a job" value={jobInList ? jobId : ''} onChange={(e) => setJobId(e.target.value)}>
                   <MenuItem value="">Not tied to a job (walk-up booking)</MenuItem>
                   {bookableJobs.map((j: any) => (
                     <MenuItem key={j.id} value={j.id}>
@@ -243,7 +262,16 @@ export default function BookInventory() {
           </CardContent>
         </Card>
 
-        {jobId && <JobEquipmentBookingPanel jobId={jobId} defaultExpanded />}
+        {jobId && (
+          <Card variant="outlined" sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 1.5 }}>
+                {selectedJob?.name ? `Equipment Booking — ${selectedJob.name}` : 'Equipment Booking'}
+              </Typography>
+              <JobEquipmentBookingCalendar jobId={jobId} />
+            </CardContent>
+          </Card>
+        )}
 
         {!jobId && (
           <Card variant="outlined" sx={{ mb: 3 }}>
@@ -266,9 +294,9 @@ export default function BookInventory() {
                 </FormControl>
 
                 {item && timed && (
-                  <BookingWeekGrid
-                    weekStart={weekStart}
-                    onWeekStart={setWeekStart}
+                  <BookingMonthGrid
+                    month={month}
+                    onMonth={setMonth}
                     bookings={myOnItem}
                     busy={busy}
                     canAct
@@ -313,7 +341,7 @@ export default function BookInventory() {
           </Card>
         )}
 
-        {item && (
+        {item && !jobId && (
           <JobEquipmentBookingDialog
             open={!!proposed}
             title={`Book ${item.name}`}
@@ -357,10 +385,19 @@ export default function BookInventory() {
                   <Card key={b._id} variant="outlined">
                     <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                       <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-                        <Typography sx={{ fontWeight: 600 }}>{b.inventoryName}</Typography>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 600 }} noWrap title={b.notes || b.inventoryName}>
+                            {b.notes || b.inventoryName}
+                          </Typography>
+                          {b.notes && (
+                            <Typography variant="body2" color="text.secondary" noWrap>
+                              {b.inventoryName}
+                            </Typography>
+                          )}
+                        </Box>
                         <Chip size="small" label={b.status} color={b.status === 'CANCELLED' ? 'default' : b.status === 'COMPLETED' ? 'success' : 'warning'} />
                         {b.billingStatus === 'BILLED' && <Chip size="small" label="Billed" color="info" variant="outlined" />}
-                        {b.jobId && <Chip size="small" label={b.notes || 'Job booking'} variant="outlined" />}
+                        {b.jobId && <Chip size="small" label="Job booking" variant="outlined" />}
                         <Box sx={{ flex: 1 }} />
                         <Typography variant="body2" color="text.secondary">
                           {b.kind === 'TIMED'

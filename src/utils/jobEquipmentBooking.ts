@@ -119,15 +119,25 @@ export function spansForWeek<T>(
   weekStart: Date,
   range: (item: T) => { start?: string | Date | null; end?: string | Date | null }
 ): Map<string, DaySpan<T>[]> {
+  return spansForDays(items, weekStart, 7, range);
+}
+
+/** `spansForWeek` over any run of days — a month grid is six weeks of them. */
+export function spansForDays<T>(
+  items: T[],
+  firstDay: Date,
+  dayCount: number,
+  range: (item: T) => { start?: string | Date | null; end?: string | Date | null }
+): Map<string, DaySpan<T>[]> {
   const map = new Map<string, DaySpan<T>[]>();
-  const first = startOfDay(weekStart);
+  const first = startOfDay(firstDay);
   for (const item of items) {
     const r = range(item);
     if (!r.start || !r.end) continue;
     const s = new Date(r.start).getTime();
     const e = new Date(r.end).getTime();
     if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < dayCount; i++) {
       const dayStart = addDays(first, i);
       const dayEnd = addDays(first, i + 1);
       const from = Math.max(s, dayStart.getTime());
@@ -153,4 +163,16 @@ export function defaultSlotFor(day: Date, now: Date = new Date()): { start: Date
     start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
   }
   return { start, end: new Date(start.getTime() + 3_600_000) };
+}
+
+/** Hours reserved across a job's live timed bookings — what the customer card reports. */
+export function bookedHours(bookings: Array<{ kind?: string | null; status?: string | null; startTime?: string | null; endTime?: string | null }>): number {
+  let ms = 0;
+  for (const b of bookings) {
+    if (b.status === 'CANCELLED' || !b.startTime || !b.endTime) continue;
+    if (b.kind && b.kind !== 'TIMED') continue;
+    const span = new Date(b.endTime).getTime() - new Date(b.startTime).getTime();
+    if (Number.isFinite(span) && span > 0) ms += span;
+  }
+  return Math.round((ms / 3_600_000) * 100) / 100;
 }

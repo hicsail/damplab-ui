@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockedMessage, bookingsForWeek, defaultSlotFor, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES, spansForWeek } from './jobEquipmentBooking';
+import { blockedMessage, bookingsForWeek, bookedHours, defaultSlotFor, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES, spansForDays, spansForWeek } from './jobEquipmentBooking';
 
 describe('formatBookingWindow', () => {
   it('prints a closed window as a range', () => {
@@ -117,5 +117,24 @@ describe('defaultSlotFor', () => {
     const { start, end } = defaultSlotFor(new Date(2026, 0, 6), now);
     expect(start).toEqual(new Date(2026, 0, 6, 14));
     expect(end).toEqual(new Date(2026, 0, 6, 15));
+  });
+});
+
+describe('spansForDays', () => {
+  it('covers a run longer than a week', () => {
+    const map = spansForDays([{ s: '2026-01-20T10:00:00', e: '2026-01-20T11:00:00' }], new Date(2026, 0, 5), 42, (r) => ({ start: r.s, end: r.e }));
+    expect([...map.keys()]).toEqual(['2026-01-20']);
+  });
+});
+
+describe('bookedHours', () => {
+  it('sums live timed bookings and ignores cancelled or quantity ones', () => {
+    expect(
+      bookedHours([
+        { kind: 'TIMED', status: 'RESERVED', startTime: '2026-01-06T10:00:00Z', endTime: '2026-01-06T12:30:00Z' },
+        { kind: 'TIMED', status: 'CANCELLED', startTime: '2026-01-06T10:00:00Z', endTime: '2026-01-06T20:00:00Z' },
+        { kind: 'QUANTITY', status: 'RESERVED', startTime: null, endTime: null }
+      ])
+    ).toBe(2.5);
   });
 });
