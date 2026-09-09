@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { buildNodeParameters, generateFormDataFromParams, serviceAllowsMultipleRuns } from './ReactFlowEvents';
 import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { EQUIPMENT_PARAM_DEFS, serviceIsEquipmentUse, withEquipmentParams } from './ReactFlowEvents';
+import {
+  EQUIPMENT_BOOKERS_PARAM_ID,
+  EQUIPMENT_END_PARAM_ID,
+  EQUIPMENT_HOURS_PER_WEEK_PARAM_ID,
+  EQUIPMENT_OPEN_END_PARAM_ID,
+  EQUIPMENT_PARAM_IDS,
+  EQUIPMENT_START_PARAM_ID
+} from '../utils/servicePricing';
 
 const params = [
   { id: 'vol', name: 'Volume', type: 'number', required: true },
@@ -71,5 +80,87 @@ describe('generateFormDataFromParams', () => {
 
   it('injects one when asked', () => {
     expect(generateFormDataFromParams(params, 'n1', { includeRunCount: true }).some((p) => p.id === RUN_COUNT_PARAM_ID)).toBe(true);
+  });
+});
+
+describe('serviceIsEquipmentUse', () => {
+  it('is off unless the catalog explicitly turned it on', () => {
+    expect(serviceIsEquipmentUse(service())).toBe(false);
+    expect(serviceIsEquipmentUse(service({ equipmentUse: false }))).toBe(false);
+    expect(serviceIsEquipmentUse(service({ equipmentUse: true }))).toBe(true);
+    expect(serviceIsEquipmentUse(undefined)).toBe(false);
+  });
+});
+
+describe('EQUIPMENT_PARAM_DEFS', () => {
+  it('is exactly the five reserved parameters, in order, with the pinned labels and types', () => {
+    expect(EQUIPMENT_PARAM_DEFS.map((p) => p.id)).toEqual([...EQUIPMENT_PARAM_IDS]);
+    expect(EQUIPMENT_PARAM_DEFS.map((p) => [p.id, p.name, p.type, p.required])).toEqual([
+      [EQUIPMENT_START_PARAM_ID, 'Start Date', 'date', true],
+      [EQUIPMENT_END_PARAM_ID, 'End Date', 'date', true],
+      [EQUIPMENT_OPEN_END_PARAM_ID, 'Open End Date?', 'boolean', false],
+      [EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, 'Projected Hours per Week', 'number', true],
+      [EQUIPMENT_BOOKERS_PARAM_ID, 'Authorized booker emails', 'emails', false]
+    ]);
+  });
+
+  it('carries no price fields, so the client-facing catalog view is unchanged', () => {
+    for (const def of EQUIPMENT_PARAM_DEFS) {
+      expect(def.price).toBeUndefined();
+      expect(def.pricing).toBeUndefined();
+      expect(def.isPriceMultiplier).toBeUndefined();
+    }
+  });
+});
+
+describe('buildNodeParameters — equipment use', () => {
+  it('leaves the five off a service that is not equipment use', () => {
+    const { formData, parameters } = buildNodeParameters(service(), 'n1');
+    for (const id of EQUIPMENT_PARAM_IDS) {
+      expect(formData.some((p) => p.id === id)).toBe(false);
+      expect(parameters.some((p: any) => p.id === id)).toBe(false);
+    }
+  });
+
+  it('adds all five to both the form entries and the parameter list', () => {
+    const { formData, parameters } = buildNodeParameters(service({ equipmentUse: true }), 'n1');
+    expect(formData.map((p) => p.id)).toEqual(['vol', 'buf', ...EQUIPMENT_PARAM_IDS]);
+    expect(parameters.map((p: any) => p.id)).toEqual(['vol', 'buf', ...EQUIPMENT_PARAM_IDS]);
+  });
+
+  it('seeds the form entries empty, so the required-field check has something to fail on', () => {
+    const { formData } = buildNodeParameters(service({ equipmentUse: true }), 'n1');
+    const byId = new Map(formData.map((p) => [p.id, p.value]));
+    expect(byId.get(EQUIPMENT_START_PARAM_ID)).toBe('');
+    expect(byId.get(EQUIPMENT_END_PARAM_ID)).toBe('');
+    expect(byId.get(EQUIPMENT_HOURS_PER_WEEK_PARAM_ID)).toBe('');
+    expect(byId.get(EQUIPMENT_OPEN_END_PARAM_ID)).toBe(false);
+    expect(byId.get(EQUIPMENT_BOOKERS_PARAM_ID)).toEqual([]);
+  });
+
+  it('stamps the node id on every injected entry', () => {
+    const { formData } = buildNodeParameters(service({ equipmentUse: true }), 'n7');
+    for (const id of EQUIPMENT_PARAM_IDS) {
+      expect(formData.find((p) => p.id === id)?.nodeId).toBe('n7');
+    }
+  });
+
+  it('does not duplicate a reserved id a service defines for itself', () => {
+    const selfDefined = [{ id: EQUIPMENT_START_PARAM_ID, name: 'Kickoff', type: 'date' }];
+    const { formData, parameters } = buildNodeParameters({ parameters: selfDefined, equipmentUse: true }, 'n1');
+    expect(formData.filter((p) => p.id === EQUIPMENT_START_PARAM_ID)).toHaveLength(1);
+    expect(parameters.filter((p: any) => p.id === EQUIPMENT_START_PARAM_ID)).toHaveLength(1);
+    expect(parameters[0].name).toBe('Kickoff');
+  });
+
+  it('carries the run count and the equipment params together when both are on', () => {
+    const { formData } = buildNodeParameters(service({ equipmentUse: true, allowMultipleRuns: true }), 'n1');
+    expect(formData.map((p) => p.id)).toEqual(['vol', 'buf', RUN_COUNT_PARAM_ID, ...EQUIPMENT_PARAM_IDS]);
+  });
+});
+
+describe('withEquipmentParams', () => {
+  it('is a no-op when not asked', () => {
+    expect(withEquipmentParams(params, false)).toEqual(params);
   });
 });

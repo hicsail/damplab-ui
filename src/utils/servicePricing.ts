@@ -7,6 +7,37 @@ export const RUN_COUNT_PARAM_ID = '__runCount';
 export const RUN_COUNT_PARAM_NAME = 'Number of runs';
 
 /**
+ * The five reserved equipment-use parameter ids. Injected into a node's formData at
+ * creation like the run count, never stored in service.parameters — so pricing,
+ * diffing and display all read them straight out of formData.
+ * Must stay in sync with the constants of the same names in
+ * damplab-backend/src/pricing/service-pricing.util.ts.
+ */
+export const EQUIPMENT_START_PARAM_ID = '__equipStart';
+export const EQUIPMENT_END_PARAM_ID = '__equipEnd';
+export const EQUIPMENT_OPEN_END_PARAM_ID = '__equipOpenEnd';
+export const EQUIPMENT_HOURS_PER_WEEK_PARAM_ID = '__equipHoursPerWeek';
+export const EQUIPMENT_BOOKERS_PARAM_ID = '__equipBookers';
+
+/** The five, in the order the sidebar and the documents show them. */
+export const EQUIPMENT_PARAM_IDS: readonly string[] = [
+  EQUIPMENT_START_PARAM_ID,
+  EQUIPMENT_END_PARAM_ID,
+  EQUIPMENT_OPEN_END_PARAM_ID,
+  EQUIPMENT_HOURS_PER_WEEK_PARAM_ID,
+  EQUIPMENT_BOOKERS_PARAM_ID,
+];
+
+/** Fixed labels. Staff cannot rename these in this run. */
+export const EQUIPMENT_PARAM_NAMES: Readonly<Record<string, string>> = {
+  [EQUIPMENT_START_PARAM_ID]: 'Start Date',
+  [EQUIPMENT_END_PARAM_ID]: 'End Date',
+  [EQUIPMENT_OPEN_END_PARAM_ID]: 'Open End Date?',
+  [EQUIPMENT_HOURS_PER_WEEK_PARAM_ID]: 'Projected Hours per Week',
+  [EQUIPMENT_BOOKERS_PARAM_ID]: 'Authorized booker emails',
+};
+
+/**
  * Display name for a formData entry, or undefined if none can be determined.
  *
  * Submitted jobs store formData as `{ id, value }` only (see the backend's
@@ -18,7 +49,8 @@ export const RUN_COUNT_PARAM_NAME = 'Number of runs';
 export const resolveParameterName = (entry: any, paramDef?: any): string | undefined =>
   entry?.name ||
   paramDef?.name ||
-  (entry?.id === RUN_COUNT_PARAM_ID ? RUN_COUNT_PARAM_NAME : undefined);
+  (entry?.id === RUN_COUNT_PARAM_ID ? RUN_COUNT_PARAM_NAME : undefined) ||
+  (typeof entry?.id === 'string' ? EQUIPMENT_PARAM_NAMES[entry.id] : undefined);
 import type { CustomerCategory } from './customerCategory';
 export type { CustomerCategory };
 
@@ -302,6 +334,51 @@ const resolveQty = (rawValue: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * A `YYYY-MM-DD` string as UTC midnight in ms, or undefined. UTC deliberately: the
+ * difference between two of these has to be a whole number of days on both sides of
+ * the wire and across a DST boundary, and the backend twin parses the same way.
+ */
+const dateOnlyToUtcMs = (value: unknown): number | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const m = DATE_ONLY_RE.exec(value.trim());
+  if (!m) return undefined;
+  const ms = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isFinite(ms) ? ms : undefined;
+};
+
+/**
+ * Whole weeks from start to end, any partial week rounded up, never below one.
+ * Undefined when either date is missing or malformed, or the end precedes the start.
+ * Twin of equipmentWeeks in damplab-backend/src/pricing/service-pricing.util.ts.
+ */
+export const equipmentWeeks = (start: unknown, end: unknown): number | undefined => {
+  const s = dateOnlyToUtcMs(start);
+  const e = dateOnlyToUtcMs(end);
+  if (s === undefined || e === undefined) return undefined;
+  const days = Math.round((e - s) / 86400000);
+  if (days < 0) return undefined;
+  return Math.max(1, Math.ceil(days / 7));
+};
+
+/**
+ * The estimate multiplier for an equipment-use operation: projected hours per week
+ * times weeks in the window. Undefined when the node is not an equipment one, or its
+ * window/hours are incomplete — the submission validator blocks those, not the pricer.
+ * Twin of equipmentFactor in damplab-backend/src/pricing/service-pricing.util.ts.
+ */
+export const equipmentFactor = (rawFormData: unknown): number | undefined => {
+  const formData = normalizeFormDataToArray(rawFormData, new Set<string>());
+  const byId = new Map(formData.map((entry) => [entry.id, entry.value]));
+  const weeks = equipmentWeeks(byId.get(EQUIPMENT_START_PARAM_ID), byId.get(EQUIPMENT_END_PARAM_ID));
+  if (weeks === undefined) return undefined;
+  const hours = resolveQty(byId.get(EQUIPMENT_HOURS_PER_WEEK_PARAM_ID));
+  if (hours === undefined || !(hours > 0)) return undefined;
+  return hours * weeks;
+};
+
 const getMultiplier = (
   parameters: unknown,
   rawFormData: unknown,
@@ -321,6 +398,11 @@ const getMultiplier = (
     const qty = resolveQty(runCountRaw);
     if (qty !== undefined) multiplier *= qty;
   }
+
+  // Equipment use, also read straight from formData. Stacks with the run count:
+  // 2 runs of a 40-hour booking bills 80 hours.
+  const equipmentQty = equipmentFactor(rawFormData);
+  if (equipmentQty !== undefined) multiplier *= equipmentQty;
 
   // Additional isPriceMultiplier params from service parameter definitions.
   // RUN_COUNT_PARAM_ID is excluded here (already handled above) to prevent double-counting.

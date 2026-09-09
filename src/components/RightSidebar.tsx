@@ -13,6 +13,7 @@ import { CanvasContext } from '../contexts/Canvas'
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { trunc } from '../utils';
 import { calculateServiceCost } from '../utils/servicePricing';
+import { EQUIPMENT_SIDEBAR_CAPTION, hasEquipmentParams, orderEquipmentFirst } from '../utils/equipmentParams';
 
 import { RecState } from '../types/Types';
 
@@ -265,22 +266,22 @@ export default function ContextTestComponent(props: SidebarProps) {
             : []
     );
 
+    const rawFormData: any[] = Array.isArray(activeNode?.data?.formData) ? (activeNode!.data.formData as any[]) : [];
+    const showsEquipmentGroup = hasEquipmentParams(rawFormData);
+
+    // Price multipliers first, then everything else — then the equipment group is lifted
+    // above both, because its dates and hours are what the estimate is computed from.
+    const multipliersFirst = priceMultiplierParamIds.size > 0
+        ? [
+            ...rawFormData.filter((p: any) => p && typeof p.id === 'string' && priceMultiplierParamIds.has(p.id)),
+            ...rawFormData.filter((p: any) => !(p && typeof p.id === 'string' && priceMultiplierParamIds.has(p.id))),
+        ]
+        : rawFormData;
+    const orderedFormData = orderEquipmentFirst(multipliersFirst);
+
     const activeNodeForParams =
-        activeNode && priceMultiplierParamIds.size > 0 && Array.isArray(activeNode.data?.formData)
-            ? {
-                ...activeNode,
-                data: {
-                    ...activeNode.data,
-                    formData: [
-                        ...(activeNode.data.formData as any[]).filter(
-                            (p: any) => p && typeof p.id === 'string' && priceMultiplierParamIds.has(p.id)
-                        ),
-                        ...(activeNode.data.formData as any[]).filter(
-                            (p: any) => !(p && typeof p.id === 'string' && priceMultiplierParamIds.has(p.id))
-                        ),
-                    ],
-                },
-            }
+        activeNode && rawFormData.length > 0 && orderedFormData !== rawFormData
+            ? { ...activeNode, data: { ...activeNode.data, formData: orderedFormData } }
             : activeNode;
 
     const action = (
@@ -358,6 +359,11 @@ export default function ContextTestComponent(props: SidebarProps) {
                     activeNode?.data.formData 
                     ? (
                         <div>
+                            {showsEquipmentGroup ? (
+                                <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
+                                    <Typography variant="body2">{EQUIPMENT_SIDEBAR_CAPTION}</Typography>
+                                </Alert>
+                            ) : null}
                             <Params
                                 activeNode={activeNodeForParams}
                                 onFormDataChange={() => setPricingTick((t) => t + 1)}
