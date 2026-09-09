@@ -1384,6 +1384,8 @@ const BOOKING_FIELDS = `
   ownerEmail
   ownerName
   ownerInstitution
+  createdBySub
+  jobId
   customerCategory
   kind
   startTime
@@ -1432,6 +1434,63 @@ export const GET_BILLABLE_BOOKINGS = gql`
   query BillableBookings($ownerSub: String!) {
     billableBookings(ownerSub: $ownerSub) {
       ${BOOKING_FIELDS}
+    }
+  }
+`;
+
+/**
+ * Everything the job page's equipment-booking panel needs, in one round trip.
+ *
+ * Hand-written like every other document here — `npm run codegen` is not run for
+ * these shapes. `access.status` is one of OPEN / SOW_NOT_SIGNED / BLOCKED /
+ * NOT_ELIGIBLE / HIDDEN; anything but OPEN comes back with empty `operations` and
+ * `bookings`, so the panel must key off the status, not off the arrays.
+ */
+export const GET_JOB_EQUIPMENT_BOOKING = gql`
+  query JobEquipmentBooking($jobId: ID!) {
+    jobEquipmentBooking(jobId: $jobId) {
+      access {
+        status
+        canBook
+        canBlock
+        reason
+      }
+      operations {
+        nodeId
+        label
+        serviceId
+        canBook
+        window {
+          start
+          end
+          openEnd
+        }
+        hoursPerWeek
+        items {
+          id
+          name
+          rateType
+          schedulable
+        }
+        bookers
+      }
+      bookings {
+        _id
+        inventoryItem
+        inventoryName
+        jobId
+        nodeId
+        serviceId
+        startTime
+        endTime
+        status
+        rateSnapshot
+        cost
+        billingStatus
+        createdBySub
+        createdByName
+        notes
+      }
     }
   }
 `;
