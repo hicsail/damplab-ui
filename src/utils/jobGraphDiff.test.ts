@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { diffJobGraphs, pickJobDiffBaseline, currentDiffPair, selectedDiffPair, latestContentVersion, latestVersion, jobStateLabel, jobStateColor, jobVersionDisplayLabel, jobVersionChip, JobVersionLike, SnapshotWorkflow } from './jobGraphDiff';
+import { EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_OPEN_END_PARAM_ID, EQUIPMENT_START_PARAM_ID } from './servicePricing';
 
 function node(id: string, params: Record<string, any> = {}, over: Record<string, any> = {}) {
   return {
@@ -470,5 +471,48 @@ describe('the version a job page lands on', () => {
     const noEvent = history.slice(0, 2);
     expect(latestVersion(noEvent)!.versionNumber).toBe(5001);
     expect(latestContentVersion(noEvent)!.versionNumber).toBe(5001);
+  });
+});
+
+describe('diffJobGraphs — equipment parameters', () => {
+  it('reports a moved end date as a value change on that one parameter', () => {
+    const before = [workflow([node('a', { [EQUIPMENT_START_PARAM_ID]: '2026-01-01', [EQUIPMENT_END_PARAM_ID]: '2026-01-29' })])];
+    const after = [workflow([node('a', { [EQUIPMENT_START_PARAM_ID]: '2026-01-01', [EQUIPMENT_END_PARAM_ID]: '2026-02-05' })])];
+    const diff = diffJobGraphs(before, after).byNodeId.get('a')!;
+
+    expect(diff.kind).toBe('changed');
+    expect(diff.paramDiffs.map((p) => p.id)).toEqual([EQUIPMENT_END_PARAM_ID]);
+    expect(diff.paramDiffs[0].before).toBe('2026-01-29');
+    expect(diff.paramDiffs[0].after).toBe('2026-02-05');
+    expect(diff.paramDiffs[0].name).toBe('End Date');
+  });
+
+  it('does not invent an edit when a snapshot predates the five', () => {
+    // A version saved before equipment use existed carries none of the ids.
+    // __equipOpenEnd defaults to the boolean false, which isEmptyValue does not
+    // treat as empty — without the seed this pair reports "" -> "false".
+    const before = [workflow([node('a', { vol: '10' })])];
+    const after = [
+      workflow([
+        node('a', {
+          vol: '10',
+          [EQUIPMENT_START_PARAM_ID]: '',
+          [EQUIPMENT_END_PARAM_ID]: '',
+          [EQUIPMENT_OPEN_END_PARAM_ID]: false,
+          [EQUIPMENT_HOURS_PER_WEEK_PARAM_ID]: ''
+        })
+      ])
+    ];
+    const d = diffJobGraphs(before, after);
+
+    expect(d.byNodeId.get('a')!.paramDiffs).toEqual([]);
+    expect(d.hasChanges).toBe(false);
+  });
+
+  it('still sees the open-end box being ticked', () => {
+    // The seed must not swallow a real edit to the same parameter.
+    const before = [workflow([node('a', { [EQUIPMENT_OPEN_END_PARAM_ID]: false })])];
+    const after = [workflow([node('a', { [EQUIPMENT_OPEN_END_PARAM_ID]: true })])];
+    expect(diffJobGraphs(before, after).byNodeId.get('a')!.paramDiffs.map((p) => p.id)).toEqual([EQUIPMENT_OPEN_END_PARAM_ID]);
   });
 });

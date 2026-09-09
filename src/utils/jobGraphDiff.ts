@@ -1,5 +1,13 @@
 import { diffWordsWithSpace, Change } from 'diff';
-import { RUN_COUNT_PARAM_ID } from './servicePricing';
+import {
+    RUN_COUNT_PARAM_ID,
+    EQUIPMENT_PARAM_NAMES,
+    EQUIPMENT_START_PARAM_ID,
+    EQUIPMENT_END_PARAM_ID,
+    EQUIPMENT_OPEN_END_PARAM_ID,
+    EQUIPMENT_HOURS_PER_WEEK_PARAM_ID,
+    EQUIPMENT_BOOKERS_PARAM_ID
+} from './servicePricing';
 
 /**
  * Comparing two versions of a job's workflow graph.
@@ -139,6 +147,21 @@ export const formatParamValue = (value: any): string => {
     return String(value);
 };
 
+/**
+ * The default an injected parameter takes when a snapshot predates it — the same
+ * value buildNodeParameters seeds at node creation. Without these, adding the
+ * equipment flag to a service would make every older job version look like it had
+ * five parameters added.
+ */
+const INJECTED_PARAM_DEFAULTS: Array<{ id: string; value: any }> = [
+    { id: RUN_COUNT_PARAM_ID, value: 1 },
+    { id: EQUIPMENT_START_PARAM_ID, value: '' },
+    { id: EQUIPMENT_END_PARAM_ID, value: '' },
+    { id: EQUIPMENT_OPEN_END_PARAM_ID, value: false },
+    { id: EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, value: '' },
+    { id: EQUIPMENT_BOOKERS_PARAM_ID, value: [] }
+];
+
 const paramEntries = (formData: any): Map<string, any> => {
     const entries = new Map<string, any>();
     if (Array.isArray(formData)) {
@@ -146,10 +169,18 @@ const paramEntries = (formData: any): Map<string, any> => {
             if (entry && typeof entry.id === 'string') entries.set(entry.id, entry);
         }
     }
-    // An absent run count means one run, so a snapshot taken before the
-    // universal run-count entry existed must compare equal to one that spells
-    // the default out. Mirrors paramValuesById on the backend.
-    if (!entries.has(RUN_COUNT_PARAM_ID)) entries.set(RUN_COUNT_PARAM_ID, { id: RUN_COUNT_PARAM_ID, name: 'Number of runs', value: 1 });
+    // An absent run count or equipment parameter means the default value, so a
+    // snapshot taken before the universal run-count entry (or the equipment
+    // parameters) existed must compare equal to one that spells the default
+    // out. Mirrors paramValuesById on the backend. The name is fixed for these
+    // ids regardless of whether the entry is present — formData's own `name`
+    // is stripped by the backend on submitted jobs (see resolveParameterName),
+    // and even when present client-side it must not shadow the reserved label.
+    for (const def of INJECTED_PARAM_DEFAULTS) {
+        const name = def.id === RUN_COUNT_PARAM_ID ? 'Number of runs' : EQUIPMENT_PARAM_NAMES[def.id];
+        const existing = entries.get(def.id);
+        entries.set(def.id, existing ? { ...existing, name } : { id: def.id, name, value: def.value });
+    }
     return entries;
 };
 
