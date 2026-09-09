@@ -71,7 +71,16 @@ export default function InventoryCalendar() {
   const canConfirmUsage = can(PERMISSIONS.BillingView);
   const canManageOthersBookings = can(PERMISSIONS.InventoryWrite);
   const mySub = userProps?.subject;
-  const canCancel = (booking: any): boolean => canManageOthersBookings || (!!mySub && booking?.ownerSub === mySub);
+  /**
+   * Mirrors the server rule. A job-scoped booking's owner is the JOB, so its
+   * `ownerSub` is the job creator's — a listed booker who made the reservation
+   * would see no Cancel at all under the walk-up rule. The full rule (job creator,
+   * client email, listed booker of that operation, jobs:view-all) needs the job,
+   * which this page does not load; whoever made the booking is the part of it this
+   * page can answer, and the server refuses the rest.
+   */
+  const canCancel = (booking: any): boolean =>
+    canManageOthersBookings || (!!mySub && (booking?.ownerSub === mySub || (!!booking?.jobId && booking?.createdBySub === mySub)));
 
   const weekEnd = addDays(weekStart, 7);
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-first' });
@@ -190,8 +199,11 @@ export default function InventoryCalendar() {
                         ? `${b.startTime ? format(new Date(b.startTime), 'h:mm a') : ''}–${b.endTime ? format(new Date(b.endTime), 'h:mm a') : ''}`
                         : `${b.quantity} units`}
                     </Typography>
+                    {/* A job-scoped booking's `notes` is already "Job #NNNNN ·
+                        <operation>" — the server writes it that way — so the job
+                        line needs no second source of truth. */}
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
-                      {b.ownerName || b.ownerEmail}
+                      {b.jobId ? b.notes || 'Job booking' : b.ownerName || b.ownerEmail}
                     </Typography>
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
                       <Chip size="small" label={b.usageConfirmed ? 'Confirmed' : b.status} color={b.usageConfirmed ? 'success' : STATUS_COLOR[b.status] ?? 'default'} sx={{ height: 18 }} />

@@ -33,6 +33,7 @@ import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SowEditorModal             from '../components/sow/SowEditorModal';
 import { SowPdfDownloadButton, SowStatusDetails, SowStatusSummary, useSowStaffStatus } from '../components/sow/SowStatusCard';
 import ProcessCard                from '../components/technician/ProcessCard';
+import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
 import ReasonDialog               from '../components/ReasonDialog';
 import Can                        from '../components/PermissionGate';
 import { PERMISSIONS }            from '../hooks/usePermissions';
@@ -942,6 +943,11 @@ export default function TechnicianView() {
                         )
                     }
                 />
+
+                {/* Read-only for staff, plus the pause switch when they hold
+                    billing:view. Booking is the customer's act; confirming usage
+                    stays on the Inventory schedule. */}
+                <JobEquipmentBookingPanel jobId={id || ''} staffView />
 
                 <ProcessCard
                     title="Invoices"

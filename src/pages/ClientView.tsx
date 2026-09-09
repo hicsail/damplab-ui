@@ -12,6 +12,7 @@ import { formatGqlError } from '../utils/gqlError';
 import { invoiceCountLabel } from '../utils/invoiceCounts';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
+import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
 import ProcessCard                from '../components/technician/ProcessCard';
 import StatusPaneHeader           from '../components/technician/StatusPaneHeader';
 import { CommentsSection }        from '../components/CommentsSection';
@@ -522,6 +523,11 @@ export default function Tracking() {
                 <Box ref={sowSectionRef} tabIndex={-1} sx={{ outline: 'none' }}>
                     <SowCustomerView jobId={id || ''} onDeclined={refreshJobPage} />
                 </Box>
+
+                {/* Directly under the SOW, because that is what unlocks it: the
+                    panel renders nothing at all for a caller who is not on this
+                    job, and one sentence for one who is but cannot book yet. */}
+                <JobEquipmentBookingPanel jobId={id || ''} />
 
                 <ProcessCard
                     title="Invoices"

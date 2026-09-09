@@ -741,6 +741,40 @@ export const CANCEL_BOOKING = gql`
   }
 `;
 
+export const CREATE_JOB_EQUIPMENT_BOOKING = gql`
+  mutation CreateJobEquipmentBooking($input: CreateJobEquipmentBookingInput!) {
+    createJobEquipmentBooking(input: $input) {
+      _id
+      startTime
+      endTime
+      cost
+    }
+  }
+`;
+
+export const UPDATE_JOB_EQUIPMENT_BOOKING = gql`
+  mutation UpdateJobEquipmentBooking($id: ID!, $input: UpdateJobEquipmentBookingInput!) {
+    updateJobEquipmentBooking(id: $id, input: $input) {
+      _id
+      startTime
+      endTime
+      cost
+    }
+  }
+`;
+
+export const SET_JOB_BOOKING_BLOCK = gql`
+  mutation SetJobBookingBlock($jobId: ID!, $blocked: Boolean!, $reason: String) {
+    setJobBookingBlock(jobId: $jobId, blocked: $blocked, reason: $reason) {
+      id
+      bookingBlocked
+      bookingBlockedReason
+      bookingBlockedBy
+      bookingBlockedAt
+    }
+  }
+`;
+
 export const GENERATE_USAGE_BILLING = gql`
   mutation GenerateUsageBilling($input: GenerateUsageBillingInput!) {
     generateUsageBilling(input: $input) {
