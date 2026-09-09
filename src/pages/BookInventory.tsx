@@ -77,6 +77,10 @@ export default function BookInventory() {
   // the URL in step so the back link and a reload both return to the same job.
   const jobId = searchParams.get('job') ?? '';
   const setJobId = (id: string): void => setSearchParams(id ? { job: id } : {}, { replace: true });
+  // `&edit=<bookingId>` (from the job page's pencil) opens that booking's dialog
+  // once; the calendar clears it so a reload does not reopen it.
+  const editBookingId = searchParams.get('edit') ?? undefined;
+  const clearEdit = (): void => setSearchParams(jobId ? { job: jobId } : {}, { replace: true });
 
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
   const { data: myData, loading: myLoading, refetch } = useQuery(GET_MY_BOOKINGS, { fetchPolicy: 'cache-and-network' });
@@ -268,7 +272,7 @@ export default function BookInventory() {
               <Typography variant="h6" sx={{ mb: 1.5 }}>
                 {selectedJob?.name ? `Equipment Booking — ${selectedJob.name}` : 'Equipment Booking'}
               </Typography>
-              <JobEquipmentBookingCalendar jobId={jobId} />
+              <JobEquipmentBookingCalendar jobId={jobId} editBookingId={editBookingId} onEditConsumed={clearEdit} />
             </CardContent>
           </Card>
         )}

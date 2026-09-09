@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { Alert, Box, Button, Chip, CircularProgress, FormControl, InputLabel, MenuItem, Select, Stack, Typography } from '@mui/material';
 import { addDays, startOfMonth } from 'date-fns';
@@ -12,6 +12,10 @@ import BookingMonthGrid, { BusySlot, monthGrid } from './BookingMonthGrid';
 
 interface Props {
   jobId: string;
+  /** Open the edit dialog for this booking as soon as the job loads (the job page's pencil). */
+  editBookingId?: string;
+  /** Called once the deep link has been acted on, so the caller can drop it from the URL. */
+  onEditConsumed?: () => void;
 }
 
 /**
@@ -22,7 +26,7 @@ interface Props {
  * Every gate has a server-side twin — `jobEquipmentBooking` returns HIDDEN and no
  * data to a caller who is not on the job, and the mutations re-check.
  */
-export default function JobEquipmentBookingCalendar({ jobId }: Props): React.JSX.Element | null {
+export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEditConsumed }: Props): React.JSX.Element | null {
   const { can } = usePermissions();
   const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [selectedItem, setSelectedItem] = useState<Record<string, string>>({});
@@ -56,6 +60,24 @@ export default function JobEquipmentBookingCalendar({ jobId }: Props): React.JSX
     fetchPolicy: 'cache-and-network'
   });
   const conflicts: any[] = availData?.inventoryAvailability ?? [];
+
+  // Deep link from the job page: once the bookings are in, open that one for editing,
+  // on its month and its equipment. A booking that is gone, cancelled or billed is
+  // simply not opened; the link is consumed either way.
+  useEffect(() => {
+    if (!editBookingId || !view) return;
+    const target = (view.bookings ?? []).find((b: any) => String(b._id) === String(editBookingId));
+    if (target && target.status !== 'CANCELLED' && target.billingStatus !== 'BILLED') {
+      setMonth(startOfMonth(new Date(target.startTime)));
+      setSelectedItem((s) => ({ ...s, [target.nodeId]: String(target.inventoryItem) }));
+      setBookingFor(null);
+      setProposed(null);
+      setDialogError(null);
+      setEditing(target);
+    }
+    onEditConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editBookingId, view]);
 
   const [createBooking, { loading: creating }] = useMutation(CREATE_JOB_EQUIPMENT_BOOKING);
   const [updateBooking, { loading: updating }] = useMutation(UPDATE_JOB_EQUIPMENT_BOOKING);

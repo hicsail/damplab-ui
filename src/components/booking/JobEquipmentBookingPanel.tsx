@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Collapse, FormControlLabel, IconButton, Stack, Switch, Tooltip, Typography } from '@mui/material';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CloseIcon from '@mui/icons-material/Close';
+import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { format } from 'date-fns';
@@ -132,6 +133,10 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   const upcoming = live.find((b) => new Date(b.endTime).getTime() > Date.now());
   const operationLabel = (b: any): string => operations.find((op) => op.nodeId === b.nodeId)?.label ?? '';
   const mayCancel = (b: any): boolean => !staffView && b.status !== 'CANCELLED' && b.billingStatus !== 'BILLED';
+  // Editing needs the calendar (the busy slots, the window), so the pencil opens
+  // the booking page on this job with the dialog already up for that booking.
+  const mayEdit = (b: any): boolean => open && mayCancel(b);
+  const editOnBookingPage = (b: any): void => void navigate(`/book-inventory?job=${encodeURIComponent(jobId)}&edit=${encodeURIComponent(b._id)}`);
 
   const doCancel = async (id: string): Promise<void> => {
     if (!window.confirm('Cancel this booking?')) return;
@@ -256,6 +261,13 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
                             <IconButton size="small" onClick={() => setHistoryOpen((s) => ({ ...s, [b._id]: !showHistory }))} aria-expanded={showHistory}>
                               <HistoryIcon fontSize="inherit" />
                               <ExpandMoreIcon sx={{ fontSize: 14, transform: showHistory ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {mayEdit(b) && (
+                          <Tooltip title="Change this booking">
+                            <IconButton size="small" onClick={() => editOnBookingPage(b)}>
+                              <EditIcon fontSize="inherit" />
                             </IconButton>
                           </Tooltip>
                         )}
