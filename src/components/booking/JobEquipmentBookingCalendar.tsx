@@ -256,6 +256,7 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
         window={dialogOperation?.window ?? {}}
         items={dialogOperation?.items ?? []}
         fixedItemId={editing ? String(editing.inventoryItem) : undefined}
+        editing={!!editing}
         initialItemId={bookingFor ? selectedItem[bookingFor.nodeId] : undefined}
         initialStart={editing ? new Date(editing.startTime) : (proposed?.start ?? null)}
         initialEnd={editing ? new Date(editing.endTime) : (proposed?.end ?? null)}

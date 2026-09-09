@@ -18,6 +18,8 @@ interface Props {
   items: BookingDialogItem[];
   /** Set when editing: the item is fixed and the picker is hidden. */
   fixedItemId?: string;
+  /** True when changing an existing booking — asks for the reason the history records. */
+  editing?: boolean;
   /** The item the caller had selected on the grid, so the dialog opens on it. */
   initialItemId?: string;
   initialStart?: Date | null;
@@ -44,6 +46,7 @@ export default function JobEquipmentBookingDialog({
   window: estimatedWindow,
   items,
   fixedItemId,
+  editing = false,
   initialItemId,
   initialStart,
   initialEnd,
@@ -59,7 +62,6 @@ export default function JobEquipmentBookingDialog({
   const [end, setEnd] = useState<Date | null>(null);
   const [notes, setNotes] = useState('');
   const [reason, setReason] = useState('');
-  const editing = !!fixedItemId && !!initialStart;
 
   // Each opening starts from the caller's values, so an abandoned edit can never
   // be submitted against the next booking.

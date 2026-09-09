@@ -30,7 +30,15 @@ interface Props {
   onCancel?: (bookingId: string) => void;
   /** Clicking a day card proposes a slot on that day. Absent → cards are inert. */
   onDayClick?: (day: Date) => void;
+  /** First line of a booking card. Default: the note, else the item name. */
+  titleOf?: (booking: any) => string;
+  /** Optional third line of a booking card, e.g. a status or a quantity. */
+  detailOf?: (booking: any) => string | undefined;
+  /** The range a booking occupies. Default: startTime–endTime; a consumable's usedOn needs a point range. */
+  rangeOf?: (booking: any) => { start?: string | Date | null; end?: string | Date | null };
 }
+
+const defaultRange = (b: any): { start?: string | Date | null; end?: string | Date | null } => ({ start: b.startTime, end: b.endTime });
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -57,10 +65,23 @@ export function monthGrid(month: Date): { first: Date; dayCount: number } {
  * which is what stops a busy month from looking free. Every column is the same
  * width whatever it holds — `minmax(0, 1fr)` stops a long label widening its day.
  */
-export default function BookingMonthGrid({ month, onMonth, bookings, busy = [], window: estimatedWindow, canAct, onEdit, onCancel, onDayClick }: Props): React.JSX.Element {
+export default function BookingMonthGrid({
+  month,
+  onMonth,
+  bookings,
+  busy = [],
+  window: estimatedWindow,
+  canAct,
+  onEdit,
+  onCancel,
+  onDayClick,
+  titleOf,
+  detailOf,
+  rangeOf = defaultRange
+}: Props): React.JSX.Element {
   const { first, dayCount } = useMemo(() => monthGrid(month), [month]);
   const days = useMemo(() => Array.from({ length: dayCount }, (_, i) => addDays(first, i)), [first, dayCount]);
-  const mine = useMemo(() => spansForDays(bookings, first, dayCount, (b: any) => ({ start: b.startTime, end: b.endTime })), [bookings, first, dayCount]);
+  const mine = useMemo(() => spansForDays(bookings, first, dayCount, rangeOf), [bookings, first, dayCount, rangeOf]);
   const held = useMemo(() => spansForDays(busy, first, dayCount, (s) => ({ start: s.start, end: s.end })), [busy, first, dayCount]);
 
   return (
@@ -136,9 +157,10 @@ export default function BookingMonthGrid({ month, onMonth, bookings, busy = [], 
                 {own.map((span) => {
                   const b: any = span.item;
                   const outside = estimatedWindow ? isOutsideWindow(estimatedWindow, new Date(b.startTime), new Date(b.endTime)) : false;
-                  const title = b.notes || b.inventoryName || 'Booking';
+                  const title = titleOf ? titleOf(b) : b.notes || b.inventoryName || 'Booking';
+                  const detail = detailOf?.(b);
                   return (
-                    <Tooltip key={`${b._id}-${key}`} title={`${title} · ${b.inventoryName ?? ''} · ${timeLabel(span)}`}>
+                    <Tooltip key={`${b._id}-${key}`} title={`${title} · ${b.inventoryName ?? ''} · ${timeLabel(span)}${detail ? ` · ${detail}` : ''}`}>
                       <Box onClick={(e) => e.stopPropagation()} sx={{ minWidth: 0, border: '1px solid', borderColor: 'primary.main', borderRadius: 1, p: 0.5, bgcolor: 'background.paper', cursor: 'default' }}>
                         <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2, ...clamp }}>
                           {title}
@@ -146,6 +168,11 @@ export default function BookingMonthGrid({ month, onMonth, bookings, busy = [], 
                         <Typography variant="caption" sx={{ ...clamp }}>
                           {timeLabel(span)}
                         </Typography>
+                        {detail && (
+                          <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>
+                            {detail}
+                          </Typography>
+                        )}
                         <Stack direction="row" spacing={0.25} alignItems="center">
                           {b.cost != null && <Typography variant="caption">${Number(b.cost).toFixed(2)}</Typography>}
                           {outside && <WarningAmberIcon color="warning" sx={{ fontSize: 14 }} />}
