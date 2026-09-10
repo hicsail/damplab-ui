@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import CloseIcon from '@mui/icons-material/Close';
 import { format } from 'date-fns';
-import { GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
 import { RECORD_JOB_PAYMENT, VOID_JOB_PAYMENT } from '../../gql/mutations';
 import { balanceHeading, balanceRailLabel, formatMoney, paymentsCountLabel } from '../../utils/equipmentBilling';
 import { chipStatusBackground } from '../../utils/technicianProcessStatus';
@@ -43,10 +43,12 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   const [receivedOn, setReceivedOn] = useState(todayIso());
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
   const [voidTarget, setVoidTarget] = useState<{ id: string; amount: number } | null>(null);
 
   const balanceQuery = useQuery(GET_JOB_BALANCE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
   const paymentsQuery = useQuery(GET_JOB_PAYMENTS, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
+  const invoicesQuery = useQuery(GET_INVOICES_BY_JOB_ID, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-first', errorPolicy: 'all' });
 
   const [recordPayment] = useMutation(RECORD_JOB_PAYMENT);
   const [voidPayment] = useMutation(VOID_JOB_PAYMENT);
@@ -54,6 +56,13 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   const balance = balanceQuery.data?.jobBalance;
   const payments: any[] = paymentsQuery.data?.jobPayments ?? [];
   const live = payments.filter((p) => !p.voidedAt);
+  // Live (non-void) invoices, newest first — the dialog's "Applies to invoice"
+  // options. `latestInvoice` isn't a fit here: that util picks one invoice, and
+  // this needs every live invoice in order.
+  const liveInvoices = (invoicesQuery.data?.invoicesByJobId ?? [])
+    .filter((inv: any) => !inv?.voidedAt)
+    .slice()
+    .sort((a: any, b: any) => new Date(b.invoiceDate ?? 0).getTime() - new Date(a.invoiceDate ?? 0).getTime());
 
   if (!jobId) return null;
   if (balanceQuery.loading && !balanceQuery.data) {
@@ -92,6 +101,7 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
     setAmount('');
     setReference('');
     setNote('');
+    setSelectedInvoiceId('');
     setReceivedOn(todayIso());
     setRecordError(null);
   };
@@ -115,7 +125,8 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
             // timezone, which is where this lab is.
             receivedOn: new Date(`${receivedOn}T12:00:00`).toISOString(),
             reference: reference.trim() || null,
-            note: note.trim() || null
+            note: note.trim() || null,
+            invoiceId: selectedInvoiceId || null
           }
         }
       });
@@ -202,6 +213,7 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
                         <Typography variant="body2" color="text.secondary">
                           {p.receivedOn ? format(new Date(p.receivedOn), 'MMM d, yyyy') : ''}
                           {p.reference ? ` · ${p.reference}` : ''}
+                          {p.invoiceNumber ? ` · Invoice ${p.invoiceNumber}` : ''}
                         </Typography>
                         <Box sx={{ flex: 1 }} />
                         <Typography variant="caption" color="text.secondary">
@@ -261,6 +273,22 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
               onChange={(e) => setReceivedOn(e.target.value)}
               slotProps={{ inputLabel: { shrink: true } }}
             />
+            {liveInvoices.length > 0 && (
+              <TextField
+                select
+                label="Applies to invoice"
+                value={selectedInvoiceId}
+                disabled={busy}
+                onChange={(e) => setSelectedInvoiceId(e.target.value)}
+              >
+                <MenuItem value="">None</MenuItem>
+                {liveInvoices.map((inv: any) => (
+                  <MenuItem key={inv.id} value={inv.id}>
+                    {`${inv.invoiceNumber} · ${formatMoney(inv.totalCost)}`}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             <TextField label="Reference" placeholder="Check #1042" value={reference} disabled={busy} onChange={(e) => setReference(e.target.value)} />
             <TextField label="Note" multiline minRows={2} value={note} disabled={busy} onChange={(e) => setNote(e.target.value)} />
             {recordError && <Alert severity="error">{recordError}</Alert>}
