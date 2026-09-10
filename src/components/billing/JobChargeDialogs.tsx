@@ -52,6 +52,13 @@ interface GenerateInvoiceDialogProps {
   documentStale?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
+  /**
+   * Whether the SOW in force is countersigned. `false` before that — including
+   * when there is no SOW at all — forces deposit mode: a deposit is money
+   * collected before signing, so it must stay reachable in exactly the states
+   * that block a full release.
+   */
+  countersigned: boolean;
   depositMode: boolean;
   onDepositMode: (on: boolean) => void;
   depositAmount: string;
@@ -84,6 +91,7 @@ export function GenerateInvoiceDialog({
   documentStale,
   onCancel,
   onConfirm,
+  countersigned,
   depositMode,
   onDepositMode,
   depositAmount,
@@ -100,12 +108,18 @@ export function GenerateInvoiceDialog({
   // so the switch is off the table rather than offered and then rejected.
   const anyReleased = rows.some((row) => row.released);
 
+  // A deposit is money collected before signing, so until the SOW is
+  // countersigned there is nothing else to offer: the switch is forced on
+  // and locked, whatever the caller's own `depositMode` state says.
+  const forcedDeposit = !countersigned;
+  const effectiveDepositMode = forcedDeposit || depositMode;
+
   const patchLine = (i: number, patch: Partial<CustomLineDraft>): void =>
     onCustomLines(customLines.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
   // The server's own wording for whichever mode is showing, so the confirm
   // button and the field helper text never disagree with the refusal.
-  const blocked = depositMode ? depositError(depositAmount) : customLineErrors(customLines);
+  const blocked = effectiveDepositMode ? depositError(depositAmount) : customLineErrors(customLines);
 
   return (
     <Dialog open={open} onClose={() => (busy ? undefined : onCancel())} maxWidth="sm" fullWidth>
@@ -113,13 +127,21 @@ export function GenerateInvoiceDialog({
       <DialogContent>
         <Box sx={{ mb: 1 }}>
           <FormControlLabel
-            control={<Switch checked={depositMode} disabled={busy || anyReleased} onChange={(e) => onDepositMode(e.target.checked)} />}
+            control={
+              <Switch checked={effectiveDepositMode} disabled={busy || forcedDeposit || anyReleased} onChange={(e) => onDepositMode(e.target.checked)} />
+            }
             label="This is a deposit request"
           />
-          {anyReleased && (
+          {forcedDeposit ? (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              A deposit cannot be requested once service lines have been released.
+              Only a deposit can be requested until the Statement of Work is countersigned.
             </Typography>
+          ) : (
+            anyReleased && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                A deposit cannot be requested once service lines have been released.
+              </Typography>
+            )
           )}
         </Box>
         {documentStale && (
@@ -164,11 +186,11 @@ export function GenerateInvoiceDialog({
           // caller's `checked` array says — they cannot be released twice. In
           // deposit mode every line is shown unchecked and locked: a deposit
           // releases nothing.
-          const isChecked = !depositMode && (row.released || checkedSet.has(row.sourceIndex));
+          const isChecked = !effectiveDepositMode && (row.released || checkedSet.has(row.sourceIndex));
           return (
             <Box key={row.sourceIndex} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
               <FormControlLabel
-                control={<Checkbox checked={isChecked} disabled={row.released || busy || depositMode} onChange={() => onToggle(row.sourceIndex)} />}
+                control={<Checkbox checked={isChecked} disabled={row.released || busy || effectiveDepositMode} onChange={() => onToggle(row.sourceIndex)} />}
                 label={
                   <Box>
                     <Typography variant="subtitle2" color={row.released ? 'text.disabled' : undefined}>
@@ -227,7 +249,7 @@ export function GenerateInvoiceDialog({
           )}
         </Box>
 
-        {depositMode ? (
+        {effectiveDepositMode ? (
           <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
             <TextField
               required

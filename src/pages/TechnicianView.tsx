@@ -411,12 +411,16 @@ export default function TechnicianView() {
     }, [sowFullData?.billableServices, chargesResult?.jobCharges]);
 
     const openInvoiceDialog = () => {
-        if (!sowFullData) return;
+        // Not gated on `sowFullData`: a deposit needs no SOW at all, only the
+        // job itself having loaded.
+        if (!jobData) return;
         setInvoiceError(null);
         setDueDate(format(addDays(new Date(), 30), 'yyyy-MM-dd'));
         // Every opening starts clean, so a half-typed deposit or charge line
         // from a cancelled attempt is never submitted with the next one.
-        setDepositMode(false);
+        // Deposit mode starts on whenever the SOW is not countersigned — that
+        // is the only request reachable until it is.
+        setDepositMode(!!invoiceBlocked);
         setDepositAmount('');
         setDepositLabel('');
         setCustomLines([emptyCustomLine()]);
@@ -632,12 +636,20 @@ export default function TechnicianView() {
      * refusal by clicking through a dialog and picking service lines first.
      */
     const invoiceBlocked = invoiceBlockedMessage(sowFullData ? { activeStatus: sowStatus.active?.status ?? null, versions: sowStatus.sow?.versions ?? [] } : null);
+    // Whether the SOW in force is countersigned — the only state that unlocks a
+    // full release. A deposit is money collected before signing, so it stays
+    // reachable in every other state; `Generate invoice` itself is no longer
+    // gated on this (see the rail button below).
+    const countersigned = !invoiceBlocked;
     // Computed unconditionally so a not-yet-loaded SOW is blocked rather than
     // offered, which is the direction `invoiceGate.ts` documents. The *reason* is
     // held back while loading, though: before the query answers, `sowFullData` is
     // undefined and the reason reads "this job has no Statement of Work yet" —
     // true of a job that has none, and wrong about every job that does.
     const showInvoiceBlockedReason = !sowLoading && !sowStatus.loading && !!invoiceBlocked;
+    // Fixed wording used instead of `invoiceBlocked`'s detailed reason now that
+    // the button stays enabled: a deposit is exactly what's still available.
+    const depositOnlyMessage = 'Only a deposit can be requested until the Statement of Work is countersigned.';
     const jobStatusPaneColor = chipStatusBackground(jobData ? jobStatusColor(jobState) : 'default');
     const biosecurity = PLACEHOLDER_BIOSECURITY;
     const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
@@ -1052,16 +1064,16 @@ export default function TechnicianView() {
                     actions={
                         <>
                             <Can permission={PERMISSIONS.BillingWrite}>
-                                <Tooltip title={showInvoiceBlockedReason ? invoiceBlocked : ''} disableHoverListener={!showInvoiceBlockedReason}>
+                                <Tooltip title={showInvoiceBlockedReason ? depositOnlyMessage : ''} disableHoverListener={!showInvoiceBlockedReason}>
                                     {/* A span, because MUI cannot attach a tooltip to a disabled
                                         button — and the reason is the whole point of disabling it. */}
                                     <span style={{ display: 'block' }}>
                                         <Button
-                                            color={sowFullData && !invoiceBlocked ? 'primary' : 'secondary'}
+                                            color={countersigned ? 'primary' : 'secondary'}
                                             variant="contained"
                                             size="small"
                                             startIcon={<ReceiptLongIcon />}
-                                            disabled={!sowFullData || sowLoading || sowStatus.loading || !!invoiceBlocked}
+                                            disabled={!jobData}
                                             onClick={openInvoiceDialog}
                                             sx={{ ...railBtnSx, width: '100%' }}
                                         >
@@ -1072,7 +1084,7 @@ export default function TechnicianView() {
                             </Can>
                             {showInvoiceBlockedReason && (
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                                    {invoiceBlocked}
+                                    {depositOnlyMessage}
                                 </Typography>
                             )}
                             {/* Gated on a *standing* invoice: with none, `invoice` would be
@@ -1350,6 +1362,7 @@ export default function TechnicianView() {
                     documentStale={!!sowFullData?.documentStale}
                     onCancel={closeInvoiceDialog}
                     onConfirm={submitCreateInvoice}
+                    countersigned={countersigned}
                     depositMode={depositMode}
                     onDepositMode={setDepositMode}
                     depositAmount={depositAmount}
