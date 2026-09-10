@@ -3,6 +3,7 @@ import { Document, Page, StyleSheet, View, Text, Image, Font } from '@react-pdf/
 import type { SOWData } from '../types/SOWTypes';
 import { RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
 import type { CustomerCategory } from '../utils/customerCategory';
+import { balanceHeading, invoiceKindOf } from '../utils/equipmentBilling';
 
 Font.register({ family: 'Courier-New', fonts: [{ src: '/fonts/Courier-New.ttf' }] });
 
@@ -331,6 +332,28 @@ export function invoiceMoney(invoice: { services?: unknown[] | null; subtotal?: 
 }
 
 /**
+ * The three lines an equipment invoice ends with.
+ *
+ * A running statement, not a bill for new work: it restates the whole charge
+ * to date and subtracts what has been paid, so the one figure the customer
+ * acts on is the last row. `balanceDue` is derived only when the invoice does
+ * not carry one — a legacy shape this component should still render rather
+ * than blank.
+ */
+export function buildEquipmentTotals(invoice: { subtotal?: number | null; paymentsToDate?: number | null; balanceDue?: number | null } | null | undefined): Array<{ label: string; amount: string }> {
+  const charges = Number(invoice?.subtotal) || 0;
+  const payments = Number(invoice?.paymentsToDate) || 0;
+  const balance = invoice?.balanceDue != null ? Number(invoice.balanceDue) : charges - payments;
+  return [
+    { label: 'Charges to date', amount: formatCurrency(charges) },
+    { label: 'Payments to date', amount: `-${formatCurrency(payments)}` },
+    // Said in words rather than as a minus sign: a negative total on an
+    // invoice reads as a rendering fault, not as money the lab owes back.
+    { label: balanceHeading(balance), amount: formatCurrency(Math.abs(balance)) }
+  ];
+}
+
+/**
  * Which customer category an invoice was billed under.
  *
  * The invoice's own frozen record wins; the live job is only the fallback, for
@@ -444,6 +467,21 @@ export interface JobInvoiceDocumentProps {
      * instructions on invoices already issued under the old category.
      */
     customerCategory?: string | null;
+    /** 'SOW' or 'EQUIPMENT'. Absent on invoices written before equipment invoicing; reads as SOW. */
+    kind?: string | null;
+    equipmentLines?: Array<{
+      bookingId?: string | null;
+      itemName?: string | null;
+      operationLabel?: string | null;
+      startTime?: string | Date | null;
+      endTime?: string | Date | null;
+      actualHours?: number | null;
+      rate?: number | null;
+      cost?: number | null;
+      confirmedAt?: string | Date | null;
+    }> | null;
+    paymentsToDate?: number | null;
+    balanceDue?: number | null;
   } | null;
 }
 
@@ -501,6 +539,10 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
   const pricingCategoryLabel = getCustomerCategoryLabel(billedCategory);
 
   const voidNotice = buildVoidNotice(invoice);
+
+  const isEquipment = invoiceKindOf(invoice) === 'EQUIPMENT';
+  const equipmentLines = Array.isArray(invoice?.equipmentLines) ? invoice!.equipmentLines! : [];
+  const equipmentTotals = buildEquipmentTotals(invoice);
 
   return (
     <Document>
@@ -572,122 +614,185 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
 
         <View style={styles.divider} />
 
-        <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <View style={styles.cellDate}>
-              <Text style={styles.cellTextHeader} wrap>
-                Date
-              </Text>
-            </View>
-            <View style={styles.cellService}>
-              <Text style={styles.cellTextHeader} wrap>
-                Service
-              </Text>
-              <Text style={[styles.cellText, { marginTop: 3 }]} wrap>
-                Description
-              </Text>
-            </View>
-            <View style={styles.cellPricing}>
-              <Text style={styles.cellTextHeader} wrap>
-                Pricing details
-              </Text>
-            </View>
-            <View style={styles.cellRate}>
-              <Text style={styles.cellTextHeaderRight} wrap>
-                Rate
-              </Text>
-            </View>
-            <View style={styles.cellAmount}>
-              <Text style={styles.cellTextHeaderRight} wrap>
-                Amount
-              </Text>
-            </View>
-          </View>
-
-          {services.map((s, idx) => {
-            const row = s;
-            const rate = Number(row.cost) || 0;
-            const amount = rate;
-            const pricingNote = buildInvoicePricingNote(row);
-            return (
-              <View key={row.serviceId || row.id || idx} style={styles.row}>
-                <View style={styles.cellDate}>
-                  <Text style={styles.cellText} wrap>
-                    {formatMMDDYYYY(invoiceDate)}
-                  </Text>
-                </View>
-                <View style={styles.cellService}>
-                  <Text style={styles.serviceName} wrap>
-                    {row.name}
-                  </Text>
-                  <Text style={styles.serviceMeta} wrap>
-                    {row.category ?? ''}
-                    {row.description ? `${row.category ? ' · ' : ''}${row.description}` : ''}
-                  </Text>
-                </View>
-                <View style={styles.cellPricing}>
-                  {pricingNote
-                    ? (() => {
-                        const lines = pricingNote.split('\n');
-                        return lines.map((line, i) => (
-                          <Text
-                            key={i}
-                            style={i === lines.length - 1 ? styles.pricingLineLast : styles.pricingLine}
-                            wrap
-                          >
-                            {line}
-                          </Text>
-                        ));
-                      })()
-                    : null}
-                </View>
-                <View style={styles.cellRate}>
-                  <Text style={styles.cellTextRight} wrap>
-                    {formatCurrency(rate)}
-                  </Text>
-                </View>
-                <View style={styles.cellAmount}>
-                  <Text style={styles.cellTextRight} wrap>
-                    {formatCurrency(amount)}
-                  </Text>
-                </View>
+        {isEquipment ? (
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <View style={styles.cellService}>
+                <Text style={styles.cellTextHeader} wrap>Equipment</Text>
+                <Text style={[styles.cellText, { marginTop: 3 }]} wrap>Operation</Text>
               </View>
-            );
-          })}
-
-          {/* Only show a Subtotal line when something adjusts it, so an invoice
-              with no adjustments keeps its original single-Total look. */}
-          {monetaryAdjustments.length > 0 && (
-            <>
-              <View style={styles.totalRow}>
-                <Text style={styles.text}>Subtotal&nbsp;&nbsp;{formatCurrency(subtotal)}</Text>
+              <View style={styles.cellPricing}>
+                <Text style={styles.cellTextHeader} wrap>Used</Text>
               </View>
-              {monetaryAdjustments.map((adj, i) => {
-                const applied = Number(adj?.appliedAmount) || 0;
-                const label = adj?.description || (adj?.type === 'DISCOUNT' ? 'Discount' : 'Additional cost');
-                return (
-                  <View style={styles.totalRow} key={`adj-${i}`}>
-                    <Text style={styles.text}>
-                      {label}
-                      {adj?.reason ? ` (${adj.reason})` : ''}
-                      &nbsp;&nbsp;
-                      {applied < 0 ? `-${formatCurrency(Math.abs(applied))}` : formatCurrency(applied)}
+              <View style={styles.cellDate}>
+                <Text style={styles.cellTextHeaderRight} wrap>Hours</Text>
+              </View>
+              <View style={styles.cellRate}>
+                <Text style={styles.cellTextHeaderRight} wrap>Rate</Text>
+              </View>
+              <View style={styles.cellAmount}>
+                <Text style={styles.cellTextHeaderRight} wrap>Amount</Text>
+              </View>
+            </View>
+
+            {equipmentLines.map((line, idx) => {
+              const start = safeParseISODate(toIsoStringSafe(line.startTime));
+              const end = safeParseISODate(toIsoStringSafe(line.endTime));
+              return (
+                <View key={line.bookingId || idx} style={styles.row}>
+                  <View style={styles.cellService}>
+                    <Text style={styles.serviceName} wrap>{line.itemName ?? 'Equipment'}</Text>
+                    <Text style={styles.serviceMeta} wrap>{line.operationLabel ?? ''}</Text>
+                  </View>
+                  <View style={styles.cellPricing}>
+                    <Text style={styles.pricingLineLast} wrap>
+                      {start ? formatMMDDYYYY(start) : ''}{end && start && formatMMDDYYYY(end) !== formatMMDDYYYY(start) ? ` – ${formatMMDDYYYY(end)}` : ''}
                     </Text>
                   </View>
-                );
-              })}
-            </>
-          )}
+                  <View style={styles.cellDate}>
+                    <Text style={styles.cellTextRight} wrap>{line.actualHours != null ? String(line.actualHours) : ''}</Text>
+                  </View>
+                  <View style={styles.cellRate}>
+                    <Text style={styles.cellTextRight} wrap>{line.rate != null ? formatCurrency(line.rate) : ''}</Text>
+                  </View>
+                  <View style={styles.cellAmount}>
+                    <Text style={styles.cellTextRight} wrap>{formatCurrency(Number(line.cost) || 0)}</Text>
+                  </View>
+                </View>
+              );
+            })}
 
-          <View style={styles.totalRow}>
-            <Text style={styles.strong}>Total&nbsp;&nbsp;{formatCurrency(invoiceTotal)}</Text>
+            {equipmentTotals.map((row, i) => (
+              <View style={styles.totalRow} key={`eq-total-${i}`}>
+                <Text style={i === equipmentTotals.length - 1 ? styles.strong : styles.text}>
+                  {row.label}&nbsp;&nbsp;{row.amount}
+                </Text>
+              </View>
+            ))}
           </View>
-        </View>
+        ) : (
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <View style={styles.cellDate}>
+                <Text style={styles.cellTextHeader} wrap>
+                  Date
+                </Text>
+              </View>
+              <View style={styles.cellService}>
+                <Text style={styles.cellTextHeader} wrap>
+                  Service
+                </Text>
+                <Text style={[styles.cellText, { marginTop: 3 }]} wrap>
+                  Description
+                </Text>
+              </View>
+              <View style={styles.cellPricing}>
+                <Text style={styles.cellTextHeader} wrap>
+                  Pricing details
+                </Text>
+              </View>
+              <View style={styles.cellRate}>
+                <Text style={styles.cellTextHeaderRight} wrap>
+                  Rate
+                </Text>
+              </View>
+              <View style={styles.cellAmount}>
+                <Text style={styles.cellTextHeaderRight} wrap>
+                  Amount
+                </Text>
+              </View>
+            </View>
+
+            {services.map((s, idx) => {
+              const row = s;
+              const rate = Number(row.cost) || 0;
+              const amount = rate;
+              const pricingNote = buildInvoicePricingNote(row);
+              return (
+                <View key={row.serviceId || row.id || idx} style={styles.row}>
+                  <View style={styles.cellDate}>
+                    <Text style={styles.cellText} wrap>
+                      {formatMMDDYYYY(invoiceDate)}
+                    </Text>
+                  </View>
+                  <View style={styles.cellService}>
+                    <Text style={styles.serviceName} wrap>
+                      {row.name}
+                    </Text>
+                    <Text style={styles.serviceMeta} wrap>
+                      {row.category ?? ''}
+                      {row.description ? `${row.category ? ' · ' : ''}${row.description}` : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.cellPricing}>
+                    {pricingNote
+                      ? (() => {
+                          const lines = pricingNote.split('\n');
+                          return lines.map((line, i) => (
+                            <Text
+                              key={i}
+                              style={i === lines.length - 1 ? styles.pricingLineLast : styles.pricingLine}
+                              wrap
+                            >
+                              {line}
+                            </Text>
+                          ));
+                        })()
+                      : null}
+                  </View>
+                  <View style={styles.cellRate}>
+                    <Text style={styles.cellTextRight} wrap>
+                      {formatCurrency(rate)}
+                    </Text>
+                  </View>
+                  <View style={styles.cellAmount}>
+                    <Text style={styles.cellTextRight} wrap>
+                      {formatCurrency(amount)}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+
+            {/* Only show a Subtotal line when something adjusts it, so an invoice
+                with no adjustments keeps its original single-Total look. */}
+            {monetaryAdjustments.length > 0 && (
+              <>
+                <View style={styles.totalRow}>
+                  <Text style={styles.text}>Subtotal&nbsp;&nbsp;{formatCurrency(subtotal)}</Text>
+                </View>
+                {monetaryAdjustments.map((adj, i) => {
+                  const applied = Number(adj?.appliedAmount) || 0;
+                  const label = adj?.description || (adj?.type === 'DISCOUNT' ? 'Discount' : 'Additional cost');
+                  return (
+                    <View style={styles.totalRow} key={`adj-${i}`}>
+                      <Text style={styles.text}>
+                        {label}
+                        {adj?.reason ? ` (${adj.reason})` : ''}
+                        &nbsp;&nbsp;
+                        {applied < 0 ? `-${formatCurrency(Math.abs(applied))}` : formatCurrency(applied)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            <View style={styles.totalRow}>
+              <Text style={styles.strong}>Total&nbsp;&nbsp;{formatCurrency(invoiceTotal)}</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.note}>
           <Text style={styles.strong}>Note to customer</Text>
           <Text style={styles.text}>Service Prices for {fyShort}</Text>
           <Text style={styles.text}>Pricing category: {pricingCategoryLabel}</Text>
+          {isEquipment && (
+            <Text style={styles.text}>
+              This is a running statement of equipment use on this job: it lists every confirmed booking to date and states the balance after payments received.
+            </Text>
+          )}
           {isProrated && (
             <Text style={styles.text}>
               This invoice covers part of the job; pricing adjustments are applied in proportion to the services billed here.

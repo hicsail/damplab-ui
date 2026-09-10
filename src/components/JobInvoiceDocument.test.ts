@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billedCustomerCategory, buildInvoicePricingNote, buildVoidNotice, invoiceMoney } from './JobInvoiceDocument';
+import { billedCustomerCategory, buildEquipmentTotals, buildInvoicePricingNote, buildVoidNotice, invoiceMoney } from './JobInvoiceDocument';
 
 /**
  * The invoice has to state the same pricing basis the SOW's Fee Schedule does.
@@ -152,5 +152,31 @@ describe('invoiceMoney: an invoice prints only its own lines', () => {
 
   it('ignores a line whose cost is missing or unparseable', () => {
     expect(invoiceMoney({ services: [{ cost: 100 }, { cost: null }, { cost: 'x' }, {}] }).lineItemSum).toBe(100);
+  });
+});
+
+describe('buildEquipmentTotals', () => {
+  it('states charges, payments and the balance due, in that order', () => {
+    expect(buildEquipmentTotals({ subtotal: 200, paymentsToDate: 50, balanceDue: 150 })).toEqual([
+      { label: 'Charges to date', amount: '$200.00' },
+      { label: 'Payments to date', amount: '-$50.00' },
+      { label: 'Balance due', amount: '$150.00' }
+    ]);
+  });
+
+  it('calls an overpayment a credit balance and prints it positive', () => {
+    expect(buildEquipmentTotals({ subtotal: 100, paymentsToDate: 130, balanceDue: -30 })[2]).toEqual({ label: 'Credit balance', amount: '$30.00' });
+  });
+
+  it('derives the balance when the invoice does not carry one', () => {
+    expect(buildEquipmentTotals({ subtotal: 200, paymentsToDate: 50 })[2]).toEqual({ label: 'Balance due', amount: '$150.00' });
+  });
+
+  it('treats a missing payments figure as none received', () => {
+    expect(buildEquipmentTotals({ subtotal: 200 })).toEqual([
+      { label: 'Charges to date', amount: '$200.00' },
+      { label: 'Payments to date', amount: '-$0.00' },
+      { label: 'Balance due', amount: '$200.00' }
+    ]);
   });
 });
