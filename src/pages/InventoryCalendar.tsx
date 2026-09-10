@@ -6,28 +6,22 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
   Stack,
-  TextField,
   Tooltip,
   Typography
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import { addDays, format, isSameDay, startOfWeek } from 'date-fns';
 import { GET_ACTIVE_INVENTORY_ITEMS, GET_BOOKINGS } from '../gql/queries';
-import { CANCEL_BOOKING, CONFIRM_BOOKING_USAGE } from '../gql/mutations';
+import { CANCEL_BOOKING } from '../gql/mutations';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { formatSaveError } from '../utils/gqlError';
@@ -58,8 +52,6 @@ const clamp = { overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, 
 export default function InventoryCalendar() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [itemFilter, setItemFilter] = useState('');
-  const [confirmTarget, setConfirmTarget] = useState<any | null>(null);
-  const [actualValue, setActualValue] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
 
   /**
@@ -67,9 +59,8 @@ export default function InventoryCalendar() {
    * lets equipment users reach it. So the per-row controls are gated on ownership,
    * not on reaching the page:
    *
-   * - **Confirm usage** mirrors `confirmBookingUsage`, which is `billing:view`
-   *   (Administrator-only). Confirming usage is what makes a booking chargeable —
-   *   a billing act, not a scheduling one.
+   * - **Confirm usage** lives on the job page (a billing act, not a scheduling
+   *   one), so this board carries no confirm control.
    * - **Cancel** mirrors `cancelBooking`'s server-side rule exactly: owner, OR a
    *   caller holding `inventory:write`. Gating it on `inventory:schedule` instead
    *   would show an equipment user a Cancel on everyone else's slots that the
@@ -79,7 +70,6 @@ export default function InventoryCalendar() {
    */
   const { can } = usePermissions();
   const { userProps } = useEffectiveUser();
-  const canConfirmUsage = can(PERMISSIONS.BillingView);
   const canManageOthersBookings = can(PERMISSIONS.InventoryWrite);
   const mySub = userProps?.subject;
   /**
@@ -101,39 +91,12 @@ export default function InventoryCalendar() {
     pollInterval: 30000
   });
 
-  const [confirmUsage] = useMutation(CONFIRM_BOOKING_USAGE);
   const [cancelBooking] = useMutation(CANCEL_BOOKING);
 
   const bookings: any[] = useMemo(() => (data?.bookings ?? []).filter((b: any) => b.status !== 'CANCELLED'), [data]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const byDay = useMemo(() => spansForWeek(bookings, weekStart, bookingRange), [bookings, weekStart]);
-
-  const openConfirm = (b: any) => {
-    setConfirmTarget(b);
-    if (b.kind === 'TIMED') {
-      const hrs = b.startTime && b.endTime ? (new Date(b.endTime).getTime() - new Date(b.startTime).getTime()) / 3_600_000 : 0;
-      setActualValue(String(Math.round(hrs * 100) / 100));
-    } else {
-      setActualValue(String(b.quantity ?? 1));
-    }
-  };
-
-  const submitConfirm = async () => {
-    if (!confirmTarget) return;
-    const v = Number(actualValue);
-    const vars: any = { id: confirmTarget._id };
-    if (confirmTarget.kind === 'TIMED') vars.actualHours = Number.isFinite(v) ? v : null;
-    else vars.actualQuantity = Number.isFinite(v) ? Math.round(v) : null;
-    try {
-      await confirmUsage({ variables: vars });
-      setConfirmTarget(null);
-      await refetch();
-    } catch (error) {
-      console.error('Confirm usage failed:', error);
-      setActionError(formatSaveError(error, 'this usage confirmation'));
-    }
-  };
 
   const doCancel = async (id: string) => {
     if (!window.confirm('Cancel this booking?')) return;
@@ -207,11 +170,6 @@ export default function InventoryCalendar() {
                       <Chip size="small" label={b.usageConfirmed ? 'Confirmed' : b.status} color={b.usageConfirmed ? 'success' : STATUS_COLOR[b.status] ?? 'default'} sx={{ height: 18 }} />
                       {b.cost != null && <Typography variant="caption">${Number(b.cost).toFixed(2)}</Typography>}
                       <Box sx={{ flex: 1 }} />
-                      {canConfirmUsage && !b.usageConfirmed && b.billingStatus !== 'BILLED' && (
-                        <Tooltip title="Confirm usage">
-                          <IconButton size="small" color="success" onClick={() => openConfirm(b)}><CheckCircleIcon fontSize="inherit" /></IconButton>
-                        </Tooltip>
-                      )}
                       {canCancel(b) && b.billingStatus !== 'BILLED' && (
                         <Tooltip title="Cancel booking">
                           <IconButton size="small" color="error" onClick={() => doCancel(b._id)}><CloseIcon fontSize="inherit" /></IconButton>
@@ -228,32 +186,6 @@ export default function InventoryCalendar() {
         })}
       </Box>
 
-      <Dialog open={!!confirmTarget && canConfirmUsage} onClose={() => setConfirmTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Confirm usage — {confirmTarget?.inventoryName}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Confirm the actual {confirmTarget?.kind === 'TIMED' ? 'hours used' : 'quantity used'}. This is what gets billed.
-          </Typography>
-          <TextField
-            autoFocus
-            fullWidth
-            type="number"
-            label={confirmTarget?.kind === 'TIMED' ? 'Actual hours' : 'Actual quantity'}
-            value={actualValue}
-            onChange={(e) => setActualValue(e.target.value)}
-            inputProps={{ min: 0, step: confirmTarget?.kind === 'TIMED' ? '0.25' : '1' }}
-          />
-          {confirmTarget?.rateSnapshot != null && Number.isFinite(Number(actualValue)) && (
-            <Typography variant="body2" sx={{ mt: 1.5 }}>
-              Cost: ${(Number(actualValue) * confirmTarget.rateSnapshot).toFixed(2)} ({confirmTarget.rateSnapshot.toFixed(2)}/{confirmTarget.kind === 'TIMED' ? 'hr' : 'unit'})
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmTarget(null)}>Cancel</Button>
-          <Button variant="contained" onClick={submitConfirm}>Confirm</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

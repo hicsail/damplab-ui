@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { useNavigate } from 'react-router';
 import { Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Collapse, FormControlLabel, IconButton, Stack, Switch, Tooltip, Typography } from '@mui/material';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CloseIcon from '@mui/icons-material/Close';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { format } from 'date-fns';
-import { GET_JOB_EQUIPMENT_BALANCE, GET_JOB_EQUIPMENT_BOOKING } from '../../gql/queries';
-import { CANCEL_BOOKING, SET_JOB_BOOKING_BLOCK } from '../../gql/mutations';
+import { GET_JOB_EQUIPMENT_BALANCE, GET_JOB_EQUIPMENT_BOOKING, GET_JOB_PAYMENTS } from '../../gql/queries';
+import { CANCEL_BOOKING, CONFIRM_BOOKING_USAGE, SET_JOB_BOOKING_BLOCK } from '../../gql/mutations';
 import { blockedMessage, bookedHours, LOCKED_MESSAGES } from '../../utils/jobEquipmentBooking';
 import { confirmedUsageSuffix } from '../../utils/equipmentBilling';
 import { formatGqlError, formatSaveError } from '../../utils/gqlError';
@@ -17,6 +18,8 @@ import { chipStatusBackground } from '../../utils/technicianProcessStatus';
 import ProcessCard from '../technician/ProcessCard';
 import StatusPaneHeader from '../technician/StatusPaneHeader';
 import ReasonDialog from '../ReasonDialog';
+import ConfirmUsageDialog from './ConfirmUsageDialog';
+import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 
 interface Props {
   jobId: string;
@@ -79,7 +82,11 @@ function BookingHistory({ entries }: { entries: any[] }): React.JSX.Element {
  */
 export default function JobEquipmentBookingPanel({ jobId, staffView = false }: Props): React.JSX.Element | null {
   const navigate = useNavigate();
+  const apolloClient = useApolloClient();
+  const { can } = usePermissions();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<any | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [pausing, setPausing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState<Record<string, boolean>>({});
 
@@ -99,6 +106,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
     errorPolicy: 'all'
   });
   const [cancelBooking] = useMutation(CANCEL_BOOKING);
+  const [confirmUsage, { loading: confirming }] = useMutation(CONFIRM_BOOKING_USAGE);
   const [setBlock] = useMutation(SET_JOB_BOOKING_BLOCK);
 
   const view = data?.jobEquipmentBooking;
@@ -147,6 +155,25 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   // Editing needs the calendar (the busy slots, the window), so the pencil opens
   // the booking page on this job with the dialog already up for that booking.
   const mayEdit = (b: any): boolean => open && mayCancel(b);
+  // Confirming usage is what makes a booking chargeable — a billing act, so it is
+  // the staff page's and `billing:view`'s. Any time, past or future, until billed;
+  // an already-confirmed booking can be corrected until then.
+  const canConfirm = staffView && can(PERMISSIONS.BillingView);
+  const mayConfirm = (b: any): boolean => canConfirm && b.status !== 'CANCELLED' && b.billingStatus !== 'BILLED';
+
+  const submitConfirm = async (values: { actualHours?: number; actualQuantity?: number }): Promise<void> => {
+    if (!confirmTarget) return;
+    setConfirmError(null);
+    try {
+      await confirmUsage({ variables: { id: confirmTarget._id, actualHours: values.actualHours ?? null, actualQuantity: values.actualQuantity ?? null } });
+      setConfirmTarget(null);
+      // The balance and the Payments card read their own documents; refetch by
+      // document so every card on the page sees the new charge.
+      await Promise.all([refetch(), apolloClient.refetchQueries({ include: [GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS] })]);
+    } catch (error) {
+      setConfirmError(formatSaveError(error, 'this usage confirmation'));
+    }
+  };
   const editOnBookingPage = (b: any): void => void navigate(`/book-inventory?job=${encodeURIComponent(jobId)}&edit=${encodeURIComponent(b._id)}`);
 
   const doCancel = async (id: string): Promise<void> => {
@@ -258,7 +285,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
                         </Box>
                         <Chip
                           size="small"
-                          label={cancelled ? 'Cancelled' : b.usageConfirmed ? 'Confirmed' : b.status}
+                          label={cancelled ? 'Cancelled' : b.usageConfirmed ? `Confirmed${b.actualHours != null ? ` · ${b.actualHours} hrs` : ''}` : b.status}
                           color={cancelled ? 'default' : b.usageConfirmed ? 'success' : (STATUS_COLOR[b.status] ?? 'default')}
                           variant={cancelled ? 'outlined' : 'filled'}
                         />
@@ -273,6 +300,20 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
                             <IconButton size="small" onClick={() => setHistoryOpen((s) => ({ ...s, [b._id]: !showHistory }))} aria-expanded={showHistory}>
                               <HistoryIcon fontSize="inherit" />
                               <ExpandMoreIcon sx={{ fontSize: 14, transform: showHistory ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {mayConfirm(b) && (
+                          <Tooltip title={b.usageConfirmed ? 'Adjust confirmed usage' : 'Confirm usage'}>
+                            <IconButton
+                              size="small"
+                              color={b.usageConfirmed ? 'default' : 'success'}
+                              onClick={() => {
+                                setConfirmError(null);
+                                setConfirmTarget(b);
+                              }}
+                            >
+                              <CheckCircleIcon fontSize="inherit" />
                             </IconButton>
                           </Tooltip>
                         )}
@@ -303,6 +344,18 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
             </Stack>
           )
         }
+      />
+
+      <ConfirmUsageDialog
+        open={!!confirmTarget}
+        booking={confirmTarget}
+        busy={confirming}
+        error={confirmError}
+        onCancel={() => {
+          setConfirmTarget(null);
+          setConfirmError(null);
+        }}
+        onConfirm={submitConfirm}
       />
 
       <ReasonDialog
