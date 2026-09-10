@@ -5,12 +5,13 @@ import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, 
 
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
-import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutations';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
-import { formatGqlError } from '../utils/gqlError';
+import { formatGqlError, isPermissionError } from '../utils/gqlError';
 import { invoiceCountLabel } from '../utils/invoiceCounts';
-import { invoiceKindLabel, invoiceKindOf } from '../utils/equipmentBilling';
+import { dueDateLabel, formatMoney, invoiceKindLabel, invoiceKindOf, isLegacyInvoice } from '../utils/equipmentBilling';
+import { chargeKindLabel, sortChargesForDisplay } from '../utils/jobCharges';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
@@ -124,6 +125,19 @@ export default function Tracking() {
     // client's page that line reads as what they owe.
     const liveInvoices = invoices.filter((inv: any) => !inv?.voidedAt);
     const newestLiveInvoice = latestInvoice<any>(liveInvoices);
+
+    // The statement's own view of what it carries beyond the invoice list — a
+    // read-only Charges block under it, matching the staff page. errorPolicy
+    // 'all', the pattern JobEquipmentBookingPanel uses for the balance: a
+    // client refused this query simply sees no block rather than an error.
+    const { data: chargesResult, loading: chargesLoading, error: chargesError } = useQuery(GET_JOB_CHARGES, {
+        variables: { jobId: id as string },
+        skip: !id,
+        fetchPolicy: 'cache-and-network',
+        errorPolicy: 'all',
+    });
+    const charges: any[] = chargesResult?.jobCharges ?? [];
+
     const [refreshing, setRefreshing] = useState(false);
 
     const refreshJobPage = async () => {
@@ -134,7 +148,7 @@ export default function Tracking() {
             // The SOW card runs its own query. Without this, Refresh Job reloaded
             // the job and left the Statement of Work showing whatever it had —
             // including a version that had since been superseded.
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_PAYMENTS] })
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS] })
         ]);
     };
 
@@ -531,10 +545,6 @@ export default function Tracking() {
                     job, and one sentence for one who is but cannot book yet. */}
                 <JobEquipmentBookingPanel jobId={id || ''} />
 
-                {/* Between booking and invoices, because that is the order the money moves:
-                    time is booked, it is charged, it is paid. */}
-                <JobPaymentsPanel jobId={id || ''} />
-
                 <ProcessCard
                     title="Invoices"
                     defaultExpanded={invoices.length > 0}
@@ -592,7 +602,8 @@ export default function Tracking() {
                         ) : undefined
                     }
                     details={
-                        invoices.length ? (
+                        <>
+                        {invoices.length ? (
                             <List dense>
                                 {invoices.map((inv: any, idx: number) => (
                                     /* A voided invoice stays in the client's list rather than vanishing
@@ -604,6 +615,7 @@ export default function Tracking() {
                                             primary={
                                                 <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
                                                     <Chip size="small" label={invoiceKindLabel(inv)} variant="outlined" color={invoiceKindOf(inv) === 'EQUIPMENT' ? 'info' : 'default'} />
+                                                    {isLegacyInvoice(inv) && <Chip size="small" variant="outlined" color="default" label="Legacy" />}
                                                     <Box component="span">
                                                         {id && sowFullData ? (
                                                             <PDFDownloadLink
@@ -631,7 +643,7 @@ export default function Tracking() {
                                             }
                                             secondary={
                                                 <>
-                                                    {`${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`}
+                                                    {`${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}${dueDateLabel(inv.dueDate) ? ` • ${dueDateLabel(inv.dueDate)}` : ''}`}
                                                     {inv.voidedAt && (
                                                         <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
                                                             {`VOID — this invoice is not payable${inv.voidReason ? `. ${inv.voidReason}` : ''}`}
@@ -647,9 +659,56 @@ export default function Tracking() {
                             <Typography variant="body2" color="text.secondary">
                                 Invoices will appear here when the lab issues them.
                             </Typography>
-                        )
+                        )}
+
+                        {/* Read-only: no void control, no billing:view gate — a client
+                            refused this query (errorPolicy 'all') simply sees no block,
+                            the same silence JobEquipmentBookingPanel gives the balance
+                            line rather than an error where a charges list should be. */}
+                        {!(charges.length === 0 && !!chargesError && isPermissionError(chargesError)) && (
+                            <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                    Charges
+                                </Typography>
+                                {charges.length === 0 ? (
+                                    chargesLoading ? null : chargesError ? (
+                                        <Alert severity="error">{formatGqlError(chargesError, 'Could not load the charges.')}</Alert>
+                                    ) : (
+                                        <Typography variant="body2" color="text.secondary">
+                                            No charges have been added to this job yet.
+                                        </Typography>
+                                    )
+                                ) : (
+                                    <List dense>
+                                        {sortChargesForDisplay(charges).map((c: any) => {
+                                            const voided = !!c.voidedAt;
+                                            return (
+                                                <ListItem key={c.id} sx={{ pl: 0, opacity: voided ? 0.6 : 1 }}>
+                                                    <ListItemText
+                                                        slotProps={voided ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
+                                                        primary={`${chargeKindLabel(c.kind)} · ${c.label} · ${formatMoney(c.amount)}`}
+                                                        secondary={
+                                                            voided ? (
+                                                                <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
+                                                                    {`VOID — ${c.voidReason || 'no reason recorded'}`}
+                                                                </Typography>
+                                                            ) : undefined
+                                                        }
+                                                    />
+                                                </ListItem>
+                                            );
+                                        })}
+                                    </List>
+                                )}
+                            </Box>
+                        )}
+                        </>
                     }
                 />
+
+                {/* Payments read the invoice they settle, so this card sits below
+                    the one that issues it. */}
+                <JobPaymentsPanel jobId={id || ''} />
 
                 {/* Comments Section */}
                 <CommentsSection
