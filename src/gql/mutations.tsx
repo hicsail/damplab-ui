@@ -420,6 +420,7 @@ export const CREATE_SOW = gql`
           reason
         }
         totalCost
+        estimatedEquipmentCost
       }
       terms
       additionalInformation
@@ -471,6 +472,7 @@ export const UPDATE_SOW = gql`
           reason
         }
         totalCost
+        estimatedEquipmentCost
       }
       terms
       additionalInformation
@@ -551,6 +553,7 @@ export const CREATE_INVOICE = gql`
         kind
         label
         amount
+        note
       }
       adjustments {
         type

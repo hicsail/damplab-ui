@@ -934,6 +934,7 @@ export const GET_SOW_BY_ID = gql`
           reason
         }
         totalCost
+        estimatedEquipmentCost
       }
       terms
       additionalInformation
@@ -1002,6 +1003,7 @@ export const GET_SOW_BY_JOB_ID = gql`
           reason
         }
         totalCost
+        estimatedEquipmentCost
       }
       terms
       additionalInformation
@@ -1077,6 +1079,7 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         kind
         label
         amount
+        note
       }
       equipmentLines {
         bookingId
@@ -1965,6 +1968,7 @@ export const SOW_VERSION_FIELDS = gql`
       deliverables
       baseCost
       totalCost
+      estimatedEquipmentCost
       customerCategory
       periods {
         startDate
