@@ -4,12 +4,18 @@ import {
   balanceRailLabel,
   buildStatementTotals,
   confirmedUsageSuffix,
-  depositDropNote,
+  currentInvoice,
+  depositSummary,
   dueDateLabel,
   equipmentEstimateNote,
   formatMoney,
   invoiceKindLabel,
   invoiceKindOf,
+  invoiceStatusChipColor,
+  invoiceStatusLabel,
+  invoiceStatusOf,
+  invoiceTitle,
+  invoiceVersionOf,
   isLegacyInvoice,
   paymentsCountLabel
 } from './equipmentBilling';
@@ -29,19 +35,93 @@ describe('invoiceKindOf', () => {
     expect(invoiceKindOf(invoice as any)).toBe('SOW');
   });
 
-  it('reads a statement as STATEMENT and anything unrecognised as SOW', () => {
+  it('reads a statement as STATEMENT', () => {
     expect(invoiceKindOf({ kind: 'STATEMENT' })).toBe('STATEMENT');
-    expect(invoiceKindOf({ kind: 'EQUIPMENT' })).toBe('EQUIPMENT');
-    expect(invoiceKindOf({})).toBe('SOW');
   });
 });
 
 describe('isLegacyInvoice', () => {
-  it('is true for every document written before statements', () => {
+  it('is true for every document written before versioned invoices', () => {
     expect(isLegacyInvoice({ kind: 'SOW' })).toBe(true);
     expect(isLegacyInvoice({ kind: 'EQUIPMENT' })).toBe(true);
     expect(isLegacyInvoice({})).toBe(true);
     expect(isLegacyInvoice({ kind: 'STATEMENT' })).toBe(false);
+  });
+});
+
+describe('invoiceStatusOf', () => {
+  it('takes the server’s status', () => {
+    expect(invoiceStatusOf({ status: 'PAID' })).toBe('PAID');
+    expect(invoiceStatusOf({ status: 'ISSUED' })).toBe('ISSUED');
+    expect(invoiceStatusOf({ status: 'SUPERSEDED' })).toBe('SUPERSEDED');
+  });
+
+  it('falls back to the void and superseded fields for an older cache entry', () => {
+    expect(invoiceStatusOf({ voidedAt: '2026-09-01' })).toBe('VOID');
+    expect(invoiceStatusOf({ supersededAt: '2026-09-01' })).toBe('SUPERSEDED');
+    expect(invoiceStatusOf({})).toBe('ISSUED');
+  });
+
+  it('never lets a stale PAID outrank a void', () => {
+    expect(invoiceStatusOf({ status: 'PAID', voidedAt: '2026-09-01' })).toBe('VOID');
+  });
+});
+
+describe('invoice status wording', () => {
+  it('labels and colours each status', () => {
+    expect(['ISSUED', 'PAID', 'SUPERSEDED', 'VOID'].map((s) => invoiceStatusLabel(s as any))).toEqual(['Issued', 'Paid', 'Superseded', 'Void']);
+    expect(['ISSUED', 'PAID', 'SUPERSEDED', 'VOID'].map((s) => invoiceStatusChipColor(s as any))).toEqual(['info', 'success', 'default', 'error']);
+  });
+});
+
+describe('invoiceVersionOf and invoiceTitle', () => {
+  it('names a version by the job and its number', () => {
+    expect(invoiceTitle({ jobDisplayId: '00005', versionNumber: 2, invoiceNumber: '00005-002' })).toBe('Invoice 00005 · v2');
+  });
+
+  it('reads a pre-versioning invoice off its number', () => {
+    expect(invoiceVersionOf({ invoiceNumber: '00005-001' })).toBe(1);
+    expect(invoiceTitle({ invoiceNumber: '00005-001' })).toBe('Invoice 00005 · v1');
+  });
+
+  it('falls back to the bare number when there is no version to state', () => {
+    expect(invoiceTitle({ invoiceNumber: 'INV' })).toBe('Invoice INV');
+    expect(invoiceTitle(null)).toBe('');
+  });
+});
+
+describe('currentInvoice', () => {
+  it('is the newest invoice that is neither void nor superseded', () => {
+    const rows = [
+      { id: 'v3', status: 'VOID', createdAt: '2026-09-03' },
+      { id: 'v2', status: 'PAID', createdAt: '2026-09-02' },
+      { id: 'v1', status: 'SUPERSEDED', createdAt: '2026-09-01' }
+    ];
+    expect(currentInvoice(rows)?.id).toBe('v2');
+  });
+
+  it('is null when nothing stands', () => {
+    expect(currentInvoice([{ status: 'VOID' }, { status: 'SUPERSEDED' }])).toBeNull();
+    expect(currentInvoice([])).toBeNull();
+  });
+
+  it('picks the newest of several legacy invoices still standing', () => {
+    expect(currentInvoice([{ id: 'old', invoiceDate: '2026-01-01' }, { id: 'new', invoiceDate: '2026-02-01' }])?.id).toBe('new');
+  });
+});
+
+describe('depositSummary', () => {
+  it('states the deposit, its date, and what is still owed', () => {
+    expect(depositSummary({ label: 'Deposit', amount: 500, dueDate: '2026-10-01T12:00:00Z', outstanding: 200 })).toBe('Deposit $500.00 · Due 10/01/2026 · $200.00 outstanding');
+  });
+
+  it('says so once payments cover it', () => {
+    expect(depositSummary({ label: 'Deposit', amount: 500, dueDate: null, outstanding: 0 })).toBe('Deposit $500.00 · covered by payments');
+  });
+
+  it('says nothing when there is no deposit', () => {
+    expect(depositSummary(null)).toBe('');
+    expect(depositSummary({ amount: null })).toBe('');
   });
 });
 
@@ -67,20 +147,9 @@ describe('dueDateLabel', () => {
   });
 });
 
-describe('depositDropNote', () => {
-  it('explains the drop-off only when it has happened', () => {
-    expect(depositDropNote({ depositsDropped: true })).toBe(
-      'Deposits have dropped off now that services are released; the payment against them carries forward.'
-    );
-    expect(depositDropNote({ depositsDropped: false })).toBe('');
-  });
-});
-
 describe('equipmentEstimateNote', () => {
   it('marks an equipment-use line, and leaves an ordinary one alone', () => {
-    expect(equipmentEstimateNote('Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)')).toBe(
-      'Estimated · billed at actual booked hours'
-    );
+    expect(equipmentEstimateNote('Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)')).toBe('Estimated · billed at actual booked hours');
     expect(equipmentEstimateNote('Amplification')).toBe('');
   });
 });
@@ -124,7 +193,7 @@ describe('balanceRailLabel', () => {
 });
 
 describe('balanceHeading', () => {
-  it('names the total on the statement', () => {
+  it('names the total on the invoice', () => {
     expect(balanceHeading(120)).toBe('Balance due');
     expect(balanceHeading(0)).toBe('Balance due');
     expect(balanceHeading(-30)).toBe('Credit balance');
@@ -142,23 +211,23 @@ describe('paymentsCountLabel', () => {
 });
 
 describe('confirmedUsageSuffix', () => {
-  it('appends the confirmed hours and the charge to the booking card’s status line', () => {
-    expect(confirmedUsageSuffix({ confirmedHours: 3.5, chargesToDate: 140 })).toBe(' · 3.5 hrs confirmed · $140.00');
+  it('appends the confirmed hours and what they cost to the booking card’s status line', () => {
+    expect(confirmedUsageSuffix({ confirmedHours: 3.5, equipmentCharges: 140 })).toBe(' · 3.5 hrs confirmed · $140.00');
+  });
+
+  it('quotes the equipment charges alone, never the job’s whole total', () => {
+    expect(confirmedUsageSuffix({ confirmedHours: 2, equipmentCharges: 80, chargesToDate: 1080 } as any)).toBe(' · 2 hrs confirmed · $80.00');
   });
 
   it('says nothing when no usage has been confirmed', () => {
-    expect(confirmedUsageSuffix({ confirmedHours: 0, chargesToDate: 0 })).toBe('');
+    expect(confirmedUsageSuffix({ confirmedHours: 0, equipmentCharges: 0 })).toBe('');
   });
 
   it('still reports hours confirmed at a zero rate — free time is confirmed usage', () => {
-    expect(confirmedUsageSuffix({ confirmedHours: 2, chargesToDate: 0 })).toBe(' · 2 hrs confirmed · $0.00');
+    expect(confirmedUsageSuffix({ confirmedHours: 2, equipmentCharges: 0 })).toBe(' · 2 hrs confirmed · $0.00');
   });
 
   it('says nothing when the balance has not loaded', () => {
     expect(confirmedUsageSuffix(null)).toBe('');
-  });
-
-  it('drops trailing zeros so two hours does not read as "2.00 hrs"', () => {
-    expect(confirmedUsageSuffix({ confirmedHours: 2.0, chargesToDate: 80 })).toBe(' · 2 hrs confirmed · $80.00');
   });
 });

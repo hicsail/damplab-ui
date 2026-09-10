@@ -1047,6 +1047,8 @@ export const GET_INVOICES_BY_JOB_ID = gql`
       jobDisplayId
       jobName
       invoiceNumber
+      versionNumber
+      status
       kind
       invoiceDate
       createdBy
@@ -1081,6 +1083,13 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         amount
         note
       }
+      deposit {
+        chargeId
+        label
+        amount
+        dueDate
+        outstanding
+      }
       equipmentLines {
         bookingId
         itemName
@@ -1108,6 +1117,8 @@ export const GET_INVOICES_BY_JOB_ID = gql`
       voidedAt
       voidedBy
       voidReason
+      supersededAt
+      supersededByNumber
       createdAt
     }
   }
@@ -1121,13 +1132,14 @@ export const GET_JOB_BALANCE = gql`
       adjustmentCharges
       equipmentCharges
       customCharges
-      depositCharges
       chargesToDate
       paymentsToDate
       balanceDue
+      depositAmount
+      depositDueDate
+      depositOutstanding
       confirmedHours
       unconfirmedBookings
-      depositsDropped
     }
   }
 `;
@@ -1144,6 +1156,7 @@ export const GET_JOB_CHARGES = gql`
       sowVersionNumber
       sourceIndex
       note
+      dueDate
       addedBy
       addedAt
       voidedAt

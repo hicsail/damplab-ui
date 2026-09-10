@@ -531,6 +531,8 @@ export const CREATE_INVOICE = gql`
       jobDisplayId
       jobName
       invoiceNumber
+      versionNumber
+      status
       kind
       invoiceDate
       dueDate
@@ -566,24 +568,32 @@ export const CREATE_INVOICE = gql`
       totalCost
       paymentsToDate
       balanceDue
+      deposit {
+        chargeId
+        label
+        amount
+        dueDate
+        outstanding
+      }
       createdAt
     }
   }
 `;
 
 /**
- * Void an invoice — the record is kept, its service lines are released.
+ * Void the job's current invoice — the record is kept, nothing else moves.
  *
  * Never a delete: invoice numbers are derived from a per-job count, so removing a
- * document would hand its number to the next invoice. Returns the same fields
- * GET_INVOICES_BY_JOB_ID selects for a row, so Apollo updates the cached invoice
- * in place and the list re-renders it struck through without a refetch.
+ * document would hand its number to the next invoice. Returns the status and void
+ * fields GET_INVOICES_BY_JOB_ID selects for a row, so Apollo updates the cached
+ * invoice in place and the list re-renders it as void without a refetch.
  */
 export const VOID_INVOICE = gql`
   mutation VoidInvoice($invoiceId: ID!, $reason: String!) {
     voidInvoice(invoiceId: $invoiceId, reason: $reason) {
       id
       invoiceNumber
+      status
       voidedAt
       voidedBy
       voidReason
@@ -599,6 +609,7 @@ export const ADD_JOB_CHARGE = gql`
       kind
       label
       amount
+      dueDate
       addedBy
       addedAt
     }

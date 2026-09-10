@@ -3,15 +3,11 @@ import { useParams, useNavigate } from 'react-router';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import JobInvoiceDocument from '../components/JobInvoiceDocument';
+import InvoicePanel from '../components/billing/InvoicePanel';
 import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutations';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
-import { formatGqlError, isPermissionError } from '../utils/gqlError';
-import { invoiceCountLabel } from '../utils/invoiceCounts';
-import { dueDateLabel, formatMoney, invoiceKindLabel, invoiceKindOf, isLegacyInvoice } from '../utils/equipmentBilling';
-import { chargeKindLabel, sortChargesForDisplay } from '../utils/jobCharges';
+import { formatGqlError } from '../utils/gqlError';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
@@ -38,7 +34,7 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { deriveCustomerLifecycle, validResponseAction } from '../utils/customerLifecycle';
 import type { CustomerActionRequired } from '../utils/jobReview';
-import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestInvoice, partyVersionLabel } from '../utils/technicianProcessStatus';
+import { chipStatusBackground, isJobProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, partyVersionLabel } from '../utils/technicianProcessStatus';
 
 export default function Tracking() {
 
@@ -110,45 +106,16 @@ export default function Tracking() {
         fetchPolicy: 'network-only',
     });
     const sowFullData = sowByJobIdResult?.sowByJobId ?? null;
-
-    const { data: invoicesResult, refetch: refetchInvoices } = useQuery(GET_INVOICES_BY_JOB_ID, {
-        variables: { jobId: id as string },
-        skip: !id,
-        fetchPolicy: 'network-only',
-    });
-    const invoices = invoicesResult?.invoicesByJobId ?? [];
-    // Newest first from the server, so the last element is the OLDEST — see latestInvoice.
-    //
-    // Two bindings, because "most recent record" and "the figure that stands" stop
-    // being the same thing once an invoice can be voided. The summary's dollar
-    // amount and the Download button must never quote a voided invoice: on the
-    // client's page that line reads as what they owe.
-    const liveInvoices = invoices.filter((inv: any) => !inv?.voidedAt);
-    const newestLiveInvoice = latestInvoice<any>(liveInvoices);
-
-    // The statement's own view of what it carries beyond the invoice list — a
-    // read-only Charges block under it, matching the staff page. errorPolicy
-    // 'all', the pattern JobEquipmentBookingPanel uses for the balance: a
-    // client refused this query simply sees no block rather than an error.
-    const { data: chargesResult, loading: chargesLoading, error: chargesError } = useQuery(GET_JOB_CHARGES, {
-        variables: { jobId: id as string },
-        skip: !id,
-        fetchPolicy: 'cache-and-network',
-        errorPolicy: 'all',
-    });
-    const charges: any[] = chargesResult?.jobCharges ?? [];
-
     const [refreshing, setRefreshing] = useState(false);
 
     const refreshJobPage = async () => {
         await Promise.all([
             refetch(),
             refetchSow(),
-            refetchInvoices(),
             // The SOW card runs its own query. Without this, Refresh Job reloaded
             // the job and left the Statement of Work showing whatever it had —
             // including a version that had since been superseded.
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS] })
+            apolloClient.refetchQueries({ include: [GET_INVOICES_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS] })
         ]);
     };
 
@@ -545,169 +512,15 @@ export default function Tracking() {
                     job, and one sentence for one who is but cannot book yet. */}
                 <JobEquipmentBookingPanel jobId={id || ''} />
 
-                <ProcessCard
-                    title="Invoices"
-                    defaultExpanded={invoices.length > 0}
-                    customerBadge={null}
-                    staffBadge={null}
-                    statusPaneSx={{ bgcolor: chipStatusBackground(liveInvoices.length ? 'info' : 'default') }}
-                    statusPane={
-                        invoices.length ? (
-                            <StatusPaneHeader
-                                status={invoiceCountLabel(invoices)}
-                                reference={invoiceVersionLabel(liveInvoices) !== '—' ? invoiceVersionLabel(liveInvoices) : undefined}
-                                description={
-                                    // Quotes the newest invoice that still stands. This line
-                                    // reads as "what you owe" to a client, so a voided figure
-                                    // must never reach it — and when nothing stands it says so
-                                    // in those terms, which the status's bare "voided" does not.
-                                    newestLiveInvoice?.totalCost != null
-                                        ? `Latest invoice · $${Number(newestLiveInvoice.totalCost).toFixed(2)}`
-                                        : liveInvoices.length === 0
-                                          ? 'Nothing is currently payable'
-                                          : undefined
-                                }
-                            />
-                        ) : (
-                            <StatusPaneHeader
-                                status="No invoices yet"
-                                description="The lab has not invoiced this job yet. Invoices appear here when they do."
-                            />
-                        )
-                    }
-                    actions={
-                        // A standing invoice, not merely any invoice: with none, the
-                        // document would fall back to the SOW's own services.
-                        liveInvoices.length > 0 && id && sowFullData ? (
-                            <PDFDownloadLink
-                                document={
-                                    <JobInvoiceDocument
-                                        jobId={id}
-                                        jobDisplayId={data?.ownJobById?.jobId ?? null}
-                                        jobName={jobName}
-                                        customerCategory={data?.ownJobById?.customerCategory ?? undefined}
-                                        sow={sowFullData}
-                                        invoice={newestLiveInvoice}
-                                    />
-                                }
-                                fileName={`Invoice-${(newestLiveInvoice?.invoiceNumber ?? id) || id}.pdf`}
-                                style={{ textDecoration: 'none', width: '100%' }}
-                            >
-                                {({ loading: pdfLoading }) => (
-                                    <Button size="small" variant="outlined" disabled={pdfLoading} sx={railBtnSx}>
-                                        {pdfLoading ? 'Loading invoice…' : 'Download Latest Invoice'}
-                                    </Button>
-                                )}
-                            </PDFDownloadLink>
-                        ) : undefined
-                    }
-                    details={
-                        <>
-                        {invoices.length ? (
-                            <List dense>
-                                {invoices.map((inv: any, idx: number) => (
-                                    /* A voided invoice stays in the client's list rather than vanishing
-                                       from it — they may already hold the copy that was sent — so it has
-                                       to read as void here and in the PDF itself. */
-                                    <ListItem key={inv.id || idx} sx={{ pl: 0, opacity: inv.voidedAt ? 0.6 : 1 }}>
-                                        <ListItemText
-                                            slotProps={inv.voidedAt ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
-                                            primary={
-                                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                                                    <Chip size="small" label={invoiceKindLabel(inv)} variant="outlined" color={invoiceKindOf(inv) === 'EQUIPMENT' ? 'info' : 'default'} />
-                                                    {isLegacyInvoice(inv) && <Chip size="small" variant="outlined" color="default" label="Legacy" />}
-                                                    <Box component="span">
-                                                        {id && sowFullData ? (
-                                                            <PDFDownloadLink
-                                                                document={
-                                                                    <JobInvoiceDocument
-                                                                        jobId={id}
-                                                                        jobDisplayId={data?.ownJobById?.jobId ?? null}
-                                                                        jobName={jobName}
-                                                                        customerCategory={data?.ownJobById?.customerCategory ?? undefined}
-                                                                        sow={sowFullData}
-                                                                        invoice={inv}
-                                                                    />
-                                                                }
-                                                                fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
-                                                            >
-                                                                {({ loading }) =>
-                                                                    loading ? 'Loading...' : `Invoice ${inv.invoiceNumber || ''}`.trim()
-                                                                }
-                                                            </PDFDownloadLink>
-                                                        ) : (
-                                                            `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
-                                                        )}
-                                                    </Box>
-                                                </Box>
-                                            }
-                                            secondary={
-                                                <>
-                                                    {`${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}${dueDateLabel(inv.dueDate) ? ` • ${dueDateLabel(inv.dueDate)}` : ''}`}
-                                                    {inv.voidedAt && (
-                                                        <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
-                                                            {`VOID — this invoice is not payable${inv.voidReason ? `. ${inv.voidReason}` : ''}`}
-                                                        </Typography>
-                                                    )}
-                                                </>
-                                            }
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        ) : (
-                            <Typography variant="body2" color="text.secondary">
-                                Invoices will appear here when the lab issues them.
-                            </Typography>
-                        )}
-
-                        {/* Read-only: no void control, no billing:view gate — a client
-                            refused this query (errorPolicy 'all') simply sees no block,
-                            the same silence JobEquipmentBookingPanel gives the balance
-                            line rather than an error where a charges list should be. */}
-                        {!(charges.length === 0 && !!chargesError && isPermissionError(chargesError)) && (
-                            <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                    Charges
-                                </Typography>
-                                {charges.length === 0 ? (
-                                    chargesLoading ? null : chargesError ? (
-                                        <Alert severity="error">{formatGqlError(chargesError, 'Could not load the charges.')}</Alert>
-                                    ) : (
-                                        <Typography variant="body2" color="text.secondary">
-                                            No charges have been added to this job yet.
-                                        </Typography>
-                                    )
-                                ) : (
-                                    <List dense>
-                                        {sortChargesForDisplay(charges).map((c: any) => {
-                                            const voided = !!c.voidedAt;
-                                            return (
-                                                <ListItem key={c.id} sx={{ pl: 0, opacity: voided ? 0.6 : 1 }}>
-                                                    <ListItemText
-                                                        slotProps={voided ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
-                                                        primary={`${chargeKindLabel(c.kind)} · ${c.label} · ${formatMoney(c.amount)}`}
-                                                        secondary={
-                                                            voided ? (
-                                                                <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
-                                                                    {`VOID — ${c.voidReason || 'no reason recorded'}`}
-                                                                </Typography>
-                                                            ) : undefined
-                                                        }
-                                                    />
-                                                </ListItem>
-                                            );
-                                        })}
-                                    </List>
-                                )}
-                            </Box>
-                        )}
-                        </>
-                    }
+                <InvoicePanel
+                    jobId={id || ''}
+                    jobDisplayId={data?.ownJobById?.jobId ?? null}
+                    jobName={jobName}
+                    customerCategory={data?.ownJobById?.customerCategory ?? null}
+                    sow={sowFullData}
                 />
 
-                {/* Payments read the invoice they settle, so this card sits below
-                    the one that issues it. */}
+                {/* Payments belong to the job; every invoice version restates them. */}
                 <JobPaymentsPanel jobId={id || ''} />
 
                 {/* Comments Section */}

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
-import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import CloseIcon from '@mui/icons-material/Close';
 import { format } from 'date-fns';
-import { GET_INVOICES_BY_JOB_ID, GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
+import { GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
 import { RECORD_JOB_PAYMENT, VOID_JOB_PAYMENT } from '../../gql/mutations';
-import { balanceHeading, balanceRailLabel, formatMoney, paymentsCountLabel } from '../../utils/equipmentBilling';
+import { balanceHeading, balanceRailLabel, depositSummary, formatMoney, paymentsCountLabel } from '../../utils/equipmentBilling';
 import { chipStatusBackground } from '../../utils/technicianProcessStatus';
 import { formatGqlError, formatSaveError, isPermissionError } from '../../utils/gqlError';
 import ProcessCard from '../technician/ProcessCard';
@@ -27,8 +27,9 @@ const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyConten
 const todayIso = (): string => format(new Date(), 'yyyy-MM-dd');
 
 /**
- * The job page's Payments card: what the job has been charged for equipment,
- * what has been received against it, and the balance.
+ * The job page's Payments card: what the job has been charged, what has been
+ * received against it, and the balance — live. Payments belong to the job,
+ * never to one invoice; every invoice version restates them.
  *
  * Renders nothing at all when the caller may not read the job's billing — the
  * server answers ForbiddenException, exactly as `jobEquipmentBooking` answers
@@ -43,12 +44,10 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   const [receivedOn, setReceivedOn] = useState(todayIso());
   const [reference, setReference] = useState('');
   const [note, setNote] = useState('');
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
   const [voidTarget, setVoidTarget] = useState<{ id: string; amount: number } | null>(null);
 
   const balanceQuery = useQuery(GET_JOB_BALANCE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
   const paymentsQuery = useQuery(GET_JOB_PAYMENTS, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
-  const invoicesQuery = useQuery(GET_INVOICES_BY_JOB_ID, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-first', errorPolicy: 'all' });
 
   const [recordPayment] = useMutation(RECORD_JOB_PAYMENT);
   const [voidPayment] = useMutation(VOID_JOB_PAYMENT);
@@ -56,13 +55,6 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   const balance = balanceQuery.data?.jobBalance;
   const payments: any[] = paymentsQuery.data?.jobPayments ?? [];
   const live = payments.filter((p) => !p.voidedAt);
-  // Live (non-void) invoices, newest first — the dialog's "Applies to invoice"
-  // options. `latestInvoice` isn't a fit here: that util picks one invoice, and
-  // this needs every live invoice in order.
-  const liveInvoices = (invoicesQuery.data?.invoicesByJobId ?? [])
-    .filter((inv: any) => !inv?.voidedAt)
-    .slice()
-    .sort((a: any, b: any) => new Date(b.invoiceDate ?? 0).getTime() - new Date(a.invoiceDate ?? 0).getTime());
 
   if (!jobId) return null;
   if (balanceQuery.loading && !balanceQuery.data) {
@@ -101,7 +93,6 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
     setAmount('');
     setReference('');
     setNote('');
-    setSelectedInvoiceId('');
     setReceivedOn(todayIso());
     setRecordError(null);
   };
@@ -125,8 +116,7 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
             // timezone, which is where this lab is.
             receivedOn: new Date(`${receivedOn}T12:00:00`).toISOString(),
             reference: reference.trim() || null,
-            note: note.trim() || null,
-            invoiceId: selectedInvoiceId || null
+            note: note.trim() || null
           }
         }
       });
@@ -173,6 +163,17 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
         statusPaneSx={{ bgcolor: chipStatusBackground(Number(balance.balanceDue) > 0 ? 'warning' : live.length > 0 ? 'success' : 'default') }}
         statusPane={
           <StatusPaneHeader status={status} description={description}>
+            {Number(balance.depositOutstanding) > 0 && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                {depositSummary({ label: 'Deposit', amount: balance.depositAmount, dueDate: balance.depositDueDate, outstanding: balance.depositOutstanding })}
+              </Typography>
+            )}
+            {/* The invoice is a snapshot; this card is live. Said outright, so a
+                booking confirmed after issue moving these figures reads as
+                expected rather than as the two disagreeing. */}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Live figures. The invoice states them as they stood when it was issued.
+            </Typography>
             {balance.unconfirmedBookings > 0 && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                 {`${balance.unconfirmedBookings} booking${balance.unconfirmedBookings === 1 ? '' : 's'} not yet confirmed, so not on this balance.`}
@@ -273,22 +274,6 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
               onChange={(e) => setReceivedOn(e.target.value)}
               slotProps={{ inputLabel: { shrink: true } }}
             />
-            {liveInvoices.length > 0 && (
-              <TextField
-                select
-                label="Applies to invoice"
-                value={selectedInvoiceId}
-                disabled={busy}
-                onChange={(e) => setSelectedInvoiceId(e.target.value)}
-              >
-                <MenuItem value="">None</MenuItem>
-                {liveInvoices.map((inv: any) => (
-                  <MenuItem key={inv.id} value={inv.id}>
-                    {`${inv.invoiceNumber} · ${formatMoney(inv.totalCost)}`}
-                  </MenuItem>
-                ))}
-              </TextField>
-            )}
             <TextField label="Reference" placeholder="Check #1042" value={reference} disabled={busy} onChange={(e) => setReference(e.target.value)} />
             <TextField label="Note" multiline minRows={2} value={note} disabled={busy} onChange={(e) => setNote(e.target.value)} />
             {recordError && <Alert severity="error">{recordError}</Alert>}
@@ -310,7 +295,7 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
           title={`Void the ${formatMoney(voidTarget.amount)} payment?`}
           warning={
             'The payment is kept and shown struck through with your reason, so the balance moving back up is explicable.\n\n' +
-            'Invoices already issued are not changed — each one states the balance as at its own date.'
+            'The current invoice is not changed — it states the balance as at its own date. Issue a new version to restate it.'
           }
           fieldLabel="Reason (the client sees this)"
           confirmLabel="Void payment"

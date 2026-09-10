@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { billedCustomerCategory, buildEquipmentTotals, buildInvoicePricingNote, buildVoidNotice, invoiceMoney } from './JobInvoiceDocument';
+import { billedCustomerCategory, buildDepositNotice, buildEquipmentTotals, buildInvoicePricingNote, buildSupersededNotice, buildVoidNotice, invoiceMoney } from './JobInvoiceDocument';
 import { buildStatementTotals, equipmentEstimateNote } from '../utils/equipmentBilling';
 
 /**
@@ -191,5 +191,39 @@ describe('the statement totals', () => {
 describe('the equipment-use note on a statement’s service rows', () => {
   it('marks the line the SOW described as an estimate', () => {
     expect(equipmentEstimateNote('Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)')).toBe('Estimated · billed at actual booked hours');
+  });
+});
+
+describe('buildSupersededNotice', () => {
+  // A superseded version stays downloadable, so it has to say it is not payable.
+  it('says the version is not payable and names its replacement', () => {
+    const notice = buildSupersededNotice({ supersededAt: '2026-09-10T15:00:00.000Z', supersededByNumber: '00005-003' });
+    expect(notice?.title).toBe('SUPERSEDED — THIS INVOICE IS NOT PAYABLE');
+    expect(notice?.detail).toBe('Replaced by invoice 00005-003 on 09/10/2026.');
+  });
+
+  it('renders nothing for the current invoice', () => {
+    expect(buildSupersededNotice({ supersededAt: null })).toBeNull();
+    expect(buildSupersededNotice(null)).toBeNull();
+  });
+
+  it('gives way to VOID, which says more', () => {
+    expect(buildSupersededNotice({ supersededAt: '2026-09-10T15:00:00.000Z', voidedAt: '2026-09-11T15:00:00.000Z' })).toBeNull();
+  });
+});
+
+describe('buildDepositNotice', () => {
+  it('states the deposit, its date, what was outstanding, and that it is not extra', () => {
+    expect(buildDepositNotice({ label: 'Deposit', amount: 500, dueDate: '2026-10-01T12:00:00.000Z', outstanding: 300 })).toBe(
+      'Deposit: $500.00, due 10/01/2026. Outstanding at issue: $300.00. The deposit is part of the total above, not in addition to it.'
+    );
+  });
+
+  it('says so when payments already covered it', () => {
+    expect(buildDepositNotice({ label: 'Deposit', amount: 500, outstanding: 0 })).toContain('Covered by the payments received.');
+  });
+
+  it('says nothing when the invoice asks for no deposit', () => {
+    expect(buildDepositNotice(null)).toBeNull();
   });
 });

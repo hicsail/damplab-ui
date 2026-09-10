@@ -2,27 +2,20 @@ import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { addDays, format } from 'date-fns';
 
-import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, IconButton, InputLabel, MenuItem, Select, Tooltip } from '@mui/material';
+import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
 import EditNoteIcon                                   from '@mui/icons-material/EditNote';
-import { formatGqlError, formatSaveError } from '../utils/gqlError';
-import { invoiceCountLabel } from '../utils/invoiceCounts';
 import { invoiceBlockedMessage } from '../utils/invoiceGate';
-import { dueDateLabel, formatMoney, invoiceKindLabel, invoiceKindOf, isLegacyInvoice } from '../utils/equipmentBilling';
-import { buildCustomLineInputs, buildReleaseRows, buildReleaseSelections, chargeKindLabel, defaultCheckedRows, emptyCustomLine, sortChargesForDisplay } from '../utils/jobCharges';
-import type { CustomLineDraft } from '../utils/jobCharges';
 import UndoIcon                                       from '@mui/icons-material/Undo';
 import CancelIcon                                     from '@mui/icons-material/Cancel';
-import ReceiptLongIcon                                from '@mui/icons-material/ReceiptLong';
 import RefreshIcon                                    from '@mui/icons-material/Refresh';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, VOID_JOB_CHARGE, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION, VOID_INVOICE }  from '../gql/mutations';
+import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -32,13 +25,12 @@ import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 import JobFeedbackModal           from '../components/JobFeedbackModal';
 import { canRevertVersions, technicianCustomerActionCopy } from '../utils/jobEditing';
 import JobPDFDocument             from '../components/JobPDFDocument';
-import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SowEditorModal             from '../components/sow/SowEditorModal';
 import { SowPdfDownloadButton, SowStatusDetails, SowStatusSummary, useSowStaffStatus } from '../components/sow/SowStatusCard';
 import ProcessCard                from '../components/technician/ProcessCard';
 import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
 import JobPaymentsPanel from '../components/billing/JobPaymentsPanel';
-import { GenerateInvoiceDialog } from '../components/billing/JobChargeDialogs';
+import InvoicePanel from '../components/billing/InvoicePanel';
 import ReasonDialog               from '../components/ReasonDialog';
 import Can                        from '../components/PermissionGate';
 import { PERMISSIONS }            from '../hooks/usePermissions';
@@ -46,7 +38,7 @@ import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
 import { CUSTOMER_CATEGORY_OPTIONS, statusColor } from '../components/sow/sowTypes';
-import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestInvoice, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
+import { chipStatusBackground, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
 import StatusPaneHeader from '../components/technician/StatusPaneHeader';
 import { BIOSECURITY_SCREENINGS, PLACEHOLDER_BIOSECURITY, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus } from '../components/technician/biosecurityStatus';
 
@@ -168,31 +160,6 @@ export default function TechnicianView() {
     });
     const invoices = invoicesResult?.invoicesByJobId ?? [];
 
-    // The statement's own view of what it carries beyond the SOW lines: the
-    // release checklist reads `charges` to know which positions already have
-    // a live SERVICE_LINE charge, and the Generate invoice dialog's summary
-    // and the Charges block below both read `balance` / `charges` directly.
-    const { data: chargesResult, loading: chargesLoading, error: chargesError } = useQuery(GET_JOB_CHARGES, {
-        variables: { jobId: id as string },
-        skip: !id,
-        fetchPolicy: 'cache-and-network',
-    });
-    const charges: any[] = chargesResult?.jobCharges ?? [];
-
-    const { data: balanceResult, loading: balanceLoading, error: balanceError } = useQuery(GET_JOB_BALANCE, {
-        variables: { jobId: id as string },
-        skip: !id,
-        fetchPolicy: 'cache-and-network',
-    });
-    const balance = balanceResult?.jobBalance ?? null;
-    // Newest first from the server, so the last element is the OLDEST — see latestInvoice.
-    //
-    // Two bindings, because "most recent record" and "the figure that stands" stop
-    // being the same thing once an invoice can be voided. The summary's dollar
-    // amount and the Download button must never quote a voided invoice: on the
-    // client's page that line reads as what they owe.
-    const liveInvoices = invoices.filter((inv: any) => !inv?.voidedAt);
-    const newestLiveInvoice = latestInvoice<any>(liveInvoices);
     const sowStatus = useSowStaffStatus(id || '');
 
     // Derive from Apollo cache so refetches (e.g. after SOW upsert) update without a full page reload.
@@ -290,40 +257,6 @@ export default function TechnicianView() {
         }
     };
 
-    const [createInvoice, { loading: creatingInvoice }] = useMutation(CREATE_INVOICE);
-
-    /**
-     * Voiding an invoice.
-     *
-     * The double-billing guard refuses a line an earlier invoice already covers,
-     * which without a void makes a mis-generated invoice permanent. Voiding keeps
-     * the record — numbering is derived from a per-job count, so nothing may ever
-     * be deleted — and releases its lines back into the picker.
-     *
-     * Held by id rather than by a boolean: the list can show several invoices, and
-     * the dialog has to know which one it is confirming.
-     */
-    const [voidInvoice] = useMutation(VOID_INVOICE);
-    const [voidTarget, setVoidTarget] = useState<{ id: string; invoiceNumber: string } | null>(null);
-    const [voiding, setVoiding] = useState(false);
-
-    const handleVoidInvoice = async (reason: string) => {
-        if (!voidTarget) return;
-        setVoiding(true);
-        try {
-            await voidInvoice({ variables: { invoiceId: voidTarget.id, reason } });
-            // Refetched rather than relying on the cache write: voiding changes
-            // which lines the Create Invoice dialog may tick, and that is computed
-            // from this same list.
-            await refetchInvoices();
-            setVoidTarget(null);
-        } catch (err: any) {
-            window.alert(formatGqlError(err, 'Could not void the invoice.'));
-        } finally {
-            setVoiding(false);
-        }
-    };
-
     const [modalOpen, setModalOpen] = useState(false);
     const [sowModalOpen, setSowModalOpen] = useState(false);
 
@@ -383,104 +316,6 @@ export default function TechnicianView() {
     const handleCloseSOWModal = () => {
         setSowModalOpen(false);
         void refreshJobPage();
-    };
-
-    // The lines the server will bill, which is what the release checklist has to
-    // list — the live `services` above can have drifted from the version in force.
-    const billableServices: any[] = sowFullData?.billableServices ?? [];
-
-    // One row per SOW position, marked with whatever the charge ledger already
-    // knows about it — released and locked, or open to release now.
-    const releaseRows = buildReleaseRows(billableServices, charges);
-
-    const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-    const [checkedRows, setCheckedRows] = useState<number[]>([]);
-    const [invoiceError, setInvoiceError] = useState<string | null>(null);
-    const [dueDate, setDueDate] = useState('');
-    const [depositMode, setDepositMode] = useState(false);
-    const [depositAmount, setDepositAmount] = useState('');
-    const [depositLabel, setDepositLabel] = useState('');
-    const [customLines, setCustomLines] = useState<CustomLineDraft[]>([]);
-
-    // Ticked by default whenever the ledger or the SOW positions change —
-    // released rows stay checked (and locked) in the dialog regardless, so this
-    // only matters for which unreleased rows start on.
-    useEffect(() => {
-        setCheckedRows(defaultCheckedRows(releaseRows));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sowFullData?.billableServices, chargesResult?.jobCharges]);
-
-    const openInvoiceDialog = () => {
-        // Not gated on `sowFullData`: a deposit needs no SOW at all, only the
-        // job itself having loaded.
-        if (!jobData) return;
-        setInvoiceError(null);
-        setDueDate(format(addDays(new Date(), 30), 'yyyy-MM-dd'));
-        // Every opening starts clean, so a half-typed deposit or charge line
-        // from a cancelled attempt is never submitted with the next one.
-        // Deposit mode starts on whenever the SOW is not countersigned — that
-        // is the only request reachable until it is.
-        setDepositMode(!!invoiceBlocked);
-        setDepositAmount('');
-        setDepositLabel('');
-        setCustomLines([emptyCustomLine()]);
-        setInvoiceDialogOpen(true);
-    };
-    const closeInvoiceDialog = () => setInvoiceDialogOpen(false);
-
-    const toggleReleaseRow = (index: number) => {
-        setCheckedRows((prev) => (prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]));
-    };
-
-    const submitCreateInvoice = async () => {
-        if (!id || !dueDate) return;
-        setInvoiceError(null);
-        try {
-            const input: any = {
-                jobId: id as string,
-                // Noon, not midnight — a date-only string parsed as UTC midnight
-                // renders as the previous day in every negative-offset timezone,
-                // which is where this lab is (same reason JobPaymentsPanel gives).
-                dueDate: new Date(`${dueDate}T12:00:00`).toISOString()
-            };
-            if (depositMode) {
-                // A deposit releases nothing: the server refuses the two together with
-                // "A deposit request cannot release service lines."
-                input.deposit = { amount: Number(depositAmount), ...(depositLabel.trim() ? { label: depositLabel.trim() } : {}) };
-            } else {
-                input.releaseServiceLines = buildReleaseSelections(releaseRows, checkedRows);
-                const lines = buildCustomLineInputs(customLines);
-                if (lines.length > 0) input.customLines = lines;
-            }
-            await createInvoice({ variables: { input } });
-            await refreshJobPage();
-            setInvoiceDialogOpen(false);
-        } catch (err) {
-            // Stays open with the refusal visible in the dialog itself — most often
-            // the SOW is not yet countersigned, there is nothing new to release, or
-            // a workflow edit re-synced the SOW while this was open.
-            setInvoiceError(formatSaveError(err, 'this invoice'));
-        }
-    };
-
-    /**
-     * Voiding a charge.
-     *
-     * Held by id + label rather than a boolean, matching `voidTarget` above —
-     * the dialog's title names the charge it is about to void.
-     */
-    const [voidJobCharge, { loading: voidingCharge }] = useMutation(VOID_JOB_CHARGE);
-    const [chargeVoidTarget, setChargeVoidTarget] = useState<{ id: string; label: string } | null>(null);
-
-    const handleVoidCharge = async (reason: string) => {
-        if (!chargeVoidTarget) return;
-        try {
-            await voidJobCharge({ variables: { id: chargeVoidTarget.id, reason } });
-            setChargeVoidTarget(null);
-            await refreshJobPage();
-        } catch (err: any) {
-            window.alert(formatGqlError(err, 'Could not void the charge.'));
-        }
     };
 
     const getParameterFiles = () => getJobParameterFiles(workflows);
@@ -619,37 +454,14 @@ export default function TechnicianView() {
     const jobStaffVersion = partyVersionLabel(latestStaffVisibleJobVersion(versions));
     const sowCustomerVersion = sowPartyVersionLabel(latestCustomerVisibleSowVersion(sowStatus.sow?.versions ?? []));
     const sowStaffVersion = sowPartyVersionLabel(latestStaffVisibleSowVersion(sowStatus.sow?.versions ?? []));
-    const invoiceLabel = invoiceVersionLabel(liveInvoices);
     const sowStatusPaneColor = chipStatusBackground(
         sowStatus.sow ? statusColor(sowStatus.active?.status ?? sowStatus.current?.status) : 'default'
     );
-    // Keyed on standing invoices: a job whose only invoice was voided has not been
-    // billed, and an info-coloured pane saying "1 invoice" would imply it had.
-    const invoiceStatusPaneColor = chipStatusBackground(liveInvoices.length ? 'info' : 'default');
-
-    /**
-     * Why Create Invoice is unavailable, or null when it is not.
-     *
-     * The server refuses an invoice against anything but a countersigned SOW.
-     * `useSowStaffStatus` already holds the state that decides it and drives the
-     * SOW card above; the button used to ignore it entirely, so staff reached the
-     * refusal by clicking through a dialog and picking service lines first.
-     */
+    // Why no invoice version can be issued yet, or null when one can. The server
+    // refuses anything but a countersigned SOW; while that state is still loading
+    // the button stays blocked rather than offered and then refused.
     const invoiceBlocked = invoiceBlockedMessage(sowFullData ? { activeStatus: sowStatus.active?.status ?? null, versions: sowStatus.sow?.versions ?? [] } : null);
-    // Whether the SOW in force is countersigned — the only state that unlocks a
-    // full release. A deposit is money collected before signing, so it stays
-    // reachable in every other state; `Generate invoice` itself is no longer
-    // gated on this (see the rail button below).
-    const countersigned = !invoiceBlocked;
-    // Computed unconditionally so a not-yet-loaded SOW is blocked rather than
-    // offered, which is the direction `invoiceGate.ts` documents. The *reason* is
-    // held back while loading, though: before the query answers, `sowFullData` is
-    // undefined and the reason reads "this job has no Statement of Work yet" —
-    // true of a job that has none, and wrong about every job that does.
-    const showInvoiceBlockedReason = !sowLoading && !sowStatus.loading && !!invoiceBlocked;
-    // Fixed wording used instead of `invoiceBlocked`'s detailed reason now that
-    // the button stays enabled: a deposit is exactly what's still available.
-    const depositOnlyMessage = 'Only a deposit can be requested until the Statement of Work is countersigned.';
+    const issueBlockedReason = sowLoading || sowStatus.loading ? 'Checking the Statement of Work…' : invoiceBlocked;
     const jobStatusPaneColor = chipStatusBackground(jobData ? jobStatusColor(jobState) : 'default');
     const biosecurity = PLACEHOLDER_BIOSECURITY;
     const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
@@ -1031,262 +843,19 @@ export default function TechnicianView() {
                     stays on the Inventory schedule. */}
                 <JobEquipmentBookingPanel jobId={id || ''} staffView />
 
-                <ProcessCard
-                    title="Invoices"
-                    defaultExpanded
-                    customerBadge={null}
-                    staffBadge={null}
-                    customerVersion={invoiceLabel}
-                    staffVersion={invoiceLabel}
-                    statusPaneSx={{ bgcolor: invoiceStatusPaneColor }}
-                    statusPane={
-                        invoices.length ? (
-                            <StatusPaneHeader
-                                status={invoiceCountLabel(invoices)}
-                                reference={invoiceLabel !== '—' ? invoiceLabel : undefined}
-                                description={
-                                    // The number is in the reference slot and the voided state is
-                                    // in the status, so this line carries only the figure — and it
-                                    // quotes the newest invoice that still stands, never a voided
-                                    // one.
-                                    newestLiveInvoice?.totalCost != null
-                                        ? `Latest invoice · $${Number(newestLiveInvoice.totalCost).toFixed(2)}`
-                                        : undefined
-                                }
-                            />
-                        ) : (
-                            <StatusPaneHeader
-                                status="No invoices yet"
-                                description="Create an invoice from the Statement of Work services when you are ready to bill."
-                            />
-                        )
-                    }
-                    actions={
-                        <>
-                            <Can permission={PERMISSIONS.BillingWrite}>
-                                <Tooltip title={showInvoiceBlockedReason ? depositOnlyMessage : ''} disableHoverListener={!showInvoiceBlockedReason}>
-                                    {/* A span, because MUI cannot attach a tooltip to a disabled
-                                        button — and the reason is the whole point of disabling it. */}
-                                    <span style={{ display: 'block' }}>
-                                        <Button
-                                            color={countersigned ? 'primary' : 'secondary'}
-                                            variant="contained"
-                                            size="small"
-                                            startIcon={<ReceiptLongIcon />}
-                                            disabled={!jobData}
-                                            onClick={openInvoiceDialog}
-                                            sx={{ ...railBtnSx, width: '100%' }}
-                                        >
-                                            Generate invoice
-                                        </Button>
-                                    </span>
-                                </Tooltip>
-                            </Can>
-                            {showInvoiceBlockedReason && (
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                                    {depositOnlyMessage}
-                                </Typography>
-                            )}
-                            {/* Gated on a *standing* invoice: with none, `invoice` would be
-                                null and the document would fall back to the SOW's own services,
-                                printing a total with no adjustments applied. */}
-                            {liveInvoices.length > 0 && id && sowFullData ? (
-                                <PDFDownloadLink
-                                    document={
-                                        <JobInvoiceDocument
-                                            jobId={id}
-                                            jobDisplayId={jobData?.jobId ?? null}
-                                            jobName={jobName}
-                                            customerCategory={jobData?.customerCategory ?? undefined}
-                                            sow={sowFullData}
-                                            invoice={newestLiveInvoice}
-                                        />
-                                    }
-                                    fileName={`Invoice-${(newestLiveInvoice?.invoiceNumber ?? id) || id}.pdf`}
-                                    style={{ textDecoration: 'none', width: '100%' }}
-                                >
-                                    {({ loading }) => (
-                                        <Button color="primary" size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} sx={railBtnSx}>
-                                            {loading ? 'Loading invoice...' : 'Download Latest Invoice'}
-                                        </Button>
-                                    )}
-                                </PDFDownloadLink>
-                            ) : (
-                                <Button color="secondary" size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} disabled sx={railBtnSx}>
-                                    Download Latest Invoice
-                                </Button>
-                            )}
-                        </>
-                    }
-                    details={
-                        <>
-                        {!invoices?.length ? (
-                            <Typography variant="body2" color="text.secondary">
-                                No invoices have been generated for this job yet.
-                            </Typography>
-                        ) : (
-                            <List dense>
-                                {invoices.map((inv: any, idx: number) => (
-                                    /* A voided invoice stays listed and stays numbered — deleting one
-                                       would hand its number to the next invoice, since numbering is a
-                                       per-job count. It is still downloadable, stamped VOID, because
-                                       the copy already sent to a client has to remain retrievable. */
-                                    <ListItem
-                                        key={inv.id || idx}
-                                        sx={{ pl: 0, opacity: inv.voidedAt ? 0.6 : 1 }}
-                                        secondaryAction={
-                                            inv.voidedAt ? null : (
-                                                <Can permission={PERMISSIONS.BillingWrite}>
-                                                    <Button
-                                                        size="small"
-                                                        color="warning"
-                                                        startIcon={<CancelIcon />}
-                                                        disabled={voiding}
-                                                        onClick={() => setVoidTarget({ id: String(inv.id), invoiceNumber: String(inv.invoiceNumber ?? inv.id ?? '') })}
-                                                    >
-                                                        Void
-                                                    </Button>
-                                                </Can>
-                                            )
-                                        }
-                                    >
-                                        <ListItemText
-                                            slotProps={inv.voidedAt ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
-                                            primary={
-                                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-                                                    <Chip size="small" label={invoiceKindLabel(inv)} variant="outlined" color={invoiceKindOf(inv) === 'EQUIPMENT' ? 'info' : 'default'} />
-                                                    {isLegacyInvoice(inv) && <Chip size="small" variant="outlined" color="default" label="Legacy" />}
-                                                    <Box component="span">
-                                                        {id && sowFullData ? (
-                                                            <PDFDownloadLink
-                                                                document={
-                                                                    <JobInvoiceDocument
-                                                                        jobId={id}
-                                                                        jobDisplayId={jobData?.jobId ?? null}
-                                                                        jobName={jobName}
-                                                                        customerCategory={jobData?.customerCategory ?? undefined}
-                                                                        sow={sowFullData}
-                                                                        invoice={inv}
-                                                                    />
-                                                                }
-                                                                fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
-                                                            >
-                                                                {({ loading }) =>
-                                                                    loading
-                                                                        ? 'Loading...'
-                                                                        : `Invoice ${inv.invoiceNumber || ''}`.trim()
-                                                                }
-                                                            </PDFDownloadLink>
-                                                        ) : (
-                                                            `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
-                                                        )}
-                                                    </Box>
-                                                </Box>
-                                            }
-                                            secondary={
-                                                <>
-                                                    {`${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}${dueDateLabel(inv.dueDate) ? ` • ${dueDateLabel(inv.dueDate)}` : ''}`}
-                                                    {/* Says VOID in words, not by the strikethrough alone —
-                                                        the reason is the part staff actually need. */}
-                                                    {inv.voidedAt && (
-                                                        <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
-                                                            {`VOID — ${inv.voidReason || 'no reason recorded'}`}
-                                                            {inv.voidedBy ? ` (${inv.voidedBy}` : ''}
-                                                            {inv.voidedBy && inv.voidedAt ? `, ${new Date(inv.voidedAt).toLocaleDateString()})` : inv.voidedBy ? ')' : ''}
-                                                        </Typography>
-                                                    )}
-                                                    {/* Overlaps the server could prove are refused outright. These
-                                                        are the ones it could not check — an earlier invoice that
-                                                        predates line tracking, or one billed from a different
-                                                        version — where silence would imply a guarantee nobody made. */}
-                                                    {Array.isArray(inv.billingWarnings) && inv.billingWarnings.length > 0 && (
-                                                        <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
-                                                            {inv.billingWarnings.map((warning: string, i: number) => (
-                                                                <Typography key={i} component="span" variant="caption" color="warning.main" sx={{ display: 'block' }}>
-                                                                    {warning}
-                                                                </Typography>
-                                                            ))}
-                                                        </Box>
-                                                    )}
-                                                </>
-                                            }
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        )}
-
-                        <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                Charges
-                            </Typography>
-                            {charges.length === 0 ? (
-                                chargesLoading ? null : chargesError ? (
-                                    <Alert severity="error">{formatGqlError(chargesError, 'Could not load the charges.')}</Alert>
-                                ) : (
-                                    <Typography variant="body2" color="text.secondary">
-                                        No charges have been added to this job yet.
-                                    </Typography>
-                                )
-                            ) : (
-                                <List dense>
-                                    {sortChargesForDisplay(charges).map((c: any) => {
-                                        const voided = !!c.voidedAt;
-                                        return (
-                                            <ListItem
-                                                key={c.id}
-                                                sx={{ pl: 0, opacity: voided ? 0.6 : 1 }}
-                                                secondaryAction={
-                                                    voided ? null : (
-                                                        <Can permission={PERMISSIONS.BillingWrite}>
-                                                            <Tooltip title="Void this charge">
-                                                                <IconButton
-                                                                    size="small"
-                                                                    color="warning"
-                                                                    disabled={voidingCharge}
-                                                                    onClick={() => setChargeVoidTarget({ id: String(c.id), label: String(c.label ?? '') })}
-                                                                >
-                                                                    <CancelIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                        </Can>
-                                                    )
-                                                }
-                                            >
-                                                <ListItemText
-                                                    slotProps={voided ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
-                                                    primary={`${chargeKindLabel(c.kind)} · ${c.label} · ${formatMoney(c.amount)}`}
-                                                    secondary={
-                                                        c.note || voided ? (
-                                                            <>
-                                                                {/* `component="span"` on both: `secondary` renders inside a
-                                                                    <p>, which may not contain a block-level element. */}
-                                                                {c.note && (
-                                                                    <Typography component="span" variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                                                        {c.note}
-                                                                    </Typography>
-                                                                )}
-                                                                {voided && (
-                                                                    <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
-                                                                        {`VOID — ${c.voidReason || 'no reason recorded'}`}
-                                                                    </Typography>
-                                                                )}
-                                                            </>
-                                                        ) : undefined
-                                                    }
-                                                />
-                                            </ListItem>
-                                        );
-                                    })}
-                                </List>
-                            )}
-                        </Box>
-                        </>
-                    }
+                <InvoicePanel
+                    jobId={id || ''}
+                    jobDisplayId={jobData?.jobId ?? null}
+                    jobName={jobName}
+                    customerCategory={jobData?.customerCategory ?? null}
+                    sow={sowFullData}
+                    staffView
+                    issueBlockedReason={issueBlockedReason}
+                    documentStale={!!sowFullData?.documentStale}
+                    onChanged={refreshJobPage}
                 />
 
-                {/* Payments read the invoice they settle, so this card sits below
-                    the one that issues it. */}
+                {/* Payments belong to the job; every invoice version restates them. */}
                 <JobPaymentsPanel jobId={id || ''} staffView />
 
                 <CommentsSection
@@ -1309,24 +878,6 @@ export default function TechnicianView() {
                         onConfirm={handleWithdraw}
                     />
                 )}
-                {voidTarget && (
-                    <ReasonDialog
-                        open
-                        title={`Void invoice ${voidTarget.invoiceNumber}?`}
-                        warning={
-                            'The invoice is kept and keeps its number — nothing is deleted, so a later invoice can never reuse it.\n\n' +
-                            'Its services become available to invoice again. The client sees the invoice marked VOID in their list, and the reason you give below is printed on the invoice itself.'
-                        }
-                        // ReasonDialog's default wording, deliberately: the reason is
-                        // printed in the client's invoice list AND in the VOID banner on
-                        // the downloadable PDF. Labelling it "recorded on the invoice"
-                        // invites an internal note into a field the customer reads.
-                        confirmLabel="Void invoice"
-                        busy={voiding}
-                        onCancel={() => setVoidTarget(null)}
-                        onConfirm={handleVoidInvoice}
-                    />
-                )}
                 <JobFeedbackModal
                     open={modalOpen}
                     onClose={handleCloseModal}
@@ -1346,47 +897,6 @@ export default function TechnicianView() {
                     jobId={id ?? ''}
                     jobName={jobData?.name}
                 />
-
-                <GenerateInvoiceDialog
-                    open={invoiceDialogOpen}
-                    busy={creatingInvoice}
-                    error={invoiceError}
-                    rows={releaseRows}
-                    checked={checkedRows}
-                    onToggle={toggleReleaseRow}
-                    balance={balance}
-                    balanceLoading={balanceLoading}
-                    balanceError={balanceError}
-                    dueDate={dueDate}
-                    onDueDate={setDueDate}
-                    documentStale={!!sowFullData?.documentStale}
-                    onCancel={closeInvoiceDialog}
-                    onConfirm={submitCreateInvoice}
-                    countersigned={countersigned}
-                    depositMode={depositMode}
-                    onDepositMode={setDepositMode}
-                    depositAmount={depositAmount}
-                    onDepositAmount={setDepositAmount}
-                    depositLabel={depositLabel}
-                    onDepositLabel={setDepositLabel}
-                    customLines={customLines}
-                    onCustomLines={setCustomLines}
-                />
-
-                {chargeVoidTarget && (
-                    <ReasonDialog
-                        open
-                        title={`Void the ${chargeVoidTarget.label} charge?`}
-                        warning={
-                            'The charge is kept and shown struck through with your reason, so the balance moving back down is explicable.\n\n' +
-                            'Invoices already issued are not changed — each one states the balance as at its own date.'
-                        }
-                        confirmLabel="Void charge"
-                        busy={voidingCharge}
-                        onCancel={() => setChargeVoidTarget(null)}
-                        onConfirm={handleVoidCharge}
-                    />
-                )}
             </div>
         </div>
     )

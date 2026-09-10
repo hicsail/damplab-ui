@@ -3,7 +3,7 @@ import { Document, Page, StyleSheet, View, Text, Image, Font } from '@react-pdf/
 import type { SOWData } from '../types/SOWTypes';
 import { RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
 import type { CustomerCategory } from '../utils/customerCategory';
-import { balanceHeading, buildStatementTotals, equipmentEstimateNote, invoiceKindOf } from '../utils/equipmentBilling';
+import { balanceHeading, buildStatementTotals, equipmentEstimateNote, invoiceKindOf, invoiceVersionOf } from '../utils/equipmentBilling';
 
 Font.register({ family: 'Courier-New', fonts: [{ src: '/fonts/Courier-New.ttf' }] });
 
@@ -63,6 +63,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 800,
     color: '#d32f2f',
+    marginBottom: 2,
+  },
+  /** SUPERSEDED: the same three signals as VOID, in grey — history, not an error. */
+  supersededWatermark: {
+    position: 'absolute',
+    top: 300,
+    left: 40,
+    fontSize: 60,
+    fontWeight: 800,
+    color: '#555555',
+    opacity: 0.14,
+    transform: 'rotate(-30deg)',
+  },
+  supersededBanner: {
+    borderWidth: 2,
+    borderColor: '#555555',
+    padding: 6,
+    marginBottom: 10,
+  },
+  supersededBannerTitle: {
+    fontSize: 14,
+    fontWeight: 800,
+    color: '#555555',
     marginBottom: 2,
   },
   monoBold: {
@@ -302,6 +325,39 @@ export function buildVoidNotice(invoice: { voidedAt?: string | Date | null; void
 }
 
 /**
+ * What the SUPERSEDED banner says. A superseded version stays downloadable as
+ * the copy that was sent, so like a void it has to say it is not payable — and
+ * name what replaced it. Null on a live invoice, and on a void one (VOID wins).
+ */
+export function buildSupersededNotice(
+  invoice: { supersededAt?: string | Date | null; supersededByNumber?: string | null; voidedAt?: string | Date | null } | null | undefined
+): { title: string; detail: string } | null {
+  if (!invoice?.supersededAt || invoice.voidedAt) return null;
+  const at = safeParseISODate(toIsoStringSafe(invoice.supersededAt));
+  return {
+    title: 'SUPERSEDED — THIS INVOICE IS NOT PAYABLE',
+    detail: `Replaced by ${invoice.supersededByNumber?.trim() ? `invoice ${invoice.supersededByNumber.trim()}` : 'a newer version'}${at ? ` on ${formatMMDDYYYY(at)}` : ''}.`
+  };
+}
+
+/**
+ * The deposit paragraph under the totals: what it is, when it is due, what was
+ * still owed at issue — and that it is part of the total, not added to it.
+ */
+export function buildDepositNotice(
+  deposit: { label?: string | null; amount?: number | null; dueDate?: string | Date | null; outstanding?: number | null } | null | undefined
+): string | null {
+  if (!deposit || deposit.amount == null) return null;
+  const due = safeParseISODate(toIsoStringSafe(deposit.dueDate));
+  const outstanding = Number(deposit.outstanding) || 0;
+  return (
+    `${deposit.label?.trim() || 'Deposit'}: ${formatCurrency(Number(deposit.amount) || 0)}${due ? `, due ${formatMMDDYYYY(due)}` : ''}. ` +
+    `${outstanding > 0 ? `Outstanding at issue: ${formatCurrency(outstanding)}.` : 'Covered by the payments received.'} ` +
+    'The deposit is part of the total above, not in addition to it.'
+  );
+}
+
+/**
  * The lines and the money an invoice prints — from the invoice, and only the invoice.
  *
  * This used to fall back to `sow.services` when the invoice carried none, and the
@@ -486,6 +542,13 @@ export interface JobInvoiceDocumentProps {
     dueDate?: string | Date | null;
     /** Custom charges and deposits on a statement's "Other charges" block. */
     customLines?: Array<{ chargeId?: string | null; kind?: string | null; label?: string | null; amount?: number | null; note?: string | null }> | null;
+    /** Which version of the job's invoice this is; read off the number when absent. */
+    versionNumber?: number | null;
+    /** Set once a newer version replaced this one. */
+    supersededAt?: string | Date | null;
+    supersededByNumber?: string | null;
+    /** The deposit this version asks for, with its own due date. Part of the total. */
+    deposit?: { label?: string | null; amount?: number | null; dueDate?: string | Date | null; outstanding?: number | null } | null;
   } | null;
 }
 
@@ -543,6 +606,9 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
   const pricingCategoryLabel = getCustomerCategoryLabel(billedCategory);
 
   const voidNotice = buildVoidNotice(invoice);
+  const supersededNotice = buildSupersededNotice(invoice);
+  const depositNotice = buildDepositNotice(invoice?.deposit);
+  const version = invoiceVersionOf(invoice);
 
   const isStatement = invoiceKindOf(invoice) === 'STATEMENT';
   const isEquipment = invoiceKindOf(invoice) === 'EQUIPMENT';
@@ -565,6 +631,13 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
             <Text style={styles.voidBannerTitle}>{voidNotice.title}</Text>
             <Text style={styles.text}>{voidNotice.attribution}</Text>
             <Text style={styles.text}>{voidNotice.reason}</Text>
+          </View>
+        )}
+        {supersededNotice && <Text style={styles.supersededWatermark} fixed>SUPERSEDED</Text>}
+        {supersededNotice && (
+          <View style={styles.supersededBanner}>
+            <Text style={styles.supersededBannerTitle}>{supersededNotice.title}</Text>
+            <Text style={styles.text}>{supersededNotice.detail}</Text>
           </View>
         )}
         <View style={styles.headerRow}>
@@ -599,6 +672,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
 
             <View style={{ width: 200 }}>
               <Text style={styles.strong}>Invoice no.: {invoiceNo}</Text>
+              {isStatement && version != null && <Text style={styles.text}>Version: v{version}</Text>}
               <Text style={styles.text}>Job ID: {jobDisplayId}</Text>
               {!isStatement && <Text style={styles.text}>Terms: Net 30</Text>}
               <Text style={styles.text}>Invoice date: {formatMMDDYYYY(invoiceDate)}</Text>
@@ -796,7 +870,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
 
             {customLines.length > 0 && (
               <>
-                <Text style={styles.strong}>Other charges</Text>
+                <Text style={styles.strong}>Other charges and discounts</Text>
                 {customLines.map((line, idx) => {
                   const amt = Number(line?.amount) || 0;
                   const amountText = amt < 0 ? `-${formatCurrency(Math.abs(amt))}` : formatCurrency(amt);
@@ -820,6 +894,13 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
                 </Text>
               </View>
             ))}
+
+            {depositNotice && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.strong}>Deposit</Text>
+                <Text style={styles.text}>{depositNotice}</Text>
+              </View>
+            )}
           </View>
         ) : isEquipment ? (
           <View style={styles.table}>
@@ -1002,7 +1083,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
           )}
           {isStatement && (
             <Text style={styles.text}>
-              This is a statement of everything this job has been charged to date, less the payments received. The balance shown is what is currently owed.
+              This invoice states everything this job has been charged to date, less the payments received. The balance shown is what is currently owed. It replaces any earlier version.
             </Text>
           )}
           {isProrated && (

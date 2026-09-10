@@ -1,152 +1,104 @@
 import React from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Checkbox,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  IconButton,
-  Switch,
-  TextField,
-  Typography
-} from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import type { CustomLineDraft, ReleaseRow } from '../../utils/jobCharges';
-import { customLineError, customLineErrors, depositError, emptyCustomLine } from '../../utils/jobCharges';
-import { depositDropNote, equipmentEstimateNote, formatMoney } from '../../utils/equipmentBilling';
+import type { CustomLineDraft, DepositDraft } from '../../utils/jobCharges';
+import { customLineError, customLineErrors, depositDraftError, emptyCustomLine, issuePreview } from '../../utils/jobCharges';
+import { balanceHeading, dueDateLabel, formatHours, formatMoney } from '../../utils/equipmentBilling';
 import { formatGqlError } from '../../utils/gqlError';
 
 /**
- * The dialog the job page's Invoices card opens.
+ * The dialog the Invoice card opens to issue a version.
  *
- * Split out of TechnicianView because it carries enough of its own layout
- * and validation to be worth reading on its own — unlike JobPaymentsPanel's
- * record-payment dialog, which stays inline because it is that card's only
- * dialog.
+ * Split out of InvoicePanel because it carries enough of its own layout and
+ * validation to be worth reading on its own.
  */
 
-/** Trailing zeros off an hours figure, so 2 hours does not print as "2.00 hrs". */
-function formatHours(n: number | null | undefined): string {
+/** A signed amount: a discount prints "-$50.00", never "$-50.00". */
+function signedMoney(n: number | null | undefined): string {
   const value = Number(n) || 0;
-  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+  return value < 0 ? `-${formatMoney(Math.abs(value))}` : formatMoney(value);
 }
 
-interface GenerateInvoiceDialogProps {
+interface IssueInvoiceDialogProps {
   open: boolean;
   busy: boolean;
   error: string | null;
-  rows: ReleaseRow[];
-  checked: number[];
-  onToggle: (index: number) => void;
+  /** The title of the invoice this version will supersede, or null when there is none. */
+  supersedes: string | null;
   balance: any | null;
   balanceLoading?: boolean;
   balanceError?: unknown;
+  /** Live CUSTOM charges already on the job — carried onto every version. */
+  existingCustom: any[];
+  /** The job's live DEPOSIT charge, if any. */
+  existingDeposit: any | null;
+  customLines: CustomLineDraft[];
+  onCustomLines: (rows: CustomLineDraft[]) => void;
+  /** A deposit being set in this dialog, or null. Only offered when the job has none. */
+  deposit: DepositDraft | null;
+  onDeposit: (draft: DepositDraft | null) => void;
   dueDate: string;
   onDueDate: (iso: string) => void;
   documentStale?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
-  /**
-   * Whether the SOW in force is countersigned. `false` before that — including
-   * when there is no SOW at all — forces deposit mode: a deposit is money
-   * collected before signing, so it must stay reachable in exactly the states
-   * that block a full release.
-   */
-  countersigned: boolean;
-  depositMode: boolean;
-  onDepositMode: (on: boolean) => void;
-  depositAmount: string;
-  onDepositAmount: (v: string) => void;
-  depositLabel: string;
-  onDepositLabel: (v: string) => void;
-  customLines: CustomLineDraft[];
-  onCustomLines: (rows: CustomLineDraft[]) => void;
 }
 
 /**
- * Generating a statement: which SOW lines to release now — or, in deposit
- * mode, a single up-front deposit instead — plus a read-only look at
- * everything else the statement already carries: equipment usage, custom
- * lines, deposits, payments, so staff are not guessing what else is on it
- * before they issue it.
+ * Issuing a version: a read-only look at everything it restates — the
+ * countersigned SOW's services, confirmed equipment use, the charges already
+ * on the job, payments — plus new charge or discount lines, the deposit when
+ * the job has none yet, and the due date. The preview underneath states what
+ * the version will say, including whether it will already read as Paid.
  */
-export function GenerateInvoiceDialog({
+export function IssueInvoiceDialog({
   open,
   busy,
   error,
-  rows,
-  checked,
-  onToggle,
+  supersedes,
   balance,
   balanceLoading,
   balanceError,
+  existingCustom,
+  existingDeposit,
+  customLines,
+  onCustomLines,
+  deposit,
+  onDeposit,
   dueDate,
   onDueDate,
   documentStale,
   onCancel,
-  onConfirm,
-  countersigned,
-  depositMode,
-  onDepositMode,
-  depositAmount,
-  onDepositAmount,
-  depositLabel,
-  onDepositLabel,
-  customLines,
-  onCustomLines
-}: GenerateInvoiceDialogProps): React.JSX.Element {
-  const checkedSet = new Set(checked);
+  onConfirm
+}: IssueInvoiceDialogProps): React.JSX.Element {
+  const patchLine = (i: number, patch: Partial<CustomLineDraft>): void => onCustomLines(customLines.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  const patchDeposit = (patch: Partial<DepositDraft>): void => onDeposit({ ...(deposit ?? { amount: '', label: '', dueDate: '' }), ...patch });
 
-  // The server refuses a deposit once anything has been released
-  // ("A deposit cannot be requested once service lines have been released."),
-  // so the switch is off the table rather than offered and then rejected.
-  const anyReleased = rows.some((row) => row.released);
-
-  // A deposit is money collected before signing, so until the SOW is
-  // countersigned there is nothing else to offer: the switch is forced on
-  // and locked, whatever the caller's own `depositMode` state says.
-  const forcedDeposit = !countersigned;
-  const effectiveDepositMode = forcedDeposit || depositMode;
-
-  const patchLine = (i: number, patch: Partial<CustomLineDraft>): void =>
-    onCustomLines(customLines.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-
-  // The server's own wording for whichever mode is showing, so the confirm
-  // button and the field helper text never disagree with the refusal.
-  const blocked = effectiveDepositMode ? depositError(depositAmount) : customLineErrors(customLines);
+  // The server's own wording, so the confirm button and the refusal never disagree.
+  const blocked = customLineErrors(customLines) ?? depositDraftError(deposit);
+  const preview = issuePreview(balance, customLines, deposit);
+  const summaryRow = (label: string, value: string): React.JSX.Element => (
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="body2">{value}</Typography>
+    </Box>
+  );
 
   return (
     <Dialog open={open} onClose={() => (busy ? undefined : onCancel())} maxWidth="sm" fullWidth>
-      <DialogTitle>Generate invoice</DialogTitle>
+      <DialogTitle>{supersedes ? 'Issue a new invoice version' : 'Issue invoice'}</DialogTitle>
       <DialogContent>
-        <Box sx={{ mb: 1 }}>
-          <FormControlLabel
-            control={
-              <Switch checked={effectiveDepositMode} disabled={busy || forcedDeposit || anyReleased} onChange={(e) => onDepositMode(e.target.checked)} />
-            }
-            label="This is a deposit request"
-          />
-          {forcedDeposit ? (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              Only a deposit can be requested until the Statement of Work is countersigned.
-            </Typography>
-          ) : (
-            anyReleased && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                A deposit cannot be requested once service lines have been released.
-              </Typography>
-            )
-          )}
-        </Box>
+        {supersedes && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            {`${supersedes} will be marked Superseded. The new version restates the whole job as it stands now.`}
+          </Alert>
+        )}
         {documentStale && (
           <Alert severity="info" sx={{ mb: 2 }}>
-            The job has changed since this Statement of Work was issued. These are the figures the client agreed to, which is what the invoice bills — not the job&rsquo;s current prices.
+            The job has changed since this Statement of Work was countersigned. The invoice bills the figures the client agreed to, not the job&rsquo;s current prices.
           </Alert>
         )}
         {error && (
@@ -154,66 +106,10 @@ export function GenerateInvoiceDialog({
             {error}
           </Alert>
         )}
-        {rows.length === 0 && (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            This Statement of Work has no service lines to invoice.
-          </Alert>
-        )}
-        {rows.map((row) => {
-          // An equipment line is billed from its bookings, never released, so
-          // it gets no checkbox at all — greyed, with the estimate note, and
-          // still carrying its released date when it has one.
-          if (row.estimate) {
-            return (
-              <Box key={row.sourceIndex} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5, pl: 5 }}>
-                <Box>
-                  <Typography variant="subtitle2" color="text.disabled">
-                    {row.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.disabled">
-                    {equipmentEstimateNote(row.description)}
-                  </Typography>
-                  {row.released && (
-                    <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>
-                      {`Released ${row.releasedAt}`}
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-            );
-          }
-          // Released lines are always shown checked and locked, whatever the
-          // caller's `checked` array says — they cannot be released twice. In
-          // deposit mode every line is shown unchecked and locked: a deposit
-          // releases nothing.
-          const isChecked = !effectiveDepositMode && (row.released || checkedSet.has(row.sourceIndex));
-          return (
-            <Box key={row.sourceIndex} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
-              <FormControlLabel
-                control={<Checkbox checked={isChecked} disabled={row.released || busy || effectiveDepositMode} onChange={() => onToggle(row.sourceIndex)} />}
-                label={
-                  <Box>
-                    <Typography variant="subtitle2" color={row.released ? 'text.disabled' : undefined}>
-                      {row.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {row.released ? `Released ${row.releasedAt}` : `${row.description}${row.cost != null ? ` • ${formatMoney(row.cost)}` : ''}`}
-                    </Typography>
-                    {row.released && row.mismatch && (
-                      <Typography variant="caption" color="warning.main" sx={{ display: 'block' }}>
-                        {row.mismatch}
-                      </Typography>
-                    )}
-                  </Box>
-                }
-              />
-            </Box>
-          );
-        })}
 
-        <Box sx={{ mt: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+        <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
           <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
-            Also on this statement
+            On this invoice
           </Typography>
           {!balance ? (
             balanceLoading ? (
@@ -224,83 +120,113 @@ export function GenerateInvoiceDialog({
                 </Typography>
               </Box>
             ) : (
-              <Alert severity="error">{formatGqlError(balanceError, 'Could not load the balance.')}</Alert>
+              <Alert severity="error">{formatGqlError(balanceError, 'Could not load the job’s charges.')}</Alert>
             )
           ) : (
             <>
-              <Typography variant="body2" color="text.secondary">
-                {`Equipment usage ${formatMoney(balance?.equipmentCharges)} · ${formatHours(balance?.confirmedHours)} hrs`}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {`Custom charges ${formatMoney(balance?.customCharges)}`}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {`Deposits ${formatMoney(balance?.depositCharges)}`}
-              </Typography>
-              {depositDropNote(balance) && (
+              {summaryRow('Services (countersigned SOW)', formatMoney(balance.serviceCharges))}
+              {Number(balance.adjustmentCharges) !== 0 && summaryRow('SOW adjustments', signedMoney(balance.adjustmentCharges))}
+              {summaryRow(`Equipment usage · ${formatHours(balance.confirmedHours)} hrs confirmed`, formatMoney(balance.equipmentCharges))}
+              {balance.unconfirmedBookings > 0 && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  {depositDropNote(balance)}
+                  {`${balance.unconfirmedBookings} booking${balance.unconfirmedBookings === 1 ? '' : 's'} not yet confirmed, so not on this invoice.`}
                 </Typography>
               )}
-              <Typography variant="body2" color="text.secondary">
-                {`Payments to date ${formatMoney(balance?.paymentsToDate)}`}
-              </Typography>
+              {existingCustom.map((c: any) => (
+                <React.Fragment key={c.id}>{summaryRow(c.label, signedMoney(c.amount))}</React.Fragment>
+              ))}
+              {summaryRow('Payments to date', `-${formatMoney(balance.paymentsToDate)}`)}
+              {existingDeposit && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  {`${existingDeposit.label} ${formatMoney(existingDeposit.amount)}${dueDateLabel(existingDeposit.dueDate) ? ` · ${dueDateLabel(existingDeposit.dueDate)}` : ''} — carried onto every version. To change it, void it from the Charges list first.`}
+                </Typography>
+              )}
             </>
           )}
         </Box>
 
-        {effectiveDepositMode ? (
-          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-            <TextField
-              required
-              label="Deposit amount"
-              type="number"
-              value={depositAmount}
-              disabled={busy}
-              error={depositAmount.trim() !== '' && depositError(depositAmount) !== null}
-              helperText={depositAmount.trim() !== '' && depositError(depositAmount) !== null ? depositError(depositAmount) : ' '}
-              onChange={(e) => onDepositAmount(e.target.value)}
-              slotProps={{ htmlInput: { step: '0.01' } }}
-            />
-            <TextField label="Label" placeholder="Deposit" value={depositLabel} disabled={busy} onChange={(e) => onDepositLabel(e.target.value)} sx={{ flex: 1 }} />
-          </Box>
-        ) : (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Add charge or discount lines
+          </Typography>
+          {customLines.map((row, i) => {
+            const rowError = customLineError(row);
+            return (
+              <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 1 }}>
+                <TextField size="small" label="Label" value={row.label} disabled={busy} sx={{ flex: 1 }} onChange={(e) => patchLine(i, { label: e.target.value })} />
+                <TextField
+                  size="small"
+                  label="Amount"
+                  type="number"
+                  value={row.amount}
+                  disabled={busy}
+                  sx={{ width: 128 }}
+                  error={rowError !== null}
+                  helperText={rowError ?? 'negative for a discount'}
+                  onChange={(e) => patchLine(i, { amount: e.target.value })}
+                  slotProps={{ htmlInput: { step: '0.01' } }}
+                />
+                <TextField size="small" label="Note" value={row.note} disabled={busy} sx={{ flex: 1 }} onChange={(e) => patchLine(i, { note: e.target.value })} />
+                <IconButton size="small" aria-label={`Remove line ${i + 1}`} disabled={busy} onClick={() => onCustomLines(customLines.filter((_, idx) => idx !== i))}>
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            );
+          })}
+          <Button size="small" startIcon={<AddIcon />} disabled={busy} onClick={() => onCustomLines([...customLines, emptyCustomLine()])}>
+            Add line
+          </Button>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            New lines stay on the job and carry onto every later version.
+          </Typography>
+        </Box>
+
+        {!existingDeposit && (
           <Box sx={{ mt: 2 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Other charges
+              Deposit
             </Typography>
-            {customLines.map((row, i) => {
-              const rowError = customLineError(row);
-              return (
-                <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', mb: 1 }}>
-                  <TextField size="small" label="Label" value={row.label} disabled={busy} sx={{ flex: 1 }} onChange={(e) => patchLine(i, { label: e.target.value })} />
+            {deposit ? (
+              <>
+                <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                   <TextField
                     size="small"
                     label="Amount"
                     type="number"
-                    value={row.amount}
+                    value={deposit.amount}
                     disabled={busy}
                     sx={{ width: 128 }}
-                    error={rowError !== null}
-                    helperText={rowError ?? 'negative for a discount'}
-                    onChange={(e) => patchLine(i, { amount: e.target.value })}
+                    onChange={(e) => patchDeposit({ amount: e.target.value })}
                     slotProps={{ htmlInput: { step: '0.01' } }}
                   />
-                  <TextField size="small" label="Note" value={row.note} disabled={busy} sx={{ flex: 1 }} onChange={(e) => patchLine(i, { note: e.target.value })} />
-                  <IconButton size="small" aria-label={`Remove charge ${i + 1}`} disabled={busy} onClick={() => onCustomLines(customLines.filter((_, idx) => idx !== i))}>
+                  <TextField size="small" label="Label" placeholder="Deposit" value={deposit.label} disabled={busy} sx={{ flex: 1 }} onChange={(e) => patchDeposit({ label: e.target.value })} />
+                  <TextField
+                    size="small"
+                    label="Deposit due"
+                    type="date"
+                    value={deposit.dueDate}
+                    disabled={busy}
+                    onChange={(e) => patchDeposit({ dueDate: e.target.value })}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                  <IconButton size="small" aria-label="Remove deposit" disabled={busy} onClick={() => onDeposit(null)}>
                     <DeleteOutlineIcon fontSize="small" />
                   </IconButton>
                 </Box>
-              );
-            })}
-            <Button size="small" startIcon={<AddIcon />} disabled={busy} onClick={() => onCustomLines([...customLines, emptyCustomLine()])}>
-              Add charge line
-            </Button>
+                <Typography variant="caption" color={depositDraftError(deposit) ? 'error' : 'text.secondary'} sx={{ display: 'block', mt: 0.5 }}>
+                  {depositDraftError(deposit) ?? 'Part of the total, asked for by its own date — never added to it.'}
+                </Typography>
+              </>
+            ) : (
+              <Button size="small" startIcon={<AddIcon />} disabled={busy} onClick={() => onDeposit({ amount: '', label: '', dueDate: '' })}>
+                Add a deposit
+              </Button>
+            )}
           </Box>
         )}
 
         <TextField
-          label="Due date"
+          label="Invoice due date"
           type="date"
           value={dueDate}
           disabled={busy}
@@ -308,13 +234,38 @@ export function GenerateInvoiceDialog({
           sx={{ mt: 2 }}
           slotProps={{ inputLabel: { shrink: true } }}
         />
+
+        {balance && (
+          <Box sx={{ mt: 2, p: 1.5, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+            {summaryRow('Charges', formatMoney(preview.charges))}
+            {summaryRow('Payments', `-${formatMoney(preview.payments)}`)}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+              <Typography variant="body2" fontWeight={600}>
+                {balanceHeading(preview.balance)}
+              </Typography>
+              <Typography variant="body2" fontWeight={600}>
+                {formatMoney(Math.abs(preview.balance))}
+              </Typography>
+            </Box>
+            {preview.depositOutstanding > 0 && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                {`Of which ${formatMoney(preview.depositOutstanding)} is due first, as the deposit.`}
+              </Typography>
+            )}
+            {preview.paid && (
+              <Typography variant="caption" color="success.main" sx={{ display: 'block', fontWeight: 600 }}>
+                The payments received cover this invoice — it will show as Paid.
+              </Typography>
+            )}
+          </Box>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onCancel} disabled={busy}>
           Cancel
         </Button>
         <Button variant="contained" onClick={onConfirm} disabled={busy || !dueDate || !balance || blocked !== null}>
-          {busy ? 'Generating…' : 'Generate invoice'}
+          {busy ? 'Issuing…' : supersedes ? 'Issue new version' : 'Issue invoice'}
         </Button>
       </DialogActions>
     </Dialog>

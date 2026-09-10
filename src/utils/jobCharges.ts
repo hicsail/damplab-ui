@@ -1,148 +1,13 @@
 /**
- * The UI's read of a job's charge ledger: which SOW positions are already
- * released, what a new release request should send, and how the Charges
- * list orders and labels what has already been added.
+ * The UI's read of a job's charges — the custom lines and the deposit every
+ * invoice version restates — and of what issuing a new version would add.
  *
  * Pure and here for the same reason as `equipmentBilling.ts` — no jsdom in
  * this repo, so anything worth testing has to live outside a component.
  */
 
-import { formatMoney } from './equipmentBilling';
-import { isEquipmentLineDescription } from './servicePricing';
-
-export interface ReleaseRow {
-  sourceIndex: number;
-  serviceId: string;
-  name: string;
-  cost: number;
-  description: string;
-  released: boolean;
-  releasedAt: string | null;
-  mismatch: string | null;
-  estimate: boolean;
-}
-
-interface BillableLineLike {
-  serviceId?: string | null;
-  name?: string | null;
-  description?: string | null;
-  cost?: number | null;
-}
-
-interface JobChargeLike {
-  id?: string | null;
-  kind?: string | null;
-  label?: string | null;
-  amount?: number | null;
-  serviceId?: string | null;
-  sourceIndex?: number | null;
-  addedAt?: string | Date | null;
-  voidedAt?: string | Date | null;
-}
-
-function pad2(n: number): string {
-  return String(n).padStart(2, '0');
-}
-
-/** `MM/DD/YYYY` from the charge's local date parts, matching the documents' own habit. */
-function formatMMDDYYYY(value: string | Date | null | undefined): string | null {
-  if (!value) return null;
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
-}
-
-/**
- * Which SOW positions the job's live SERVICE_LINE charges hold. A charge
- * counts as holding a position only when it is a SERVICE_LINE, is not
- * voided, and carries a numeric `sourceIndex` — the same three conditions
- * `JobChargeService` enforces when it writes one.
- */
-function releasedByPosition(charges: readonly JobChargeLike[]): Map<number, JobChargeLike> {
-  const byPosition = new Map<number, JobChargeLike>();
-  for (const charge of charges) {
-    if (charge.kind !== 'SERVICE_LINE') continue;
-    if (charge.voidedAt) continue;
-    if (typeof charge.sourceIndex !== 'number') continue;
-    byPosition.set(charge.sourceIndex, charge);
-  }
-  return byPosition;
-}
-
-/**
- * One row per SOW billable-line position, marked with whatever the charge
- * ledger already knows about it.
- *
- * A released line keeps the amount and the service it was released against
- * forever — the ledger is authoritative for the money, never the current
- * SOW version — so `mismatch` surfaces the two ways a version can now
- * disagree with what was already billed: a different price at that
- * position, or the position naming a different service altogether. The
- * service check runs first because a moved position can coincidentally
- * still show the same cost.
- */
-export function buildReleaseRows(billableLines: readonly BillableLineLike[], charges: readonly JobChargeLike[]): ReleaseRow[] {
-  const byPosition = releasedByPosition(charges);
-
-  return billableLines.map((line, sourceIndex) => {
-    const charge = byPosition.get(sourceIndex);
-    const released = charge !== undefined;
-
-    let mismatch: string | null = null;
-    if (charge) {
-      const lineServiceId = String(line.serviceId ?? '');
-      const chargeServiceId = String(charge.serviceId ?? '');
-      if (chargeServiceId !== lineServiceId) {
-        mismatch = `Released as “${charge.label ?? ''}”; this version lists “${line.name ?? ''}” at that position.`;
-      } else {
-        const chargedAmount = Number(charge.amount) || 0;
-        const currentCost = Number(line.cost) || 0;
-        if (chargedAmount !== currentCost) {
-          mismatch = `Released at ${formatMoney(chargedAmount)}; this version lists ${formatMoney(currentCost)}.`;
-        }
-      }
-    }
-
-    return {
-      sourceIndex,
-      serviceId: String(line.serviceId ?? ''),
-      name: String(line.name ?? ''),
-      cost: Number(line.cost) || 0,
-      description: String(line.description ?? ''),
-      released,
-      releasedAt: released ? formatMMDDYYYY(charge!.addedAt) : null,
-      mismatch,
-      estimate: isEquipmentLineDescription(line.description)
-    };
-  });
-}
-
-/**
- * Every row ticked by default: a released line's box stays checked (and is
- * disabled in the UI — it cannot be released twice) while an unreleased
- * line starts checked because an invoice usually covers the whole job. An
- * estimate row is never ticked — it is billed from bookings, not released.
- */
-export function defaultCheckedRows(rows: readonly ReleaseRow[]): number[] {
-  return rows.filter((row) => !row.estimate).map((row) => row.sourceIndex);
-}
-
-/**
- * What a release request sends: only the positions that are checked and not
- * already released — releasing an already-released line would double-charge
- * it. Sorted by position, so the statement lists new lines in document order
- * regardless of click order. An estimate row is dropped even if somehow
- * checked: the server refuses these outright (`Equipment-use lines are
- * billed from bookings, not released.`), so the dialog must never be able
- * to send one.
- */
-export function buildReleaseSelections(rows: readonly ReleaseRow[], checked: readonly number[]): Array<{ sourceIndex: number; serviceId: string }> {
-  const checkedSet = new Set(checked);
-  return rows
-    .filter((row) => checkedSet.has(row.sourceIndex) && !row.released && !row.estimate)
-    .slice()
-    .sort((a, b) => a.sourceIndex - b.sourceIndex)
-    .map((row) => ({ sourceIndex: row.sourceIndex, serviceId: row.serviceId }));
+function round2(n: number): number {
+  return Math.round((Number(n) || 0) * 100) / 100;
 }
 
 /** Words a charge's kind for the Charges list. */
@@ -154,9 +19,9 @@ export function chargeKindLabel(kind: string | null | undefined): string {
 }
 
 /**
- * Orders the Charges list: released SOW positions first, in document order,
- * then everything else (custom lines, deposits) oldest first — the order
- * they were actually added to the ledger.
+ * Orders the Charges list: legacy released SOW positions first, in document
+ * order, then everything else (custom lines, deposits) oldest first — the
+ * order they were actually added.
  */
 export function sortChargesForDisplay<T extends { kind?: string | null; sourceIndex?: number | null; addedAt?: string | Date | null }>(
   charges: readonly T[]
@@ -184,8 +49,9 @@ export function sortChargesForDisplay<T extends { kind?: string | null; sourceIn
 const LABEL_REQUIRED = 'A label is required for a charge.';
 const AMOUNT_ZERO = 'A charge amount cannot be zero.';
 const DEPOSIT_NOT_POSITIVE = 'A deposit must be greater than zero.';
+const DEPOSIT_DUE_REQUIRED = 'A deposit needs a due date.';
 
-/** One empty custom-line draft row, for the dialog to start or append with. */
+/** One custom-line draft row in the issue dialog. */
 export interface CustomLineDraft {
   label: string;
   amount: string;
@@ -237,4 +103,65 @@ export function depositError(amount: string): string | null {
   const n = Number(amount.trim());
   if (!Number.isFinite(n) || n <= 0) return DEPOSIT_NOT_POSITIVE;
   return null;
+}
+
+/** The deposit being set in the issue dialog, as typed. `dueDate` is `yyyy-MM-dd`. */
+export interface DepositDraft {
+  amount: string;
+  label: string;
+  dueDate: string;
+}
+
+/** The server's exact refusal for the deposit draft, or null when there is none or it is fine. */
+export function depositDraftError(draft: DepositDraft | null | undefined): string | null {
+  if (!draft) return null;
+  const amount = depositError(draft.amount);
+  if (amount) return amount;
+  if (!draft.dueDate.trim()) return DEPOSIT_DUE_REQUIRED;
+  return null;
+}
+
+/**
+ * A `yyyy-MM-dd` day as noon local time, in ISO form. Noon, not midnight: a
+ * date-only string parsed as UTC midnight renders as the previous day in every
+ * negative-offset timezone, which is where this lab is.
+ */
+export function noonIso(day: string): string {
+  return new Date(`${day}T12:00:00`).toISOString();
+}
+
+/** The mutation's deposit input, or null when there is no (valid) draft. */
+export function buildDepositInput(draft: DepositDraft | null | undefined): { amount: number; label?: string; dueDate: string } | null {
+  if (!draft || depositDraftError(draft)) return null;
+  const label = draft.label.trim();
+  return { amount: Number(draft.amount.trim()), ...(label ? { label } : {}), dueDate: noonIso(draft.dueDate) };
+}
+
+export interface IssuePreview {
+  charges: number;
+  payments: number;
+  balance: number;
+  paid: boolean;
+  depositOutstanding: number;
+}
+
+/**
+ * What the version about to be issued will state, from the job's live balance
+ * plus whatever the dialog adds — the same arithmetic `JobBalanceService`
+ * performs, so the preview and the issued document agree: new lines add to
+ * the charges; a deposit never does, and what it asks for is capped at the
+ * balance.
+ */
+export function issuePreview(
+  balance: { chargesToDate?: number | null; paymentsToDate?: number | null; depositAmount?: number | null } | null | undefined,
+  customLines: readonly CustomLineDraft[],
+  deposit: DepositDraft | null | undefined
+): IssuePreview {
+  const added = buildCustomLineInputs(customLines.filter((row) => customLineError(row) === null)).reduce((sum, line) => sum + line.amount, 0);
+  const charges = round2((Number(balance?.chargesToDate) || 0) + added);
+  const payments = round2(Number(balance?.paymentsToDate) || 0);
+  const due = round2(charges - payments);
+  const depositAmount = deposit && !depositError(deposit.amount) ? Number(deposit.amount) : balance?.depositAmount != null ? Number(balance.depositAmount) : null;
+  const depositOutstanding = depositAmount == null ? 0 : round2(Math.max(0, Math.min(depositAmount - payments, due)));
+  return { charges, payments, balance: due, paid: Math.round(payments * 100) >= Math.round(charges * 100), depositOutstanding };
 }
