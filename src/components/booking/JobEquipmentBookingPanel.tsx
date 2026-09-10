@@ -8,9 +8,10 @@ import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { format } from 'date-fns';
-import { GET_JOB_EQUIPMENT_BOOKING } from '../../gql/queries';
+import { GET_JOB_EQUIPMENT_BALANCE, GET_JOB_EQUIPMENT_BOOKING } from '../../gql/queries';
 import { CANCEL_BOOKING, SET_JOB_BOOKING_BLOCK } from '../../gql/mutations';
 import { blockedMessage, bookedHours, LOCKED_MESSAGES } from '../../utils/jobEquipmentBooking';
+import { confirmedUsageSuffix } from '../../utils/equipmentBilling';
 import { formatGqlError, formatSaveError } from '../../utils/gqlError';
 import { chipStatusBackground } from '../../utils/technicianProcessStatus';
 import ProcessCard from '../technician/ProcessCard';
@@ -87,6 +88,16 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
     skip: !jobId,
     fetchPolicy: 'cache-and-network'
   });
+  // The confirmed-usage half of this card's status line. Its own query, and
+  // errorPolicy 'all', because the same panel renders for a caller the balance
+  // query refuses — they simply see the line without the suffix rather than an
+  // error where a booking list should be.
+  const { data: balanceData } = useQuery(GET_JOB_EQUIPMENT_BALANCE, {
+    variables: { jobId },
+    skip: !jobId,
+    fetchPolicy: 'cache-and-network',
+    errorPolicy: 'all'
+  });
   const [cancelBooking] = useMutation(CANCEL_BOOKING);
   const [setBlock] = useMutation(SET_JOB_BOOKING_BLOCK);
 
@@ -148,7 +159,8 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
     }
   };
 
-  const status = live.length === 0 ? 'No bookings in place' : `${live.length} booking${live.length === 1 ? '' : 's'} · ${hours} hrs`;
+  const usage = confirmedUsageSuffix(balanceData?.jobEquipmentBalance);
+  const status = `${live.length === 0 ? 'No bookings in place' : `${live.length} booking${live.length === 1 ? '' : 's'} · ${hours} hrs`}${usage}`;
   const description = locked
     ? locked
     : upcoming
