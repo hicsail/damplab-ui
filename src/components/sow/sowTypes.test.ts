@@ -368,7 +368,15 @@ describe('sowTotals', () => {
   ];
 
   it('adds the service lines', () => {
-    expect(sowTotals(services, [])).toEqual({ baseCost: 475.5, totalCost: 475.5 });
+    expect(sowTotals(services, [])).toEqual({ baseCost: 475.5, totalCost: 475.5, estimatedEquipmentCost: 0 });
+  });
+
+  it('leaves an equipment estimate out of the base and reports it beside it', () => {
+    const withEquipment = [
+      ...services,
+      { serviceId: 'e1', name: 'Plate reader', description: 'Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)', cost: 400 }
+    ];
+    expect(sowTotals(withEquipment, [])).toEqual({ baseCost: 475.5, totalCost: 475.5, estimatedEquipmentCost: 400 });
   });
 
   it('subtracts a discount and adds a cost, whatever sign was typed', () => {
@@ -384,8 +392,8 @@ describe('sowTotals', () => {
   });
 
   it('treats missing lists as nothing rather than NaN', () => {
-    expect(sowTotals(null, null)).toEqual({ baseCost: 0, totalCost: 0 });
-    expect(sowTotals(undefined, undefined)).toEqual({ baseCost: 0, totalCost: 0 });
+    expect(sowTotals(null, null)).toEqual({ baseCost: 0, totalCost: 0, estimatedEquipmentCost: 0 });
+    expect(sowTotals(undefined, undefined)).toEqual({ baseCost: 0, totalCost: 0, estimatedEquipmentCost: 0 });
   });
 });
 

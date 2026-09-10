@@ -7,6 +7,8 @@
  * only moves when the generator moves and the field is not overridden.
  */
 
+import { splitContractedLines, sumLineCosts } from '../../utils/servicePricing';
+
 export type SowFieldKind = 'CALCULATED' | 'PROSE' | 'CUSTOM';
 
 export type SowStatus = 'DRAFT' | 'SENT' | 'SIGNED' | 'FINAL' | 'CANCELLED';
@@ -157,6 +159,8 @@ export interface SowVersionInputs {
   adjustments: SowVersionAdjustment[];
   baseCost?: number;
   totalCost?: number;
+  /** Equipment-use estimate held out of baseCost/totalCost — see sowTotals. */
+  estimatedEquipmentCost?: number;
   customerCategory?: string | null;
 }
 
@@ -520,11 +524,18 @@ export function feeScheduleLivePatch(inputs: SowVersionInputs, liveServices: Sow
  * derives it on save (sow-version.service.ts). The editor recomputes this on
  * every price or adjustment edit, so the figure on screen is never a saved
  * number waiting to catch up with the boxes above it.
+ *
+ * Equipment-use lines are estimates billed from bookings, so they are in no
+ * total — the same split the server applies in SOWService.calculateBaseCost.
  */
-export function sowTotals(services?: SowVersionService[] | null, adjustments?: SowVersionAdjustment[] | null): { baseCost: number; totalCost: number } {
-  const baseCost = (services ?? []).reduce((sum, s) => sum + (Number(s.cost) || 0), 0);
+export function sowTotals(
+  services?: SowVersionService[] | null,
+  adjustments?: SowVersionAdjustment[] | null
+): { baseCost: number; totalCost: number; estimatedEquipmentCost: number } {
+  const { contracted, equipment } = splitContractedLines(services ?? []);
+  const baseCost = sumLineCosts(contracted);
   const totalCost = (adjustments ?? []).reduce((sum, a) => sum + (a.type === 'DISCOUNT' ? -Math.abs(a.amount) : Math.abs(a.amount)), baseCost);
-  return { baseCost, totalCost };
+  return { baseCost, totalCost, estimatedEquipmentCost: sumLineCosts(equipment) };
 }
 
 /** "× 10", not "× 10.00" — but a multiplier is not always a whole number. */

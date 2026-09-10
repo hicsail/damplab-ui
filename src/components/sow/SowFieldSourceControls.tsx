@@ -26,6 +26,7 @@ import {
   sowTotals
 } from './sowTypes';
 import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays } from '../../utils/sowDateUtils';
+import { equipmentEstimateNote } from '../../utils/equipmentBilling';
 
 /**
  * The structured inputs behind each generated section, rendered inside the
@@ -349,7 +350,8 @@ export default function SowFieldSourceControls({ fieldKey, inputs, administrator
         </Box>
       );
 
-    case 'feeSchedule':
+    case 'feeSchedule': {
+      const feeTotals = sowTotals(feeServices, inputs.adjustments);
       return (
         <Box>
           <Typography variant="caption" sx={labelSx}>
@@ -382,6 +384,11 @@ export default function SowFieldSourceControls({ fieldKey, inputs, administrator
                   <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                     {multiplier === 1 ? formatCurrency(s.cost) : `${formatCurrency(unitCost)} × ${formatMultiplier(multiplier)} = ${formatCurrency(s.cost)}`}
                   </Typography>
+                  {equipmentEstimateNote(s.description) && (
+                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', display: 'block' }}>
+                      {equipmentEstimateNote(s.description)}
+                    </Typography>
+                  )}
                   {live && Number(live.cost) !== Number(s.cost) && (
                     <Typography variant="caption" color="warning.main" sx={{ whiteSpace: 'nowrap' }}>
                       Job now: {formatCurrency(Number(live.cost))}
@@ -515,12 +522,20 @@ export default function SowFieldSourceControls({ fieldKey, inputs, administrator
             >
               Add adjustment
             </Button>
-            <Typography variant="body2" color="text.secondary">
-              Total {formatCurrency(sowTotals(feeServices, inputs.adjustments).totalCost)}
-            </Typography>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="body2" color="text.secondary">
+                Total {formatCurrency(feeTotals.totalCost)}
+              </Typography>
+              {feeTotals.estimatedEquipmentCost > 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Estimated equipment usage (not included in Total) {formatCurrency(feeTotals.estimatedEquipmentCost)}
+                </Typography>
+              )}
+            </Box>
           </Box>
         </Box>
       );
+    }
 
     default:
       return null;

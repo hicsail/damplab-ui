@@ -391,6 +391,36 @@ export const isEquipmentLineDescription = (description: string | null | undefine
   return EQUIPMENT_DESCRIPTION_SUFFIX_RE.test(String(description ?? ''));
 };
 
+/** The shape both halves of the split need: a description to classify by and a cost to sum. */
+export interface CostLineLike {
+  description?: string | null;
+  cost?: number | null;
+}
+
+/**
+ * THE split between what a SOW contracts for and what it merely estimates.
+ * Twin of `splitContractedLines` in
+ * damplab-backend/src/pricing/service-pricing.util.ts — must stay in sync.
+ */
+export const splitContractedLines = <T extends CostLineLike>(lines: readonly T[] | null | undefined): { contracted: T[]; equipment: T[] } => {
+  const contracted: T[] = [];
+  const equipment: T[] = [];
+  for (const line of lines ?? []) {
+    (isEquipmentLineDescription(line?.description) ? equipment : contracted).push(line);
+  }
+  return { contracted, equipment };
+};
+
+/**
+ * Σ cost, rounded to cents so a float sum cannot put noise into a stored total.
+ * Twin of `sumLineCosts` in damplab-backend/src/pricing/service-pricing.util.ts —
+ * must stay in sync.
+ */
+export const sumLineCosts = (lines: readonly CostLineLike[] | null | undefined): number => {
+  const total = (lines ?? []).reduce((sum, line) => sum + (Number(line?.cost) || 0), 0);
+  return Math.round(total * 100) / 100;
+};
+
 const getMultiplier = (
   parameters: unknown,
   rawFormData: unknown,
