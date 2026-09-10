@@ -64,7 +64,8 @@ export default function ConfirmUsageDialog({ open, booking, busy, error, onCance
         )}
         {rate == null && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-            No rate was recorded on this booking, so confirming sets the hours but not a cost.
+            No rate is recorded on this booking yet. Confirming looks up the operation’s current price for this job’s customer category; if none is set, the
+            hours are recorded without a cost until you set one and confirm again.
           </Typography>
         )}
         {error && (
