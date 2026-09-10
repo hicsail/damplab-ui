@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { buildReleaseRows, buildReleaseSelections, chargeKindLabel, defaultCheckedRows, sortChargesForDisplay } from './jobCharges';
+import {
+  buildCustomLineInputs,
+  buildReleaseRows,
+  buildReleaseSelections,
+  chargeKindLabel,
+  customLineError,
+  customLineErrors,
+  defaultCheckedRows,
+  depositError,
+  emptyCustomLine,
+  isBlankCustomLine,
+  sortChargesForDisplay
+} from './jobCharges';
 
 const lines = [
   { serviceId: 's1', name: 'PCR', description: 'Amplification', cost: 350 },
@@ -75,5 +87,72 @@ describe('chargeKindLabel', () => {
     expect(chargeKindLabel('CUSTOM')).toBe('Custom');
     expect(chargeKindLabel('DEPOSIT')).toBe('Deposit');
     expect(chargeKindLabel(undefined)).toBe('Charge');
+  });
+});
+
+const EQUIP = 'Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)';
+const withEquipment = [...lines, { serviceId: 'e1', name: 'Plate reader', description: EQUIP, cost: 45 }];
+
+describe('equipment estimates on the checklist', () => {
+  it('marks the estimate row and leaves the others alone', () => {
+    expect(buildReleaseRows(withEquipment, []).map((r) => r.estimate)).toEqual([false, false, true]);
+  });
+
+  it('never ticks an estimate by default', () => {
+    expect(defaultCheckedRows(buildReleaseRows(withEquipment, []))).toEqual([0, 1]);
+  });
+
+  it('never sends one even if it is somehow checked', () => {
+    const rows = buildReleaseRows(withEquipment, []);
+    expect(buildReleaseSelections(rows, [0, 1, 2]).map((s) => s.sourceIndex)).toEqual([0, 1]);
+  });
+
+  it('still shows a legacy equipment line that was already released', () => {
+    const rows = buildReleaseRows(withEquipment, [released({ kind: 'SERVICE_LINE', sourceIndex: 2, serviceId: 'e1', label: 'Plate reader', amount: 45 })]);
+    expect(rows[2]).toMatchObject({ estimate: true, released: true, releasedAt: '04/01/2026' });
+  });
+});
+
+describe('custom line drafts', () => {
+  it('drops a blank row', () => {
+    expect(isBlankCustomLine({ label: '  ', amount: '', note: '' })).toBe(true);
+    expect(buildCustomLineInputs([emptyCustomLine(), { label: 'Courier', amount: '25', note: '' }])).toEqual([{ label: 'Courier', amount: 25 }]);
+  });
+
+  it('keeps a note when there is one, trimmed', () => {
+    expect(buildCustomLineInputs([{ label: ' Courier ', amount: '25', note: ' Overnight ' }])).toEqual([{ label: 'Courier', amount: 25, note: 'Overnight' }]);
+  });
+
+  it('allows a negative amount', () => {
+    expect(buildCustomLineInputs([{ label: 'Goodwill', amount: '-50', note: '' }])).toEqual([{ label: 'Goodwill', amount: -50 }]);
+  });
+
+  it('blocks a labelled row with a zero amount, in the server’s words', () => {
+    expect(customLineError({ label: 'Courier', amount: '0', note: '' })).toBe('A charge amount cannot be zero.');
+    expect(customLineError({ label: 'Courier', amount: '', note: '' })).toBe('A charge amount cannot be zero.');
+  });
+
+  it('blocks an amount with no label, in the server’s words', () => {
+    expect(customLineError({ label: '  ', amount: '25', note: '' })).toBe('A label is required for a charge.');
+  });
+
+  it('says nothing about a blank row or a good one', () => {
+    expect(customLineError(emptyCustomLine())).toBeNull();
+    expect(customLineError({ label: 'Courier', amount: '25', note: '' })).toBeNull();
+  });
+
+  it('reports the first offending row for the dialog', () => {
+    expect(customLineErrors([{ label: 'Courier', amount: '25', note: '' }, { label: 'Bad', amount: '0', note: '' }])).toBe('A charge amount cannot be zero.');
+    expect(customLineErrors([emptyCustomLine()])).toBeNull();
+  });
+});
+
+describe('depositError', () => {
+  it.each([['0'], ['-5'], [''], ['abc']])('refuses %s in the server’s words', (v) => {
+    expect(depositError(v)).toBe('A deposit must be greater than zero.');
+  });
+
+  it('accepts a positive amount', () => {
+    expect(depositError('500')).toBeNull();
   });
 });

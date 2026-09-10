@@ -1143,6 +1143,7 @@ export const GET_JOB_CHARGES = gql`
       serviceId
       sowVersionNumber
       sourceIndex
+      note
       addedBy
       addedAt
       voidedAt

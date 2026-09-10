@@ -8,6 +8,7 @@
  */
 
 import { formatMoney } from './equipmentBilling';
+import { isEquipmentLineDescription } from './servicePricing';
 
 export interface ReleaseRow {
   sourceIndex: number;
@@ -18,6 +19,7 @@ export interface ReleaseRow {
   released: boolean;
   releasedAt: string | null;
   mismatch: string | null;
+  estimate: boolean;
 }
 
 interface BillableLineLike {
@@ -109,7 +111,8 @@ export function buildReleaseRows(billableLines: readonly BillableLineLike[], cha
       description: String(line.description ?? ''),
       released,
       releasedAt: released ? formatMMDDYYYY(charge!.addedAt) : null,
-      mismatch
+      mismatch,
+      estimate: isEquipmentLineDescription(line.description)
     };
   });
 }
@@ -117,22 +120,26 @@ export function buildReleaseRows(billableLines: readonly BillableLineLike[], cha
 /**
  * Every row ticked by default: a released line's box stays checked (and is
  * disabled in the UI — it cannot be released twice) while an unreleased
- * line starts checked because an invoice usually covers the whole job.
+ * line starts checked because an invoice usually covers the whole job. An
+ * estimate row is never ticked — it is billed from bookings, not released.
  */
 export function defaultCheckedRows(rows: readonly ReleaseRow[]): number[] {
-  return rows.map((row) => row.sourceIndex);
+  return rows.filter((row) => !row.estimate).map((row) => row.sourceIndex);
 }
 
 /**
  * What a release request sends: only the positions that are checked and not
  * already released — releasing an already-released line would double-charge
  * it. Sorted by position, so the statement lists new lines in document order
- * regardless of click order.
+ * regardless of click order. An estimate row is dropped even if somehow
+ * checked: the server refuses these outright (`Equipment-use lines are
+ * billed from bookings, not released.`), so the dialog must never be able
+ * to send one.
  */
 export function buildReleaseSelections(rows: readonly ReleaseRow[], checked: readonly number[]): Array<{ sourceIndex: number; serviceId: string }> {
   const checkedSet = new Set(checked);
   return rows
-    .filter((row) => checkedSet.has(row.sourceIndex) && !row.released)
+    .filter((row) => checkedSet.has(row.sourceIndex) && !row.released && !row.estimate)
     .slice()
     .sort((a, b) => a.sourceIndex - b.sourceIndex)
     .map((row) => ({ sourceIndex: row.sourceIndex, serviceId: row.serviceId }));
@@ -166,4 +173,68 @@ export function sortChargesForDisplay<T extends { kind?: string | null; sourceIn
   serviceLines.sort((a, b) => (a.sourceIndex as number) - (b.sourceIndex as number));
   rest.sort((a, b) => new Date(a.addedAt ?? 0).getTime() - new Date(b.addedAt ?? 0).getTime());
   return [...serviceLines, ...rest];
+}
+
+/*
+ * Verbatim copies of `CHARGE_MESSAGES` in `job-charge.service.ts` — the
+ * dialog validates client-side with the server's own wording so a refusal
+ * never surprises staff with a different message than the one they'd see
+ * on submit.
+ */
+const LABEL_REQUIRED = 'A label is required for a charge.';
+const AMOUNT_ZERO = 'A charge amount cannot be zero.';
+const DEPOSIT_NOT_POSITIVE = 'A deposit must be greater than zero.';
+
+/** One empty custom-line draft row, for the dialog to start or append with. */
+export interface CustomLineDraft {
+  label: string;
+  amount: string;
+  note: string;
+}
+
+export function emptyCustomLine(): CustomLineDraft {
+  return { label: '', amount: '', note: '' };
+}
+
+/** A row with nothing typed into it yet — dropped silently rather than validated. */
+export function isBlankCustomLine(row: CustomLineDraft): boolean {
+  return row.label.trim() === '' && row.amount.trim() === '';
+}
+
+/** The server's exact refusal for this row, or null when it is fine or blank. */
+export function customLineError(row: CustomLineDraft): string | null {
+  if (isBlankCustomLine(row)) return null;
+  if (row.label.trim() === '') return LABEL_REQUIRED;
+  const n = Number(row.amount.trim());
+  if (!Number.isFinite(n) || n === 0) return AMOUNT_ZERO;
+  return null;
+}
+
+/** The first offending row's message, for the dialog to show once. */
+export function customLineErrors(rows: readonly CustomLineDraft[]): string | null {
+  for (const row of rows) {
+    const error = customLineError(row);
+    if (error) return error;
+  }
+  return null;
+}
+
+/** Blank rows dropped, everything else trimmed; `note` omitted entirely when blank. */
+export function buildCustomLineInputs(rows: readonly CustomLineDraft[]): Array<{ label: string; amount: number; note?: string }> {
+  const inputs: Array<{ label: string; amount: number; note?: string }> = [];
+  for (const row of rows) {
+    if (isBlankCustomLine(row)) continue;
+    const label = row.label.trim();
+    const amount = Number(row.amount.trim());
+    const note = row.note.trim();
+    inputs.push(note ? { label, amount, note } : { label, amount });
+  }
+  return inputs;
+}
+
+/** The server's exact refusal for a deposit amount field, or null. */
+export function depositError(amount: string): string | null {
+  const n = Number(amount.trim());
+  if (!Number.isFinite(n) || n <= 0) return DEPOSIT_NOT_POSITIVE;
+  return null;
 }
