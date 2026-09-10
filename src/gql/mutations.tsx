@@ -529,6 +529,7 @@ export const CREATE_INVOICE = gql`
       jobDisplayId
       jobName
       invoiceNumber
+      kind
       invoiceDate
       createdBy
       billedToName
@@ -571,6 +572,46 @@ export const VOID_INVOICE = gql`
     voidInvoice(invoiceId: $invoiceId, reason: $reason) {
       id
       invoiceNumber
+      voidedAt
+      voidedBy
+      voidReason
+    }
+  }
+`;
+
+export const CREATE_EQUIPMENT_INVOICE = gql`
+  mutation CreateEquipmentInvoice($jobId: ID!) {
+    createEquipmentInvoice(jobId: $jobId) {
+      id
+      invoiceNumber
+      kind
+      subtotal
+      paymentsToDate
+      balanceDue
+      totalCost
+    }
+  }
+`;
+
+export const RECORD_JOB_PAYMENT = gql`
+  mutation RecordJobPayment($input: RecordJobPaymentInput!) {
+    recordJobPayment(input: $input) {
+      id
+      jobId
+      amount
+      receivedOn
+      reference
+      note
+      recordedBy
+      recordedAt
+    }
+  }
+`;
+
+export const VOID_JOB_PAYMENT = gql`
+  mutation VoidJobPayment($id: ID!, $reason: String!) {
+    voidJobPayment(id: $id, reason: $reason) {
+      id
       voidedAt
       voidedBy
       voidReason

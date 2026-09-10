@@ -64,8 +64,13 @@ function resolveRate(pricing: any, category?: string): number | undefined {
 
 const isTimed = (item: any) => (item?.rateType ? item.rateType === 'HOURLY' : item?.type !== 'CONSUMABLE');
 
-/** A job whose Statement of Work both parties have signed — the state that opens booking on it. */
-const SIGNED = new Set(['SIGNED', 'FINAL']);
+/**
+ * A job whose Statement of Work both parties have signed — countersigned, i.e.
+ * FINAL. SIGNED means the client has signed and the lab has not, which is not
+ * yet a contract to book time against. Server twin:
+ * `BOOKABLE_SOW_STATUS` in damplab-backend/src/booking/job-equipment-booking.service.ts.
+ */
+const BOOKABLE_SOW_STATUS = 'FINAL';
 
 export default function BookInventory() {
   const userContext = useContext(UserContext) as UserContextProps;
@@ -89,7 +94,7 @@ export default function BookInventory() {
   const { data: jobsData } = useQuery(OWN_JOBS, { variables: { input: { limit: 100, hasSow: true } }, fetchPolicy: 'cache-and-network' });
 
   const bookable = useMemo(() => (invData?.activeInventoryItems ?? []).filter((i: any) => i.bookable), [invData]);
-  const bookableJobs = useMemo(() => (jobsData?.ownJobs?.items ?? []).filter((j: any) => j.sow && SIGNED.has(j.sow.status)), [jobsData]);
+  const bookableJobs = useMemo(() => (jobsData?.ownJobs?.items ?? []).filter((j: any) => j.sow?.status === BOOKABLE_SOW_STATUS), [jobsData]);
   const jobInList = !jobId || bookableJobs.some((j: any) => j.id === jobId);
 
   const [itemId, setItemId] = useState('');
@@ -259,7 +264,7 @@ export default function BookInventory() {
               </FormControl>
               {bookableJobs.length === 0 && (
                 <Typography variant="body2" color="text.secondary">
-                  None of your jobs has a signed Statement of Work yet. Time booked against a job is billed to that job at the operation's rate.
+                  None of your jobs has a countersigned Statement of Work yet. Time booked against a job is billed to that job at the operation's rate.
                 </Typography>
               )}
             </Stack>

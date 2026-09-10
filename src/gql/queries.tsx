@@ -1045,6 +1045,7 @@ export const GET_INVOICES_BY_JOB_ID = gql`
       jobDisplayId
       jobName
       invoiceNumber
+      kind
       invoiceDate
       createdBy
       billedToName
@@ -1070,6 +1071,19 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         }
       }
       subtotal
+      equipmentLines {
+        bookingId
+        itemName
+        operationLabel
+        startTime
+        endTime
+        actualHours
+        rate
+        cost
+        confirmedAt
+      }
+      paymentsToDate
+      balanceDue
       adjustments {
         type
         description
@@ -1085,6 +1099,37 @@ export const GET_INVOICES_BY_JOB_ID = gql`
       voidedBy
       voidReason
       createdAt
+    }
+  }
+`;
+
+export const GET_JOB_EQUIPMENT_BALANCE = gql`
+  query JobEquipmentBalance($jobId: ID!) {
+    jobEquipmentBalance(jobId: $jobId) {
+      jobId
+      chargesToDate
+      paymentsToDate
+      balanceDue
+      confirmedHours
+      unconfirmedBookings
+    }
+  }
+`;
+
+export const GET_JOB_PAYMENTS = gql`
+  query JobPayments($jobId: ID!) {
+    jobPayments(jobId: $jobId) {
+      id
+      jobId
+      amount
+      receivedOn
+      reference
+      note
+      recordedBy
+      recordedAt
+      voidedAt
+      voidedBy
+      voidReason
     }
   }
 `;
@@ -1488,6 +1533,8 @@ export const GET_JOB_EQUIPMENT_BOOKING = gql`
         startTime
         endTime
         status
+        usageConfirmed
+        actualHours
         rateSnapshot
         cost
         billingStatus
