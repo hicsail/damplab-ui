@@ -8,7 +8,7 @@ import { GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
 import { RECORD_JOB_PAYMENT, VOID_JOB_PAYMENT } from '../../gql/mutations';
 import { balanceHeading, balanceRailLabel, formatMoney, paymentsCountLabel } from '../../utils/equipmentBilling';
 import { chipStatusBackground } from '../../utils/technicianProcessStatus';
-import { formatSaveError } from '../../utils/gqlError';
+import { formatGqlError, formatSaveError, isPermissionError } from '../../utils/gqlError';
 import ProcessCard from '../technician/ProcessCard';
 import StatusPaneHeader from '../technician/StatusPaneHeader';
 import ReasonDialog from '../ReasonDialog';
@@ -36,6 +36,7 @@ const todayIso = (): string => format(new Date(), 'yyyy-MM-dd');
  */
 export default function JobPaymentsPanel({ jobId, staffView = false }: Props): React.JSX.Element | null {
   const [actionError, setActionError] = useState<string | null>(null);
+  const [recordError, setRecordError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState(false);
   const [amount, setAmount] = useState('');
@@ -62,9 +63,25 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
       </Box>
     );
   }
-  // A refusal is the caller having no business with this job's money. Nothing at
-  // all, not an error card.
-  if (!balance) return null;
+  if (!balance) {
+    // A permission refusal is the caller having no business with this job's
+    // money — nothing at all, not an error card, exactly as `jobEquipmentBooking`
+    // answers HIDDEN. Any other failure, with nothing cached to fall back on, is
+    // worth telling the caller about.
+    if (balanceQuery.error && !isPermissionError(balanceQuery.error)) {
+      return (
+        <Card variant="outlined" sx={{ mb: 2 }}>
+          <CardContent sx={{ pb: 2, '&:last-child': { pb: 2 } }}>
+            <Typography variant="h6" sx={{ mb: 1.5 }}>
+              Payments
+            </Typography>
+            <Alert severity="error">{formatGqlError(balanceQuery.error, 'Could not load payments.')}</Alert>
+          </CardContent>
+        </Card>
+      );
+    }
+    return null;
+  }
 
   const refresh = async (): Promise<void> => {
     await Promise.all([balanceQuery.refetch(), paymentsQuery.refetch()]);
@@ -76,10 +93,17 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
     setReference('');
     setNote('');
     setReceivedOn(todayIso());
+    setRecordError(null);
+  };
+
+  const openRecord = (): void => {
+    setRecordError(null);
+    setRecording(true);
   };
 
   const submitPayment = async (): Promise<void> => {
     setBusy(true);
+    setRecordError(null);
     try {
       await recordPayment({
         variables: {
@@ -98,7 +122,10 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
       closeRecord();
       await refresh();
     } catch (error) {
-      setActionError(formatSaveError(error, 'this payment'));
+      // Stays open with the refusal visible in the dialog itself — closing here
+      // would drop the error behind the modal backdrop, where the status pane's
+      // own alert can't be seen until the user reopens the dialog.
+      setRecordError(formatSaveError(error, 'this payment'));
     } finally {
       setBusy(false);
     }
@@ -150,14 +177,16 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
         actions={
           staffView ? (
             <Can permission={PERMISSIONS.BillingWrite}>
-              <Button variant="contained" size="small" startIcon={<PaymentsIcon />} onClick={() => setRecording(true)} sx={railBtnSx}>
+              <Button variant="contained" size="small" startIcon={<PaymentsIcon />} onClick={openRecord} sx={railBtnSx}>
                 Record payment
               </Button>
             </Can>
           ) : undefined
         }
         details={
-          payments.length === 0 ? (
+          paymentsQuery.error && !paymentsQuery.data ? (
+            <Alert severity="error">{formatGqlError(paymentsQuery.error, 'Could not load payments.')}</Alert>
+          ) : payments.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               No payments have been recorded against this job yet.
             </Typography>
@@ -234,6 +263,7 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
             />
             <TextField label="Reference" placeholder="Check #1042" value={reference} disabled={busy} onChange={(e) => setReference(e.target.value)} />
             <TextField label="Note" multiline minRows={2} value={note} disabled={busy} onChange={(e) => setNote(e.target.value)} />
+            {recordError && <Alert severity="error">{recordError}</Alert>}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
