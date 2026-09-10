@@ -379,6 +379,18 @@ export const equipmentFactor = (rawFormData: unknown): number | undefined => {
   return hours * weeks;
 };
 
+/** Everything `equipmentLineDescription` appends, so it can also be recognised. */
+const EQUIPMENT_DESCRIPTION_SUFFIX_RE = / — \d+(?:\.\d+)? hrs\/wk x \d+ wks \(estimate; billed on actual hours\)$/;
+
+/**
+ * Whether a SOW/invoice line describes equipment time.
+ * Twin of `isEquipmentLineDescription` in
+ * damplab-backend/src/pricing/service-pricing.util.ts — must stay in sync.
+ */
+export const isEquipmentLineDescription = (description: string | null | undefined): boolean => {
+  return EQUIPMENT_DESCRIPTION_SUFFIX_RE.test(String(description ?? ''));
+};
+
 const getMultiplier = (
   parameters: unknown,
   rawFormData: unknown,

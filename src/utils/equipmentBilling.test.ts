@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { balanceHeading, balanceRailLabel, confirmedUsageSuffix, formatMoney, invoiceKindLabel, invoiceKindOf, paymentsCountLabel } from './equipmentBilling';
+import {
+  balanceHeading,
+  balanceRailLabel,
+  buildStatementTotals,
+  confirmedUsageSuffix,
+  depositDropNote,
+  dueDateLabel,
+  equipmentEstimateNote,
+  formatMoney,
+  invoiceKindLabel,
+  invoiceKindOf,
+  isLegacyInvoice,
+  paymentsCountLabel
+} from './equipmentBilling';
 
 describe('invoiceKindOf', () => {
   it('reads an equipment invoice as EQUIPMENT', () => {
@@ -15,11 +28,67 @@ describe('invoiceKindOf', () => {
   ])('reads %s as SOW — the same fallback the server applies', (_label, invoice) => {
     expect(invoiceKindOf(invoice as any)).toBe('SOW');
   });
+
+  it('reads a statement as STATEMENT and anything unrecognised as SOW', () => {
+    expect(invoiceKindOf({ kind: 'STATEMENT' })).toBe('STATEMENT');
+    expect(invoiceKindOf({ kind: 'EQUIPMENT' })).toBe('EQUIPMENT');
+    expect(invoiceKindOf({})).toBe('SOW');
+  });
+});
+
+describe('isLegacyInvoice', () => {
+  it('is true for every document written before statements', () => {
+    expect(isLegacyInvoice({ kind: 'SOW' })).toBe(true);
+    expect(isLegacyInvoice({ kind: 'EQUIPMENT' })).toBe(true);
+    expect(isLegacyInvoice({})).toBe(true);
+    expect(isLegacyInvoice({ kind: 'STATEMENT' })).toBe(false);
+  });
+});
+
+describe('buildStatementTotals', () => {
+  it('states charges, payments and the balance, with the payment line negative', () => {
+    expect(buildStatementTotals({ subtotal: 500, paymentsToDate: 200, balanceDue: 300 })).toEqual([
+      { label: 'Charges to date', amount: '$500.00' },
+      { label: 'Payments to date', amount: '-$200.00' },
+      { label: 'Balance due', amount: '$300.00' }
+    ]);
+  });
+
+  it('says "Credit balance" in words rather than printing a minus total', () => {
+    const rows = buildStatementTotals({ subtotal: 100, paymentsToDate: 130, balanceDue: -30 });
+    expect(rows[2]).toEqual({ label: 'Credit balance', amount: '$30.00' });
+  });
+});
+
+describe('dueDateLabel', () => {
+  it('words a due date, and says nothing for a legacy document that has none', () => {
+    expect(dueDateLabel('2026-04-09T12:00:00.000Z')).toBe('Due 04/09/2026');
+    expect(dueDateLabel(null)).toBe('');
+  });
+});
+
+describe('depositDropNote', () => {
+  it('explains the drop-off only when it has happened', () => {
+    expect(depositDropNote({ depositsDropped: true })).toBe(
+      'Deposits have dropped off now that services are released; the payment against them carries forward.'
+    );
+    expect(depositDropNote({ depositsDropped: false })).toBe('');
+  });
+});
+
+describe('equipmentEstimateNote', () => {
+  it('marks an equipment-use line, and leaves an ordinary one alone', () => {
+    expect(equipmentEstimateNote('Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)')).toBe(
+      'Estimated · billed at actual booked hours'
+    );
+    expect(equipmentEstimateNote('Amplification')).toBe('');
+  });
 });
 
 describe('invoiceKindLabel', () => {
   it('names the chip on each row', () => {
     expect(invoiceKindLabel({ kind: 'EQUIPMENT' })).toBe('Equipment');
+    expect(invoiceKindLabel({ kind: 'STATEMENT' })).toBe('Statement');
     expect(invoiceKindLabel({})).toBe('SOW');
   });
 });
