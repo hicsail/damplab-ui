@@ -1071,6 +1071,13 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         }
       }
       subtotal
+      dueDate
+      customLines {
+        chargeId
+        kind
+        label
+        amount
+      }
       equipmentLines {
         bookingId
         itemName
@@ -1103,15 +1110,41 @@ export const GET_INVOICES_BY_JOB_ID = gql`
   }
 `;
 
-export const GET_JOB_EQUIPMENT_BALANCE = gql`
-  query JobEquipmentBalance($jobId: ID!) {
-    jobEquipmentBalance(jobId: $jobId) {
+export const GET_JOB_BALANCE = gql`
+  query JobBalance($jobId: ID!) {
+    jobBalance(jobId: $jobId) {
       jobId
+      serviceCharges
+      adjustmentCharges
+      equipmentCharges
+      customCharges
+      depositCharges
       chargesToDate
       paymentsToDate
       balanceDue
       confirmedHours
       unconfirmedBookings
+      depositsDropped
+    }
+  }
+`;
+
+export const GET_JOB_CHARGES = gql`
+  query JobCharges($jobId: ID!) {
+    jobCharges(jobId: $jobId) {
+      id
+      jobId
+      kind
+      label
+      amount
+      serviceId
+      sowVersionNumber
+      sourceIndex
+      addedBy
+      addedAt
+      voidedAt
+      voidedBy
+      voidReason
     }
   }
 `;
@@ -1130,6 +1163,8 @@ export const GET_JOB_PAYMENTS = gql`
       voidedAt
       voidedBy
       voidReason
+      invoiceId
+      invoiceNumber
     }
   }
 `;

@@ -5,7 +5,7 @@ import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, 
 
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
-import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS } from '../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../gql/queries';
 import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutations';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
@@ -134,7 +134,7 @@ export default function Tracking() {
             // The SOW card runs its own query. Without this, Refresh Job reloaded
             // the job and left the Statement of Work showing whatever it had —
             // including a version that had since been superseded.
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS] })
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_PAYMENTS] })
         ]);
     };
 

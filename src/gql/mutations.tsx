@@ -531,6 +531,7 @@ export const CREATE_INVOICE = gql`
       invoiceNumber
       kind
       invoiceDate
+      dueDate
       createdBy
       billedToName
       billedToEmail
@@ -545,6 +546,12 @@ export const CREATE_INVOICE = gql`
         category
       }
       subtotal
+      customLines {
+        chargeId
+        kind
+        label
+        amount
+      }
       adjustments {
         type
         description
@@ -554,6 +561,8 @@ export const CREATE_INVOICE = gql`
         prorationFactor
       }
       totalCost
+      paymentsToDate
+      balanceDue
       createdAt
     }
   }
@@ -579,16 +588,27 @@ export const VOID_INVOICE = gql`
   }
 `;
 
-export const CREATE_EQUIPMENT_INVOICE = gql`
-  mutation CreateEquipmentInvoice($jobId: ID!) {
-    createEquipmentInvoice(jobId: $jobId) {
+export const ADD_JOB_CHARGE = gql`
+  mutation AddJobCharge($input: AddJobChargeInput!) {
+    addJobCharge(input: $input) {
       id
-      invoiceNumber
+      jobId
       kind
-      subtotal
-      paymentsToDate
-      balanceDue
-      totalCost
+      label
+      amount
+      addedBy
+      addedAt
+    }
+  }
+`;
+
+export const VOID_JOB_CHARGE = gql`
+  mutation VoidJobCharge($id: ID!, $reason: String!) {
+    voidJobCharge(id: $id, reason: $reason) {
+      id
+      voidedAt
+      voidedBy
+      voidReason
     }
   }
 `;
@@ -604,6 +624,8 @@ export const RECORD_JOB_PAYMENT = gql`
       note
       recordedBy
       recordedAt
+      invoiceId
+      invoiceNumber
     }
   }
 `;

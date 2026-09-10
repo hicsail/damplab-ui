@@ -4,7 +4,7 @@ import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, Dialog
 import PaymentsIcon from '@mui/icons-material/Payments';
 import CloseIcon from '@mui/icons-material/Close';
 import { format } from 'date-fns';
-import { GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
+import { GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
 import { RECORD_JOB_PAYMENT, VOID_JOB_PAYMENT } from '../../gql/mutations';
 import { balanceHeading, balanceRailLabel, formatMoney, paymentsCountLabel } from '../../utils/equipmentBilling';
 import { chipStatusBackground } from '../../utils/technicianProcessStatus';
@@ -45,13 +45,13 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   const [note, setNote] = useState('');
   const [voidTarget, setVoidTarget] = useState<{ id: string; amount: number } | null>(null);
 
-  const balanceQuery = useQuery(GET_JOB_EQUIPMENT_BALANCE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
+  const balanceQuery = useQuery(GET_JOB_BALANCE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
   const paymentsQuery = useQuery(GET_JOB_PAYMENTS, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
 
   const [recordPayment] = useMutation(RECORD_JOB_PAYMENT);
   const [voidPayment] = useMutation(VOID_JOB_PAYMENT);
 
-  const balance = balanceQuery.data?.jobEquipmentBalance;
+  const balance = balanceQuery.data?.jobBalance;
   const payments: any[] = paymentsQuery.data?.jobPayments ?? [];
   const live = payments.filter((p) => !p.voidedAt);
 

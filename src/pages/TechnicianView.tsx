@@ -18,9 +18,9 @@ import CancelIcon                                     from '@mui/icons-material/
 import ReceiptLongIcon                                from '@mui/icons-material/ReceiptLong';
 import RefreshIcon                                    from '@mui/icons-material/Refresh';
 
-import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS } from '../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION, VOID_INVOICE, CREATE_EQUIPMENT_INVOICE }  from '../gql/mutations';
+import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION, VOID_INVOICE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -272,29 +272,6 @@ export default function TechnicianView() {
     const [createInvoice, { loading: creatingInvoice }] = useMutation(CREATE_INVOICE);
 
     /**
-     * The equipment invoice: a running statement of confirmed bookings, payments
-     * and balance. Its own button rather than a mode of the SOW dialog — it
-     * selects nothing, and its gate is different (a countersigned SOW plus some
-     * confirmed usage, which the server checks).
-     */
-    const [createEquipmentInvoice, { loading: creatingEquipmentInvoice }] = useMutation(CREATE_EQUIPMENT_INVOICE);
-    const [equipmentInvoiceError, setEquipmentInvoiceError] = useState<string | null>(null);
-
-    const submitEquipmentInvoice = async () => {
-        if (!id) return;
-        setEquipmentInvoiceError(null);
-        try {
-            await createEquipmentInvoice({ variables: { jobId: id } });
-            await refetchInvoices();
-            // The statement just issued changes nothing about the balance, but the
-            // Payments card and this one must agree about what has been billed.
-            await apolloClient.refetchQueries({ include: [GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS] });
-        } catch (err: any) {
-            setEquipmentInvoiceError(formatGqlError(err, 'Could not create the equipment invoice.'));
-        }
-    };
-
-    /**
      * Voiding an invoice.
      *
      * The double-billing guard refuses a line an earlier invoice already covers,
@@ -344,7 +321,7 @@ export default function TechnicianView() {
             refetchJob(),
             refetchSow(),
             refetchInvoices(),
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS] })
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_PAYMENTS] })
         ]);
     };
 
@@ -1027,26 +1004,6 @@ export default function TechnicianView() {
                                     </Button>
                                 </span>
                             </Tooltip>
-                            <Tooltip title={showInvoiceBlockedReason ? invoiceBlocked : ''} disableHoverListener={!showInvoiceBlockedReason}>
-                                <span style={{ display: 'block' }}>
-                                    <Button
-                                        color={sowFullData && !invoiceBlocked ? 'primary' : 'secondary'}
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<ReceiptLongIcon />}
-                                        disabled={!sowFullData || sowLoading || sowStatus.loading || !!invoiceBlocked || creatingEquipmentInvoice}
-                                        onClick={submitEquipmentInvoice}
-                                        sx={{ ...railBtnSx, width: '100%' }}
-                                    >
-                                        {creatingEquipmentInvoice ? 'Creating…' : 'Equipment invoice'}
-                                    </Button>
-                                </span>
-                            </Tooltip>
-                            {equipmentInvoiceError && (
-                                <Alert severity="error" sx={{ mt: 0.5 }} onClose={() => setEquipmentInvoiceError(null)}>
-                                    {equipmentInvoiceError}
-                                </Alert>
-                            )}
                             {showInvoiceBlockedReason && (
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                                     {invoiceBlocked}

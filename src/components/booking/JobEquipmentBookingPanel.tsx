@@ -9,7 +9,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { format } from 'date-fns';
-import { GET_JOB_EQUIPMENT_BALANCE, GET_JOB_EQUIPMENT_BOOKING, GET_JOB_PAYMENTS } from '../../gql/queries';
+import { GET_JOB_BALANCE, GET_JOB_EQUIPMENT_BOOKING, GET_JOB_PAYMENTS } from '../../gql/queries';
 import { CANCEL_BOOKING, CONFIRM_BOOKING_USAGE, SET_JOB_BOOKING_BLOCK } from '../../gql/mutations';
 import { blockedMessage, bookedHours, LOCKED_MESSAGES } from '../../utils/jobEquipmentBooking';
 import { confirmedUsageSuffix } from '../../utils/equipmentBilling';
@@ -99,7 +99,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   // errorPolicy 'all', because the same panel renders for a caller the balance
   // query refuses — they simply see the line without the suffix rather than an
   // error where a booking list should be.
-  const { data: balanceData } = useQuery(GET_JOB_EQUIPMENT_BALANCE, {
+  const { data: balanceData } = useQuery(GET_JOB_BALANCE, {
     variables: { jobId },
     skip: !jobId,
     fetchPolicy: 'cache-and-network',
@@ -169,7 +169,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
       setConfirmTarget(null);
       // The balance and the Payments card read their own documents; refetch by
       // document so every card on the page sees the new charge.
-      await Promise.all([refetch(), apolloClient.refetchQueries({ include: [GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS] })]);
+      await Promise.all([refetch(), apolloClient.refetchQueries({ include: [GET_JOB_BALANCE, GET_JOB_PAYMENTS] })]);
     } catch (error) {
       setConfirmError(formatSaveError(error, 'this usage confirmation'));
     }
@@ -186,7 +186,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
     }
   };
 
-  const usage = confirmedUsageSuffix(balanceData?.jobEquipmentBalance);
+  const usage = confirmedUsageSuffix(balanceData?.jobBalance);
   const status = `${live.length === 0 ? 'No bookings in place' : `${live.length} booking${live.length === 1 ? '' : 's'} · ${hours} hrs`}${usage}`;
   const description = locked
     ? locked
