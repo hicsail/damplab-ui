@@ -1226,10 +1226,10 @@ export default function TechnicianView() {
                             <Typography variant="subtitle2" sx={{ mb: 1 }}>
                                 Charges
                             </Typography>
-                            {chargesError ? (
-                                <Alert severity="error">{formatGqlError(chargesError, 'Could not load the charges.')}</Alert>
-                            ) : charges.length === 0 ? (
-                                chargesLoading ? null : (
+                            {charges.length === 0 ? (
+                                chargesLoading ? null : chargesError ? (
+                                    <Alert severity="error">{formatGqlError(chargesError, 'Could not load the charges.')}</Alert>
+                                ) : (
                                     <Typography variant="body2" color="text.secondary">
                                         No charges have been added to this job yet.
                                     </Typography>
