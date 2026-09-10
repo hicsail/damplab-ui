@@ -10,6 +10,7 @@ import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutat
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
 import { invoiceCountLabel } from '../utils/invoiceCounts';
+import { invoiceKindLabel, invoiceKindOf } from '../utils/equipmentBilling';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
@@ -596,27 +597,32 @@ export default function Tracking() {
                                         <ListItemText
                                             slotProps={inv.voidedAt ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
                                             primary={
-                                                id && sowFullData ? (
-                                                    <PDFDownloadLink
-                                                        document={
-                                                            <JobInvoiceDocument
-                                                                jobId={id}
-                                                                jobDisplayId={data?.ownJobById?.jobId ?? null}
-                                                                jobName={jobName}
-                                                                customerCategory={data?.ownJobById?.customerCategory ?? undefined}
-                                                                sow={sowFullData}
-                                                                invoice={inv}
-                                                            />
-                                                        }
-                                                        fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
-                                                    >
-                                                        {({ loading }) =>
-                                                            loading ? 'Loading...' : `Invoice ${inv.invoiceNumber || ''}`.trim()
-                                                        }
-                                                    </PDFDownloadLink>
-                                                ) : (
-                                                    `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
-                                                )
+                                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                                                    <Chip size="small" label={invoiceKindLabel(inv)} variant="outlined" color={invoiceKindOf(inv) === 'EQUIPMENT' ? 'info' : 'default'} />
+                                                    <Box component="span">
+                                                        {id && sowFullData ? (
+                                                            <PDFDownloadLink
+                                                                document={
+                                                                    <JobInvoiceDocument
+                                                                        jobId={id}
+                                                                        jobDisplayId={data?.ownJobById?.jobId ?? null}
+                                                                        jobName={jobName}
+                                                                        customerCategory={data?.ownJobById?.customerCategory ?? undefined}
+                                                                        sow={sowFullData}
+                                                                        invoice={inv}
+                                                                    />
+                                                                }
+                                                                fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
+                                                            >
+                                                                {({ loading }) =>
+                                                                    loading ? 'Loading...' : `Invoice ${inv.invoiceNumber || ''}`.trim()
+                                                                }
+                                                            </PDFDownloadLink>
+                                                        ) : (
+                                                            `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
+                                                        )}
+                                                    </Box>
+                                                </Box>
                                             }
                                             secondary={
                                                 <>
