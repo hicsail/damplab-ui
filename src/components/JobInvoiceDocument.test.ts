@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { billedCustomerCategory, buildEquipmentTotals, buildInvoicePricingNote, buildVoidNotice, invoiceMoney } from './JobInvoiceDocument';
+import { buildStatementTotals, equipmentEstimateNote } from '../utils/equipmentBilling';
 
 /**
  * The invoice has to state the same pricing basis the SOW's Fee Schedule does.
@@ -178,5 +179,17 @@ describe('buildEquipmentTotals', () => {
       { label: 'Payments to date', amount: '-$0.00' },
       { label: 'Balance due', amount: '$200.00' }
     ]);
+  });
+});
+
+describe('the statement totals', () => {
+  it('are the same three lines the equipment statement states', () => {
+    expect(buildStatementTotals({ subtotal: 500, paymentsToDate: 200, balanceDue: 300 })).toEqual(buildEquipmentTotals({ subtotal: 500, paymentsToDate: 200, balanceDue: 300 }));
+  });
+});
+
+describe('the equipment-use note on a statement’s service rows', () => {
+  it('marks the line the SOW described as an estimate', () => {
+    expect(equipmentEstimateNote('Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)')).toBe('Estimated · billed at actual booked hours');
   });
 });

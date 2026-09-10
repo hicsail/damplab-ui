@@ -3,7 +3,7 @@ import { Document, Page, StyleSheet, View, Text, Image, Font } from '@react-pdf/
 import type { SOWData } from '../types/SOWTypes';
 import { RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
 import type { CustomerCategory } from '../utils/customerCategory';
-import { balanceHeading, invoiceKindOf } from '../utils/equipmentBilling';
+import { balanceHeading, buildStatementTotals, equipmentEstimateNote, invoiceKindOf } from '../utils/equipmentBilling';
 
 Font.register({ family: 'Courier-New', fonts: [{ src: '/fonts/Courier-New.ttf' }] });
 
@@ -482,6 +482,10 @@ export interface JobInvoiceDocumentProps {
     }> | null;
     paymentsToDate?: number | null;
     balanceDue?: number | null;
+    /** When this statement is due. Absent on legacy SOW/EQUIPMENT documents, which print `Terms: Net 30` instead. */
+    dueDate?: string | Date | null;
+    /** Custom charges and deposits on a statement's "Other charges" block. */
+    customLines?: Array<{ chargeId?: string | null; kind?: string | null; label?: string | null; amount?: number | null }> | null;
   } | null;
 }
 
@@ -540,9 +544,17 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
 
   const voidNotice = buildVoidNotice(invoice);
 
+  const isStatement = invoiceKindOf(invoice) === 'STATEMENT';
   const isEquipment = invoiceKindOf(invoice) === 'EQUIPMENT';
   const equipmentLines = Array.isArray(invoice?.equipmentLines) ? invoice!.equipmentLines! : [];
   const equipmentTotals = buildEquipmentTotals(invoice);
+  const customLines = Array.isArray(invoice?.customLines) ? invoice!.customLines! : [];
+  const statementTotals = buildStatementTotals(invoice);
+  const dueDate = safeParseISODate(toIsoStringSafe(invoice?.dueDate));
+  // The Services block's own subtotal — NOT invoice.subtotal, which on a statement
+  // is chargesToDate and already includes the adjustments, equipment and custom
+  // lines below it. Printing that here would triple-count the adjustments.
+  const statementLineItemSum = invoiceMoney(invoice).lineItemSum;
 
   return (
     <Document>
@@ -588,8 +600,9 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
             <View style={{ width: 200 }}>
               <Text style={styles.strong}>Invoice no.: {invoiceNo}</Text>
               <Text style={styles.text}>Job ID: {jobDisplayId}</Text>
-              <Text style={styles.text}>Terms: Net 30</Text>
+              {!isStatement && <Text style={styles.text}>Terms: Net 30</Text>}
               <Text style={styles.text}>Invoice date: {formatMMDDYYYY(invoiceDate)}</Text>
+              {dueDate && <Text style={styles.text}>Due date: {formatMMDDYYYY(dueDate)}</Text>}
             </View>
           </View>
         </View>
@@ -614,7 +627,198 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
 
         <View style={styles.divider} />
 
-        {isEquipment ? (
+        {isStatement ? (
+          <View style={styles.table}>
+            {services.length > 0 && (
+              <>
+                <View style={styles.tableHeader}>
+                  <View style={styles.cellDate}>
+                    <Text style={styles.cellTextHeader} wrap>
+                      Date
+                    </Text>
+                  </View>
+                  <View style={styles.cellService}>
+                    <Text style={styles.cellTextHeader} wrap>
+                      Service
+                    </Text>
+                    <Text style={[styles.cellText, { marginTop: 3 }]} wrap>
+                      Description
+                    </Text>
+                  </View>
+                  <View style={styles.cellPricing}>
+                    <Text style={styles.cellTextHeader} wrap>
+                      Pricing details
+                    </Text>
+                  </View>
+                  <View style={styles.cellRate}>
+                    <Text style={styles.cellTextHeaderRight} wrap>
+                      Rate
+                    </Text>
+                  </View>
+                  <View style={styles.cellAmount}>
+                    <Text style={styles.cellTextHeaderRight} wrap>
+                      Amount
+                    </Text>
+                  </View>
+                </View>
+
+                {services.map((s, idx) => {
+                  const row = s;
+                  const rate = Number(row.cost) || 0;
+                  const amount = rate;
+                  const pricingNote = buildInvoicePricingNote(row);
+                  const estimateNote = equipmentEstimateNote(row.description);
+                  return (
+                    <View key={row.serviceId || row.id || idx} style={styles.row}>
+                      <View style={styles.cellDate}>
+                        <Text style={styles.cellText} wrap>
+                          {formatMMDDYYYY(invoiceDate)}
+                        </Text>
+                      </View>
+                      <View style={styles.cellService}>
+                        <Text style={styles.serviceName} wrap>
+                          {row.name}
+                        </Text>
+                        <Text style={styles.serviceMeta} wrap>
+                          {row.category ?? ''}
+                          {row.description ? `${row.category ? ' · ' : ''}${row.description}` : ''}
+                        </Text>
+                        {estimateNote ? (
+                          <Text style={styles.serviceMeta} wrap>
+                            {estimateNote}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.cellPricing}>
+                        {pricingNote
+                          ? (() => {
+                              const lines = pricingNote.split('\n');
+                              return lines.map((line, i) => (
+                                <Text
+                                  key={i}
+                                  style={i === lines.length - 1 ? styles.pricingLineLast : styles.pricingLine}
+                                  wrap
+                                >
+                                  {line}
+                                </Text>
+                              ));
+                            })()
+                          : null}
+                      </View>
+                      <View style={styles.cellRate}>
+                        <Text style={styles.cellTextRight} wrap>
+                          {formatCurrency(rate)}
+                        </Text>
+                      </View>
+                      <View style={styles.cellAmount}>
+                        <Text style={styles.cellTextRight} wrap>
+                          {formatCurrency(amount)}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            {monetaryAdjustments.length > 0 && (
+              <>
+                <View style={styles.totalRow}>
+                  <Text style={styles.text}>Subtotal&nbsp;&nbsp;{formatCurrency(statementLineItemSum)}</Text>
+                </View>
+                {monetaryAdjustments.map((adj, i) => {
+                  const applied = Number(adj?.appliedAmount) || 0;
+                  const label = adj?.description || (adj?.type === 'DISCOUNT' ? 'Discount' : 'Additional cost');
+                  return (
+                    <View style={styles.totalRow} key={`stmt-adj-${i}`}>
+                      <Text style={styles.text}>
+                        {label}
+                        {adj?.reason ? ` (${adj.reason})` : ''}
+                        &nbsp;&nbsp;
+                        {applied < 0 ? `-${formatCurrency(Math.abs(applied))}` : formatCurrency(applied)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            {equipmentLines.length > 0 && (
+              <>
+                <Text style={styles.strong}>Equipment usage</Text>
+                <View style={styles.tableHeader}>
+                  <View style={styles.cellService}>
+                    <Text style={styles.cellTextHeader} wrap>Equipment</Text>
+                    <Text style={[styles.cellText, { marginTop: 3 }]} wrap>Operation</Text>
+                  </View>
+                  <View style={styles.cellPricing}>
+                    <Text style={styles.cellTextHeader} wrap>Used</Text>
+                  </View>
+                  <View style={styles.cellDate}>
+                    <Text style={styles.cellTextHeaderRight} wrap>Hours</Text>
+                  </View>
+                  <View style={styles.cellRate}>
+                    <Text style={styles.cellTextHeaderRight} wrap>Rate</Text>
+                  </View>
+                  <View style={styles.cellAmount}>
+                    <Text style={styles.cellTextHeaderRight} wrap>Amount</Text>
+                  </View>
+                </View>
+
+                {equipmentLines.map((line, idx) => {
+                  const start = safeParseISODate(toIsoStringSafe(line.startTime));
+                  const end = safeParseISODate(toIsoStringSafe(line.endTime));
+                  return (
+                    <View key={line.bookingId || idx} style={styles.row}>
+                      <View style={styles.cellService}>
+                        <Text style={styles.serviceName} wrap>{line.itemName ?? 'Equipment'}</Text>
+                        <Text style={styles.serviceMeta} wrap>{line.operationLabel ?? ''}</Text>
+                      </View>
+                      <View style={styles.cellPricing}>
+                        <Text style={styles.pricingLineLast} wrap>
+                          {start ? formatMMDDYYYY(start) : ''}{end && start && formatMMDDYYYY(end) !== formatMMDDYYYY(start) ? ` – ${formatMMDDYYYY(end)}` : ''}
+                        </Text>
+                      </View>
+                      <View style={styles.cellDate}>
+                        <Text style={styles.cellTextRight} wrap>{line.actualHours != null ? String(line.actualHours) : ''}</Text>
+                      </View>
+                      <View style={styles.cellRate}>
+                        <Text style={styles.cellTextRight} wrap>{line.rate != null ? formatCurrency(line.rate) : ''}</Text>
+                      </View>
+                      <View style={styles.cellAmount}>
+                        <Text style={styles.cellTextRight} wrap>{formatCurrency(Number(line.cost) || 0)}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            {customLines.length > 0 && (
+              <>
+                <Text style={styles.strong}>Other charges</Text>
+                {customLines.map((line, idx) => {
+                  const amt = Number(line?.amount) || 0;
+                  const amountText = amt < 0 ? `-${formatCurrency(Math.abs(amt))}` : formatCurrency(amt);
+                  return (
+                    <View key={line?.chargeId || idx} style={[styles.row, styles.twoCol]}>
+                      <Text style={styles.cellText}>{line?.label ?? ''}</Text>
+                      <Text style={[styles.cellText, { textAlign: 'right' }]}>{amountText}</Text>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            {statementTotals.map((row, i) => (
+              <View style={styles.totalRow} key={`stmt-total-${i}`}>
+                <Text style={i === statementTotals.length - 1 ? styles.strong : styles.text}>
+                  {row.label}&nbsp;&nbsp;{row.amount}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : isEquipment ? (
           <View style={styles.table}>
             <View style={styles.tableHeader}>
               <View style={styles.cellService}>
@@ -791,6 +995,11 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
           {isEquipment && (
             <Text style={styles.text}>
               This is a running statement of equipment use on this job: it lists every confirmed booking to date and states the balance after payments received.
+            </Text>
+          )}
+          {isStatement && (
+            <Text style={styles.text}>
+              This is a statement of everything this job has been charged to date, less the payments received. The balance shown is what is currently owed.
             </Text>
           )}
           {isProrated && (
