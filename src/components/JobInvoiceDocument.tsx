@@ -485,7 +485,7 @@ export interface JobInvoiceDocumentProps {
     /** When this statement is due. Absent on legacy SOW/EQUIPMENT documents, which print `Terms: Net 30` instead. */
     dueDate?: string | Date | null;
     /** Custom charges and deposits on a statement's "Other charges" block. */
-    customLines?: Array<{ chargeId?: string | null; kind?: string | null; label?: string | null; amount?: number | null }> | null;
+    customLines?: Array<{ chargeId?: string | null; kind?: string | null; label?: string | null; amount?: number | null; note?: string | null }> | null;
   } | null;
 }
 
@@ -802,7 +802,10 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
                   const amountText = amt < 0 ? `-${formatCurrency(Math.abs(amt))}` : formatCurrency(amt);
                   return (
                     <View key={line?.chargeId || idx} style={[styles.row, styles.twoCol]}>
-                      <Text style={styles.cellText}>{line?.label ?? ''}</Text>
+                      <View>
+                        <Text style={styles.cellText}>{line?.label ?? ''}</Text>
+                        {line?.note ? <Text style={styles.serviceMeta}>{line.note}</Text> : null}
+                      </View>
                       <Text style={[styles.cellText, { textAlign: 'right' }]}>{amountText}</Text>
                     </View>
                   );
