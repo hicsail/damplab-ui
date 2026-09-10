@@ -602,7 +602,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
               <Text style={styles.text}>Job ID: {jobDisplayId}</Text>
               {!isStatement && <Text style={styles.text}>Terms: Net 30</Text>}
               <Text style={styles.text}>Invoice date: {formatMMDDYYYY(invoiceDate)}</Text>
-              {dueDate && <Text style={styles.text}>Due date: {formatMMDDYYYY(dueDate)}</Text>}
+              {isStatement && dueDate && <Text style={styles.text}>Due date: {formatMMDDYYYY(dueDate)}</Text>}
             </View>
           </View>
         </View>
