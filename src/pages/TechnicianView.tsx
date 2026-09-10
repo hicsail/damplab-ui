@@ -13,16 +13,16 @@ import { formatGqlError, formatSaveError } from '../utils/gqlError';
 import { invoiceCountLabel } from '../utils/invoiceCounts';
 import { invoiceBlockedMessage } from '../utils/invoiceGate';
 import { dueDateLabel, formatMoney, invoiceKindLabel, invoiceKindOf, isLegacyInvoice } from '../utils/equipmentBilling';
-import { buildReleaseRows, buildReleaseSelections, chargeKindLabel, defaultCheckedRows, sortChargesForDisplay } from '../utils/jobCharges';
+import { buildCustomLineInputs, buildReleaseRows, buildReleaseSelections, chargeKindLabel, defaultCheckedRows, emptyCustomLine, sortChargesForDisplay } from '../utils/jobCharges';
+import type { CustomLineDraft } from '../utils/jobCharges';
 import UndoIcon                                       from '@mui/icons-material/Undo';
 import CancelIcon                                     from '@mui/icons-material/Cancel';
 import ReceiptLongIcon                                from '@mui/icons-material/ReceiptLong';
 import RefreshIcon                                    from '@mui/icons-material/Refresh';
-import AddCardIcon                                    from '@mui/icons-material/AddCard';
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { ADD_JOB_CHARGE, CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, VOID_JOB_CHARGE, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION, VOID_INVOICE }  from '../gql/mutations';
+import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, VOID_JOB_CHARGE, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION, VOID_INVOICE }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -38,7 +38,7 @@ import { SowPdfDownloadButton, SowStatusDetails, SowStatusSummary, useSowStaffSt
 import ProcessCard                from '../components/technician/ProcessCard';
 import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
 import JobPaymentsPanel from '../components/billing/JobPaymentsPanel';
-import { AddChargeDialog, GenerateInvoiceDialog } from '../components/billing/JobChargeDialogs';
+import { GenerateInvoiceDialog } from '../components/billing/JobChargeDialogs';
 import ReasonDialog               from '../components/ReasonDialog';
 import Can                        from '../components/PermissionGate';
 import { PERMISSIONS }            from '../hooks/usePermissions';
@@ -397,6 +397,10 @@ export default function TechnicianView() {
     const [checkedRows, setCheckedRows] = useState<number[]>([]);
     const [invoiceError, setInvoiceError] = useState<string | null>(null);
     const [dueDate, setDueDate] = useState('');
+    const [depositMode, setDepositMode] = useState(false);
+    const [depositAmount, setDepositAmount] = useState('');
+    const [depositLabel, setDepositLabel] = useState('');
+    const [customLines, setCustomLines] = useState<CustomLineDraft[]>([]);
 
     // Ticked by default whenever the ledger or the SOW positions change —
     // released rows stay checked (and locked) in the dialog regardless, so this
@@ -410,6 +414,12 @@ export default function TechnicianView() {
         if (!sowFullData) return;
         setInvoiceError(null);
         setDueDate(format(addDays(new Date(), 30), 'yyyy-MM-dd'));
+        // Every opening starts clean, so a half-typed deposit or charge line
+        // from a cancelled attempt is never submitted with the next one.
+        setDepositMode(false);
+        setDepositAmount('');
+        setDepositLabel('');
+        setCustomLines([emptyCustomLine()]);
         setInvoiceDialogOpen(true);
     };
     const closeInvoiceDialog = () => setInvoiceDialogOpen(false);
@@ -422,18 +432,23 @@ export default function TechnicianView() {
         if (!id || !dueDate) return;
         setInvoiceError(null);
         try {
-            await createInvoice({
-                variables: {
-                    input: {
-                        jobId: id as string,
-                        releaseServiceLines: buildReleaseSelections(releaseRows, checkedRows),
-                        // Noon, not midnight — a date-only string parsed as UTC midnight
-                        // renders as the previous day in every negative-offset timezone,
-                        // which is where this lab is (same reason JobPaymentsPanel gives).
-                        dueDate: new Date(`${dueDate}T12:00:00`).toISOString()
-                    }
-                }
-            });
+            const input: any = {
+                jobId: id as string,
+                // Noon, not midnight — a date-only string parsed as UTC midnight
+                // renders as the previous day in every negative-offset timezone,
+                // which is where this lab is (same reason JobPaymentsPanel gives).
+                dueDate: new Date(`${dueDate}T12:00:00`).toISOString()
+            };
+            if (depositMode) {
+                // A deposit releases nothing: the server refuses the two together with
+                // "A deposit request cannot release service lines."
+                input.deposit = { amount: Number(depositAmount), ...(depositLabel.trim() ? { label: depositLabel.trim() } : {}) };
+            } else {
+                input.releaseServiceLines = buildReleaseSelections(releaseRows, checkedRows);
+                const lines = buildCustomLineInputs(customLines);
+                if (lines.length > 0) input.customLines = lines;
+            }
+            await createInvoice({ variables: { input } });
             await refreshJobPage();
             setInvoiceDialogOpen(false);
         } catch (err) {
@@ -441,28 +456,6 @@ export default function TechnicianView() {
             // the SOW is not yet countersigned, there is nothing new to release, or
             // a workflow edit re-synced the SOW while this was open.
             setInvoiceError(formatSaveError(err, 'this invoice'));
-        }
-    };
-
-    const [addJobCharge, { loading: addingCharge }] = useMutation(ADD_JOB_CHARGE);
-    const [addChargeOpen, setAddChargeOpen] = useState(false);
-    const [addChargeError, setAddChargeError] = useState<string | null>(null);
-
-    const openAddCharge = () => {
-        setAddChargeError(null);
-        setAddChargeOpen(true);
-    };
-    const closeAddCharge = () => setAddChargeOpen(false);
-
-    const submitAddCharge = async (input: { kind: 'CUSTOM' | 'DEPOSIT'; label: string; amount: number }) => {
-        if (!id) return;
-        setAddChargeError(null);
-        try {
-            await addJobCharge({ variables: { input: { jobId: id as string, ...input } } });
-            await refreshJobPage();
-            setAddChargeOpen(false);
-        } catch (err) {
-            setAddChargeError(formatSaveError(err, 'this charge'));
         }
     };
 
@@ -1082,17 +1075,6 @@ export default function TechnicianView() {
                                     {invoiceBlocked}
                                 </Typography>
                             )}
-                            <Can permission={PERMISSIONS.BillingWrite}>
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    startIcon={<AddCardIcon />}
-                                    onClick={openAddCharge}
-                                    sx={railBtnSx}
-                                >
-                                    Add charge
-                                </Button>
-                            </Can>
                             {/* Gated on a *standing* invoice: with none, `invoice` would be
                                 null and the document would fall back to the SOW's own services,
                                 printing a total with no adjustments applied. */}
@@ -1263,10 +1245,21 @@ export default function TechnicianView() {
                                                     slotProps={voided ? { primary: { sx: { textDecoration: 'line-through' } } } : undefined}
                                                     primary={`${chargeKindLabel(c.kind)} · ${c.label} · ${formatMoney(c.amount)}`}
                                                     secondary={
-                                                        voided ? (
-                                                            <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
-                                                                {`VOID — ${c.voidReason || 'no reason recorded'}`}
-                                                            </Typography>
+                                                        c.note || voided ? (
+                                                            <>
+                                                                {/* `component="span"` on both: `secondary` renders inside a
+                                                                    <p>, which may not contain a block-level element. */}
+                                                                {c.note && (
+                                                                    <Typography component="span" variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                                                        {c.note}
+                                                                    </Typography>
+                                                                )}
+                                                                {voided && (
+                                                                    <Typography component="span" variant="caption" color="error.main" sx={{ display: 'block', mt: 0.5, fontWeight: 700 }}>
+                                                                        {`VOID — ${c.voidReason || 'no reason recorded'}`}
+                                                                    </Typography>
+                                                                )}
+                                                            </>
                                                         ) : undefined
                                                     }
                                                 />
@@ -1357,14 +1350,14 @@ export default function TechnicianView() {
                     documentStale={!!sowFullData?.documentStale}
                     onCancel={closeInvoiceDialog}
                     onConfirm={submitCreateInvoice}
-                />
-
-                <AddChargeDialog
-                    open={addChargeOpen}
-                    busy={addingCharge}
-                    error={addChargeError}
-                    onCancel={closeAddCharge}
-                    onConfirm={submitAddCharge}
+                    depositMode={depositMode}
+                    onDepositMode={setDepositMode}
+                    depositAmount={depositAmount}
+                    onDepositAmount={setDepositAmount}
+                    depositLabel={depositLabel}
+                    onDepositLabel={setDepositLabel}
+                    customLines={customLines}
+                    onCustomLines={setCustomLines}
                 />
 
                 {chargeVoidTarget && (
