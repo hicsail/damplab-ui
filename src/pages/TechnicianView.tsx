@@ -172,14 +172,14 @@ export default function TechnicianView() {
     // release checklist reads `charges` to know which positions already have
     // a live SERVICE_LINE charge, and the Generate invoice dialog's summary
     // and the Charges block below both read `balance` / `charges` directly.
-    const { data: chargesResult } = useQuery(GET_JOB_CHARGES, {
+    const { data: chargesResult, loading: chargesLoading, error: chargesError } = useQuery(GET_JOB_CHARGES, {
         variables: { jobId: id as string },
         skip: !id,
         fetchPolicy: 'cache-and-network',
     });
     const charges: any[] = chargesResult?.jobCharges ?? [];
 
-    const { data: balanceResult } = useQuery(GET_JOB_BALANCE, {
+    const { data: balanceResult, loading: balanceLoading, error: balanceError } = useQuery(GET_JOB_BALANCE, {
         variables: { jobId: id as string },
         skip: !id,
         fetchPolicy: 'cache-and-network',
@@ -404,7 +404,7 @@ export default function TechnicianView() {
     useEffect(() => {
         setCheckedRows(defaultCheckedRows(releaseRows));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sowFullData?.billableServices, charges]);
+    }, [sowFullData?.billableServices, chargesResult?.jobCharges]);
 
     const openInvoiceDialog = () => {
         if (!sowFullData) return;
@@ -1226,10 +1226,14 @@ export default function TechnicianView() {
                             <Typography variant="subtitle2" sx={{ mb: 1 }}>
                                 Charges
                             </Typography>
-                            {charges.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary">
-                                    No charges have been added to this job yet.
-                                </Typography>
+                            {chargesError ? (
+                                <Alert severity="error">{formatGqlError(chargesError, 'Could not load the charges.')}</Alert>
+                            ) : charges.length === 0 ? (
+                                chargesLoading ? null : (
+                                    <Typography variant="body2" color="text.secondary">
+                                        No charges have been added to this job yet.
+                                    </Typography>
+                                )
                             ) : (
                                 <List dense>
                                     {sortChargesForDisplay(charges).map((c: any) => {
@@ -1346,6 +1350,8 @@ export default function TechnicianView() {
                     checked={checkedRows}
                     onToggle={toggleReleaseRow}
                     balance={balance}
+                    balanceLoading={balanceLoading}
+                    balanceError={balanceError}
                     dueDate={dueDate}
                     onDueDate={setDueDate}
                     documentStale={!!sowFullData?.documentStale}

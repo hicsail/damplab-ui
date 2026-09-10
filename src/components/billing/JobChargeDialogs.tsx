@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Checkbox,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -16,6 +17,7 @@ import {
 } from '@mui/material';
 import type { ReleaseRow } from '../../utils/jobCharges';
 import { depositDropNote, formatMoney } from '../../utils/equipmentBilling';
+import { formatGqlError } from '../../utils/gqlError';
 
 /**
  * The two dialogs the job page's Invoices card opens.
@@ -40,6 +42,8 @@ interface GenerateInvoiceDialogProps {
   checked: number[];
   onToggle: (index: number) => void;
   balance: any | null;
+  balanceLoading?: boolean;
+  balanceError?: unknown;
   dueDate: string;
   onDueDate: (iso: string) => void;
   documentStale?: boolean;
@@ -61,6 +65,8 @@ export function GenerateInvoiceDialog({
   checked,
   onToggle,
   balance,
+  balanceLoading,
+  balanceError,
   dueDate,
   onDueDate,
   documentStale,
@@ -120,23 +126,38 @@ export function GenerateInvoiceDialog({
           <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
             Also on this statement
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {`Equipment usage ${formatMoney(balance?.equipmentCharges)} · ${formatHours(balance?.confirmedHours)} hrs`}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {`Custom charges ${formatMoney(balance?.customCharges)}`}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {`Deposits ${formatMoney(balance?.depositCharges)}`}
-          </Typography>
-          {depositDropNote(balance) && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              {depositDropNote(balance)}
-            </Typography>
+          {!balance ? (
+            balanceLoading ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="text.secondary">
+                  Loading…
+                </Typography>
+              </Box>
+            ) : (
+              <Alert severity="error">{formatGqlError(balanceError, 'Could not load the balance.')}</Alert>
+            )
+          ) : (
+            <>
+              <Typography variant="body2" color="text.secondary">
+                {`Equipment usage ${formatMoney(balance?.equipmentCharges)} · ${formatHours(balance?.confirmedHours)} hrs`}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {`Custom charges ${formatMoney(balance?.customCharges)}`}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {`Deposits ${formatMoney(balance?.depositCharges)}`}
+              </Typography>
+              {depositDropNote(balance) && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  {depositDropNote(balance)}
+                </Typography>
+              )}
+              <Typography variant="body2" color="text.secondary">
+                {`Payments to date ${formatMoney(balance?.paymentsToDate)}`}
+              </Typography>
+            </>
           )}
-          <Typography variant="body2" color="text.secondary">
-            {`Payments to date ${formatMoney(balance?.paymentsToDate)}`}
-          </Typography>
         </Box>
 
         <TextField
@@ -153,7 +174,7 @@ export function GenerateInvoiceDialog({
         <Button onClick={onCancel} disabled={busy}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={onConfirm} disabled={busy || !dueDate}>
+        <Button variant="contained" onClick={onConfirm} disabled={busy || !dueDate || !balance}>
           {busy ? 'Generating…' : 'Generate invoice'}
         </Button>
       </DialogActions>
