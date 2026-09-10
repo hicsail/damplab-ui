@@ -5,7 +5,7 @@ import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, 
 
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import JobInvoiceDocument from '../components/JobInvoiceDocument';
-import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY } from '../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS } from '../gql/queries';
 import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutations';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
@@ -14,6 +14,7 @@ import { invoiceKindLabel, invoiceKindOf } from '../utils/equipmentBilling';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
 import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
+import JobPaymentsPanel from '../components/billing/JobPaymentsPanel';
 import ProcessCard                from '../components/technician/ProcessCard';
 import StatusPaneHeader           from '../components/technician/StatusPaneHeader';
 import { CommentsSection }        from '../components/CommentsSection';
@@ -133,7 +134,7 @@ export default function Tracking() {
             // The SOW card runs its own query. Without this, Refresh Job reloaded
             // the job and left the Statement of Work showing whatever it had —
             // including a version that had since been superseded.
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY] })
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS] })
         ]);
     };
 
@@ -529,6 +530,10 @@ export default function Tracking() {
                     panel renders nothing at all for a caller who is not on this
                     job, and one sentence for one who is but cannot book yet. */}
                 <JobEquipmentBookingPanel jobId={id || ''} />
+
+                {/* Between booking and invoices, because that is the order the money moves:
+                    time is booked, it is charged, it is paid. */}
+                <JobPaymentsPanel jobId={id || ''} />
 
                 <ProcessCard
                     title="Invoices"

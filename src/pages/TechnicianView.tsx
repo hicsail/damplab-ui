@@ -35,6 +35,7 @@ import SowEditorModal             from '../components/sow/SowEditorModal';
 import { SowPdfDownloadButton, SowStatusDetails, SowStatusSummary, useSowStaffStatus } from '../components/sow/SowStatusCard';
 import ProcessCard                from '../components/technician/ProcessCard';
 import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
+import JobPaymentsPanel from '../components/billing/JobPaymentsPanel';
 import ReasonDialog               from '../components/ReasonDialog';
 import Can                        from '../components/PermissionGate';
 import { PERMISSIONS }            from '../hooks/usePermissions';
@@ -343,7 +344,7 @@ export default function TechnicianView() {
             refetchJob(),
             refetchSow(),
             refetchInvoices(),
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY] })
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BALANCE, GET_JOB_PAYMENTS] })
         ]);
     };
 
@@ -972,6 +973,10 @@ export default function TechnicianView() {
                     billing:view. Booking is the customer's act; confirming usage
                     stays on the Inventory schedule. */}
                 <JobEquipmentBookingPanel jobId={id || ''} staffView />
+
+                {/* Between booking and invoices, because that is the order the money moves:
+                    time is booked, it is charged, it is paid. */}
+                <JobPaymentsPanel jobId={id || ''} staffView />
 
                 <ProcessCard
                     title="Invoices"
