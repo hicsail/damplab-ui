@@ -95,7 +95,9 @@ export default function InvoicePanel({ jobId, jobDisplayId, jobName, customerCat
   const charges: any[] = chargesQuery.data?.jobCharges ?? [];
   const liveCharges = charges.filter((c) => !c.voidedAt);
   const existingCustom = sortChargesForDisplay(liveCharges.filter((c) => c.kind === 'CUSTOM'));
-  const existingDeposit = liveCharges.filter((c) => c.kind === 'DEPOSIT').slice(-1)[0] ?? null;
+  // Newest by addedAt — the same deposit JobBalanceService bills, whatever order
+  // the server listed the charges in.
+  const existingDeposit = sortChargesForDisplay(liveCharges.filter((c) => c.kind === 'DEPOSIT')).slice(-1)[0] ?? null;
 
   const refreshAll = async (): Promise<void> => {
     await Promise.all([invoicesQuery.refetch(), balanceQuery.refetch(), chargesQuery.refetch(), onChanged?.()]);

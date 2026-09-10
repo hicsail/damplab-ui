@@ -9,7 +9,6 @@ import {
   dueDateLabel,
   equipmentEstimateNote,
   formatMoney,
-  invoiceKindLabel,
   invoiceKindOf,
   invoiceStatusChipColor,
   invoiceStatusLabel,
@@ -151,14 +150,6 @@ describe('equipmentEstimateNote', () => {
   it('marks an equipment-use line, and leaves an ordinary one alone', () => {
     expect(equipmentEstimateNote('Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)')).toBe('Estimated · billed at actual booked hours');
     expect(equipmentEstimateNote('Amplification')).toBe('');
-  });
-});
-
-describe('invoiceKindLabel', () => {
-  it('names the chip on each row', () => {
-    expect(invoiceKindLabel({ kind: 'EQUIPMENT' })).toBe('Equipment');
-    expect(invoiceKindLabel({ kind: 'STATEMENT' })).toBe('Statement');
-    expect(invoiceKindLabel({})).toBe('SOW');
   });
 });
 

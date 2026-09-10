@@ -25,13 +25,6 @@ export function invoiceKindOf(invoice: { kind?: string | null } | null | undefin
   return 'SOW';
 }
 
-export function invoiceKindLabel(invoice: { kind?: string | null } | null | undefined): 'SOW' | 'Equipment' | 'Statement' {
-  const kind = invoiceKindOf(invoice);
-  if (kind === 'STATEMENT') return 'Statement';
-  if (kind === 'EQUIPMENT') return 'Equipment';
-  return 'SOW';
-}
-
 /**
  * True for every invoice written before versioned invoices — the two retired
  * generators' documents. Drives the "Legacy" chip in the version history.
