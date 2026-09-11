@@ -149,6 +149,10 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
           ? blockedMessage(access.reason)
           : null;
   const hours = bookedHours(live);
+  // Staff still owe usage confirmation on every live booking before a job can be
+  // invoiced; the pane only goes green (and collapses) once none are left.
+  const staffAllConfirmed = live.length > 0 && live.every((b) => b.usageConfirmed);
+  const staffNeedsConfirmation = staffView && live.length > 0 && !staffAllConfirmed;
   const upcoming = live.find((b) => new Date(b.endTime).getTime() > Date.now());
   const operationLabel = (b: any): string => operations.find((op) => op.nodeId === b.nodeId)?.label ?? '';
   const mayCancel = (b: any): boolean => !staffView && b.status !== 'CANCELLED' && b.billingStatus !== 'BILLED';
@@ -239,11 +243,14 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
       <ProcessCard
         title="Equipment Booking"
         defaultExpanded={bookings.length > 0}
+        defaultDetailsOpen={staffNeedsConfirmation}
         customerBadge={live.length > 0 ? 'check' : null}
         staffBadge={paused ? 'paper' : open ? 'check' : null}
         customerVersion={`${hours} hrs booked`}
         staffVersion={paused ? 'Paused' : open ? 'Bookable' : 'Not open'}
-        statusPaneSx={{ bgcolor: chipStatusBackground(paused ? 'warning' : open && live.length > 0 ? 'success' : 'default') }}
+        statusPaneSx={{
+          bgcolor: chipStatusBackground(paused ? 'warning' : (staffView ? staffAllConfirmed : open && live.length > 0) ? 'success' : 'default')
+        }}
         statusPane={
           <StatusPaneHeader
             status={status}

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
@@ -15,7 +15,7 @@ import RefreshIcon                                    from '@mui/icons-material/
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
+import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -37,7 +37,7 @@ import { PERMISSIONS }            from '../hooks/usePermissions';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
-import { CUSTOMER_CATEGORY_OPTIONS, statusColor } from '../components/sow/sowTypes';
+import { statusColor } from '../components/sow/sowTypes';
 import { chipStatusBackground, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
 import StatusPaneHeader from '../components/technician/StatusPaneHeader';
 import { BIOSECURITY_SCREENINGS, PLACEHOLDER_BIOSECURITY, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus } from '../components/technician/biosecurityStatus';
@@ -171,7 +171,6 @@ export default function TechnicianView() {
     const [creatingSow, setCreatingSow] = useState(false);
     const [sowCreateError, setSowCreateError] = useState<string | null>(null);
 
-    const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
     const [withdrawFromCustomer] = useMutation(WITHDRAW_JOB_FROM_CUSTOMER);
     const [withdrawAcceptance] = useMutation(WITHDRAW_JOB_ACCEPTANCE);
@@ -444,7 +443,6 @@ export default function TechnicianView() {
         </>
     );
 
-    const currentCustomerCategory = jobData?.customerCategory ?? 'EXTERNAL_CUSTOMER_MARKET';
     const jobParties = jobPartyStatus(jobState);
     const sowParties = sowPartyStatus({
         currentStatus: sowStatus.current?.status,
@@ -467,26 +465,27 @@ export default function TechnicianView() {
     const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
     const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
-    const handleCustomerCategoryChange = async (nextCategory: string) => {
-        if (!id) return;
-        try {
-            await changeJobCustomerCategory({
-                variables: { jobId: id as string, customerCategory: nextCategory },
-            });
-            await Promise.all([
-                refetchJob(),
-                refetchSow(),
-                apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY] }),
-            ]);
-        } catch (e) {
-            console.error('Failed to update job customer category:', e);
-        }
-    };
-
     return (
         <div>
-            <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
+                {/* The job's name, the submission line, and the commands that act
+                    on it. Kept sticky, offset below the fixed black header and the
+                    breadcrumb bar (both publish their heights as CSS vars — see
+                    HeaderBar and AppBreadcrumbs) so this stays visible on scroll
+                    instead of getting buried under a long job. */}
+                <Box
+                    sx={{
+                        position: 'sticky',
+                        top: 'calc(var(--app-header-height, 64px) + var(--app-breadcrumb-height, 41px))',
+                        zIndex: 1050,
+                        bgcolor: 'background.paper',
+                        pt: 1,
+                        pb: 1.5,
+                        mb: 1,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                    }}
+                >
                 <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1 }}>
                     <Typography variant="h5" fontWeight="bold">
                         {jobName}
@@ -526,35 +525,15 @@ export default function TechnicianView() {
                         {jobState === 'CLOSED' ? 'Job closed' : closingJob ? 'Closing…' : 'Close job'}
                     </Button>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-                    {/* Drop the stray top margin on the first <p> so this column starts
-                        flush, leaving the mt on the pricing control as the only offset. */}
-                    <Box sx={{ fontSize: 13, textAlign: 'left', '& p:first-of-type': { mt: 0 } }}>
-                        <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
-                        <p><b>User:</b> {submitter.user}</p>
-                        {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
-                        <p><b>Organization:</b> {submitter.organization}</p>
-                    </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, mt: 1 }}>
-                        <FormControl size="small" sx={{ minWidth: 260 }} disabled={categoryUpdating || !jobData}>
-                            <InputLabel id="pricing-category-label">Pricing category</InputLabel>
-                            <Select
-                                labelId="pricing-category-label"
-                                value={currentCustomerCategory}
-                                label="Pricing category"
-                                onChange={(e) => handleCustomerCategoryChange(String(e.target.value))}
-                            >
-                                {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
-                                    <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 260, textAlign: 'right' }}>
-                            Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
-                        </Typography>
-                    </Box>
+                <Typography sx={{ fontSize: 13 }}>
+                    {submitter.user}
+                    {submitter.organization && `, ${submitter.organization}`}
+                    {' submitted this job on '}
+                    {jobTime.slice(0, 16).replace('T', ' ')}
+                </Typography>
+                {submitter.onBehalfOf && (
+                    <Typography sx={{ fontSize: 13, mt: 0.5 }}>{submitter.onBehalfOf}</Typography>
+                )}
                 </Box>
 
                 {sowCreateError && (

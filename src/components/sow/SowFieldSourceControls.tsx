@@ -13,6 +13,7 @@ import {
   SowAdjustmentCategory,
   SOW_ADJUSTMENT_CATEGORIES,
   SowPeriod,
+  CUSTOMER_CATEGORY_OPTIONS,
   formatCurrency,
   formatMultiplier,
   customerCategoryLabel,
@@ -49,10 +50,14 @@ interface Props {
   projectLeads: StaffOption[];
   disabled?: boolean;
   onChange: (patch: Partial<SowVersionInputs>) => void;
-  /** feeSchedule only: the job's current pricing category (read-only context). */
+  /** feeSchedule only: the job's current pricing category. */
   liveCustomerCategory?: string | null;
   /** feeSchedule only: what the job prices these lines at now, for the "Job now" comparison caption. */
   liveServices?: SowVersionInputs['services'] | null;
+  /** feeSchedule only: change the job's own pricing category (not the document's). */
+  onChangeLiveCustomerCategory?: (category: string) => void;
+  /** feeSchedule only: the category change above is in flight. */
+  categoryUpdating?: boolean;
 }
 
 const labelSx = { display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 500 } as const;
@@ -231,7 +236,7 @@ function PeriodListEditor({ periods, disabled, onChange }: { periods: SowPeriod[
   );
 }
 
-export default function SowFieldSourceControls({ fieldKey, inputs, administrators, projectLeads, disabled, onChange, liveCustomerCategory, liveServices }: Props): React.JSX.Element | null {
+export default function SowFieldSourceControls({ fieldKey, inputs, administrators, projectLeads, disabled, onChange, liveCustomerCategory, liveServices, onChangeLiveCustomerCategory, categoryUpdating }: Props): React.JSX.Element | null {
   // The document's own figures, not the job's. A version is a static record:
   // these move only when staff hit Recalculate, which patches them locally and
   // marks the save as a refresh.
@@ -357,12 +362,25 @@ export default function SowFieldSourceControls({ fieldKey, inputs, administrator
           <Typography variant="caption" sx={labelSx}>
             Pricing category
           </Typography>
-          <Typography variant="body2" sx={{ mb: liveCategoryDiffers ? 0 : 2 }}>
-            {customerCategoryLabel(inputs.customerCategory)}
+          <Select
+            size="small"
+            sx={{ display: 'block', mb: 0.5, minWidth: 260 }}
+            value={liveCustomerCategory ?? ''}
+            disabled={disabled || !onChangeLiveCustomerCategory || categoryUpdating}
+            onChange={(e) => onChangeLiveCustomerCategory?.(String(e.target.value))}
+          >
+            {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: liveCategoryDiffers ? 0.5 : 2 }}>
+            Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
           </Typography>
           {liveCategoryDiffers && (
             <Typography variant="body2" color="warning.main" sx={{ mb: 2 }}>
-              Job now: {customerCategoryLabel(liveCustomerCategory)}
+              This document was written at: {customerCategoryLabel(inputs.customerCategory)}
             </Typography>
           )}
 

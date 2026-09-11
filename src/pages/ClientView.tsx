@@ -279,8 +279,25 @@ export default function Tracking() {
 
     return (
         <div>
-            <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
+                {/* The job's name, the submission line, and the commands that act
+                    on it. Kept sticky, offset below the fixed black header and the
+                    breadcrumb bar (both publish their heights as CSS vars — see
+                    HeaderBar and AppBreadcrumbs) so this stays visible on scroll
+                    instead of getting buried under a long job. */}
+                <Box
+                    sx={{
+                        position: 'sticky',
+                        top: 'calc(var(--app-header-height, 64px) + var(--app-breadcrumb-height, 41px))',
+                        zIndex: 1050,
+                        bgcolor: 'background.paper',
+                        pt: 1,
+                        pb: 1.5,
+                        mb: 1,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                    }}
+                >
                 {/* The job's name and the commands that act on it, on one line —
                     the same header the staff page uses. Viewing the canvas is not
                     here: it is permanent rather than a response to a prompt, so it
@@ -392,17 +409,21 @@ export default function Tracking() {
                         </Button>
                     )}
                 </Box>
+                <Typography sx={{ fontSize: 13 }}>
+                    {submitter.user}
+                    {submitter.organization && `, ${submitter.organization}`}
+                    {' submitted this job on '}
+                    {jobTime.slice(0, 16).replace('T', ' ')}
+                </Typography>
+                {submitter.onBehalfOf && (
+                    <Typography sx={{ fontSize: 13, mt: 0.5 }}>{submitter.onBehalfOf}</Typography>
+                )}
+                </Box>
                 {commandError && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCommandError(null)}>
                         {commandError}
                     </Alert>
                 )}
-                <Box sx={{ fontSize: 13, mb: 2, textAlign: 'left', '& p:first-of-type': { mt: 0 } }}>
-                    <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
-                    <p><b>User:</b> {submitter.user}</p>
-                    {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
-                    <p><b>Organization:</b> {submitter.organization}</p>
-                </Box>
 
                 <ProcessCard
                     title="Job"

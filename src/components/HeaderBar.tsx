@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useContext, useCallback, useRef } from "react";
 import { Link, useLocation, useMatch, useNavigate } from "react-router";
 import {
   AppBar,
@@ -69,6 +69,22 @@ export default function HeaderBar() {
   // panel that opens itself would be in the way more often than it helped.
   const [navOpen, setNavOpen] = useState(false);
   const windowLocation = useLocation();
+  const appBarRef = useRef<HTMLDivElement>(null);
+
+  // Publishes the fixed bar's real height as a CSS var so sticky bars further
+  // down the page (breadcrumbs, page headers) can offset below it without
+  // duplicating the Toolbar's responsive 56px/64px breakpoint.
+  useLayoutEffect(() => {
+    const el = appBarRef.current;
+    if (!el) return;
+    const publish = () => {
+      document.documentElement.style.setProperty('--app-header-height', `${el.getBoundingClientRect().height}px`);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // This function is responsible for keeping currentCanvas up to date, it is called when user saves or loads a canvas.
   const updateCurrentCanvas = (canvasName = "") => {
@@ -175,7 +191,7 @@ export default function HeaderBar() {
 
   return (
     <div>
-      <AppBar position="fixed">
+      <AppBar position="fixed" ref={appBarRef}>
         <Toolbar style={{ background: "black" }}>
           <Tooltip title="Menu">
             <IconButton
