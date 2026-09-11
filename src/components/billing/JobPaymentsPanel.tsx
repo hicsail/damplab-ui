@@ -49,8 +49,10 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   const balanceQuery = useQuery(GET_JOB_BALANCE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
   const paymentsQuery = useQuery(GET_JOB_PAYMENTS, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
 
-  const [recordPayment] = useMutation(RECORD_JOB_PAYMENT);
-  const [voidPayment] = useMutation(VOID_JOB_PAYMENT);
+  // A payment recorded or voided reissues the job's invoice server-side, so
+  // the Invoice card's list is refetched along with this card's own figures.
+  const [recordPayment] = useMutation(RECORD_JOB_PAYMENT, { refetchQueries: ['GetInvoicesByJobId'] });
+  const [voidPayment] = useMutation(VOID_JOB_PAYMENT, { refetchQueries: ['GetInvoicesByJobId'] });
 
   const balance = balanceQuery.data?.jobBalance;
   const payments: any[] = paymentsQuery.data?.jobPayments ?? [];
@@ -276,6 +278,9 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
             />
             <TextField label="Reference" placeholder="Check #1042" value={reference} disabled={busy} onChange={(e) => setReference(e.target.value)} />
             <TextField label="Note" multiline minRows={2} value={note} disabled={busy} onChange={(e) => setNote(e.target.value)} />
+            <Typography variant="caption" color="text.secondary">
+              If an invoice stands on this job, recording the payment issues a new version with it listed, and the client is emailed that version.
+            </Typography>
             {recordError && <Alert severity="error">{recordError}</Alert>}
           </Stack>
         </DialogContent>
@@ -295,7 +300,7 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
           title={`Void the ${formatMoney(voidTarget.amount)} payment?`}
           warning={
             'The payment is kept and shown struck through with your reason, so the balance moving back up is explicable.\n\n' +
-            'The current invoice is not changed — it states the balance as at its own date. Issue a new version to restate it.'
+            'If an invoice stands on this job, a new version is issued to restate the balance, and the client is emailed it.'
           }
           fieldLabel="Reason (the client sees this)"
           confirmLabel="Void payment"

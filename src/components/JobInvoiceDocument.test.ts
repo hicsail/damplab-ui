@@ -215,7 +215,7 @@ describe('buildSupersededNotice', () => {
 describe('buildDepositNotice', () => {
   it('states the deposit, its date, what was outstanding, and that it is not extra', () => {
     expect(buildDepositNotice({ label: 'Deposit', amount: 500, dueDate: '2026-10-01T12:00:00.000Z', outstanding: 300 })).toBe(
-      'Deposit: $500.00, due 10/01/2026. Outstanding at issue: $300.00. The deposit is part of the total above, not in addition to it.'
+      'Deposit: $500.00, due 10/01/2026. Outstanding at issue: $300.00. The deposit is part of the invoice total, not in addition to it.'
     );
   });
 

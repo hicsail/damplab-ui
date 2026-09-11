@@ -175,6 +175,101 @@ export function formatHours(n: number | null | undefined): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
 }
 
+/** A signed amount: a discount prints "-$50.00", never "$-50.00". */
+export function signedMoney(n: number | null | undefined): string {
+  const value = Number(n) || 0;
+  return value < 0 ? `-${formatMoney(Math.abs(value))}` : formatMoney(value);
+}
+
+/** `MM/DD/YYYY` from the date's local parts, or '' for a missing or unreadable one. */
+export function shortDate(value: string | Date | null | undefined): string {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
+}
+
+/** Trailing zeros off a multiplier, so "x 4" does not print as "x 4.00". */
+function formatMultiplier(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
+}
+
+/**
+ * The right-hand side of an equipment line: "2 hrs x $3.00/hr = $6.00". Just
+ * the amount when the line carries no hours or no rate — a legacy line has
+ * neither, and inventing one by dividing would state a figure nothing billed.
+ */
+export function equipmentFormula(line: { actualHours?: number | null; rate?: number | null; cost?: number | null } | null | undefined): string {
+  const cost = formatMoney(line?.cost);
+  if (line?.actualHours == null || line?.rate == null) return cost;
+  const hours = Number(line.actualHours) || 0;
+  return `${formatHours(hours)} ${hours === 1 ? 'hr' : 'hrs'} x ${formatMoney(line.rate)}/hr = ${cost}`;
+}
+
+/**
+ * The right-hand side of a service line, worded as the SOW's Fee Schedule
+ * words it: "$50.00 x 4 = $200.00" when the line was multiplied, else its
+ * amount. The unit price may legitimately be zero, so only an absent one
+ * suppresses the formula.
+ */
+export function serviceFormula(row: { unitCost?: number | null; multiplier?: number | string | null; cost?: number | null } | null | undefined): string {
+  const cost = formatMoney(row?.cost);
+  const multiplier = Number(row?.multiplier);
+  if (row?.unitCost == null || !Number.isFinite(multiplier) || multiplier === 1) return cost;
+  return `${formatMoney(row.unitCost)} x ${formatMultiplier(multiplier)} = ${cost}`;
+}
+
+/** What a parameter-priced line's unit price was made of, one row per selection — the Fee Schedule's itemisation. */
+export function pricingDetailLines(row: { pricingDetails?: Array<{ label?: string | null; quantity?: number | null; unitPrice?: number | null; total?: number | null }> | null } | null | undefined): string[] {
+  return (row?.pricingDetails ?? [])
+    .filter((detail) => String(detail?.label ?? '').trim())
+    .map((detail) => `${String(detail.label).trim()} — ${formatMultiplier(Number(detail.quantity) || 0)} x ${formatMoney(detail.unitPrice)} = ${formatMoney(detail.total)}`);
+}
+
+/** One payment row on an invoice: "Payment received 09/10/2026 · Check #1042". */
+export function paymentLineLabel(payment: { receivedOn?: string | Date | null; reference?: string | null } | null | undefined): string {
+  const date = shortDate(payment?.receivedOn);
+  return [`Payment received${date ? ` ${date}` : ''}`, payment?.reference?.trim()].filter(Boolean).join(' · ');
+}
+
+export interface DueRow {
+  /** "Deposit" (or the deposit's own label) for the deposit, otherwise empty. */
+  label: string;
+  amount: number;
+  dueDate: string | Date | null;
+}
+
+/**
+ * When the invoice asks for its balance, earliest first: the deposit while it
+ * is outstanding, then each due date. A version issued before due dates were
+ * split states its one date for everything but the deposit.
+ */
+export function dueRows(
+  invoice:
+    | {
+        deposit?: { label?: string | null; outstanding?: number | null; dueDate?: string | Date | null } | null;
+        dueSchedule?: Array<{ amount?: number | null; dueDate?: string | Date | null }> | null;
+        dueDate?: string | Date | null;
+        balanceDue?: number | null;
+      }
+    | null
+    | undefined
+): DueRow[] {
+  if (!invoice) return [];
+  const rows: DueRow[] = [];
+  const depositOutstanding = Number(invoice.deposit?.outstanding) || 0;
+  if (invoice.deposit && depositOutstanding > 0) rows.push({ label: invoice.deposit.label?.trim() || 'Deposit', amount: depositOutstanding, dueDate: invoice.deposit.dueDate ?? null });
+  if (Array.isArray(invoice.dueSchedule)) {
+    for (const entry of invoice.dueSchedule) rows.push({ label: '', amount: Number(entry?.amount) || 0, dueDate: entry?.dueDate ?? null });
+  } else if (invoice.dueDate) {
+    const rest = Math.round(((Number(invoice.balanceDue) || 0) - depositOutstanding) * 100) / 100;
+    if (rest > 0) rows.push({ label: '', amount: rest, dueDate: invoice.dueDate });
+  }
+  const at = (row: DueRow): number => (row.dueDate ? new Date(row.dueDate).getTime() : Infinity);
+  // Stable: the deposit stays ahead of a due date that falls on the same day.
+  return rows.map((row, i) => ({ row, i })).sort((a, b) => at(a.row) - at(b.row) || a.i - b.i).map(({ row }) => row);
+}
+
 /**
  * The customer's line on the Payments rail. A negative balance is a credit and
  * is said so in words: "$-30.00 due" is the failure this exists to prevent.

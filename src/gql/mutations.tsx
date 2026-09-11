@@ -536,6 +536,10 @@ export const CREATE_INVOICE = gql`
       kind
       invoiceDate
       dueDate
+      dueSchedule {
+        amount
+        dueDate
+      }
       createdBy
       billedToName
       billedToEmail

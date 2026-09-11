@@ -9,7 +9,6 @@ import {
   depositError,
   emptyCustomLine,
   isBlankCustomLine,
-  issuePreview,
   noonIso,
   sortChargesForDisplay
 } from './jobCharges';
@@ -97,30 +96,3 @@ describe('the deposit draft', () => {
   });
 });
 
-describe('issuePreview', () => {
-  const balance = { chargesToDate: 1000, paymentsToDate: 400, depositAmount: null };
-
-  it('adds the new lines to the charges and states the balance', () => {
-    const preview = issuePreview(balance, [{ label: 'Rush', amount: '50', note: '' }, emptyCustomLine()], null);
-    expect(preview).toMatchObject({ charges: 1050, payments: 400, balance: 650, paid: false });
-  });
-
-  it('shows the invoice as Paid when a discount settles the remainder', () => {
-    const preview = issuePreview(balance, [{ label: 'Write-off', amount: '-600', note: '' }], null);
-    expect(preview).toMatchObject({ charges: 400, balance: 0, paid: true });
-  });
-
-  it('ignores a line that would be refused', () => {
-    expect(issuePreview(balance, [{ label: '', amount: '75', note: '' }], null).charges).toBe(1000);
-  });
-
-  it('never adds a deposit to the charges, and caps what it asks for at the balance', () => {
-    const preview = issuePreview({ chargesToDate: 300, paymentsToDate: 0 }, [], { amount: '500', label: '', dueDate: '2026-10-01' });
-    expect(preview.charges).toBe(300);
-    expect(preview.depositOutstanding).toBe(300);
-  });
-
-  it('uses the job’s existing deposit when the dialog adds none', () => {
-    expect(issuePreview({ chargesToDate: 1000, paymentsToDate: 100, depositAmount: 250 }, [], null).depositOutstanding).toBe(150);
-  });
-});

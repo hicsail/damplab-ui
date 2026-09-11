@@ -1039,9 +1039,12 @@ export const GET_SOW_BY_JOB_ID = gql`
   }
 `;
 
-export const GET_INVOICES_BY_JOB_ID = gql`
-  query GetInvoicesByJobId($jobId: ID!) {
-    invoicesByJobId(jobId: $jobId) {
+/**
+ * Every field an invoice renders from. The job page's list and the issue
+ * dialog's preview ask for the same shape, so the dialog renders exactly what
+ * the page will show once the version is issued.
+ */
+const INVOICE_FIELDS = `
       id
       jobId
       jobDisplayId
@@ -1076,6 +1079,16 @@ export const GET_INVOICES_BY_JOB_ID = gql`
       }
       subtotal
       dueDate
+      dueSchedule {
+        amount
+        dueDate
+      }
+      payments {
+        paymentId
+        amount
+        receivedOn
+        reference
+      }
       customLines {
         chargeId
         kind
@@ -1120,6 +1133,21 @@ export const GET_INVOICES_BY_JOB_ID = gql`
       supersededAt
       supersededByNumber
       createdAt
+`;
+
+export const GET_INVOICES_BY_JOB_ID = gql`
+  query GetInvoicesByJobId($jobId: ID!) {
+    invoicesByJobId(jobId: $jobId) {
+      ${INVOICE_FIELDS}
+    }
+  }
+`;
+
+/** What issuing with this input would state, written nowhere. Staff only (billing:write). */
+export const GET_INVOICE_PREVIEW = gql`
+  query InvoicePreview($input: CreateInvoiceInput!) {
+    invoicePreview(input: $input) {
+      ${INVOICE_FIELDS}
     }
   }
 `;

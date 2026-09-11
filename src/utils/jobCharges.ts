@@ -137,31 +137,92 @@ export function buildDepositInput(draft: DepositDraft | null | undefined): { amo
   return { amount: Number(draft.amount.trim()), ...(label ? { label } : {}), dueDate: noonIso(draft.dueDate) };
 }
 
-export interface IssuePreview {
-  charges: number;
-  payments: number;
-  balance: number;
-  paid: boolean;
-  depositOutstanding: number;
+/** `yyyy-MM-dd` from a date's local parts — what a date input holds. '' for a missing or unreadable date. */
+export function localDay(value: string | Date | null | undefined): string {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const cents = (n: unknown): number => Math.round((Number(n) || 0) * 100);
+
+/** The job's deposit as the dialog's editable draft, or null when it has none. "Deposit" shows as the placeholder, not as typed text. */
+export function depositDraftFrom(deposit: { label?: string | null; amount?: number | null; dueDate?: string | Date | null } | null | undefined): DepositDraft | null {
+  if (!deposit || deposit.amount == null) return null;
+  const label = deposit.label?.trim() ?? '';
+  return { amount: (Number(deposit.amount) || 0).toFixed(2), label: label === 'Deposit' ? '' : label, dueDate: localDay(deposit.dueDate) };
 }
 
 /**
- * What the version about to be issued will state, from the job's live balance
- * plus whatever the dialog adds — the same arithmetic `JobBalanceService`
- * performs, so the preview and the issued document agree: new lines add to
- * the charges; a deposit never does, and what it asks for is capped at the
- * balance.
+ * What the mutation says about the deposit: nothing when the draft is the
+ * deposit the job already has, `removeDeposit` when staff removed it, the
+ * draft otherwise. A draft that is not valid yet says nothing — the dialog
+ * blocks on it, and the preview keeps showing the job's deposit meanwhile.
  */
-export function issuePreview(
-  balance: { chargesToDate?: number | null; paymentsToDate?: number | null; depositAmount?: number | null } | null | undefined,
-  customLines: readonly CustomLineDraft[],
-  deposit: DepositDraft | null | undefined
-): IssuePreview {
-  const added = buildCustomLineInputs(customLines.filter((row) => customLineError(row) === null)).reduce((sum, line) => sum + line.amount, 0);
-  const charges = round2((Number(balance?.chargesToDate) || 0) + added);
-  const payments = round2(Number(balance?.paymentsToDate) || 0);
-  const due = round2(charges - payments);
-  const depositAmount = deposit && !depositError(deposit.amount) ? Number(deposit.amount) : balance?.depositAmount != null ? Number(balance.depositAmount) : null;
-  const depositOutstanding = depositAmount == null ? 0 : round2(Math.max(0, Math.min(depositAmount - payments, due)));
-  return { charges, payments, balance: due, paid: Math.round(payments * 100) >= Math.round(charges * 100), depositOutstanding };
+export function depositChangeInput(
+  draft: DepositDraft | null | undefined,
+  existing: { label?: string | null; amount?: number | null; dueDate?: string | Date | null } | null | undefined
+): { deposit?: { amount: number; label?: string; dueDate: string }; removeDeposit?: true } {
+  if (!draft) return existing ? { removeDeposit: true } : {};
+  const input = buildDepositInput(draft);
+  if (!input) return {};
+  const unchanged =
+    !!existing &&
+    cents(existing.amount) === cents(input.amount) &&
+    localDay(existing.dueDate) === draft.dueDate &&
+    (existing.label?.trim() || 'Deposit') === (input.label ?? 'Deposit');
+  return unchanged ? {} : { deposit: input };
+}
+
+/*
+ * Verbatim copies of `DUE_SCHEDULE_MESSAGES` in `due-schedule.ts`, for the
+ * same reason as the charge messages above.
+ */
+const DUE_AMOUNT_NOT_POSITIVE = 'Each due date needs an amount greater than zero.';
+const DUE_DATE_REQUIRED = 'Each amount needs a due date.';
+const DUE_NOTHING_OWED = 'Nothing is owed, so this invoice takes no due dates.';
+
+/** One due-date row in the issue dialog, as typed. `dueDate` is `yyyy-MM-dd`. */
+export interface DueDraft {
+  amount: string;
+  dueDate: string;
+}
+
+/** A schedule as the dialog's editable rows. */
+export function dueDraftsFrom(schedule: ReadonlyArray<{ amount?: number | null; dueDate?: string | Date | null }> | null | undefined): DueDraft[] {
+  return (schedule ?? []).map((entry) => ({ amount: (Number(entry?.amount) || 0).toFixed(2), dueDate: localDay(entry?.dueDate) }));
+}
+
+function isValidDueRow(row: DueDraft): boolean {
+  const amount = row.amount.trim();
+  return amount !== '' && Number.isFinite(Number(amount)) && cents(amount) > 0 && row.dueDate.trim() !== '';
+}
+
+/** What the rows add up to, counting only amounts that parse. */
+export function dueDraftTotal(rows: readonly DueDraft[]): number {
+  return round2(rows.reduce((sum, row) => sum + (Number.isFinite(Number(row.amount.trim())) ? Number(row.amount.trim()) : 0), 0));
+}
+
+/** The server's exact refusal for these rows against what they must cover, or null. */
+export function dueDraftsError(rows: readonly DueDraft[], target: number): string | null {
+  for (const row of rows) {
+    const amount = row.amount.trim();
+    if (amount === '' || !Number.isFinite(Number(amount)) || cents(amount) <= 0) return DUE_AMOUNT_NOT_POSITIVE;
+    if (!row.dueDate.trim()) return DUE_DATE_REQUIRED;
+  }
+  const targetCents = Math.max(0, cents(target));
+  if (targetCents === 0) return rows.length > 0 ? DUE_NOTHING_OWED : null;
+  const sum = rows.reduce((total, row) => total + cents(row.amount), 0);
+  return sum === targetCents ? null : `The due dates add up to $${(sum / 100).toFixed(2)}, but $${(targetCents / 100).toFixed(2)} is owed.`;
+}
+
+/** The mutation's `dueSchedule`: every row, amounts to the cent, dates at local noon. */
+export function buildDueScheduleInput(rows: readonly DueDraft[]): Array<{ amount: number; dueDate: string }> {
+  return rows.map((row) => ({ amount: round2(Number(row.amount.trim())), dueDate: noonIso(row.dueDate) }));
+}
+
+/** The rows the preview can render while staff type — rows that do not parse yet are left out rather than shown as $0.00. */
+export function dueDraftsAsSchedule(rows: readonly DueDraft[]): Array<{ amount: number; dueDate: string }> {
+  return buildDueScheduleInput(rows.filter(isValidDueRow));
 }

@@ -3,7 +3,7 @@ import { Document, Page, StyleSheet, View, Text, Image, Font } from '@react-pdf/
 import type { SOWData } from '../types/SOWTypes';
 import { RUN_COUNT_PARAM_NAME } from '../utils/servicePricing';
 import type { CustomerCategory } from '../utils/customerCategory';
-import { balanceHeading, buildStatementTotals, equipmentEstimateNote, invoiceKindOf, invoiceVersionOf } from '../utils/equipmentBilling';
+import { balanceHeading, buildStatementTotals, dueDateLabel, dueRows, equipmentEstimateNote, equipmentFormula, invoiceKindOf, invoiceVersionOf, paymentLineLabel } from '../utils/equipmentBilling';
 
 Font.register({ family: 'Courier-New', fonts: [{ src: '/fonts/Courier-New.ttf' }] });
 
@@ -228,6 +228,17 @@ const styles = StyleSheet.create({
     borderTopColor: '#000',
     paddingTop: 10,
   },
+  /** The deposit, first on the statement: asked for by its own date, before anything else. */
+  depositBox: {
+    borderWidth: 1,
+    borderColor: '#000',
+    padding: 6,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontWeight: 800,
+    marginTop: 10,
+  },
 });
 
 function safeParseISODate(iso: string | undefined | null): Date | null {
@@ -353,7 +364,7 @@ export function buildDepositNotice(
   return (
     `${deposit.label?.trim() || 'Deposit'}: ${formatCurrency(Number(deposit.amount) || 0)}${due ? `, due ${formatMMDDYYYY(due)}` : ''}. ` +
     `${outstanding > 0 ? `Outstanding at issue: ${formatCurrency(outstanding)}.` : 'Covered by the payments received.'} ` +
-    'The deposit is part of the total above, not in addition to it.'
+    'The deposit is part of the invoice total, not in addition to it.'
   );
 }
 
@@ -549,6 +560,10 @@ export interface JobInvoiceDocumentProps {
     supersededByNumber?: string | null;
     /** The deposit this version asks for, with its own due date. Part of the total. */
     deposit?: { label?: string | null; amount?: number | null; dueDate?: string | Date | null; outstanding?: number | null } | null;
+    /** When the balance is due besides the deposit, oldest first. Absent on documents from before due dates were split. */
+    dueSchedule?: Array<{ amount?: number | null; dueDate?: string | Date | null }> | null;
+    /** The payments on the job when this version was issued, oldest first. */
+    payments?: Array<{ paymentId?: string | null; amount?: number | null; receivedOn?: string | Date | null; reference?: string | null }> | null;
   } | null;
 }
 
@@ -617,6 +632,8 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
   const customLines = Array.isArray(invoice?.customLines) ? invoice!.customLines! : [];
   const statementTotals = buildStatementTotals(invoice);
   const dueDate = safeParseISODate(toIsoStringSafe(invoice?.dueDate));
+  const payments = Array.isArray(invoice?.payments) ? invoice!.payments! : [];
+  const statementDueRows = isStatement ? dueRows(invoice) : [];
   // The Services block's own subtotal — NOT invoice.subtotal, which on a statement
   // is chargesToDate and already includes the adjustments, equipment and custom
   // lines below it. Printing that here would triple-count the adjustments.
@@ -676,7 +693,11 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
               <Text style={styles.text}>Job ID: {jobDisplayId}</Text>
               {!isStatement && <Text style={styles.text}>Terms: Net 30</Text>}
               <Text style={styles.text}>Invoice date: {formatMMDDYYYY(invoiceDate)}</Text>
-              {isStatement && dueDate && <Text style={styles.text}>Due date: {formatMMDDYYYY(dueDate)}</Text>}
+              {isStatement && dueDate && (
+                <Text style={styles.text}>
+                  {statementDueRows.length > 1 ? 'First due' : 'Due date'}: {formatMMDDYYYY(dueDate)}
+                </Text>
+              )}
             </View>
           </View>
         </View>
@@ -703,6 +724,13 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
 
         {isStatement ? (
           <View style={styles.table}>
+            {depositNotice && (
+              <View style={styles.depositBox}>
+                <Text style={styles.strong}>{invoice?.deposit?.label?.trim() || 'Deposit'}</Text>
+                <Text style={styles.text}>{depositNotice}</Text>
+              </View>
+            )}
+
             {services.length > 0 && (
               <>
                 <View style={styles.tableHeader}>
@@ -817,51 +845,21 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
               </>
             )}
 
+            {/* Lines of text rather than a table, matching the invoice in the
+                page: the item and its date on the left, hours x rate = amount
+                on the right. */}
             {equipmentLines.length > 0 && (
               <>
-                <Text style={styles.strong}>Equipment usage</Text>
-                <View style={styles.tableHeader}>
-                  <View style={styles.cellService}>
-                    <Text style={styles.cellTextHeader} wrap>Equipment</Text>
-                    <Text style={[styles.cellText, { marginTop: 3 }]} wrap>Operation</Text>
-                  </View>
-                  <View style={styles.cellPricing}>
-                    <Text style={styles.cellTextHeader} wrap>Used</Text>
-                  </View>
-                  <View style={styles.cellDate}>
-                    <Text style={styles.cellTextHeaderRight} wrap>Hours</Text>
-                  </View>
-                  <View style={styles.cellRate}>
-                    <Text style={styles.cellTextHeaderRight} wrap>Rate</Text>
-                  </View>
-                  <View style={styles.cellAmount}>
-                    <Text style={styles.cellTextHeaderRight} wrap>Amount</Text>
-                  </View>
-                </View>
-
+                <Text style={styles.sectionTitle}>Equipment usage</Text>
                 {equipmentLines.map((line, idx) => {
                   const start = safeParseISODate(toIsoStringSafe(line.startTime));
-                  const end = safeParseISODate(toIsoStringSafe(line.endTime));
                   return (
-                    <View key={line.bookingId || idx} style={styles.row}>
-                      <View style={styles.cellService}>
-                        <Text style={styles.serviceName} wrap>{line.itemName ?? 'Equipment'}</Text>
-                        <Text style={styles.serviceMeta} wrap>{line.operationLabel ?? ''}</Text>
+                    <View key={line.bookingId || idx} style={[styles.row, styles.twoCol]}>
+                      <View>
+                        <Text style={styles.cellText}>{[line.itemName ?? 'Equipment', start ? formatMMDDYYYY(start) : ''].filter(Boolean).join(' · ')}</Text>
+                        {line.operationLabel ? <Text style={styles.serviceMeta}>{line.operationLabel}</Text> : null}
                       </View>
-                      <View style={styles.cellPricing}>
-                        <Text style={styles.pricingLineLast} wrap>
-                          {start ? formatMMDDYYYY(start) : ''}{end && start && formatMMDDYYYY(end) !== formatMMDDYYYY(start) ? ` – ${formatMMDDYYYY(end)}` : ''}
-                        </Text>
-                      </View>
-                      <View style={styles.cellDate}>
-                        <Text style={styles.cellTextRight} wrap>{line.actualHours != null ? String(line.actualHours) : ''}</Text>
-                      </View>
-                      <View style={styles.cellRate}>
-                        <Text style={styles.cellTextRight} wrap>{line.rate != null ? formatCurrency(line.rate) : ''}</Text>
-                      </View>
-                      <View style={styles.cellAmount}>
-                        <Text style={styles.cellTextRight} wrap>{formatCurrency(Number(line.cost) || 0)}</Text>
-                      </View>
+                      <Text style={[styles.cellText, { textAlign: 'right' }]}>{equipmentFormula(line)}</Text>
                     </View>
                   );
                 })}
@@ -870,7 +868,7 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
 
             {customLines.length > 0 && (
               <>
-                <Text style={styles.strong}>Other charges and discounts</Text>
+                <Text style={styles.sectionTitle}>Other charges and discounts</Text>
                 {customLines.map((line, idx) => {
                   const amt = Number(line?.amount) || 0;
                   const amountText = amt < 0 ? `-${formatCurrency(Math.abs(amt))}` : formatCurrency(amt);
@@ -887,6 +885,18 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
               </>
             )}
 
+            {payments.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Payments</Text>
+                {payments.map((payment, idx) => (
+                  <View key={payment?.paymentId || idx} style={[styles.row, styles.twoCol]}>
+                    <Text style={styles.cellText}>{paymentLineLabel(payment)}</Text>
+                    <Text style={[styles.cellText, { textAlign: 'right' }]}>-{formatCurrency(Number(payment?.amount) || 0)}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+
             {statementTotals.map((row, i) => (
               <View style={styles.totalRow} key={`stmt-total-${i}`}>
                 <Text style={i === statementTotals.length - 1 ? styles.strong : styles.text}>
@@ -895,10 +905,15 @@ const JobInvoiceDocument: React.FC<JobInvoiceDocumentProps> = ({ jobId, jobDispl
               </View>
             ))}
 
-            {depositNotice && (
+            {statementDueRows.length > 0 && (
               <View style={{ marginTop: 12 }}>
-                <Text style={styles.strong}>Deposit</Text>
-                <Text style={styles.text}>{depositNotice}</Text>
+                <Text style={styles.strong}>When it is due</Text>
+                {statementDueRows.map((row, i) => (
+                  <View key={`due-${i}`} style={[styles.row, styles.twoCol]}>
+                    <Text style={styles.cellText}>{[dueDateLabel(row.dueDate) || 'No date given', row.label].filter(Boolean).join(' · ')}</Text>
+                    <Text style={[styles.cellText, { textAlign: 'right' }]}>{formatCurrency(row.amount)}</Text>
+                  </View>
+                ))}
               </View>
             )}
           </View>
