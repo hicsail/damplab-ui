@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Button, Chip, Tooltip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
@@ -40,7 +40,8 @@ import { AppContext }             from '../contexts/App';
 import { statusColor } from '../components/sow/sowTypes';
 import { chipStatusBackground, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
 import StatusPaneHeader from '../components/technician/StatusPaneHeader';
-import { BIOSECURITY_SCREENINGS, PLACEHOLDER_BIOSECURITY, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus } from '../components/technician/biosecurityStatus';
+import { BIOSECURITY_SCREENINGS, biosecurityFromJob, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus, homologyDetail } from '../components/technician/biosecurityStatus';
+import BiosecurityScreeningSections, { BiosecurityStatusIcon } from '../components/technician/BiosecurityScreeningSections';
 
 const stripTypename = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stripTypename);
@@ -461,8 +462,16 @@ export default function TechnicianView() {
     const invoiceBlocked = invoiceBlockedMessage(sowFullData ? { activeStatus: sowStatus.active?.status ?? null, versions: sowStatus.sow?.versions ?? [] } : null);
     const issueBlockedReason = sowLoading || sowStatus.loading ? 'Checking the Statement of Work…' : invoiceBlocked;
     const jobStatusPaneColor = chipStatusBackground(jobData ? jobStatusColor(jobState) : 'default');
-    const biosecurity = PLACEHOLDER_BIOSECURITY;
+    // Homology is the only screening with anything behind it: SecureDNA runs on
+    // submission and the job carries its verdict. The other four are placeholders.
+    const biosecurity = biosecurityFromJob(jobData);
     const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
+    // The pane's one line explains the rollup, so homology's note belongs there
+    // only when homology is what the rollup is reporting. Otherwise it would
+    // read as an explanation of a status it has nothing to do with — "In
+    // Progress ... 1 sequence cleared by SecureDNA". The details always carry it.
+    const homologyNote = homologyDetail(jobData?.homologyScreening);
+    const paneNote = biosecurityComposite === biosecurity.HOMOLOGY ? homologyNote : null;
     const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
     return (
@@ -722,17 +731,21 @@ export default function TechnicianView() {
                     statusPane={
                         <StatusPaneHeader
                             status={biosecurityStatusLabel(biosecurityComposite)}
-                            description="Metadata, homology, and customer screening have not run yet."
+                            description={paneNote ?? "Rolled up from primary and additional screening."}
                         >
-                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
+                            {/* A glance at the five, in card order. The labels live in
+                                the details below; repeating them here would make the
+                                collapsed card the same list twice. */}
+                            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1 }}>
                                 {BIOSECURITY_SCREENINGS.map((screening) => (
-                                    <Chip
+                                    <Tooltip
                                         key={screening.key}
-                                        size="small"
-                                        variant="outlined"
-                                        color={biosecurityStatusColor(biosecurity[screening.key])}
-                                        label={`${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`}
-                                    />
+                                        title={`${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`}
+                                    >
+                                        <Box sx={{ display: 'flex' }}>
+                                            <BiosecurityStatusIcon status={biosecurity[screening.key]} />
+                                        </Box>
+                                    </Tooltip>
                                 ))}
                             </Box>
                         </StatusPaneHeader>
@@ -742,12 +755,7 @@ export default function TechnicianView() {
                             Run screening
                         </Button>
                     }
-                    details={
-                        <Typography variant="body2" color="text.secondary">
-                            Biosecurity screening is not wired up yet. Metadata, homology, and customer screening will
-                            report here once they run.
-                        </Typography>
-                    }
+                    details={<BiosecurityScreeningSections screenings={biosecurity} notes={{ HOMOLOGY: homologyNote }} />}
                 />
 
                 <ProcessCard

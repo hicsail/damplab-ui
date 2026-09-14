@@ -146,6 +146,13 @@ export const GET_JOB_BY_ID = gql`
         url
         uploadedAt
       }
+      homologyScreening {
+        status
+        startedAt
+        completedAt
+        sequenceCount
+        detail
+      }
       sow {
         id
         sowNumber
