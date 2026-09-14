@@ -316,6 +316,7 @@ export const RERUN_JOB_HOMOLOGY_SCREENING = gql`
         completedAt
         sequenceCount
         detail
+        batchId
       }
     }
   }

@@ -114,6 +114,7 @@ export interface HomologyScreeningResult {
   detail?: string | null;
   sequenceCount?: number | null;
   completedAt?: string | null;
+  batchId?: string | null;
 }
 
 /**

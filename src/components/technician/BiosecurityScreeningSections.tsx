@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Tooltip, Typography } from '@mui/material';
+import { Box, ButtonBase, Tooltip, Typography } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AutorenewIcon from '@mui/icons-material/Autorenew';
@@ -45,9 +45,17 @@ interface Props {
   screenings: BiosecurityScreenings;
   /** Optional one-line "why" per screening, shown under its status. */
   notes?: Partial<Record<BiosecurityScreeningKey, string | null>>;
+  /** Homology has a stored batch to open; the chip then acts as a button. */
+  homologyDetailsAvailable?: boolean;
+  onHomologyDetails?: () => void;
 }
 
-export default function BiosecurityScreeningSections({ screenings, notes }: Props): React.JSX.Element {
+export default function BiosecurityScreeningSections({
+  screenings,
+  notes,
+  homologyDetailsAvailable = false,
+  onHomologyDetails
+}: Props): React.JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {BIOSECURITY_SCREENING_GROUPS.map((group) => (
@@ -60,30 +68,57 @@ export default function BiosecurityScreeningSections({ screenings, notes }: Prop
               const status = screenings[screening.key] ?? 'UNAVAILABLE';
               const statusLabel = biosecurityStatusLabel(status);
               const note = notes?.[screening.key];
-              return (
-                <Tooltip key={screening.key} title={note ? `${screening.label}: ${statusLabel} — ${note}` : `${screening.label}: ${statusLabel}`}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      px: 1,
-                      py: 0.5,
-                      borderRadius: 1,
-                      border: '1px solid',
-                      borderColor: 'divider'
-                    }}
-                  >
-                    <BiosecurityStatusIcon status={status} />
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ lineHeight: 1.2 }}>
-                        {screening.label}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2, display: 'block' }}>
-                        {statusLabel}
-                      </Typography>
-                    </Box>
+              const homologyClickable =
+                screening.key === 'HOMOLOGY' && homologyDetailsAvailable && Boolean(onHomologyDetails);
+              const tooltip = homologyClickable
+                ? `View homology screening details — ${statusLabel}${note ? ` — ${note}` : ''}`
+                : note
+                  ? `${screening.label}: ${statusLabel} — ${note}`
+                  : `${screening.label}: ${statusLabel}`;
+              const chip = (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.75,
+                    px: 1,
+                    py: 0.5,
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    width: '100%'
+                  }}
+                >
+                  <BiosecurityStatusIcon status={status} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ lineHeight: 1.2 }}>
+                      {screening.label}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2, display: 'block' }}>
+                      {statusLabel}
+                    </Typography>
                   </Box>
+                </Box>
+              );
+              return (
+                <Tooltip key={screening.key} title={tooltip}>
+                  {homologyClickable ? (
+                    <ButtonBase
+                      onClick={onHomologyDetails}
+                      aria-label="View homology screening details"
+                      sx={{
+                        borderRadius: 1,
+                        textAlign: 'left',
+                        '&:hover .homology-chip': { bgcolor: 'action.hover' }
+                      }}
+                    >
+                      <Box className="homology-chip" sx={{ width: '100%' }}>
+                        {chip}
+                      </Box>
+                    </ButtonBase>
+                  ) : (
+                    chip
+                  )}
                 </Tooltip>
               );
             })}

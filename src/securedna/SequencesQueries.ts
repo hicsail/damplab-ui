@@ -116,6 +116,14 @@ export const GET_SCREENING_BATCHES = gql`
   }
 `;
 
+export const GET_SCREENING_BATCH = gql`
+  query ScreeningBatch($id: ID!) {
+    screeningBatch(id: $id) {
+      ${SCREENING_BATCH_FIELDS}
+    }
+  }
+`;
+
 export const CREATE_SEQUENCES_BATCH = gql`
   mutation CreateSequencesBatch($input: BatchCreateSequencesInput!) {
     createSequencesBatch(input: $input) {

@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router';
-import { useQuery, useMutation, useApolloClient } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient, useLazyQuery } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Chip, Tooltip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Button, Chip, Tooltip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, IconButton } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
@@ -43,6 +43,9 @@ import { chipStatusBackground, isJobProcessSettled, isSowProcessSettled, jobPart
 import StatusPaneHeader from '../components/technician/StatusPaneHeader';
 import { BIOSECURITY_SCREENINGS, biosecurityFromJob, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus, homologyDetail } from '../components/technician/biosecurityStatus';
 import BiosecurityScreeningSections, { BiosecurityStatusIcon } from '../components/technician/BiosecurityScreeningSections';
+import ScreeningBatchDetailsModal from '../components/ScreeningBatchDetailsModal';
+import { GET_SCREENING_BATCH } from '../securedna/SequencesQueries';
+import type { ScreeningBatch } from '../securedna/types';
 
 const stripTypename = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stripTypename);
@@ -175,6 +178,10 @@ export default function TechnicianView() {
 
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
     const [rerunJobHomologyScreening, { loading: rerunningScreening }] = useMutation(RERUN_JOB_HOMOLOGY_SCREENING);
+    const [loadScreeningBatch, { data: screeningBatchData, loading: screeningBatchLoading, error: screeningBatchError }] = useLazyQuery<{ screeningBatch: ScreeningBatch | null }>(GET_SCREENING_BATCH, {
+        fetchPolicy: 'network-only'
+    });
+    const [homologyModalOpen, setHomologyModalOpen] = useState(false);
     const [withdrawFromCustomer] = useMutation(WITHDRAW_JOB_FROM_CUSTOMER);
     const [withdrawAcceptance] = useMutation(WITHDRAW_JOB_ACCEPTANCE);
     const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
@@ -289,6 +296,13 @@ export default function TechnicianView() {
         } catch (e) {
             window.alert(formatGqlError(e, 'Could not run homology screening.'));
         }
+    };
+
+    const handleHomologyDetails = () => {
+        const batchId = jobData?.homologyScreening?.batchId;
+        if (!batchId) return;
+        setHomologyModalOpen(true);
+        void loadScreeningBatch({ variables: { id: batchId } });
     };
 
     const handleReviewSubmitted = () => refreshJobPage();
@@ -483,6 +497,8 @@ export default function TechnicianView() {
     // read as an explanation of a status it has nothing to do with — "In
     // Progress ... 1 sequence cleared by SecureDNA". The details always carry it.
     const homologyNote = homologyDetail(jobData?.homologyScreening);
+    const homologyBatchId = jobData?.homologyScreening?.batchId as string | undefined;
+    const homologyDetailsAvailable = Boolean(homologyBatchId);
     const paneNote = biosecurityComposite === biosecurity.HOMOLOGY ? homologyNote : null;
     const homologyBusy = biosecurity.HOMOLOGY === 'IN_PROGRESS' || rerunningScreening;
     const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
@@ -750,16 +766,32 @@ export default function TechnicianView() {
                                 the details below; repeating them here would make the
                                 collapsed card the same list twice. */}
                             <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1 }}>
-                                {BIOSECURITY_SCREENINGS.map((screening) => (
-                                    <Tooltip
-                                        key={screening.key}
-                                        title={`${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`}
-                                    >
-                                        <Box sx={{ display: 'flex' }}>
-                                            <BiosecurityStatusIcon status={biosecurity[screening.key]} />
-                                        </Box>
-                                    </Tooltip>
-                                ))}
+                                {BIOSECURITY_SCREENINGS.map((screening) => {
+                                    const homologyClickable =
+                                        screening.key === 'HOMOLOGY' && homologyDetailsAvailable;
+                                    const title = homologyClickable
+                                        ? `View homology screening details — ${biosecurityStatusLabel(biosecurity[screening.key])}`
+                                        : `${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`;
+                                    const icon = <BiosecurityStatusIcon status={biosecurity[screening.key]} />;
+                                    return (
+                                        <Tooltip key={screening.key} title={title}>
+                                            {homologyClickable ? (
+                                                <IconButton
+                                                    size="small"
+                                                    aria-label="View homology screening details"
+                                                    onClick={handleHomologyDetails}
+                                                    sx={{ p: 0.25 }}
+                                                >
+                                                    {icon}
+                                                </IconButton>
+                                            ) : (
+                                                <Box sx={{ display: 'flex' }}>
+                                                    {icon}
+                                                </Box>
+                                            )}
+                                        </Tooltip>
+                                    );
+                                })}
                             </Box>
                         </StatusPaneHeader>
                     }
@@ -774,7 +806,14 @@ export default function TechnicianView() {
                             {homologyBusy ? 'Screening…' : 'Run screening'}
                         </Button>
                     }
-                    details={<BiosecurityScreeningSections screenings={biosecurity} notes={{ HOMOLOGY: homologyNote }} />}
+                    details={
+                        <BiosecurityScreeningSections
+                            screenings={biosecurity}
+                            notes={{ HOMOLOGY: homologyNote }}
+                            homologyDetailsAvailable={homologyDetailsAvailable}
+                            onHomologyDetails={handleHomologyDetails}
+                        />
+                    }
                 />
 
                 <ProcessCard
@@ -896,6 +935,13 @@ export default function TechnicianView() {
                     jobTime={jobTime}
                     jobState={jobState}
                     customerHasNotSeenEdits={customerHasNotSeenEdits}
+                />
+                <ScreeningBatchDetailsModal
+                    open={homologyModalOpen}
+                    batch={screeningBatchData?.screeningBatch ?? null}
+                    loading={screeningBatchLoading}
+                    error={screeningBatchError ? formatGqlError(screeningBatchError, 'Could not load homology screening details.') : null}
+                    onClose={() => setHomologyModalOpen(false)}
                 />
                 <SowEditorModal
                     open={sowModalOpen}

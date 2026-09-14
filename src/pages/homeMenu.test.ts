@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HOME_MENU, visibleHomeMenu, type HomeMenuUser } from './homeMenu';
+import { MENU_ICONS } from './homeMenuIcons';
 import { PERMISSIONS, type PermissionName } from '../hooks/usePermissions';
 import { applyPreview } from '../hooks/effectiveUser';
 import { ACCESS_TIERS } from '../constants/accessTiers';
@@ -92,6 +93,12 @@ describe('homepage sections match the access matrix', () => {
   it('gives every item a unique id', () => {
     const ids = HOME_MENU.flatMap((s) => s.items.map((i) => i.id));
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('gives every item an icon', () => {
+    for (const item of HOME_MENU.flatMap((s) => s.items)) {
+      expect(MENU_ICONS[item.id], item.id).toBeTruthy();
+    }
   });
 
   it('gives every item exactly one destination', () => {

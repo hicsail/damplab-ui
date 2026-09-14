@@ -152,6 +152,7 @@ export const GET_JOB_BY_ID = gql`
         completedAt
         sequenceCount
         detail
+        batchId
       }
       sow {
         id
