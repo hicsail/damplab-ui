@@ -409,45 +409,47 @@ const handleSubmitJob = async () => {
         >
           SUBMIT JOB
         </Button>
-
-
-          <Snackbar
-            open={snackbarState.open}
-            autoHideDuration={6000}
-            onClose={handleSnackbarClose}
-            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-            sx={{ mt: 6 }}
-          >
-            <Alert
-              onClose={handleSnackbarClose}
-              variant="filled"
-              severity={snackbarState.severity}
-              color={
-                snackbarState.severity === 'success'
-                  ? 'primary'
-                  : snackbarState.severity === 'error'
-                  ? 'secondary'
-                  : snackbarState.severity === 'info'
-                  ? 'info'
-                  : undefined
-              }
-              sx={{
-                width: '100%',
-                minWidth: '300px',
-                boxShadow: 2,
-                fontSize: '0.95rem',
-              }}
-              icon={
-                jobLoading ? (
-                  <CircularProgress color="inherit" size={20} />
-                ) : undefined
-              }
-            >
-              {snackbarState.message}
-            </Alert>
-          </Snackbar>
         </Box>
       </Box>
+
+      {/* Rendered outside the position:fixed order-summary card above so it
+          isn't trapped in that card's stacking context (fixed/sticky
+          elements always create one) below the header/nav bar's z-index. */}
+      <Snackbar
+        open={snackbarState.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        sx={{ mt: 6 }}
+      >
+        <Alert
+          onClose={handleSnackbarClose}
+          variant="filled"
+          severity={snackbarState.severity}
+          color={
+            snackbarState.severity === 'success'
+              ? 'primary'
+              : snackbarState.severity === 'error'
+              ? 'secondary'
+              : snackbarState.severity === 'info'
+              ? 'info'
+              : undefined
+          }
+          sx={{
+            width: '100%',
+            minWidth: '300px',
+            boxShadow: 2,
+            fontSize: '0.95rem',
+          }}
+          icon={
+            jobLoading ? (
+              <CircularProgress color="inherit" size={20} />
+            ) : undefined
+          }
+        >
+          {snackbarState.message}
+        </Alert>
+      </Snackbar>
   </div>
 );
 }
