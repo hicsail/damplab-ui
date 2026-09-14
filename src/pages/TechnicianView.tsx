@@ -15,7 +15,7 @@ import RefreshIcon                                    from '@mui/icons-material/
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
+import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, RERUN_JOB_HOMOLOGY_SCREENING, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -38,6 +38,7 @@ import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
 import { statusColor } from '../components/sow/sowTypes';
+import { formatGqlError } from '../utils/gqlError';
 import { chipStatusBackground, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
 import StatusPaneHeader from '../components/technician/StatusPaneHeader';
 import { BIOSECURITY_SCREENINGS, biosecurityFromJob, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus, homologyDetail } from '../components/technician/biosecurityStatus';
@@ -173,6 +174,7 @@ export default function TechnicianView() {
     const [sowCreateError, setSowCreateError] = useState<string | null>(null);
 
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
+    const [rerunJobHomologyScreening, { loading: rerunningScreening }] = useMutation(RERUN_JOB_HOMOLOGY_SCREENING);
     const [withdrawFromCustomer] = useMutation(WITHDRAW_JOB_FROM_CUSTOMER);
     const [withdrawAcceptance] = useMutation(WITHDRAW_JOB_ACCEPTANCE);
     const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
@@ -277,6 +279,16 @@ export default function TechnicianView() {
             refetchInvoices(),
             apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS] })
         ]);
+    };
+
+    const handleRerunHomologyScreening = async () => {
+        if (!id) return;
+        try {
+            await rerunJobHomologyScreening({ variables: { jobId: id } });
+            await refetchJob();
+        } catch (e) {
+            window.alert(formatGqlError(e, 'Could not run homology screening.'));
+        }
     };
 
     const handleReviewSubmitted = () => refreshJobPage();
@@ -472,6 +484,7 @@ export default function TechnicianView() {
     // Progress ... 1 sequence cleared by SecureDNA". The details always carry it.
     const homologyNote = homologyDetail(jobData?.homologyScreening);
     const paneNote = biosecurityComposite === biosecurity.HOMOLOGY ? homologyNote : null;
+    const homologyBusy = biosecurity.HOMOLOGY === 'IN_PROGRESS' || rerunningScreening;
     const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
     return (
@@ -751,8 +764,14 @@ export default function TechnicianView() {
                         </StatusPaneHeader>
                     }
                     actions={
-                        <Button variant="outlined" size="small" disabled sx={railBtnSx}>
-                            Run screening
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            sx={railBtnSx}
+                            disabled={!id || homologyBusy}
+                            onClick={handleRerunHomologyScreening}
+                        >
+                            {homologyBusy ? 'Screening…' : 'Run screening'}
                         </Button>
                     }
                     details={<BiosecurityScreeningSections screenings={biosecurity} notes={{ HOMOLOGY: homologyNote }} />}

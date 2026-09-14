@@ -64,7 +64,7 @@ describe('homepage sections match the access matrix', () => {
       // "My Jobs" and "Jobs" merged into one button in Client Tools: the two pages
       // rendered the same component, and scope is enforced server-side now.
       'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
-      'Technician Tools': ['Staff submit job', 'My Bench'],
+      'Technician Tools': ['Staff submit job', 'My Bench', 'Screener'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
       // "Edit Announcements" is gone: /edit_announcements merged into /announcements,
       // whose editing controls are gated inside the page on announcements:write.
@@ -73,11 +73,12 @@ describe('homepage sections match the access matrix', () => {
     });
   });
 
-  it('has 26 buttons', () => {
+  it('has 27 buttons', () => {
     // 25 until Notification Preferences arrived. Before that it was 26, then
     // "Edit Announcements" left when the editor merged into the feed, the same
-    // way "My Jobs" left when the two jobs pages merged.
-    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(26);
+    // way "My Jobs" left when the two jobs pages merged. Screener (SecureDNA)
+    // is staff-only: technicians and administrators, via jobs:view-all.
+    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('has exactly one jobs button, keyed on the baseline permission', () => {
@@ -117,7 +118,7 @@ describe('what each role sees', () => {
   it('shows a technician their operational set, and Technician Tools without Staff submit job (Q7)', () => {
     expect(labelsBySection(TECHNICIAN)).toEqual({
       'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
-      'Technician Tools': ['My Bench'],
+      'Technician Tools': ['My Bench', 'Screener'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
       'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'AI Lab Assistant'],
       'Admin Management Tools': ['Lab Monitor North', 'Lab Monitor South'],
@@ -136,7 +137,7 @@ describe('what each role sees', () => {
   });
 
   it('shows an administrator everything', () => {
-    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(26);
+    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('gates each button on what its destination needs, not what its label resembles', () => {
@@ -168,7 +169,7 @@ describe('what each role sees', () => {
 describe('degraded mode: the permissions fetch failed', () => {
   it('falls back to the legacy staff boolean rather than hiding everything from staff', () => {
     const staffWithoutPermissions: HomeMenuUser = { permissions: [], permissionsLoaded: false, isDamplabStaff: true };
-    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(26);
+    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('leaves a client with only the two unpermissioned buttons — the cost of the fallback, stated', () => {

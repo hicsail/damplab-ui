@@ -306,6 +306,21 @@ export const MUTATE_JOB_STATE = gql`
   }
 `;
 
+export const RERUN_JOB_HOMOLOGY_SCREENING = gql`
+  mutation RerunJobHomologyScreening($jobId: ID!) {
+    rerunJobHomologyScreening(jobId: $jobId) {
+      id
+      homologyScreening {
+        status
+        startedAt
+        completedAt
+        sequenceCount
+        detail
+      }
+    }
+  }
+`;
+
 export const SAVE_JOB_WORKFLOWS = gql`
   mutation SaveJobWorkflows($input: SaveJobWorkflowsInput!) {
     saveJobWorkflows(input: $input) {
