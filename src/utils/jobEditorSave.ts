@@ -34,9 +34,14 @@ export function missedUnfilteredContent(
 /**
  * What `loadedVersionNumber` should be when a job first hydrates.
  *
- * Staff seed from the filtered latest content version. Customers seed from the
- * unfiltered latest content number so a pre-existing hidden staff draft does
- * not look like a concurrent save on first persist.
+ * Staff seed from the newest row they can see, which since the editor stopped
+ * skipping trailing events may be an event rather than a content row. That is
+ * still safe: an event's number is always at least the newest content number,
+ * and `nextVersionNumber` only ever issues higher ones, so `missedContentVersion`
+ * can neither fire on a row that was already there nor miss one written later.
+ *
+ * Customers seed from the unfiltered latest content number so a pre-existing
+ * hidden staff draft does not look like a concurrent save on first persist.
  */
 export function seedLoadedVersionNumber(
     isStaff: boolean,

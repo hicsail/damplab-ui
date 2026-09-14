@@ -38,17 +38,32 @@ export interface NextBookingInfo {
   ownerName?: string;
 }
 
+/** A calendar booking that covers this moment — the item is reserved even though no operation holds it. */
+export interface CurrentBookingInfo {
+  startTime: string;
+  endTime: string;
+  ownerName?: string;
+  /** A job-scoped booking's note is "Job #NNNNN · <operation>"; a walk-up's is free text. */
+  notes?: string;
+  jobId?: string;
+}
+
 interface InventoryCardProps {
   item: InventoryItemRow;
   holder?: HolderInfo;
+  /** Set when a booking is running right now; the card reads Booked, not Free. */
+  currentBooking?: CurrentBookingInfo;
   nextBooking?: NextBookingInfo;
 }
 
-export default function InventoryCard({ item, holder, nextBooking }: InventoryCardProps) {
+const when = (iso: string) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+export default function InventoryCard({ item, holder, currentBooking, nextBooking }: InventoryCardProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const busy = !!holder || !!currentBooking;
 
   return (
-    <Card variant='outlined' sx={{ borderColor: holder ? '#dc2626' : '#16a34a' }}>
+    <Card variant='outlined' sx={{ borderColor: busy ? '#dc2626' : '#16a34a' }}>
       <CardContent>
         <Stack direction='row' alignItems='center' spacing={1} sx={{ mb: 1 }}>
           <PrecisionManufacturingIcon fontSize='small' />
@@ -63,8 +78,8 @@ export default function InventoryCard({ item, holder, nextBooking }: InventoryCa
           <Chip size='small' variant='outlined' color={item.bookable ? 'info' : 'default'} label={item.bookable ? 'Bookable' : 'Non-Bookable'} />
           <Chip
             size='small'
-            color={holder ? 'warning' : 'success'}
-            label={holder ? 'In use' : 'Free'}
+            color={busy ? 'warning' : 'success'}
+            label={holder ? 'In use' : currentBooking ? 'Booked' : 'Free'}
           />
         </Stack>
         {item.location && (
@@ -77,6 +92,12 @@ export default function InventoryCard({ item, holder, nextBooking }: InventoryCa
             {item.description && (
               <Typography variant='caption' color='text.secondary' display='block'>
                 {item.description}
+              </Typography>
+            )}
+            {currentBooking && (
+              <Typography variant='caption' color='warning.main' display='block'>
+                Booked {when(currentBooking.startTime)} – {when(currentBooking.endTime)}
+                {currentBooking.jobId ? ` · ${currentBooking.notes || 'job booking'}` : currentBooking.ownerName ? ` · ${currentBooking.ownerName}` : ''}
               </Typography>
             )}
             {nextBooking && (

@@ -13,6 +13,7 @@ import {
   SowAdjustmentCategory,
   SOW_ADJUSTMENT_CATEGORIES,
   SowPeriod,
+  CUSTOMER_CATEGORY_OPTIONS,
   formatCurrency,
   formatMultiplier,
   customerCategoryLabel,
@@ -26,6 +27,7 @@ import {
   sowTotals
 } from './sowTypes';
 import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays } from '../../utils/sowDateUtils';
+import { equipmentEstimateNote } from '../../utils/equipmentBilling';
 
 /**
  * The structured inputs behind each generated section, rendered inside the
@@ -48,10 +50,14 @@ interface Props {
   projectLeads: StaffOption[];
   disabled?: boolean;
   onChange: (patch: Partial<SowVersionInputs>) => void;
-  /** feeSchedule only: the job's current pricing category (read-only context). */
+  /** feeSchedule only: the job's current pricing category. */
   liveCustomerCategory?: string | null;
   /** feeSchedule only: what the job prices these lines at now, for the "Job now" comparison caption. */
   liveServices?: SowVersionInputs['services'] | null;
+  /** feeSchedule only: change the job's own pricing category (not the document's). */
+  onChangeLiveCustomerCategory?: (category: string) => void;
+  /** feeSchedule only: the category change above is in flight. */
+  categoryUpdating?: boolean;
 }
 
 const labelSx = { display: 'block', mb: 0.5, color: 'text.secondary', fontWeight: 500 } as const;
@@ -230,7 +236,7 @@ function PeriodListEditor({ periods, disabled, onChange }: { periods: SowPeriod[
   );
 }
 
-export default function SowFieldSourceControls({ fieldKey, inputs, administrators, projectLeads, disabled, onChange, liveCustomerCategory, liveServices }: Props): React.JSX.Element | null {
+export default function SowFieldSourceControls({ fieldKey, inputs, administrators, projectLeads, disabled, onChange, liveCustomerCategory, liveServices, onChangeLiveCustomerCategory, categoryUpdating }: Props): React.JSX.Element | null {
   // The document's own figures, not the job's. A version is a static record:
   // these move only when staff hit Recalculate, which patches them locally and
   // marks the save as a refresh.
@@ -349,18 +355,32 @@ export default function SowFieldSourceControls({ fieldKey, inputs, administrator
         </Box>
       );
 
-    case 'feeSchedule':
+    case 'feeSchedule': {
+      const feeTotals = sowTotals(feeServices, inputs.adjustments);
       return (
         <Box>
           <Typography variant="caption" sx={labelSx}>
             Pricing category
           </Typography>
-          <Typography variant="body2" sx={{ mb: liveCategoryDiffers ? 0 : 2 }}>
-            {customerCategoryLabel(inputs.customerCategory)}
+          <Select
+            size="small"
+            sx={{ display: 'block', mb: 0.5, minWidth: 260 }}
+            value={liveCustomerCategory ?? ''}
+            disabled={disabled || !onChangeLiveCustomerCategory || categoryUpdating}
+            onChange={(e) => onChangeLiveCustomerCategory?.(String(e.target.value))}
+          >
+            {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: liveCategoryDiffers ? 0.5 : 2 }}>
+            Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
           </Typography>
           {liveCategoryDiffers && (
             <Typography variant="body2" color="warning.main" sx={{ mb: 2 }}>
-              Job now: {customerCategoryLabel(liveCustomerCategory)}
+              This document was written at: {customerCategoryLabel(inputs.customerCategory)}
             </Typography>
           )}
 
@@ -382,6 +402,11 @@ export default function SowFieldSourceControls({ fieldKey, inputs, administrator
                   <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                     {multiplier === 1 ? formatCurrency(s.cost) : `${formatCurrency(unitCost)} × ${formatMultiplier(multiplier)} = ${formatCurrency(s.cost)}`}
                   </Typography>
+                  {equipmentEstimateNote(s.description) && (
+                    <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', display: 'block' }}>
+                      {equipmentEstimateNote(s.description)}
+                    </Typography>
+                  )}
                   {live && Number(live.cost) !== Number(s.cost) && (
                     <Typography variant="caption" color="warning.main" sx={{ whiteSpace: 'nowrap' }}>
                       Job now: {formatCurrency(Number(live.cost))}
@@ -515,12 +540,20 @@ export default function SowFieldSourceControls({ fieldKey, inputs, administrator
             >
               Add adjustment
             </Button>
-            <Typography variant="body2" color="text.secondary">
-              Total {formatCurrency(sowTotals(feeServices, inputs.adjustments).totalCost)}
-            </Typography>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="body2" color="text.secondary">
+                Total {formatCurrency(feeTotals.totalCost)}
+              </Typography>
+              {feeTotals.estimatedEquipmentCost > 0 && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  Estimated equipment usage (not included in Total) {formatCurrency(feeTotals.estimatedEquipmentCost)}
+                </Typography>
+              )}
+            </Box>
           </Box>
         </Box>
       );
+    }
 
     default:
       return null;

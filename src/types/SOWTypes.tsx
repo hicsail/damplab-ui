@@ -28,10 +28,13 @@ export interface SOWData {
     baseCost: number;
     adjustments: SOWPricingAdjustment[];
     totalCost: number;
-    discount?: {
-      amount: number;
-      reason: string;
-    };
+    /**
+     * Removed. `SOWPricing.discount` never affected any total — the mechanism that
+     * works is a `DISCOUNT` entry in `adjustments`, which reduces the total, is
+     * carried onto invoices and is prorated across partial ones. The field is
+     * deprecated server-side and deleted a release later; no query selects it any
+     * more, so nothing here could hold a value.
+     */
   };
   services: SOWService[];
   terms: string;

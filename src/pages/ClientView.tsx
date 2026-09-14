@@ -3,21 +3,23 @@ import { useParams, useNavigate } from 'react-router';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 
-import { PDFDownloadLink } from '@react-pdf/renderer';
-import JobInvoiceDocument from '../components/JobInvoiceDocument';
-import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE } from '../gql/queries';
-import { CANCEL_JOB, REJECT_JOB_REVIEW } from '../gql/mutations';
+import InvoicePanel from '../components/billing/InvoicePanel';
+import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
+import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutations';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
 import SowCustomerView            from '../components/sow/SowCustomerView';
+import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
+import JobPaymentsPanel from '../components/billing/JobPaymentsPanel';
 import ProcessCard                from '../components/technician/ProcessCard';
 import StatusPaneHeader           from '../components/technician/StatusPaneHeader';
 import { CommentsSection }        from '../components/CommentsSection';
 import ResubmitJobModal          from '../components/ResubmitJobModal';
 import RequestEditAccessModal    from '../components/RequestEditAccessModal';
 import ReasonDialog              from '../components/ReasonDialog';
-import { diffJobGraphs, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { canRevertVersions } from '../utils/jobEditing';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 import { AppContext } from '../contexts/App';
@@ -32,7 +34,7 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { deriveCustomerLifecycle, validResponseAction } from '../utils/customerLifecycle';
 import type { CustomerActionRequired } from '../utils/jobReview';
-import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, partyVersionLabel } from '../utils/technicianProcessStatus';
+import { chipStatusBackground, isJobProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, partyVersionLabel } from '../utils/technicianProcessStatus';
 
 export default function Tracking() {
 
@@ -104,28 +106,47 @@ export default function Tracking() {
         fetchPolicy: 'network-only',
     });
     const sowFullData = sowByJobIdResult?.sowByJobId ?? null;
-
-    const { data: invoicesResult, refetch: refetchInvoices } = useQuery(GET_INVOICES_BY_JOB_ID, {
-        variables: { jobId: id as string },
-        skip: !id,
-        fetchPolicy: 'network-only',
-    });
-    const invoices = invoicesResult?.invoicesByJobId ?? [];
     const [refreshing, setRefreshing] = useState(false);
 
     const refreshJobPage = async () => {
         await Promise.all([
             refetch(),
             refetchSow(),
-            refetchInvoices(),
             // The SOW card runs its own query. Without this, Refresh Job reloaded
             // the job and left the Statement of Work showing whatever it had —
             // including a version that had since been superseded.
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] })
+            apolloClient.refetchQueries({ include: [GET_INVOICES_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS] })
         ]);
     };
 
+    const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
+    const [restoringVersion, setRestoringVersion] = useState(false);
+
     const job = data?.ownJobById;
+
+    /**
+     * Restore the version being viewed. Offered only while the lab has actually
+     * handed the job back for editing — `canRevertVersions` mirrors the server
+     * gate, which is what decides whether the save is accepted at all.
+     *
+     * No picker bookkeeping afterwards: the effect on `data.ownJobById` snaps the
+     * view to the newest allowed row on every refetch.
+     */
+    const handleRestoreVersion = async () => {
+        if (!id || viewingVersion == null) return;
+        const label = jobVersionDisplayLabel(viewingVersion);
+        if (!window.confirm(`Restore version ${label}? This becomes the current workflow, saved as a new version. Nothing already in the history is lost.`)) return;
+        setRestoringVersion(true);
+        try {
+            await restoreJobVersion({ variables: { jobId: id, versionNumber: viewingVersion, note: `Restored version ${label}` } });
+            await refreshJobPage();
+        } catch (e: any) {
+            window.alert(formatGqlError(e, 'Could not restore that version.'));
+        } finally {
+            setRestoringVersion(false);
+        }
+    };
+
     const activeSow = sowFullData?.activeVersion ?? null;
     const visibleActiveSow = activeSow?.visibleToCustomer === true ? activeSow : null;
     const lifecycle = deriveCustomerLifecycle({
@@ -245,6 +266,8 @@ export default function Tracking() {
                             setBaselineVersionNumber(undefined);
                         }}
                         onBaselineChange={setBaselineVersionNumber}
+                        onRestore={canRevertVersions(job, false) ? handleRestoreVersion : undefined}
+                        restoring={restoringVersion}
                     />
                 </Box>
             )}
@@ -256,8 +279,25 @@ export default function Tracking() {
 
     return (
         <div>
-            <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
+                {/* The job's name, the submission line, and the commands that act
+                    on it. Kept sticky, offset below the fixed black header and the
+                    breadcrumb bar (both publish their heights as CSS vars — see
+                    HeaderBar and AppBreadcrumbs) so this stays visible on scroll
+                    instead of getting buried under a long job. */}
+                <Box
+                    sx={{
+                        position: 'sticky',
+                        top: 'calc(var(--app-header-height, 64px) + var(--app-breadcrumb-height, 41px))',
+                        zIndex: 1050,
+                        bgcolor: 'background.paper',
+                        pt: 1,
+                        pb: 1.5,
+                        mb: 1,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                    }}
+                >
                 {/* The job's name and the commands that act on it, on one line —
                     the same header the staff page uses. Viewing the canvas is not
                     here: it is permanent rather than a response to a prompt, so it
@@ -369,17 +409,21 @@ export default function Tracking() {
                         </Button>
                     )}
                 </Box>
+                <Typography sx={{ fontSize: 13 }}>
+                    {submitter.user}
+                    {submitter.organization && `, ${submitter.organization}`}
+                    {' submitted this job on '}
+                    {jobTime.slice(0, 16).replace('T', ' ')}
+                </Typography>
+                {submitter.onBehalfOf && (
+                    <Typography sx={{ fontSize: 13, mt: 0.5 }}>{submitter.onBehalfOf}</Typography>
+                )}
+                </Box>
                 {commandError && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setCommandError(null)}>
                         {commandError}
                     </Alert>
                 )}
-                <Box sx={{ fontSize: 13, mb: 2, textAlign: 'left', '& p:first-of-type': { mt: 0 } }}>
-                    <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
-                    <p><b>User:</b> {submitter.user}</p>
-                    {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
-                    <p><b>Organization:</b> {submitter.organization}</p>
-                </Box>
 
                 <ProcessCard
                     title="Job"
@@ -484,97 +528,21 @@ export default function Tracking() {
                     <SowCustomerView jobId={id || ''} onDeclined={refreshJobPage} />
                 </Box>
 
-                <ProcessCard
-                    title="Invoices"
-                    defaultExpanded={invoices.length > 0}
-                    customerBadge={null}
-                    staffBadge={null}
-                    statusPaneSx={{ bgcolor: chipStatusBackground(invoices.length ? 'info' : 'default') }}
-                    statusPane={
-                        invoices.length ? (
-                            <StatusPaneHeader
-                                status={invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
-                                reference={invoiceVersionLabel(invoices) !== '—' ? invoiceVersionLabel(invoices) : undefined}
-                                description={
-                                    invoices[invoices.length - 1]?.totalCost != null
-                                        ? `Latest invoice · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
-                                        : undefined
-                                }
-                            />
-                        ) : (
-                            <StatusPaneHeader
-                                status="No invoices yet"
-                                description="The lab has not invoiced this job yet. Invoices appear here when they do."
-                            />
-                        )
-                    }
-                    actions={
-                        invoices.length && id && sowFullData ? (
-                            <PDFDownloadLink
-                                document={
-                                    <JobInvoiceDocument
-                                        jobId={id}
-                                        jobDisplayId={data?.ownJobById?.jobId ?? null}
-                                        jobName={jobName}
-                                        customerCategory={data?.ownJobById?.customerCategory ?? undefined}
-                                        sow={sowFullData}
-                                        invoice={invoices[invoices.length - 1]}
-                                    />
-                                }
-                                fileName={`Invoice-${(invoices[invoices.length - 1]?.invoiceNumber ?? id) || id}.pdf`}
-                                style={{ textDecoration: 'none', width: '100%' }}
-                            >
-                                {({ loading: pdfLoading }) => (
-                                    <Button size="small" variant="outlined" disabled={pdfLoading} sx={railBtnSx}>
-                                        {pdfLoading ? 'Loading invoice…' : 'Download Latest Invoice'}
-                                    </Button>
-                                )}
-                            </PDFDownloadLink>
-                        ) : undefined
-                    }
-                    details={
-                        invoices.length ? (
-                            <List dense>
-                                {invoices.map((inv: any, idx: number) => (
-                                    <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
-                                        <ListItemText
-                                            primary={
-                                                id && sowFullData ? (
-                                                    <PDFDownloadLink
-                                                        document={
-                                                            <JobInvoiceDocument
-                                                                jobId={id}
-                                                                jobDisplayId={data?.ownJobById?.jobId ?? null}
-                                                                jobName={jobName}
-                                                                customerCategory={data?.ownJobById?.customerCategory ?? undefined}
-                                                                sow={sowFullData}
-                                                                invoice={inv}
-                                                            />
-                                                        }
-                                                        fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
-                                                    >
-                                                        {({ loading }) =>
-                                                            loading ? 'Loading...' : `Invoice ${inv.invoiceNumber || ''}`.trim()
-                                                        }
-                                                    </PDFDownloadLink>
-                                                ) : (
-                                                    `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
-                                                )
-                                            }
-                                            secondary={
-                                                `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
-                                            }
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        ) : (
-                            <Typography variant="body2" color="text.secondary">
-                                Invoices will appear here when the lab issues them.
-                            </Typography>
-                        )
-                    }
+                {/* Directly under the SOW, because that is what unlocks it: the
+                    panel renders nothing at all for a caller who is not on this
+                    job, and one sentence for one who is but cannot book yet. */}
+                <JobEquipmentBookingPanel jobId={id || ''} />
+
+                <InvoicePanel
+                    jobId={id || ''}
+                    jobDisplayId={data?.ownJobById?.jobId ?? null}
+                    jobName={jobName}
+                    customerCategory={data?.ownJobById?.customerCategory ?? null}
+                    sow={sowFullData}
                 />
+
+                {/* Payments belong to the job; every invoice version restates them. */}
+                <JobPaymentsPanel jobId={id || ''} />
 
                 {/* Comments Section */}
                 <CommentsSection

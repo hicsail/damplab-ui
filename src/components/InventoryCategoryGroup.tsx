@@ -9,19 +9,21 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InventoryCard from './InventoryCard';
-import type { InventoryItemRow, HolderInfo, NextBookingInfo } from './InventoryCard';
+import type { InventoryItemRow, HolderInfo, NextBookingInfo, CurrentBookingInfo } from './InventoryCard';
 
 interface InventoryCategoryGroupProps {
   type: string;
   items: InventoryItemRow[];
   heldBy: Map<string, HolderInfo>;
+  bookedNow?: Map<string, CurrentBookingInfo>;
   nextBookingMap?: Map<string, NextBookingInfo>;
   expanded: boolean;
   onToggle: () => void;
 }
 
-export default function InventoryCategoryGroup({ type, items, heldBy, nextBookingMap, expanded, onToggle }: InventoryCategoryGroupProps) {
-  const groupInUse = items.filter((it) => heldBy.has(it.id)).length;
+export default function InventoryCategoryGroup({ type, items, heldBy, bookedNow, nextBookingMap, expanded, onToggle }: InventoryCategoryGroupProps) {
+  const busy = (id: string) => heldBy.has(id) || !!bookedNow?.has(id);
+  const groupInUse = items.filter((it) => busy(it.id)).length;
   const groupFree = items.length - groupInUse;
 
   return (
@@ -56,7 +58,7 @@ export default function InventoryCategoryGroup({ type, items, heldBy, nextBookin
       <AccordionDetails>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
           {items.map((it) => (
-            <InventoryCard key={it.id} item={it} holder={heldBy.get(it.id)} nextBooking={!heldBy.has(it.id) ? nextBookingMap?.get(it.id) : undefined} />
+            <InventoryCard key={it.id} item={it} holder={heldBy.get(it.id)} currentBooking={bookedNow?.get(it.id)} nextBooking={!busy(it.id) ? nextBookingMap?.get(it.id) : undefined} />
           ))}
         </Box>
       </AccordionDetails>

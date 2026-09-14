@@ -9,7 +9,7 @@ import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, Dial
 import { buildNodeParameters, createNodeObject } from '../controllers/ReactFlowEvents';
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
 import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from '../controllers/jobGraphHydration';
-import { diffJobGraphs, latestContentVersion, latestVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
+import { diffJobGraphs, latestVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
 import { canRevertVersions, customerMayEdit, editingBlockedMessage, staffEditBlockedReason } from '../utils/jobEditing';
 import { missedContentVersion, missedUnfilteredContent, pickersAfterSave, seedLoadedVersionNumber } from '../utils/jobEditorSave';
 import JobVersionHistory from '../components/JobVersionHistory';
@@ -80,14 +80,17 @@ export default function JobEditor() {
     const [restoring, setRestoring] = useState(false);
 
     const versions: JobVersionLike[] = useMemo(() => job?.versions ?? [], [job]);
-    // Staff skip trailing events so they do not land on a Closed copy.
-    // Customers use the newest row they are allowed to see, including a
-    // visible Request Changes event — otherwise View / hydrate would show
-    // the original submission and a save would overwrite live workflows.
-    const latest = useMemo(
-        () => (isStaff ? latestContentVersion(versions) : latestVersion(versions)),
-        [isStaff, versions]
-    );
+    // The newest row the viewer is allowed to see, events included.
+    //
+    // Staff used to skip trailing events so as not to land on a Closed copy,
+    // but that put the default on the Draft *beneath* an Accepted or Closed
+    // row. Two things followed: `isHistoric` flagged the genuinely newest
+    // version as history and locked the canvas, and Restore — gated on "not
+    // the latest" — vanished from that Draft while appearing on the newer
+    // event above it. Customers already used the unfiltered latest so a
+    // visible Request Changes event hydrates rather than the original
+    // submission; both roles now follow that one rule.
+    const latest = useMemo(() => latestVersion(versions), [versions]);
 
     /**
      * Which version is on screen, and what it is compared against. Both default
@@ -122,7 +125,6 @@ export default function JobEditor() {
      * the browser would duplicate the logic and sit outside that gate.
      */
     const canRevert = canRevertVersions(job, isStaff);
-    const isLatestVersion = latest != null && viewing === latest.versionNumber;
 
     const handleRestoreVersion = async (): Promise<void> => {
         if (viewing == null || !id) return;
@@ -133,7 +135,7 @@ export default function JobEditor() {
             await restoreJobVersion({ variables: { jobId: id, versionNumber: viewing, note: `Restored version ${label}` } });
             const { data: fresh } = await refetch();
             const freshJob = fresh?.jobById ?? fresh?.ownJobById ?? null;
-            const freshLatest = isStaff ? latestContentVersion(freshJob?.versions ?? []) : latestVersion(freshJob?.versions ?? []);
+            const freshLatest = latestVersion(freshJob?.versions ?? []);
             if (freshLatest) {
                 setViewing(freshLatest.versionNumber);
                 setBaseline(undefined);
@@ -430,7 +432,7 @@ export default function JobEditor() {
     };
 
     const applyPickersAfterSave = (freshVersions: JobVersionLike[], missedVersionNumber: number | null) => {
-        const newLatest = isStaff ? latestContentVersion(freshVersions) : latestVersion(freshVersions);
+        const newLatest = latestVersion(freshVersions);
         if (!newLatest) return;
         const pickers = pickersAfterSave({
             newLatestVersionNumber: newLatest.versionNumber,
@@ -590,22 +592,9 @@ export default function JobEditor() {
                                             }}
                                             onBaselineChange={setBaseline}
                                             dense
+                                            onRestore={canRevert ? handleRestoreVersion : undefined}
+                                            restoring={restoring}
                                         />
-                                        {/* Restoring is a contract write like any
-                                            other, so it is offered only where the
-                                            server would accept the save — see
-                                            canRevertVersions. */}
-                                        {canRevert && !isLatestVersion && (
-                                            <Button
-                                                size="small"
-                                                variant="outlined"
-                                                disabled={restoring}
-                                                onClick={handleRestoreVersion}
-                                                sx={{ textTransform: 'none', mt: 0.75, width: '100%' }}
-                                            >
-                                                {restoring ? 'Restoring…' : 'Restore this version'}
-                                            </Button>
-                                        )}
                                     </Box>
                                 )}
                             </Panel>

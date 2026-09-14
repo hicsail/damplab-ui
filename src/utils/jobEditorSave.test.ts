@@ -64,8 +64,24 @@ describe('pickersAfterSave', () => {
 });
 
 describe('seedLoadedVersionNumber', () => {
-  it('seeds staff from the filtered latest content version', () => {
+  it('seeds staff from the newest row they can see', () => {
     expect(seedLoadedVersionNumber(true, 1002, 1003)).toBe(1002);
+  });
+
+  it('seeds staff from a trailing event row without making it look like a conflict', () => {
+    // An Accepted event at 2000 sits above the newest content row, 1002. The
+    // editor now defaults there, so that is what gets seeded — and because the
+    // event's number is the highest on the job, nothing already written can look
+    // newer than it.
+    const versions = [version(1002), version(2000, { isEvent: true, jobState: 'ACCEPTED', note: 'Accepted' })];
+    const loaded = seedLoadedVersionNumber(true, 2000, 1002);
+    expect(loaded).toBe(2000);
+    expect(missedContentVersion(versions, loaded)).toBeNull();
+  });
+
+  it('still catches a save written after a trailing event was seeded', () => {
+    const versions = [version(1002), version(2000, { isEvent: true, jobState: 'ACCEPTED' }), version(2001, { createdByName: 'Sam' })];
+    expect(missedContentVersion(versions, 2000)).toMatchObject({ versionNumber: 2001, createdByName: 'Sam' });
   });
 
   it('seeds a customer from the unfiltered latest so a pre-existing hidden staff draft is not a conflict', () => {

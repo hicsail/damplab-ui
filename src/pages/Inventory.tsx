@@ -19,7 +19,7 @@ import {
   GET_IN_PROGRESS_NODES_HOLDING_INVENTORY
 } from '../gql/queries';
 import InventoryFilterBar, { type InventoryFilters } from '../components/InventoryFilterBar';
-import { type InventoryItemRow, type HolderInfo, type NextBookingInfo } from '../components/InventoryCard';
+import { type InventoryItemRow, type HolderInfo, type NextBookingInfo, type CurrentBookingInfo } from '../components/InventoryCard';
 import InventoryCategoryGroup from '../components/InventoryCategoryGroup';
 import InventoryBundleGroup, { type BundleWithInventory } from '../components/InventoryBundleGroup';
 
@@ -114,12 +114,31 @@ export default function Inventory() {
     return m;
   }, [heldData]);
 
-  // Map inventoryId → next upcoming booking (soonest per item, only RESERVED status).
+  // Map inventoryId → the booking running right now, if any. The bookings query
+  // returns every slot overlapping the window, so a multi-day reservation that
+  // began before now is here too — this is what marks such an item Booked rather
+  // than Free with a "next booking" in the past.
+  const bookedNow = useMemo(() => {
+    const m = new Map<string, CurrentBookingInfo>();
+    const nowMs = Date.now();
+    const bookings: any[] = bookingsData?.bookings ?? [];
+    for (const b of bookings) {
+      if (b.kind !== 'TIMED' || !b.startTime || !b.endTime) continue;
+      if (b.status !== 'RESERVED' && b.status !== 'IN_USE') continue;
+      if (new Date(b.startTime).getTime() > nowMs || new Date(b.endTime).getTime() <= nowMs) continue;
+      const itemId = String(b.inventoryItem);
+      if (!m.has(itemId)) m.set(itemId, { startTime: b.startTime, endTime: b.endTime, ownerName: b.ownerName, notes: b.notes, jobId: b.jobId });
+    }
+    return m;
+  }, [bookingsData]);
+
+  // Map inventoryId → next upcoming booking (soonest per item that starts after now, RESERVED only).
   const nextBookingMap = useMemo(() => {
     const m = new Map<string, NextBookingInfo>();
+    const nowMs = Date.now();
     const bookings: any[] = bookingsData?.bookings ?? [];
     const sorted = [...bookings]
-      .filter((b: any) => b.status === 'RESERVED' && b.startTime)
+      .filter((b: any) => b.status === 'RESERVED' && b.startTime && new Date(b.startTime).getTime() > nowMs)
       .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     for (const b of sorted) {
       const itemId = String(b.inventoryItem);
@@ -130,6 +149,9 @@ export default function Inventory() {
     return m;
   }, [bookingsData]);
 
+  /** Held by an in-progress operation, or reserved by a booking that covers now. */
+  const isBusy = (id: string): boolean => heldBy.has(id) || bookedNow.has(id);
+
   // Derive unique types and locations for dropdown options.
   const typeOptions = useMemo(() => [...new Set(items.map((it) => it.type || 'OTHER'))].sort(), [items]);
   const locationOptions = useMemo(() => [...new Set(items.map((it) => it.location).filter(Boolean) as string[])].sort(), [items]);
@@ -138,8 +160,8 @@ export default function Inventory() {
   const filteredItems = useMemo(() => {
     const query = filters.searchText.toLowerCase().trim();
     return items.filter((it) => {
-      if (filters.statusFilter === 'free' && heldBy.has(it.id)) return false;
-      if (filters.statusFilter === 'inuse' && !heldBy.has(it.id)) return false;
+      if (filters.statusFilter === 'free' && isBusy(it.id)) return false;
+      if (filters.statusFilter === 'inuse' && !isBusy(it.id)) return false;
       if (filters.typeFilter !== 'all' && (it.type || 'OTHER') !== filters.typeFilter) return false;
       if (filters.locationFilter !== 'all' && it.location !== filters.locationFilter) return false;
       if (filters.bookableFilter === 'yes' && !it.bookable) return false;
@@ -152,7 +174,7 @@ export default function Inventory() {
         (it.description ?? '').toLowerCase().includes(query)
       );
     });
-  }, [items, heldBy, filters]);
+  }, [items, heldBy, bookedNow, filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Group filtered items by type.
   const grouped = useMemo(() => {
@@ -167,7 +189,7 @@ export default function Inventory() {
     return groups;
   }, [filteredItems]);
 
-  const inUseCount = useMemo(() => filteredItems.filter((i) => heldBy.has(i.id)).length, [filteredItems, heldBy]);
+  const inUseCount = useMemo(() => filteredItems.filter((i) => isBusy(i.id)).length, [filteredItems, heldBy, bookedNow]); // eslint-disable-line react-hooks/exhaustive-deps
   const totalCount = filteredItems.length;
 
   // Track which category sections are expanded (all collapsed by default).
@@ -223,6 +245,7 @@ export default function Inventory() {
           type={type}
           items={rows}
           heldBy={heldBy}
+          bookedNow={bookedNow}
           nextBookingMap={nextBookingMap}
           expanded={expanded.has(type)}
           onToggle={() => toggleExpanded(type)}
@@ -235,6 +258,7 @@ export default function Inventory() {
           bundle={bundle}
           allItems={items}
           heldBy={heldBy}
+          bookedNow={bookedNow}
           nextBookingMap={nextBookingMap}
           expanded={expanded.has(bundle.id)}
           onToggle={() => toggleExpanded(bundle.id)}

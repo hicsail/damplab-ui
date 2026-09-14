@@ -8,8 +8,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_ADMINISTRATOR_STAFF_LIST, GET_PROJECT_LEAD_STAFF_LIST, GET_SOW_TEXT_PRESETS } from '../../gql/queries';
-import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW, RESTORE_SOW_SIGNED_VERSION } from '../../gql/mutations';
+import { GET_SOW_EDITOR_STATE, SOW_FIELD_PREVIEW, GET_ADMINISTRATOR_STAFF_LIST, GET_PROJECT_LEAD_STAFF_LIST, GET_SOW_TEXT_PRESETS, GET_JOB_BY_ID, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY } from '../../gql/queries';
+import { SAVE_SOW_VERSION, SEND_SOW_TO_CUSTOMER, FINALIZE_SOW, RESTORE_SOW_SIGNED_VERSION, CHANGE_JOB_CUSTOMER_CATEGORY } from '../../gql/mutations';
 import SowFieldRow from './SowFieldRow';
 import { SowTextPresetOption } from './SowPresetPicker';
 import SowVersionHistory from './SowVersionHistory';
@@ -360,6 +360,24 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
     setRefreshFeeSchedule(true);
   }, [inputs, patchInputs, sow]);
 
+  // The job's pricing category, not the document's — it prices every future SOW
+  // for this customer, so it is changed on the job directly rather than staged
+  // as a draft edit. Recalculate (above) is what pulls a new value into a
+  // document that already exists.
+  const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
+  const handleChangeLiveCustomerCategory = useCallback(async (nextCategory: string) => {
+    if (!jobId) return;
+    try {
+      await changeJobCustomerCategory({ variables: { jobId, customerCategory: nextCategory } });
+      await Promise.all([
+        refetch(),
+        client.refetchQueries({ include: [GET_JOB_BY_ID, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY] })
+      ]);
+    } catch (e: any) {
+      setBanner({ severity: 'error', text: e?.message ?? 'Could not update the pricing category.' });
+    }
+  }, [jobId, changeJobCustomerCategory, refetch, client]);
+
   /* ----------------------------------------------------------------- edits */
 
   const patchField = useCallback((key: string, patch: Partial<SowField>) => {
@@ -671,6 +689,8 @@ export default function SowEditorModal({ open, onClose, jobId, jobName }: Props)
                     liveServices={sow.liveServices}
                     stale={f.key === 'feeSchedule' ? feeScheduleStale : false}
                     onRecalculate={f.key === 'feeSchedule' ? handleRecalculateFeeSchedule : undefined}
+                    onChangeLiveCustomerCategory={f.key === 'feeSchedule' ? handleChangeLiveCustomerCategory : undefined}
+                    categoryUpdating={categoryUpdating}
                   />
                 ))}
               </Box>

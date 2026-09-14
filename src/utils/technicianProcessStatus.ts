@@ -182,9 +182,3 @@ const JOB_STATUS_LABELS: Record<string, string> = {
 export function jobStatusLabel(state?: string | null): string {
   return (state && JOB_STATUS_LABELS[state]) || (state ?? '—');
 }
-
-export function invoiceVersionLabel(invoices: Array<{ invoiceNumber?: string | null }>): string {
-  if (!invoices.length) return '—';
-  const latest = invoices[invoices.length - 1];
-  return latest?.invoiceNumber?.trim() || '—';
-}

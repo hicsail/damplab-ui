@@ -22,7 +22,6 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DescriptionIcon from '@mui/icons-material/Description';
 import SearchIcon from '@mui/icons-material/Search';
 import FiberNewIcon from '@mui/icons-material/FiberNew';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
@@ -435,7 +434,7 @@ export default function SubmittedJobsList({
                             icon={<FiberNewIcon sx={{ fontSize: 16 }} />}
                             label="New"
                             size="small"
-                            color="error"
+                            color="default"
                             variant="outlined"
                           />
                         ) : null}
@@ -444,14 +443,13 @@ export default function SubmittedJobsList({
                             icon={<Inventory2OutlinedIcon sx={{ fontSize: 16 }} />}
                             label="Archived"
                             size="small"
-                            color="warning"
+                            color="default"
                             variant="outlined"
                           />
                         )}
                         {jobListSectionChips(job).map((chip) => (
                           <Chip
                             key={chip.key}
-                            icon={chip.key === 'sow' ? <DescriptionIcon sx={{ fontSize: 16 }} /> : undefined}
                             label={chip.label}
                             size="small"
                             color={chip.color}

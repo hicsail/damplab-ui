@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import { Box, Breadcrumbs, Link, Typography } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
@@ -109,10 +110,28 @@ function buildCrumbs(pathname: string): Crumb[] {
 export default function AppBreadcrumbs() {
   const { pathname } = useLocation();
   const crumbs = buildCrumbs(pathname);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Publishes this bar's own height, the same way HeaderBar publishes
+  // --app-header-height, so a page's own sticky header can stack below both
+  // bars without hardcoding either one's height.
+  useLayoutEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const publish = () => {
+      document.documentElement.style.setProperty('--app-breadcrumb-height', `${el.getBoundingClientRect().height}px`);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [crumbs.length]);
+
   if (crumbs.length === 0) return null;
 
   return (
     <Box
+      ref={barRef}
       sx={{
         px: { xs: 2, md: 3 },
         py: 1,
@@ -120,7 +139,10 @@ export default function AppBreadcrumbs() {
         borderColor: "divider",
         bgcolor: "background.paper",
         position: "sticky",
-        top: 0,
+        // top: 0 put this bar right where the fixed black header already
+        // sits, so scrolling made it float underneath/over that bar instead
+        // of stacking below it.
+        top: "var(--app-header-height, 64px)",
         zIndex: 1100,
       }}
     >

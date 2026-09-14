@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InventoryCard from './InventoryCard';
-import type { InventoryItemRow, HolderInfo, NextBookingInfo } from './InventoryCard';
+import type { InventoryItemRow, HolderInfo, NextBookingInfo, CurrentBookingInfo } from './InventoryCard';
 
 export interface BundleWithInventory {
   id: string;
@@ -27,10 +27,10 @@ type BundleAvailability = 'available' | 'partial' | 'unavailable';
 
 function getBundleAvailability(
   requiredIds: string[],
-  heldBy: Map<string, HolderInfo>
+  busy: (id: string) => boolean
 ): BundleAvailability {
   if (requiredIds.length === 0) return 'available';
-  const inUseCount = requiredIds.filter((id) => heldBy.has(id)).length;
+  const inUseCount = requiredIds.filter(busy).length;
   if (inUseCount === 0) return 'available';
   if (inUseCount === requiredIds.length) return 'unavailable';
   return 'partial';
@@ -46,6 +46,7 @@ interface InventoryBundleGroupProps {
   bundle: BundleWithInventory;
   allItems: InventoryItemRow[];
   heldBy: Map<string, HolderInfo>;
+  bookedNow?: Map<string, CurrentBookingInfo>;
   nextBookingMap?: Map<string, NextBookingInfo>;
   expanded: boolean;
   onToggle: () => void;
@@ -55,6 +56,7 @@ export default function InventoryBundleGroup({
   bundle,
   allItems,
   heldBy,
+  bookedNow,
   nextBookingMap,
   expanded,
   onToggle
@@ -75,9 +77,10 @@ export default function InventoryBundleGroup({
     (s) => !s.inventoryRequirements || s.inventoryRequirements.length === 0
   ), [bundle.services]);
 
-  const availability = getBundleAvailability(requiredIds, heldBy);
+  const busy = (id: string) => heldBy.has(id) || !!bookedNow?.has(id);
+  const availability = getBundleAvailability(requiredIds, busy);
   const config = AVAILABILITY_CONFIG[availability];
-  const inUseCount = useMemo(() => requiredItems.filter((it) => heldBy.has(it.id)).length, [requiredItems, heldBy]);
+  const inUseCount = useMemo(() => requiredItems.filter((it) => busy(it.id)).length, [requiredItems, heldBy, bookedNow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Accordion
@@ -120,7 +123,9 @@ export default function InventoryBundleGroup({
           <Box sx={{ mb: 2 }}>
             <Typography variant='caption' color='text.secondary'>
               Services without inventory requirements:{' '}
-              {unmappedServices.map((s) => s.name).join(', ')}
+              {/* Named once each: this says which operations lack requirements,
+                  not how many steps of the bundle run them. */}
+              {[...new Set(unmappedServices.map((s) => s.name))].join(', ')}
             </Typography>
           </Box>
         )}
@@ -135,7 +140,8 @@ export default function InventoryBundleGroup({
                 key={it.id}
                 item={it}
                 holder={heldBy.get(it.id)}
-                nextBooking={!heldBy.has(it.id) ? nextBookingMap?.get(it.id) : undefined}
+                currentBooking={bookedNow?.get(it.id)}
+                nextBooking={!busy(it.id) ? nextBookingMap?.get(it.id) : undefined}
               />
             ))}
           </Box>

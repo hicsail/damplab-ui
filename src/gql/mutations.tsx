@@ -420,10 +420,7 @@ export const CREATE_SOW = gql`
           reason
         }
         totalCost
-        discount {
-          amount
-          reason
-        }
+        estimatedEquipmentCost
       }
       terms
       additionalInformation
@@ -475,10 +472,7 @@ export const UPDATE_SOW = gql`
           reason
         }
         totalCost
-        discount {
-          amount
-          reason
-        }
+        estimatedEquipmentCost
       }
       terms
       additionalInformation
@@ -537,7 +531,15 @@ export const CREATE_INVOICE = gql`
       jobDisplayId
       jobName
       invoiceNumber
+      versionNumber
+      status
+      kind
       invoiceDate
+      dueDate
+      dueSchedule {
+        amount
+        dueDate
+      }
       createdBy
       billedToName
       billedToEmail
@@ -552,6 +554,13 @@ export const CREATE_INVOICE = gql`
         category
       }
       subtotal
+      customLines {
+        chargeId
+        kind
+        label
+        amount
+        note
+      }
       adjustments {
         type
         description
@@ -561,7 +570,91 @@ export const CREATE_INVOICE = gql`
         prorationFactor
       }
       totalCost
+      paymentsToDate
+      balanceDue
+      deposit {
+        chargeId
+        label
+        amount
+        dueDate
+        outstanding
+      }
       createdAt
+    }
+  }
+`;
+
+/**
+ * Void the job's current invoice — the record is kept, nothing else moves.
+ *
+ * Never a delete: invoice numbers are derived from a per-job count, so removing a
+ * document would hand its number to the next invoice. Returns the status and void
+ * fields GET_INVOICES_BY_JOB_ID selects for a row, so Apollo updates the cached
+ * invoice in place and the list re-renders it as void without a refetch.
+ */
+export const VOID_INVOICE = gql`
+  mutation VoidInvoice($invoiceId: ID!, $reason: String!) {
+    voidInvoice(invoiceId: $invoiceId, reason: $reason) {
+      id
+      invoiceNumber
+      status
+      voidedAt
+      voidedBy
+      voidReason
+    }
+  }
+`;
+
+export const ADD_JOB_CHARGE = gql`
+  mutation AddJobCharge($input: AddJobChargeInput!) {
+    addJobCharge(input: $input) {
+      id
+      jobId
+      kind
+      label
+      amount
+      dueDate
+      addedBy
+      addedAt
+    }
+  }
+`;
+
+export const VOID_JOB_CHARGE = gql`
+  mutation VoidJobCharge($id: ID!, $reason: String!) {
+    voidJobCharge(id: $id, reason: $reason) {
+      id
+      voidedAt
+      voidedBy
+      voidReason
+    }
+  }
+`;
+
+export const RECORD_JOB_PAYMENT = gql`
+  mutation RecordJobPayment($input: RecordJobPaymentInput!) {
+    recordJobPayment(input: $input) {
+      id
+      jobId
+      amount
+      receivedOn
+      reference
+      note
+      recordedBy
+      recordedAt
+      invoiceId
+      invoiceNumber
+    }
+  }
+`;
+
+export const VOID_JOB_PAYMENT = gql`
+  mutation VoidJobPayment($id: ID!, $reason: String!) {
+    voidJobPayment(id: $id, reason: $reason) {
+      id
+      voidedAt
+      voidedBy
+      voidReason
     }
   }
 `;
@@ -725,6 +818,40 @@ export const CANCEL_BOOKING = gql`
     cancelBooking(id: $id) {
       _id
       status
+    }
+  }
+`;
+
+export const CREATE_JOB_EQUIPMENT_BOOKING = gql`
+  mutation CreateJobEquipmentBooking($input: CreateJobEquipmentBookingInput!) {
+    createJobEquipmentBooking(input: $input) {
+      _id
+      startTime
+      endTime
+      cost
+    }
+  }
+`;
+
+export const UPDATE_JOB_EQUIPMENT_BOOKING = gql`
+  mutation UpdateJobEquipmentBooking($id: ID!, $input: UpdateJobEquipmentBookingInput!) {
+    updateJobEquipmentBooking(id: $id, input: $input) {
+      _id
+      startTime
+      endTime
+      cost
+    }
+  }
+`;
+
+export const SET_JOB_BOOKING_BLOCK = gql`
+  mutation SetJobBookingBlock($jobId: ID!, $blocked: Boolean!, $reason: String) {
+    setJobBookingBlock(jobId: $jobId, blocked: $blocked, reason: $reason) {
+      id
+      bookingBlocked
+      bookingBlockedReason
+      bookingBlockedBy
+      bookingBlockedAt
     }
   }
 `;

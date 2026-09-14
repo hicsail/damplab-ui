@@ -6,31 +6,26 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
   Stack,
-  TextField,
   Tooltip,
   Typography
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloseIcon from '@mui/icons-material/Close';
 import { addDays, format, isSameDay, startOfWeek } from 'date-fns';
 import { GET_ACTIVE_INVENTORY_ITEMS, GET_BOOKINGS } from '../gql/queries';
-import { CANCEL_BOOKING, CONFIRM_BOOKING_USAGE } from '../gql/mutations';
+import { CANCEL_BOOKING } from '../gql/mutations';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { formatSaveError } from '../utils/gqlError';
+import { spansForWeek } from '../utils/jobEquipmentBooking';
 
 const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success'> = {
   RESERVED: 'warning',
@@ -39,16 +34,24 @@ const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success'> = {
   CANCELLED: 'default'
 };
 
-function bookingDay(b: any): Date | null {
-  const d = b.kind === 'TIMED' ? b.startTime : b.usedOn;
-  return d ? new Date(d) : null;
+/**
+ * A timed booking spans its slot; a consumable is a point on the day it was used.
+ * Both go through `spansForWeek`, so a multi-day reservation shows on every day it
+ * covers rather than only the day it began.
+ */
+function bookingRange(b: any): { start?: string | Date | null; end?: string | Date | null } {
+  if (b.kind === 'TIMED') return { start: b.startTime, end: b.endTime };
+  if (!b.usedOn) return {};
+  const at = new Date(b.usedOn);
+  return { start: at, end: new Date(at.getTime() + 60_000) };
 }
+
+/** Two lines at most, then an ellipsis; the tooltip carries the whole text. */
+const clamp = { overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, wordBreak: 'break-word' as const };
 
 export default function InventoryCalendar() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [itemFilter, setItemFilter] = useState('');
-  const [confirmTarget, setConfirmTarget] = useState<any | null>(null);
-  const [actualValue, setActualValue] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
 
   /**
@@ -56,9 +59,8 @@ export default function InventoryCalendar() {
    * lets equipment users reach it. So the per-row controls are gated on ownership,
    * not on reaching the page:
    *
-   * - **Confirm usage** mirrors `confirmBookingUsage`, which is `billing:view`
-   *   (Administrator-only). Confirming usage is what makes a booking chargeable —
-   *   a billing act, not a scheduling one.
+   * - **Confirm usage** lives on the job page (a billing act, not a scheduling
+   *   one), so this board carries no confirm control.
    * - **Cancel** mirrors `cancelBooking`'s server-side rule exactly: owner, OR a
    *   caller holding `inventory:write`. Gating it on `inventory:schedule` instead
    *   would show an equipment user a Cancel on everyone else's slots that the
@@ -68,10 +70,18 @@ export default function InventoryCalendar() {
    */
   const { can } = usePermissions();
   const { userProps } = useEffectiveUser();
-  const canConfirmUsage = can(PERMISSIONS.BillingView);
   const canManageOthersBookings = can(PERMISSIONS.InventoryWrite);
   const mySub = userProps?.subject;
-  const canCancel = (booking: any): boolean => canManageOthersBookings || (!!mySub && booking?.ownerSub === mySub);
+  /**
+   * Mirrors the server rule. A job-scoped booking's owner is the JOB, so its
+   * `ownerSub` is the job creator's — a listed booker who made the reservation
+   * would see no Cancel at all under the walk-up rule. The full rule (job creator,
+   * client email, listed booker of that operation, jobs:view-all) needs the job,
+   * which this page does not load; whoever made the booking is the part of it this
+   * page can answer, and the server refuses the rest.
+   */
+  const canCancel = (booking: any): boolean =>
+    canManageOthersBookings || (!!mySub && (booking?.ownerSub === mySub || (!!booking?.jobId && booking?.createdBySub === mySub)));
 
   const weekEnd = addDays(weekStart, 7);
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-first' });
@@ -81,56 +91,12 @@ export default function InventoryCalendar() {
     pollInterval: 30000
   });
 
-  const [confirmUsage] = useMutation(CONFIRM_BOOKING_USAGE);
   const [cancelBooking] = useMutation(CANCEL_BOOKING);
 
   const bookings: any[] = useMemo(() => (data?.bookings ?? []).filter((b: any) => b.status !== 'CANCELLED'), [data]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, any[]>();
-    for (const b of bookings) {
-      const d = bookingDay(b);
-      if (!d) continue;
-      const key = format(d, 'yyyy-MM-dd');
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(b);
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => {
-        const da = bookingDay(a)?.getTime() ?? 0;
-        const db = bookingDay(b)?.getTime() ?? 0;
-        return da - db;
-      });
-    }
-    return map;
-  }, [bookings]);
-
-  const openConfirm = (b: any) => {
-    setConfirmTarget(b);
-    if (b.kind === 'TIMED') {
-      const hrs = b.startTime && b.endTime ? (new Date(b.endTime).getTime() - new Date(b.startTime).getTime()) / 3_600_000 : 0;
-      setActualValue(String(Math.round(hrs * 100) / 100));
-    } else {
-      setActualValue(String(b.quantity ?? 1));
-    }
-  };
-
-  const submitConfirm = async () => {
-    if (!confirmTarget) return;
-    const v = Number(actualValue);
-    const vars: any = { id: confirmTarget._id };
-    if (confirmTarget.kind === 'TIMED') vars.actualHours = Number.isFinite(v) ? v : null;
-    else vars.actualQuantity = Number.isFinite(v) ? Math.round(v) : null;
-    try {
-      await confirmUsage({ variables: vars });
-      setConfirmTarget(null);
-      await refetch();
-    } catch (error) {
-      console.error('Confirm usage failed:', error);
-      setActionError(formatSaveError(error, 'this usage confirmation'));
-    }
-  };
+  const byDay = useMemo(() => spansForWeek(bookings, weekStart, bookingRange), [bookings, weekStart]);
 
   const doCancel = async (id: string) => {
     if (!window.confirm('Cancel this booking?')) return;
@@ -170,7 +136,7 @@ export default function InventoryCalendar() {
       {actionError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError(null)}>{actionError}</Alert>}
       {loading && !data && <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(7, 1fr)' }, gap: 1, alignItems: 'start' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(7, minmax(0, 1fr))' }, gap: 1, alignItems: 'start' }}>
         {days.map((day) => {
           const key = format(day, 'yyyy-MM-dd');
           const list = byDay.get(key) ?? [];
@@ -182,26 +148,28 @@ export default function InventoryCalendar() {
               </Typography>
               <Stack spacing={0.75}>
                 {list.length === 0 && <Typography variant="caption" color="text.secondary">—</Typography>}
-                {list.map((b) => (
-                  <Box key={b._id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75, bgcolor: 'background.paper' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>{b.inventoryName}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                      {b.kind === 'TIMED'
-                        ? `${b.startTime ? format(new Date(b.startTime), 'h:mm a') : ''}–${b.endTime ? format(new Date(b.endTime), 'h:mm a') : ''}`
-                        : `${b.quantity} units`}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
-                      {b.ownerName || b.ownerEmail}
-                    </Typography>
+                {list.map((span) => {
+                  const b: any = span.item;
+                  const time =
+                    b.kind === 'TIMED'
+                      ? `${span.continuesBefore ? 'start' : format(span.start, 'h:mm a')} – ${span.continuesAfter ? 'end of day' : format(span.end, 'h:mm a')}`
+                      : `${b.quantity} units`;
+                  // A job-scoped booking's `notes` is already "Job #NNNNN · <operation>"
+                  // — the server writes it that way — so the note is the title and the
+                  // job line needs no second source of truth.
+                  const title = b.notes || b.inventoryName;
+                  const who = b.ownerName || b.ownerEmail || '';
+                  return (
+                  <Tooltip key={`${b._id}-${key}`} title={`${title} · ${b.inventoryName} · ${time}${who ? ` · ${who}` : ''}`}>
+                  <Box sx={{ minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75, bgcolor: 'background.paper' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2, ...clamp }}>{title}</Typography>
+                    {b.notes && <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{b.inventoryName}</Typography>}
+                    <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{time}</Typography>
+                    {!b.jobId && who && <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{who}</Typography>}
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
                       <Chip size="small" label={b.usageConfirmed ? 'Confirmed' : b.status} color={b.usageConfirmed ? 'success' : STATUS_COLOR[b.status] ?? 'default'} sx={{ height: 18 }} />
                       {b.cost != null && <Typography variant="caption">${Number(b.cost).toFixed(2)}</Typography>}
                       <Box sx={{ flex: 1 }} />
-                      {canConfirmUsage && !b.usageConfirmed && b.billingStatus !== 'BILLED' && (
-                        <Tooltip title="Confirm usage">
-                          <IconButton size="small" color="success" onClick={() => openConfirm(b)}><CheckCircleIcon fontSize="inherit" /></IconButton>
-                        </Tooltip>
-                      )}
                       {canCancel(b) && b.billingStatus !== 'BILLED' && (
                         <Tooltip title="Cancel booking">
                           <IconButton size="small" color="error" onClick={() => doCancel(b._id)}><CloseIcon fontSize="inherit" /></IconButton>
@@ -209,39 +177,15 @@ export default function InventoryCalendar() {
                       )}
                     </Stack>
                   </Box>
-                ))}
+                  </Tooltip>
+                  );
+                })}
               </Stack>
             </Box>
           );
         })}
       </Box>
 
-      <Dialog open={!!confirmTarget && canConfirmUsage} onClose={() => setConfirmTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Confirm usage — {confirmTarget?.inventoryName}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Confirm the actual {confirmTarget?.kind === 'TIMED' ? 'hours used' : 'quantity used'}. This is what gets billed.
-          </Typography>
-          <TextField
-            autoFocus
-            fullWidth
-            type="number"
-            label={confirmTarget?.kind === 'TIMED' ? 'Actual hours' : 'Actual quantity'}
-            value={actualValue}
-            onChange={(e) => setActualValue(e.target.value)}
-            inputProps={{ min: 0, step: confirmTarget?.kind === 'TIMED' ? '0.25' : '1' }}
-          />
-          {confirmTarget?.rateSnapshot != null && Number.isFinite(Number(actualValue)) && (
-            <Typography variant="body2" sx={{ mt: 1.5 }}>
-              Cost: ${(Number(actualValue) * confirmTarget.rateSnapshot).toFixed(2)} ({confirmTarget.rateSnapshot.toFixed(2)}/{confirmTarget.kind === 'TIMED' ? 'hr' : 'unit'})
-            </Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmTarget(null)}>Cancel</Button>
-          <Button variant="contained" onClick={submitConfirm}>Confirm</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

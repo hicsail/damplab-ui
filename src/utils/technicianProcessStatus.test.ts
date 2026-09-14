@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   chipStatusBackground,
-  invoiceVersionLabel,
   jobPartyStatus,
   latestCustomerVisibleJobVersion,
   latestCustomerVisibleSowVersion,
@@ -204,15 +203,5 @@ describe('jobStatusLabel', () => {
 
   it('falls back to an em dash when there is no state', () => {
     expect(jobStatusLabel(null)).toBe('—');
-  });
-});
-
-describe('invoiceVersionLabel', () => {
-  it('returns an em dash when there are no invoices', () => {
-    expect(invoiceVersionLabel([])).toBe('—');
-  });
-
-  it('returns the latest invoice number for both parties', () => {
-    expect(invoiceVersionLabel([{ invoiceNumber: 'INV-1' }, { invoiceNumber: 'INV-2' }])).toBe('INV-2');
   });
 });

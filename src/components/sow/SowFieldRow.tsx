@@ -48,6 +48,10 @@ interface Props {
   stale?: boolean;
   /** feeSchedule only: adopt the job's current figures into this draft. */
   onRecalculate?: () => void;
+  /** feeSchedule only: change the job's own pricing category (not the document's). */
+  onChangeLiveCustomerCategory?: (category: string) => void;
+  /** feeSchedule only: the category change above is in flight. */
+  categoryUpdating?: boolean;
 }
 
 const DIFF_CHIP: Record<string, string> = {
@@ -63,7 +67,7 @@ function firstLine(text: string): string {
   return line.replace(/^-\s*/, '');
 }
 
-function SowFieldRow({ field, inputs, administrators, projectLeads, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, liveCustomerCategory, liveServices, stale, onRecalculate }: Props): React.JSX.Element {
+function SowFieldRow({ field, inputs, administrators, projectLeads, readOnly, expanded, onToggleExpand, onChangeField, onChangeInputs, onRenameCustom, presets, diff, liveCustomerCategory, liveServices, stale, onRecalculate, onChangeLiveCustomerCategory, categoryUpdating }: Props): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const key = field.key;
 
@@ -236,6 +240,8 @@ function SowFieldRow({ field, inputs, administrators, projectLeads, readOnly, ex
                 onChange={onChangeInputs}
                 liveCustomerCategory={liveCustomerCategory}
                 liveServices={liveServices}
+                onChangeLiveCustomerCategory={onChangeLiveCustomerCategory}
+                categoryUpdating={categoryUpdating}
               />
             </Box>
           )}

@@ -368,7 +368,15 @@ describe('sowTotals', () => {
   ];
 
   it('adds the service lines', () => {
-    expect(sowTotals(services, [])).toEqual({ baseCost: 475.5, totalCost: 475.5 });
+    expect(sowTotals(services, [])).toEqual({ baseCost: 475.5, totalCost: 475.5, estimatedEquipmentCost: 0 });
+  });
+
+  it('leaves an equipment estimate out of the base and reports it beside it', () => {
+    const withEquipment = [
+      ...services,
+      { serviceId: 'e1', name: 'Plate reader', description: 'Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)', cost: 400 }
+    ];
+    expect(sowTotals(withEquipment, [])).toEqual({ baseCost: 475.5, totalCost: 475.5, estimatedEquipmentCost: 400 });
   });
 
   it('subtracts a discount and adds a cost, whatever sign was typed', () => {
@@ -384,8 +392,8 @@ describe('sowTotals', () => {
   });
 
   it('treats missing lists as nothing rather than NaN', () => {
-    expect(sowTotals(null, null)).toEqual({ baseCost: 0, totalCost: 0 });
-    expect(sowTotals(undefined, undefined)).toEqual({ baseCost: 0, totalCost: 0 });
+    expect(sowTotals(null, null)).toEqual({ baseCost: 0, totalCost: 0, estimatedEquipmentCost: 0 });
+    expect(sowTotals(undefined, undefined)).toEqual({ baseCost: 0, totalCost: 0, estimatedEquipmentCost: 0 });
   });
 });
 
@@ -400,5 +408,31 @@ describe('nextSentVersionLabel', () => {
 
   it('is empty with nothing to send', () => {
     expect(nextSentVersionLabel(null)).toBe('');
+  });
+});
+
+describe('feeScheduleIsStale: a price corrected in the catalog', () => {
+  const line = (over: Record<string, unknown> = {}) => ({ serviceId: 's1', name: 'PCR', cost: 10, unitCost: 10, multiplier: 1, ...over } as any);
+
+  it('flags a document whose figures the catalog has moved past', () => {
+    // liveServices is now priced from the catalog rather than read back off the
+    // stored billing core, so a price fixed in the catalog lights the chip and
+    // enables Recalculate. It could not before: both sides read the same stale
+    // copy and always agreed.
+    const stale = feeScheduleIsStale({ services: [line()], customerCategory: 'INTERNAL_CUSTOMERS' } as any, {
+      liveServices: [line({ cost: 999, unitCost: 999 })],
+      liveCustomerCategory: 'INTERNAL_CUSTOMERS'
+    });
+    expect(stale).toBe(true);
+  });
+
+  it('ignores fields that carry no pricing meaning', () => {
+    // category and pricingDetails ride along on the line but must not trip the
+    // chip on their own, or the document would read as permanently stale.
+    const stale = feeScheduleIsStale({ services: [line()], customerCategory: 'INTERNAL_CUSTOMERS' } as any, {
+      liveServices: [line({ category: 'sequencing', pricingDetails: [{ label: 'Kit', quantity: 1, unitPrice: 10, total: 10 }] })],
+      liveCustomerCategory: 'INTERNAL_CUSTOMERS'
+    });
+    expect(stale).toBe(false);
   });
 });

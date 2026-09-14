@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, mergeSavedFormData, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from './jobGraphHydration';
 import { getWorkflowsFromGraph } from './GraphHelpers';
+import { EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_PARAM_IDS, EQUIPMENT_START_PARAM_ID } from '../utils/servicePricing';
 
 const service = (id: string, parameters: any[] = []) => ({
   id,
@@ -583,5 +584,45 @@ describe('deriveGhostEdges', () => {
 
   it('is a no-op when nothing is ghosted', () => {
     expect(deriveGhostEdges(baseline, new Set(), new Set(['a', 'b']))).toEqual([]);
+  });
+});
+
+describe('mergeSavedFormData — equipment parameters', () => {
+  const parameters = [
+    { id: 'vol', name: 'Volume', type: 'number', required: true },
+    { id: 'buf', name: 'Buffer', type: 'string', required: false }
+  ];
+
+  it('keeps a saved booking window when the service is still equipment use', () => {
+    const saved = [
+      { id: EQUIPMENT_START_PARAM_ID, value: '2026-01-01' },
+      { id: EQUIPMENT_END_PARAM_ID, value: '2026-01-29' },
+      { id: EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, value: 10 }
+    ];
+    const merged = mergeSavedFormData(parameters, saved, 'n1', { equipmentUse: true });
+
+    expect(merged.filter((p) => EQUIPMENT_PARAM_IDS.includes(p.id)).map((p) => p.id)).toEqual([...EQUIPMENT_PARAM_IDS]);
+    expect(merged.find((p) => p.id === EQUIPMENT_END_PARAM_ID)?.value).toBe('2026-01-29');
+    expect(merged.find((p) => p.id === EQUIPMENT_HOURS_PER_WEEK_PARAM_ID)?.value).toBe(10);
+  });
+
+  it('keeps a saved window even after the catalog stops flagging the service', () => {
+    // Dropping it here would reprice a submitted job the next time it was saved,
+    // which is exactly the trap the run count already guards against.
+    const saved = [{ id: EQUIPMENT_START_PARAM_ID, value: '2026-01-01' }];
+    const merged = mergeSavedFormData(parameters, saved, 'n1', { equipmentUse: false });
+
+    expect(merged.find((p) => p.id === EQUIPMENT_START_PARAM_ID)?.value).toBe('2026-01-01');
+  });
+
+  it('adds nothing to a node that never had them and whose service is not equipment use', () => {
+    const merged = mergeSavedFormData(parameters, [{ id: 'vol', value: 5 }], 'n1', { equipmentUse: false });
+    expect(merged.some((p) => EQUIPMENT_PARAM_IDS.includes(p.id))).toBe(false);
+  });
+
+  it('does not put the five on an older node just because the service was flagged since', () => {
+    // Behaviour 4: toggling the flag never touches nodes that already exist.
+    const merged = mergeSavedFormData(parameters, [{ id: 'vol', value: 5 }], 'n1', { equipmentUse: true });
+    expect(merged.some((p) => EQUIPMENT_PARAM_IDS.includes(p.id))).toBe(false);
   });
 });

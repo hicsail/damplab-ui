@@ -1,0 +1,30 @@
+# The Dockerfile does `COPY . .`, so anything left here lands in an image layer.
+# CI builds from a clean checkout and never sees most of this; a local
+# `docker build` would otherwise bake real secrets and a host-shaped build
+# into the image.
+
+# Secrets. VITE_* values are inlined into the bundle at build time, so the
+# build must be driven by --build-arg (as CI does), never by a developer's
+# local .env leaking in through the build context.
+.env
+.env.*
+
+# Installed and generated on the build stage; copying a host copy in is both
+# wasteful and wrong (native deps are built for the host's platform).
+node_modules
+build
+.react-router
+coverage
+
+# Never needed to build the bundle.
+.git
+.github
+docs
+ops
+app-screenshots
+*.png
+
+# Editor / OS noise
+.vscode
+.vs
+.DS_Store

@@ -19,6 +19,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  Tooltip,
   Typography
 } from '@mui/material';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
@@ -75,8 +76,18 @@ export default function UsageBilling() {
     });
   };
 
+  /**
+   * Select-all covers only what can actually be billed.
+   *
+   * A booking with no `rateSnapshot` has no cost, and the server refuses to bill it
+   * rather than charging $0 — so including it here would tick a box that guarantees
+   * the Generate button fails.
+   */
+  const billable = useMemo(() => bookings.filter((b: any) => b.rateSnapshot != null), [bookings]);
+  const billableCount = billable.length;
+
   const toggleAll = () => {
-    setSelected((prev) => (prev.size === bookings.length ? new Set() : new Set(bookings.map((b) => b._id))));
+    setSelected((prev) => (prev.size === billableCount ? new Set() : new Set(billable.map((b: any) => b._id))));
   };
 
   const handleGenerate = async () => {
@@ -159,7 +170,7 @@ export default function UsageBilling() {
                     <TableHead>
                       <TableRow>
                         <TableCell padding="checkbox">
-                          <Checkbox checked={selected.size === bookings.length && bookings.length > 0} indeterminate={selected.size > 0 && selected.size < bookings.length} onChange={toggleAll} />
+                          <Checkbox checked={billableCount > 0 && selected.size === billableCount} indeterminate={selected.size > 0 && selected.size < billableCount} onChange={toggleAll} />
                         </TableCell>
                         <TableCell>Item</TableCell>
                         <TableCell>Usage</TableCell>
@@ -168,17 +179,38 @@ export default function UsageBilling() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {bookings.map((b) => (
-                        <TableRow key={b._id} hover selected={selected.has(b._id)}>
-                          <TableCell padding="checkbox">
-                            <Checkbox checked={selected.has(b._id)} onChange={() => toggle(b._id)} />
-                          </TableCell>
-                          <TableCell>{b.inventoryName}</TableCell>
-                          <TableCell>{usageDetail(b)}</TableCell>
-                          <TableCell>{(b.usedOn || b.startTime) ? format(new Date(b.usedOn || b.startTime), 'MMM d, yyyy') : '—'}</TableCell>
-                          <TableCell align="right">{b.cost != null ? `$${Number(b.cost).toFixed(2)}` : '—'}</TableCell>
-                        </TableRow>
-                      ))}
+                      {bookings.map((b) => {
+                        // No rate was resolved when this was booked — its owner was
+                        // in no pricing group. The server refuses to bill it rather
+                        // than charging $0, so say so here instead of letting staff
+                        // tick it and meet the refusal at Generate.
+                        const unrated = b.rateSnapshot == null;
+                        return (
+                          <TableRow key={b._id} hover selected={selected.has(b._id)}>
+                            <TableCell padding="checkbox">
+                              <Tooltip title={unrated ? 'This booking has no rate and cannot be billed.' : ''} disableHoverListener={!unrated}>
+                                <span>
+                                  <Checkbox checked={selected.has(b._id)} disabled={unrated} onChange={() => toggle(b._id)} />
+                                </span>
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell>{b.inventoryName}</TableCell>
+                            <TableCell>{usageDetail(b)}</TableCell>
+                            <TableCell>{(b.usedOn || b.startTime) ? format(new Date(b.usedOn || b.startTime), 'MMM d, yyyy') : '—'}</TableCell>
+                            <TableCell align="right">
+                              {unrated ? (
+                                <Typography variant="caption" color="error.main" sx={{ fontWeight: 700 }}>
+                                  No rate — owner has no pricing group
+                                </Typography>
+                              ) : b.cost != null ? (
+                                `$${Number(b.cost).toFixed(2)}`
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}

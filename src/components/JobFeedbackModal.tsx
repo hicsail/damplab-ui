@@ -136,9 +136,6 @@ export default function JobFeedbackModal(props: any) {
     >
       <ModalBox>
         <Typography variant="h6" sx={{ mb: 1 }}>Review Job</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Record one review decision. The server posts the lifecycle comment and history entry.
-        </Typography>
 
         {jobName && (
           <Box sx={{ mb: 2 }}>
@@ -161,18 +158,6 @@ export default function JobFeedbackModal(props: any) {
           </Box>
         )}
 
-        {/* Shown before a decision is made, not after one is chosen. This used to
-            appear only once the accept radio was selected — by which point the
-            reader had already decided. An Alert rather than bare red text so the
-            warning does not rest on colour alone: it carries an icon and a role
-            as well. */}
-        {accept.onCustomersBehalf && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            <AlertTitle sx={{ fontWeight: 700 }}>Accepting commits the customer to this job on their behalf.</AlertTitle>
-            {accept.acceptNote}
-          </Alert>
-        )}
-
         <FormControl component="fieldset" sx={{width: '100%'}} disabled={submitting}>
 
           <RadioGroup onChange={handleDecisionChange} value={decision} name="feedback-type" aria-label="feedback-type">
@@ -181,12 +166,24 @@ export default function JobFeedbackModal(props: any) {
                 <FormControlLabel control={<Radio disabled={submitting} />} value={option.value} label={option.optionLabel} />
                 {decision === option.value && (
                   <Box sx={{ ml: 4, mb: 1 }}>
-                    {/* Already spelled out above for accept; repeating it here
-                        would read as two different warnings. */}
-                    {option.note && option.value !== 'accept' && (
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        {option.note}
-                      </Typography>
+                    {/* Every option's note now appears only once that option is
+                        chosen, accept included — it used to sit above the whole
+                        group, warning about a decision the reader had not made.
+                        Accept keeps the Alert treatment rather than dropping to
+                        the grey Typography the others use: it is the one note
+                        that commits somebody else, and an Alert carries an icon
+                        and a role, so the warning does not rest on colour alone. */}
+                    {option.value === 'accept' && accept.onCustomersBehalf ? (
+                      <Alert severity="error" sx={{ mb: 1 }}>
+                        <AlertTitle sx={{ fontWeight: 500 }}>Accepting commits customer to this job on their behalf.</AlertTitle>
+                        {accept.acceptNote}
+                      </Alert>
+                    ) : (
+                      option.note && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          {option.note}
+                        </Typography>
+                      )
                     )}
                     <FeedbackField
                       fullWidth
@@ -197,19 +194,13 @@ export default function JobFeedbackModal(props: any) {
                       disabled={submitting}
                       required={option.messageRequired}
                       label={option.messageRequired ? 'Message to the customer' : 'Message to the customer (optional)'}
-                      helperText={option.messageRequired ? undefined : 'You may include an optional acceptance note.'}
+                      helperText={option.messageRequired ? undefined : ''}
                     />
                   </Box>
                 )}
               </React.Fragment>
             ))}
           </RadioGroup>
-
-          <Box sx={{ mt: 1, mb: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              The selected decision determines the customer’s next action. The server records the lifecycle comment and history atomically.
-            </Typography>
-          </Box>
 
           {submitError && (
             <Alert severity="error" sx={{ mb: 2 }}>

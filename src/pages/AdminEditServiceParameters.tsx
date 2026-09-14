@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Divider,
   Grid,
   IconButton,
   List,
@@ -45,6 +46,7 @@ import { idFromName, makeUniqueIds } from '../utils/idFromName';
 import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { formatSaveError } from '../utils/gqlError';
+import { EQUIPMENT_PARAM_DEFS } from '../controllers/ReactFlowEvents';
 
 const TYPE_OPTIONS = [
   { value: 'string', label: 'Text' },
@@ -142,6 +144,20 @@ export default function AdminEditServiceParameters() {
         : (service.parameters ?? []).map((p: any) => ({ ...p, _dragKey: createId() }))
     );
   }, [service]);
+
+  // The five reserved equipment parameters, shown read-only above the service's
+  // own list when the service is flagged for equipment use. Never added to
+  // `parameters` state — they are injected at node creation (Task 7), not stored
+  // on the service — so `handleSave` below needs no change to keep them off the
+  // write-back payload. A def the service already declares itself is left alone,
+  // mirroring withEquipmentParams's own rule.
+  const reservedParameters = useMemo(
+    () =>
+      service?.equipmentUse === true
+        ? EQUIPMENT_PARAM_DEFS.filter((def) => !parameters.some((p: any) => p?.id === def.id))
+        : [],
+    [service, parameters]
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -315,6 +331,21 @@ export default function AdminEditServiceParameters() {
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '280px 1fr' }, gap: 2 }}>
         <Paper variant='outlined' sx={{ p: 1, maxHeight: { md: '70vh' }, overflow: 'auto' }}>
           <Stack spacing={1}>
+            {reservedParameters.length > 0 && (
+              <>
+                <Typography variant='subtitle2' sx={{ px: 1, pt: 1, color: 'text.secondary' }}>
+                  Reserved (equipment use)
+                </Typography>
+                <List dense disablePadding>
+                  {reservedParameters.map((def) => (
+                    <ListItemButton key={def.id} disabled sx={{ pl: 2 }}>
+                      <ListItemText primary={def.name} />
+                    </ListItemButton>
+                  ))}
+                </List>
+                <Divider />
+              </>
+            )}
             <Typography variant='subtitle1' sx={{ px: 1, pt: 1 }}>
               Parameters
             </Typography>

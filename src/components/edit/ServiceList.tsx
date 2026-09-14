@@ -13,8 +13,10 @@ export const ServiceList: React.FC<ServiceListProps> = (props) => {
         multiple
         value={values}
       >
-        {values.map(value => (
-          <MenuItem key={value} value={value}>{value}</MenuItem>
+        {/* Keyed on position, not name: a bundle may run the same operation at
+            more than one step, so names are no longer unique in this list. */}
+        {values.map((value, index) => (
+          <MenuItem key={`${index}-${value}`} value={value}>{value}</MenuItem>
         ))}
       </Select>
 

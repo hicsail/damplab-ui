@@ -14,7 +14,7 @@ describe('jobReviewLabels', () => {
   it('calls out acceptance on the customer behalf while the job sits with them', () => {
     const labels = jobReviewLabels('CHANGES_REQUESTED');
     expect(labels.acceptOption).toBe("Accept on the customer's behalf (ready to proceed)");
-    expect(labels.acceptNote).toMatch(/closes their editor/i);
+    expect(labels.acceptNote).toMatch(/still be making changes/i);
   });
 
   it('re-accepts an already accepted job', () => {
@@ -40,13 +40,13 @@ describe('jobReviewLabels', () => {
       expect(labels().acceptButton).toBe('Accept Job');
     });
 
-    it('says the customer has not seen the edits', () => {
-      expect(labels().acceptNote).toMatch(/not seen/i);
+    it('says the lab has edited the job since it was submitted', () => {
+      expect(labels().acceptNote).toMatch(/edited the job since/i);
     });
 
-    it('does not claim the job is open in their editor, because it is not', () => {
+    it('does not claim the customer may still be changing it, because they may not', () => {
       // That is the CHANGES_REQUESTED wording, and it would be false here.
-      expect(labels().acceptNote).not.toMatch(/closes their editor/i);
+      expect(labels().acceptNote).not.toMatch(/still be making changes/i);
     });
   });
 
@@ -89,7 +89,7 @@ describe('reviewDecisions', () => {
 
   it('states each deterministic customer action without exposing an editing choice', () => {
     const byValue = Object.fromEntries(reviewDecisions('SUBMITTED').map((d) => [d.value, d]));
-    expect(byValue.clarify.note).toMatch(/reply.*cannot edit/i);
+    expect(byValue.clarify.note).toMatch(/reply[\s\S]*not edit/i);
     expect(byValue.edits.note).toMatch(/edit.*submit/i);
     expect(byValue.approval.note).toMatch(/approve.*cannot edit/i);
     for (const decision of Object.values(byValue)) {
@@ -115,7 +115,7 @@ describe('reviewDecisions', () => {
   it('carries the unseen-edits warning through to the decision list', () => {
     const accept = reviewDecision('accept', 'SUBMITTED', true);
     expect(accept.optionLabel).toBe(jobReviewLabels('SUBMITTED', true).acceptOption);
-    expect(accept.note).toMatch(/not seen/i);
+    expect(accept.note).toMatch(/edited the job since/i);
   });
 
   it('exposes the decision values as a stable list', () => {

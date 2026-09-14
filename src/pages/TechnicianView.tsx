@@ -3,40 +3,42 @@ import { useParams, useNavigate } from 'react-router';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, FormControl, InputLabel, MenuItem, Select, Dialog, DialogActions, DialogContent, DialogTitle, Checkbox, FormControlLabel } from '@mui/material';
+import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
 import EditNoteIcon                                   from '@mui/icons-material/EditNote';
-import { allLineIndexes, buildInvoiceServiceSelections, toggleLineIndex, type BillableServiceLine } from '../utils/invoiceSelection';
-import { formatGqlError } from '../utils/gqlError';
+import { invoiceBlockedMessage } from '../utils/invoiceGate';
 import UndoIcon                                       from '@mui/icons-material/Undo';
 import CancelIcon                                     from '@mui/icons-material/Cancel';
-import ReceiptLongIcon                                from '@mui/icons-material/ReceiptLong';
 import RefreshIcon                                    from '@mui/icons-material/Refresh';
 
-import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE }         from '../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { CREATE_INVOICE, CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, CHANGE_JOB_CUSTOMER_CATEGORY, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE }  from '../gql/mutations';
+import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
-import { diffJobGraphs, hasUnseenStaffEdits, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
+import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
 import JobVersionHistory from '../components/JobVersionHistory';
 import { versionWorkflowsAsCards } from '../controllers/jobGraphHydration';
 
 import JobFeedbackModal           from '../components/JobFeedbackModal';
-import { technicianCustomerActionCopy } from '../utils/jobEditing';
+import { canRevertVersions, technicianCustomerActionCopy } from '../utils/jobEditing';
 import JobPDFDocument             from '../components/JobPDFDocument';
-import JobInvoiceDocument         from '../components/JobInvoiceDocument';
 import SowEditorModal             from '../components/sow/SowEditorModal';
 import { SowPdfDownloadButton, SowStatusDetails, SowStatusSummary, useSowStaffStatus } from '../components/sow/SowStatusCard';
 import ProcessCard                from '../components/technician/ProcessCard';
+import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingPanel';
+import JobPaymentsPanel from '../components/billing/JobPaymentsPanel';
+import InvoicePanel from '../components/billing/InvoicePanel';
 import ReasonDialog               from '../components/ReasonDialog';
+import Can                        from '../components/PermissionGate';
+import { PERMISSIONS }            from '../hooks/usePermissions';
 import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
-import { CUSTOMER_CATEGORY_OPTIONS, statusColor } from '../components/sow/sowTypes';
-import { chipStatusBackground, invoiceVersionLabel, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
+import { statusColor } from '../components/sow/sowTypes';
+import { chipStatusBackground, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
 import StatusPaneHeader from '../components/technician/StatusPaneHeader';
 import { BIOSECURITY_SCREENINGS, PLACEHOLDER_BIOSECURITY, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus } from '../components/technician/biosecurityStatus';
 
@@ -157,6 +159,7 @@ export default function TechnicianView() {
         fetchPolicy: 'network-only',
     });
     const invoices = invoicesResult?.invoicesByJobId ?? [];
+
     const sowStatus = useSowStaffStatus(id || '');
 
     // Derive from Apollo cache so refetches (e.g. after SOW upsert) update without a full page reload.
@@ -168,10 +171,11 @@ export default function TechnicianView() {
     const [creatingSow, setCreatingSow] = useState(false);
     const [sowCreateError, setSowCreateError] = useState<string | null>(null);
 
-    const [changeJobCustomerCategory, { loading: categoryUpdating }] = useMutation(CHANGE_JOB_CUSTOMER_CATEGORY);
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
     const [withdrawFromCustomer] = useMutation(WITHDRAW_JOB_FROM_CUSTOMER);
     const [withdrawAcceptance] = useMutation(WITHDRAW_JOB_ACCEPTANCE);
+    const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
+    const [restoringVersion, setRestoringVersion] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
 
     /**
@@ -229,7 +233,28 @@ export default function TechnicianView() {
         }
     };
 
-    const [createInvoice, { loading: creatingInvoice }] = useMutation(CREATE_INVOICE);
+    /**
+     * Restore the version currently being viewed.
+     *
+     * Server-side, like the editor's copy: withdrawing a job from the customer
+     * restores the same way, and the gate deciding who may write lives there.
+     * No picker bookkeeping afterwards — the effect on `data.jobById` already
+     * snaps the view to the newest row on every refetch.
+     */
+    const handleRestoreVersion = async () => {
+        if (!id || viewingVersion == null) return;
+        const label = jobVersionDisplayLabel(viewingVersion);
+        if (!window.confirm(`Restore version ${label}? This becomes the current workflow, saved as a new version. Nothing already in the history is lost.`)) return;
+        setRestoringVersion(true);
+        try {
+            await restoreJobVersion({ variables: { jobId: id, versionNumber: viewingVersion, note: `Restored version ${label}` } });
+            await refreshJobPage();
+        } catch (e: any) {
+            window.alert(e?.message ?? 'Could not restore that version.');
+        } finally {
+            setRestoringVersion(false);
+        }
+    };
 
     const [modalOpen, setModalOpen] = useState(false);
     const [sowModalOpen, setSowModalOpen] = useState(false);
@@ -249,7 +274,7 @@ export default function TechnicianView() {
             refetchJob(),
             refetchSow(),
             refetchInvoices(),
-            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] })
+            apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS] })
         ]);
     };
 
@@ -290,47 +315,6 @@ export default function TechnicianView() {
     const handleCloseSOWModal = () => {
         setSowModalOpen(false);
         void refreshJobPage();
-    };
-
-    const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-    // Positions in billableServices, not service ids: a job can use the same
-    // service twice, and those two lines have to be tickable independently.
-    const [selectedInvoiceLines, setSelectedInvoiceLines] = useState<number[]>([]);
-    const [invoiceError, setInvoiceError] = useState<string | null>(null);
-
-    // The lines the server will bill, which is what the picker has to list — the
-    // live `services` above can have drifted from the version in force.
-    const billableServices: BillableServiceLine[] = sowFullData?.billableServices ?? [];
-
-    useEffect(() => {
-        setSelectedInvoiceLines(allLineIndexes(billableServices));
-    }, [sowFullData?.billableServices]);
-
-    const openInvoiceDialog = () => {
-        if (!sowFullData) return;
-        setInvoiceError(null);
-        setInvoiceDialogOpen(true);
-    };
-    const closeInvoiceDialog = () => setInvoiceDialogOpen(false);
-
-    const toggleInvoiceService = (index: number) => {
-        setSelectedInvoiceLines((prev) => toggleLineIndex(prev, index));
-    };
-
-    const submitCreateInvoice = async () => {
-        if (!id || selectedInvoiceLines.length === 0) return;
-        setInvoiceError(null);
-        try {
-            const services = buildInvoiceServiceSelections(billableServices, selectedInvoiceLines);
-            await createInvoice({ variables: { input: { jobId: id as string, services } } });
-            await refetchInvoices();
-            setInvoiceDialogOpen(false);
-        } catch (err) {
-            // The server refuses a selection it cannot place exactly — most often
-            // because a workflow edit re-synced the SOW while this was open.
-            setInvoiceError(formatGqlError(err, 'Could not create the invoice.'));
-            await refetchSow();
-        }
     };
 
     const getParameterFiles = () => getJobParameterFiles(workflows);
@@ -444,6 +428,8 @@ export default function TechnicianView() {
                             setBaselineVersionNumber(undefined);
                         }}
                         onBaselineChange={setBaselineVersionNumber}
+                        onRestore={canRevertVersions(jobData, true) ? handleRestoreVersion : undefined}
+                        restoring={restoringVersion}
                     />
                 </Box>
             )}
@@ -457,7 +443,6 @@ export default function TechnicianView() {
         </>
     );
 
-    const currentCustomerCategory = jobData?.customerCategory ?? 'EXTERNAL_CUSTOMER_MARKET';
     const jobParties = jobPartyStatus(jobState);
     const sowParties = sowPartyStatus({
         currentStatus: sowStatus.current?.status,
@@ -467,36 +452,40 @@ export default function TechnicianView() {
     const jobStaffVersion = partyVersionLabel(latestStaffVisibleJobVersion(versions));
     const sowCustomerVersion = sowPartyVersionLabel(latestCustomerVisibleSowVersion(sowStatus.sow?.versions ?? []));
     const sowStaffVersion = sowPartyVersionLabel(latestStaffVisibleSowVersion(sowStatus.sow?.versions ?? []));
-    const invoiceLabel = invoiceVersionLabel(invoices);
     const sowStatusPaneColor = chipStatusBackground(
         sowStatus.sow ? statusColor(sowStatus.active?.status ?? sowStatus.current?.status) : 'default'
     );
-    const invoiceStatusPaneColor = chipStatusBackground(invoices.length ? 'info' : 'default');
+    // Why no invoice version can be issued yet, or null when one can. The server
+    // refuses anything but a countersigned SOW; while that state is still loading
+    // the button stays blocked rather than offered and then refused.
+    const invoiceBlocked = invoiceBlockedMessage(sowFullData ? { activeStatus: sowStatus.active?.status ?? null, versions: sowStatus.sow?.versions ?? [] } : null);
+    const issueBlockedReason = sowLoading || sowStatus.loading ? 'Checking the Statement of Work…' : invoiceBlocked;
     const jobStatusPaneColor = chipStatusBackground(jobData ? jobStatusColor(jobState) : 'default');
     const biosecurity = PLACEHOLDER_BIOSECURITY;
     const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
     const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
-    const handleCustomerCategoryChange = async (nextCategory: string) => {
-        if (!id) return;
-        try {
-            await changeJobCustomerCategory({
-                variables: { jobId: id as string, customerCategory: nextCategory },
-            });
-            await Promise.all([
-                refetchJob(),
-                refetchSow(),
-                apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE] }),
-            ]);
-        } catch (e) {
-            console.error('Failed to update job customer category:', e);
-        }
-    };
-
     return (
         <div>
-            <Typography variant="h4" sx={{ mt: 2 }}>Job Tracking</Typography>
             <div style={{ textAlign: 'left', padding: '5vh' }}>
+                {/* The job's name, the submission line, and the commands that act
+                    on it. Kept sticky, offset below the fixed black header and the
+                    breadcrumb bar (both publish their heights as CSS vars — see
+                    HeaderBar and AppBreadcrumbs) so this stays visible on scroll
+                    instead of getting buried under a long job. */}
+                <Box
+                    sx={{
+                        position: 'sticky',
+                        top: 'calc(var(--app-header-height, 64px) + var(--app-breadcrumb-height, 41px))',
+                        zIndex: 1050,
+                        bgcolor: 'background.paper',
+                        pt: 1,
+                        pb: 1.5,
+                        mb: 1,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                    }}
+                >
                 <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1 }}>
                     <Typography variant="h5" fontWeight="bold">
                         {jobName}
@@ -536,35 +525,15 @@ export default function TechnicianView() {
                         {jobState === 'CLOSED' ? 'Job closed' : closingJob ? 'Closing…' : 'Close job'}
                     </Button>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-                    {/* Drop the stray top margin on the first <p> so this column starts
-                        flush, leaving the mt on the pricing control as the only offset. */}
-                    <Box sx={{ fontSize: 13, textAlign: 'left', '& p:first-of-type': { mt: 0 } }}>
-                        <p><b>Time:</b> {jobTime.slice(0, 16).replace('T', ' ')}</p>
-                        <p><b>User:</b> {submitter.user}</p>
-                        {submitter.onBehalfOf && <p>{submitter.onBehalfOf}</p>}
-                        <p><b>Organization:</b> {submitter.organization}</p>
-                    </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, mt: 1 }}>
-                        <FormControl size="small" sx={{ minWidth: 260 }} disabled={categoryUpdating || !jobData}>
-                            <InputLabel id="pricing-category-label">Pricing category</InputLabel>
-                            <Select
-                                labelId="pricing-category-label"
-                                value={currentCustomerCategory}
-                                label="Pricing category"
-                                onChange={(e) => handleCustomerCategoryChange(String(e.target.value))}
-                            >
-                                {CUSTOMER_CATEGORY_OPTIONS.map((opt) => (
-                                    <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 260, textAlign: 'right' }}>
-                            Updates this customer&apos;s category globally (signed SOWs remain static snapshots).
-                        </Typography>
-                    </Box>
+                <Typography sx={{ fontSize: 13 }}>
+                    {submitter.user}
+                    {submitter.organization && `, ${submitter.organization}`}
+                    {' submitted this job on '}
+                    {jobTime.slice(0, 16).replace('T', ' ')}
+                </Typography>
+                {submitter.onBehalfOf && (
+                    <Typography sx={{ fontSize: 13, mt: 0.5 }}>{submitter.onBehalfOf}</Typography>
+                )}
                 </Box>
 
                 {sowCreateError && (
@@ -848,122 +817,27 @@ export default function TechnicianView() {
                     }
                 />
 
-                <ProcessCard
-                    title="Invoices"
-                    defaultExpanded
-                    customerBadge={null}
-                    staffBadge={null}
-                    customerVersion={invoiceLabel}
-                    staffVersion={invoiceLabel}
-                    statusPaneSx={{ bgcolor: invoiceStatusPaneColor }}
-                    statusPane={
-                        invoices.length ? (
-                            <StatusPaneHeader
-                                status={invoices.length === 1 ? '1 invoice' : `${invoices.length} invoices`}
-                                reference={invoiceLabel !== '—' ? invoiceLabel : undefined}
-                                description={
-                                    // The number itself is in the reference slot now, so this
-                                    // line carries only what that does not say.
-                                    invoices[invoices.length - 1]?.totalCost != null
-                                        ? `Latest invoice · $${Number(invoices[invoices.length - 1].totalCost).toFixed(2)}`
-                                        : undefined
-                                }
-                            />
-                        ) : (
-                            <StatusPaneHeader
-                                status="No invoices yet"
-                                description="Create an invoice from the Statement of Work services when you are ready to bill."
-                            />
-                        )
-                    }
-                    actions={
-                        <>
-                            <Button
-                                color={sowFullData ? 'primary' : 'secondary'}
-                                variant="contained"
-                                size="small"
-                                startIcon={<ReceiptLongIcon />}
-                                disabled={!sowFullData || sowLoading}
-                                onClick={openInvoiceDialog}
-                                sx={railBtnSx}
-                            >
-                                Create Invoice
-                            </Button>
-                            {invoices?.length && id && sowFullData ? (
-                                <PDFDownloadLink
-                                    document={
-                                        <JobInvoiceDocument
-                                            jobId={id}
-                                            jobDisplayId={jobData?.jobId ?? null}
-                                            jobName={jobName}
-                                            customerCategory={jobData?.customerCategory ?? undefined}
-                                            sow={sowFullData}
-                                            invoice={invoices[invoices.length - 1]}
-                                        />
-                                    }
-                                    fileName={`Invoice-${(invoices[invoices.length - 1]?.invoiceNumber ?? id) || id}.pdf`}
-                                    style={{ textDecoration: 'none', width: '100%' }}
-                                >
-                                    {({ loading }) => (
-                                        <Button color="primary" size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} sx={railBtnSx}>
-                                            {loading ? 'Loading invoice...' : 'Download Latest Invoice'}
-                                        </Button>
-                                    )}
-                                </PDFDownloadLink>
-                            ) : (
-                                <Button color="secondary" size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} disabled sx={railBtnSx}>
-                                    Download Latest Invoice
-                                </Button>
-                            )}
-                        </>
-                    }
-                    details={
-                        !invoices?.length ? (
-                            <Typography variant="body2" color="text.secondary">
-                                No invoices have been generated for this job yet.
-                            </Typography>
-                        ) : (
-                            <List dense>
-                                {invoices.map((inv: any, idx: number) => (
-                                    <ListItem key={inv.id || idx} sx={{ pl: 0 }}>
-                                        <ListItemText
-                                            primary={
-                                                id && sowFullData ? (
-                                                    <PDFDownloadLink
-                                                        document={
-                                                            <JobInvoiceDocument
-                                                                jobId={id}
-                                                                jobDisplayId={jobData?.jobId ?? null}
-                                                                jobName={jobName}
-                                                                customerCategory={jobData?.customerCategory ?? undefined}
-                                                                sow={sowFullData}
-                                                                invoice={inv}
-                                                            />
-                                                        }
-                                                        fileName={`Invoice-${inv.invoiceNumber || inv.id || id}.pdf`}
-                                                    >
-                                                        {({ loading }) =>
-                                                            loading
-                                                                ? 'Loading...'
-                                                                : `Invoice ${inv.invoiceNumber || ''}`.trim()
-                                                        }
-                                                    </PDFDownloadLink>
-                                                ) : (
-                                                    `Invoice ${inv.invoiceNumber || inv.id || ''}`.trim()
-                                                )
-                                            }
-                                            secondary={
-                                                `${inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleString() : ''}${inv.totalCost != null ? ` • $${Number(inv.totalCost).toFixed(2)}` : ''}`
-                                            }
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        )
-                    }
+                {/* Read-only for staff, plus the pause switch when they hold
+                    billing:view. Booking is the customer's act; confirming usage
+                    stays on the Inventory schedule. */}
+                <JobEquipmentBookingPanel jobId={id || ''} staffView />
+
+                <InvoicePanel
+                    jobId={id || ''}
+                    jobDisplayId={jobData?.jobId ?? null}
+                    jobName={jobName}
+                    customerCategory={jobData?.customerCategory ?? null}
+                    sow={sowFullData}
+                    staffView
+                    issueBlockedReason={issueBlockedReason}
+                    documentStale={!!sowFullData?.documentStale}
+                    onChanged={refreshJobPage}
                 />
 
-                <CommentsSection 
+                {/* Payments belong to the job; every invoice version restates them. */}
+                <JobPaymentsPanel jobId={id || ''} staffView />
+
+                <CommentsSection
                     jobId={id || ''}
                     currentUser={{
                         email: userContext.userProps?.idTokenParsed?.email ?? 'technician@bu.edu',
@@ -1002,63 +876,6 @@ export default function TechnicianView() {
                     jobId={id ?? ''}
                     jobName={jobData?.name}
                 />
-
-                <Dialog open={invoiceDialogOpen} onClose={closeInvoiceDialog} maxWidth="sm" fullWidth>
-                    <DialogTitle>Create invoice (select services)</DialogTitle>
-                    <DialogContent>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            Choose which SOW services to include on this invoice. This will create a saved invoice visible to the client.
-                        </Typography>
-                        {/* The prices below come from the Statement of Work in force
-                            with the client, which is what an invoice bills. When the
-                            job has been edited since, they will not match the Fee
-                            Schedule figures shown elsewhere on this page. */}
-                        {sowFullData?.documentStale && (
-                            <Alert severity="info" sx={{ mb: 2 }}>
-                                The job has changed since this Statement of Work was issued. These are the figures the client agreed to, which is what the invoice bills — not the job&rsquo;s current prices.
-                            </Alert>
-                        )}
-                        {invoiceError && (
-                            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setInvoiceError(null)}>
-                                {invoiceError}
-                            </Alert>
-                        )}
-                        {billableServices.length === 0 && (
-                            <Alert severity="warning">This Statement of Work has no service lines to invoice.</Alert>
-                        )}
-                        {billableServices.map((s: BillableServiceLine, idx: number) => {
-                            const checked = selectedInvoiceLines.includes(idx);
-                            // Keyed on position, not on serviceId — two lines of the
-                            // same service share an id and would collide as keys.
-                            return (
-                                <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.5 }}>
-                                    <FormControlLabel
-                                        control={<Checkbox checked={checked} onChange={() => toggleInvoiceService(idx)} />}
-                                        label={
-                                            <Box>
-                                                <Typography variant="subtitle2">{s?.name ?? 'Service'}</Typography>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    {s?.description ?? ''}
-                                                    {s?.cost != null ? ` • $${Number(s.cost).toFixed(2)}` : ''}
-                                                </Typography>
-                                            </Box>
-                                        }
-                                    />
-                                </Box>
-                            );
-                        })}
-                    </DialogContent>
-                    <DialogActions>
-                        <Button onClick={closeInvoiceDialog} disabled={creatingInvoice}>Cancel</Button>
-                        <Button
-                            variant="contained"
-                            onClick={submitCreateInvoice}
-                            disabled={creatingInvoice || selectedInvoiceLines.length === 0}
-                        >
-                            {creatingInvoice ? 'Creating...' : 'Create Invoice'}
-                        </Button>
-                    </DialogActions>
-                </Dialog>
             </div>
         </div>
     )

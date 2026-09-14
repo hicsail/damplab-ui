@@ -36,7 +36,7 @@ export function jobListSectionChips(job: JobSectionSource): JobSectionChip[] {
   return [
     {
       key: 'job',
-      label: jobStatusLabel(job.state),
+      label: `Job · ${jobStatusLabel(job.state)}`,
       color: jobStatusColor(job.state)
     },
     {

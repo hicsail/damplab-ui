@@ -94,6 +94,7 @@ export default function Dashboard() {
 
   const { data, loading, error, refetch } = useQuery(JOBS_FOR_VIEWER, {
     variables: { input },
+    fetchPolicy: 'cache-and-network',
   });
 
   // Filter sources. Both are jobs:view-all queries, so skipped for a client —
@@ -161,13 +162,18 @@ export default function Dashboard() {
     setLimit(l);
     setPage(1);
   }, []);
+  // The unseen-jobs feed is a jobs:view-all concept (see JOBS_FEED_STATUS above,
+  // skipped for a client), so `lastViewedAt` never leaves its initial `null` for
+  // one — which used to read as "nothing viewed yet, so everything is new" and
+  // left every job on a client's own list permanently badged "New".
   const isJobNew = useCallback(
     (job: JobListItem) => {
+      if (!canViewAllJobs) return false;
       if (!job.submitted) return false;
       if (!lastViewedAt) return true;
       return new Date(job.submitted).getTime() > new Date(lastViewedAt).getTime();
     },
-    [lastViewedAt]
+    [canViewAllJobs, lastViewedAt]
   );
 
   const handleArchiveFilterChange = useCallback((v: ArchiveFilter) => {

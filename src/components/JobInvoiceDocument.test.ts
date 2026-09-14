@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildInvoicePricingNote } from './JobInvoiceDocument';
+import { billedCustomerCategory, buildDepositNotice, buildEquipmentTotals, buildInvoicePricingNote, buildSupersededNotice, buildVoidNotice, invoiceMoney } from './JobInvoiceDocument';
+import { buildStatementTotals, equipmentEstimateNote } from '../utils/equipmentBilling';
 
 /**
  * The invoice has to state the same pricing basis the SOW's Fee Schedule does.
@@ -32,5 +33,197 @@ describe('buildInvoicePricingNote', () => {
 
   it('does not print trailing zeros on a fractional multiplier', () => {
     expect(buildInvoicePricingNote({ unitCost: 10, multiplier: 2.5, cost: 25 })).toBe('$10.00 x 2.5 = $25.00');
+  });
+});
+
+describe('buildInvoicePricingNote: parameter-priced lines', () => {
+  const details = [
+    { label: 'Instrument: Bioanalyzer', quantity: 1, unitPrice: 100, total: 100 },
+    { label: 'Hours in use', quantity: 3, unitPrice: 40, total: 120 }
+  ];
+
+  it('itemises the selections on a line with no multiplier to describe', () => {
+    // The gap this closes: multiplier 1 suppressed the "x N =" form, so the
+    // customer saw a bare $220.00 and no indication of what drove it.
+    expect(buildInvoicePricingNote({ cost: 220, unitCost: 220, multiplier: 1, pricingDetails: details })).toBe(
+      'Instrument: Bioanalyzer — 1 x $100.00 = $100.00\nHours in use — 3 x $40.00 = $120.00'
+    );
+  });
+
+  it('shows the itemisation above the multiplier when a line has both', () => {
+    const note = buildInvoicePricingNote({ cost: 440, unitCost: 220, multiplier: 2, pricingDetails: details });
+    expect(note.split('\n')).toEqual([
+      'Instrument: Bioanalyzer — 1 x $100.00 = $100.00',
+      'Hours in use — 3 x $40.00 = $120.00',
+      '$220.00 x 2 = $440.00'
+    ]);
+  });
+
+  it('says nothing at all for a line with neither, exactly as before', () => {
+    expect(buildInvoicePricingNote({ cost: 350, unitCost: 350, multiplier: 1 })).toBe('');
+    expect(buildInvoicePricingNote({ cost: 350, unitCost: 350, multiplier: 1, pricingDetails: [] })).toBe('');
+  });
+
+  it('skips a row with no label rather than printing a dangling dash', () => {
+    expect(buildInvoicePricingNote({ cost: 10, multiplier: 1, pricingDetails: [{ label: '  ', quantity: 1, unitPrice: 10, total: 10 }] })).toBe('');
+  });
+});
+
+
+describe('buildVoidNotice', () => {
+  // A voided invoice stays downloadable — the client may already hold the copy
+  // that was sent — so the document itself has to say it is not payable.
+  const voided = { voidedAt: '2026-09-08T15:00:00.000Z', voidedBy: 'tech@bu.edu', voidReason: 'Billed the wrong customer' };
+
+  it('renders nothing for a live invoice', () => {
+    expect(buildVoidNotice({ voidedAt: null })).toBeNull();
+    expect(buildVoidNotice(null)).toBeNull();
+    expect(buildVoidNotice(undefined)).toBeNull();
+  });
+
+  it('says the invoice is not payable, in words', () => {
+    expect(buildVoidNotice(voided)?.title).toBe('VOID — THIS INVOICE IS NOT PAYABLE');
+  });
+
+  it('records who voided it and when', () => {
+    expect(buildVoidNotice(voided)?.attribution).toBe('Voided on 09/08/2026 by tech@bu.edu.');
+  });
+
+  it('prints the reason the client will read', () => {
+    expect(buildVoidNotice(voided)?.reason).toBe('Reason: Billed the wrong customer');
+  });
+
+  it('never leaves the reason blank, which would read as a rendering fault', () => {
+    expect(buildVoidNotice({ voidedAt: voided.voidedAt, voidReason: '   ' })?.reason).toBe('Reason: not recorded');
+  });
+
+  it('omits the attribution parts it does not have', () => {
+    expect(buildVoidNotice({ voidedAt: voided.voidedAt })?.attribution).toBe('Voided on 09/08/2026.');
+  });
+});
+
+describe('billedCustomerCategory', () => {
+  // Not cosmetic: this decides INTERNAL vs EXTERNAL in the header and which
+  // payment block prints. Reading the live job made a re-categorised job reprint
+  // an old invoice telling an external customer to file an internal ISR.
+  it('prefers what the invoice recorded over what the job says today', () => {
+    expect(billedCustomerCategory({ customerCategory: 'EXTERNAL_CUSTOMER_ACADEMIC' }, 'INTERNAL_CUSTOMERS')).toBe('EXTERNAL_CUSTOMER_ACADEMIC');
+  });
+
+  it('falls back to the live job for an invoice written before this was recorded', () => {
+    expect(billedCustomerCategory({}, 'INTERNAL_CUSTOMERS')).toBe('INTERNAL_CUSTOMERS');
+    expect(billedCustomerCategory(null, 'INTERNAL_CUSTOMERS')).toBe('INTERNAL_CUSTOMERS');
+  });
+
+  it('treats an empty recorded category as absent rather than as a category', () => {
+    expect(billedCustomerCategory({ customerCategory: '   ' }, 'INTERNAL_CUSTOMERS')).toBe('INTERNAL_CUSTOMERS');
+  });
+
+  it('is null when neither knows, so the caller renders the external default', () => {
+    expect(billedCustomerCategory({}, null)).toBeNull();
+    expect(billedCustomerCategory({}, undefined)).toBeNull();
+  });
+});
+
+describe('invoiceMoney: an invoice prints only its own lines', () => {
+  it('uses the invoice’s own figures when it has them', () => {
+    const money = invoiceMoney({ services: [{ cost: 100 }, { cost: 50 }], subtotal: 150, totalCost: 120 });
+    expect(money).toMatchObject({ lineItemSum: 150, subtotal: 150, total: 120 });
+  });
+
+  it('renders an empty legacy invoice as zero rather than borrowing the SOW’s lines', () => {
+    // The removed fallback fed the TOTALS, not just the line list, so an invoice
+    // with no services printed the SOW's raw line sum — the discount dropped.
+    // There is now no shape of input that can make this read anything but zero.
+    expect(invoiceMoney({ services: [] })).toMatchObject({ services: [], lineItemSum: 0, subtotal: 0, total: 0 });
+    expect(invoiceMoney({})).toMatchObject({ services: [], subtotal: 0, total: 0 });
+    expect(invoiceMoney(null)).toMatchObject({ services: [], subtotal: 0, total: 0 });
+  });
+
+  it('falls back to the line sum for invoices predating adjustments, staying within its own figures', () => {
+    const money = invoiceMoney({ services: [{ cost: 100 }, { cost: 50 }] });
+    expect(money).toMatchObject({ subtotal: 150, total: 150 });
+  });
+
+  it('keeps a genuine zero total rather than treating it as absent', () => {
+    // An over-large discount floors the total at zero server-side; `!= null` is
+    // what stops that becoming the line sum again.
+    expect(invoiceMoney({ services: [{ cost: 100 }], subtotal: 100, totalCost: 0 }).total).toBe(0);
+  });
+
+  it('ignores a line whose cost is missing or unparseable', () => {
+    expect(invoiceMoney({ services: [{ cost: 100 }, { cost: null }, { cost: 'x' }, {}] }).lineItemSum).toBe(100);
+  });
+});
+
+describe('buildEquipmentTotals', () => {
+  it('states charges, payments and the balance due, in that order', () => {
+    expect(buildEquipmentTotals({ subtotal: 200, paymentsToDate: 50, balanceDue: 150 })).toEqual([
+      { label: 'Charges to date', amount: '$200.00' },
+      { label: 'Payments to date', amount: '-$50.00' },
+      { label: 'Balance due', amount: '$150.00' }
+    ]);
+  });
+
+  it('calls an overpayment a credit balance and prints it positive', () => {
+    expect(buildEquipmentTotals({ subtotal: 100, paymentsToDate: 130, balanceDue: -30 })[2]).toEqual({ label: 'Credit balance', amount: '$30.00' });
+  });
+
+  it('derives the balance when the invoice does not carry one', () => {
+    expect(buildEquipmentTotals({ subtotal: 200, paymentsToDate: 50 })[2]).toEqual({ label: 'Balance due', amount: '$150.00' });
+  });
+
+  it('treats a missing payments figure as none received', () => {
+    expect(buildEquipmentTotals({ subtotal: 200 })).toEqual([
+      { label: 'Charges to date', amount: '$200.00' },
+      { label: 'Payments to date', amount: '-$0.00' },
+      { label: 'Balance due', amount: '$200.00' }
+    ]);
+  });
+});
+
+describe('the statement totals', () => {
+  it('are the same three lines the equipment statement states', () => {
+    expect(buildStatementTotals({ subtotal: 500, paymentsToDate: 200, balanceDue: 300 })).toEqual(buildEquipmentTotals({ subtotal: 500, paymentsToDate: 200, balanceDue: 300 }));
+  });
+});
+
+describe('the equipment-use note on a statement’s service rows', () => {
+  it('marks the line the SOW described as an estimate', () => {
+    expect(equipmentEstimateNote('Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)')).toBe('Estimated · billed at actual booked hours');
+  });
+});
+
+describe('buildSupersededNotice', () => {
+  // A superseded version stays downloadable, so it has to say it is not payable.
+  it('says the version is not payable and names its replacement', () => {
+    const notice = buildSupersededNotice({ supersededAt: '2026-09-10T15:00:00.000Z', supersededByNumber: '00005-003' });
+    expect(notice?.title).toBe('SUPERSEDED — THIS INVOICE IS NOT PAYABLE');
+    expect(notice?.detail).toBe('Replaced by invoice 00005-003 on 09/10/2026.');
+  });
+
+  it('renders nothing for the current invoice', () => {
+    expect(buildSupersededNotice({ supersededAt: null })).toBeNull();
+    expect(buildSupersededNotice(null)).toBeNull();
+  });
+
+  it('gives way to VOID, which says more', () => {
+    expect(buildSupersededNotice({ supersededAt: '2026-09-10T15:00:00.000Z', voidedAt: '2026-09-11T15:00:00.000Z' })).toBeNull();
+  });
+});
+
+describe('buildDepositNotice', () => {
+  it('states the deposit, its date, what was outstanding, and that it is not extra', () => {
+    expect(buildDepositNotice({ label: 'Deposit', amount: 500, dueDate: '2026-10-01T12:00:00.000Z', outstanding: 300 })).toBe(
+      'Deposit: $500.00, due 10/01/2026. Outstanding at issue: $300.00. The deposit is part of the invoice total, not in addition to it.'
+    );
+  });
+
+  it('says so when payments already covered it', () => {
+    expect(buildDepositNotice({ label: 'Deposit', amount: 500, outstanding: 0 })).toContain('Covered by the payments received.');
+  });
+
+  it('says nothing when the invoice asks for no deposit', () => {
+    expect(buildDepositNotice(null)).toBeNull();
   });
 });

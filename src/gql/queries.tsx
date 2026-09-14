@@ -23,6 +23,7 @@ export const GET_SERVICES = gql`
       }
       pricingMode
       allowMultipleRuns
+      equipmentUse
       icon
       parameters
       description
@@ -760,6 +761,7 @@ export const UPDATE_SERVICE = gql`
       }
       pricingMode
       allowMultipleRuns
+      equipmentUse
       icon
       deliverables
       notes
@@ -789,6 +791,7 @@ export const CREATE_SERVICE = gql`
       }
       pricingMode
       allowMultipleRuns
+      equipmentUse
       icon
       parameters
       description
@@ -931,10 +934,7 @@ export const GET_SOW_BY_ID = gql`
           reason
         }
         totalCost
-        discount {
-          amount
-          reason
-        }
+        estimatedEquipmentCost
       }
       terms
       additionalInformation
@@ -1003,10 +1003,7 @@ export const GET_SOW_BY_JOB_ID = gql`
           reason
         }
         totalCost
-        discount {
-          amount
-          reason
-        }
+        estimatedEquipmentCost
       }
       terms
       additionalInformation
@@ -1042,14 +1039,20 @@ export const GET_SOW_BY_JOB_ID = gql`
   }
 `;
 
-export const GET_INVOICES_BY_JOB_ID = gql`
-  query GetInvoicesByJobId($jobId: ID!) {
-    invoicesByJobId(jobId: $jobId) {
+/**
+ * Every field an invoice renders from. The job page's list and the issue
+ * dialog's preview ask for the same shape, so the dialog renders exactly what
+ * the page will show once the version is issued.
+ */
+const INVOICE_FIELDS = `
       id
       jobId
       jobDisplayId
       jobName
       invoiceNumber
+      versionNumber
+      status
+      kind
       invoiceDate
       createdBy
       billedToName
@@ -1066,8 +1069,53 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         multiplier
         runCount
         category
+        sourceIndex
+        pricingDetails {
+          label
+          quantity
+          unitPrice
+          total
+        }
       }
       subtotal
+      dueDate
+      dueSchedule {
+        amount
+        dueDate
+      }
+      payments {
+        paymentId
+        amount
+        receivedOn
+        reference
+      }
+      customLines {
+        chargeId
+        kind
+        label
+        amount
+        note
+      }
+      deposit {
+        chargeId
+        label
+        amount
+        dueDate
+        outstanding
+      }
+      equipmentLines {
+        bookingId
+        itemName
+        operationLabel
+        startTime
+        endTime
+        actualHours
+        rate
+        cost
+        confirmedAt
+      }
+      paymentsToDate
+      balanceDue
       adjustments {
         type
         description
@@ -1077,7 +1125,91 @@ export const GET_INVOICES_BY_JOB_ID = gql`
         prorationFactor
       }
       totalCost
+      sowVersionNumber
+      billingWarnings
+      voidedAt
+      voidedBy
+      voidReason
+      supersededAt
+      supersededByNumber
       createdAt
+`;
+
+export const GET_INVOICES_BY_JOB_ID = gql`
+  query GetInvoicesByJobId($jobId: ID!) {
+    invoicesByJobId(jobId: $jobId) {
+      ${INVOICE_FIELDS}
+    }
+  }
+`;
+
+/** What issuing with this input would state, written nowhere. Staff only (billing:write). */
+export const GET_INVOICE_PREVIEW = gql`
+  query InvoicePreview($input: CreateInvoiceInput!) {
+    invoicePreview(input: $input) {
+      ${INVOICE_FIELDS}
+    }
+  }
+`;
+
+export const GET_JOB_BALANCE = gql`
+  query JobBalance($jobId: ID!) {
+    jobBalance(jobId: $jobId) {
+      jobId
+      serviceCharges
+      adjustmentCharges
+      equipmentCharges
+      customCharges
+      chargesToDate
+      paymentsToDate
+      balanceDue
+      depositAmount
+      depositDueDate
+      depositOutstanding
+      confirmedHours
+      unconfirmedBookings
+    }
+  }
+`;
+
+export const GET_JOB_CHARGES = gql`
+  query JobCharges($jobId: ID!) {
+    jobCharges(jobId: $jobId) {
+      id
+      jobId
+      kind
+      label
+      amount
+      serviceId
+      sowVersionNumber
+      sourceIndex
+      note
+      dueDate
+      addedBy
+      addedAt
+      voidedAt
+      voidedBy
+      voidReason
+    }
+  }
+`;
+
+export const GET_JOB_PAYMENTS = gql`
+  query JobPayments($jobId: ID!) {
+    jobPayments(jobId: $jobId) {
+      id
+      jobId
+      amount
+      receivedOn
+      reference
+      note
+      recordedBy
+      recordedAt
+      voidedAt
+      voidedBy
+      voidReason
+      invoiceId
+      invoiceNumber
     }
   }
 `;
@@ -1381,6 +1513,8 @@ const BOOKING_FIELDS = `
   ownerEmail
   ownerName
   ownerInstitution
+  createdBySub
+  jobId
   customerCategory
   kind
   startTime
@@ -1429,6 +1563,75 @@ export const GET_BILLABLE_BOOKINGS = gql`
   query BillableBookings($ownerSub: String!) {
     billableBookings(ownerSub: $ownerSub) {
       ${BOOKING_FIELDS}
+    }
+  }
+`;
+
+/**
+ * Everything the job page's equipment-booking panel needs, in one round trip.
+ *
+ * Hand-written like every other document here — `npm run codegen` is not run for
+ * these shapes. `access.status` is one of OPEN / SOW_NOT_SIGNED / BLOCKED /
+ * NOT_ELIGIBLE / HIDDEN; anything but OPEN comes back with empty `operations` and
+ * `bookings`, so the panel must key off the status, not off the arrays.
+ */
+export const GET_JOB_EQUIPMENT_BOOKING = gql`
+  query JobEquipmentBooking($jobId: ID!) {
+    jobEquipmentBooking(jobId: $jobId) {
+      access {
+        status
+        canBook
+        canBlock
+        reason
+      }
+      operations {
+        nodeId
+        label
+        serviceId
+        canBook
+        window {
+          start
+          end
+          openEnd
+        }
+        hoursPerWeek
+        items {
+          id
+          name
+          rateType
+          schedulable
+        }
+        bookers
+      }
+      bookings {
+        _id
+        inventoryItem
+        inventoryName
+        jobId
+        nodeId
+        serviceId
+        startTime
+        endTime
+        status
+        usageConfirmed
+        actualHours
+        rateSnapshot
+        cost
+        billingStatus
+        createdBySub
+        createdByName
+        notes
+        history {
+          at
+          action
+          bySub
+          byName
+          reason
+          previousStartTime
+          previousEndTime
+          previousNotes
+        }
+      }
     }
   }
 `;
@@ -1807,6 +2010,7 @@ export const SOW_VERSION_FIELDS = gql`
       deliverables
       baseCost
       totalCost
+      estimatedEquipmentCost
       customerCategory
       periods {
         startDate
@@ -1821,6 +2025,13 @@ export const SOW_VERSION_FIELDS = gql`
         unitCost
         multiplier
         runCount
+        category
+        pricingDetails {
+          label
+          quantity
+          unitPrice
+          total
+        }
       }
       adjustments {
         type
@@ -1854,6 +2065,13 @@ export const GET_SOW_EDITOR_STATE = gql`
         unitCost
         multiplier
         runCount
+        category
+        pricingDetails {
+          label
+          quantity
+          unitPrice
+          total
+        }
       }
       actionGate {
         canSend
