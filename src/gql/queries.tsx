@@ -154,6 +154,19 @@ export const GET_JOB_BY_ID = gql`
         detail
         batchId
       }
+      aclidScreening {
+        screenId
+        homologyStatus
+        customerStatus
+        regulatoryStatus
+        verificationStatus
+        decisionStatus
+        verificationCompletedAt
+        sequenceCount
+        startedAt
+        completedAt
+        detail
+      }
       sow {
         id
         sowNumber
@@ -275,6 +288,19 @@ export const GET_OWN_JOB_BY_ID = gql`
         filename
         url
         uploadedAt
+      }
+      aclidScreening {
+        screenId
+        homologyStatus
+        customerStatus
+        regulatoryStatus
+        verificationStatus
+        decisionStatus
+        verificationCompletedAt
+        sequenceCount
+        startedAt
+        completedAt
+        detail
       }
       sow {
         id
