@@ -289,6 +289,17 @@ export const GET_OWN_JOB_BY_ID = gql`
         url
         uploadedAt
       }
+      # Kept identical to GET_JOB_BY_ID's block: the customer card composites
+      # Homology with the other rows, so an absent status reads Unavailable and
+      # lets the card say Passed on a job whose homology failed.
+      homologyScreening {
+        status
+        startedAt
+        completedAt
+        sequenceCount
+        detail
+        batchId
+      }
       aclidScreening {
         screenId
         homologyStatus
