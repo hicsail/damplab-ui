@@ -1,9 +1,9 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router';
-import { useQuery, useMutation, useApolloClient } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient, useLazyQuery } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import { Box, Button, Chip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
+import { Box, Button, Chip, Tooltip, Typography, Alert, Link as MuiLink, List, ListItem, ListItemText, IconButton } from '@mui/material';
 import PictureAsPdfIcon                               from '@mui/icons-material/PictureAsPdf';
 import DescriptionIcon                                from '@mui/icons-material/Description';
 import RateReviewIcon                                 from '@mui/icons-material/RateReview';
@@ -15,7 +15,7 @@ import RefreshIcon                                    from '@mui/icons-material/
 
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
-import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
+import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, RERUN_JOB_HOMOLOGY_SCREENING, START_JOB_CUSTOMER_VERIFICATION, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
 import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
@@ -38,9 +38,17 @@ import { CommentsSection }        from '../components/CommentsSection';
 import { UserContext }            from '../contexts/UserContext';
 import { AppContext }             from '../contexts/App';
 import { statusColor } from '../components/sow/sowTypes';
+import { formatGqlError } from '../utils/gqlError';
 import { chipStatusBackground, isJobProcessSettled, isSowProcessSettled, jobPartyStatus, jobStatusColor, jobStatusLabel, latestCustomerVisibleJobVersion, latestCustomerVisibleSowVersion, latestStaffVisibleJobVersion, latestStaffVisibleSowVersion, partyVersionLabel, sowPartyStatus, sowPartyVersionLabel } from '../utils/technicianProcessStatus';
 import StatusPaneHeader from '../components/technician/StatusPaneHeader';
-import { BIOSECURITY_SCREENINGS, PLACEHOLDER_BIOSECURITY, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus } from '../components/technician/biosecurityStatus';
+import { BIOSECURITY_SCREENINGS, biosecurityFromJob, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus, customerDetail, staffHomologyNote } from '../components/technician/biosecurityStatus';
+import BiosecurityScreeningSections, { BiosecurityStatusIcon } from '../components/technician/BiosecurityScreeningSections';
+// Hosted-page opener only. The embed loader is deliberately not imported here:
+// staff must never run the customer's identity verification as themselves.
+import { openHostedVerification } from '../aclid/verificationWidget';
+import ScreeningBatchDetailsModal from '../components/ScreeningBatchDetailsModal';
+import { GET_SCREENING_BATCH } from '../securedna/SequencesQueries';
+import type { ScreeningBatch } from '../securedna/types';
 
 const stripTypename = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(stripTypename);
@@ -66,6 +74,9 @@ const downloadJson = (filename: string, payload: unknown) => {
     // Let the browser start the download before revoking.
     setTimeout(() => URL.revokeObjectURL(url), 0);
 };
+
+/** The one label for every control that copies the customer's verification link. */
+const COPY_VERIFICATION_LINK = 'Copy verification link';
 
 export default function TechnicianView() {
 
@@ -172,6 +183,14 @@ export default function TechnicianView() {
     const [sowCreateError, setSowCreateError] = useState<string | null>(null);
 
     const [changeJobStateMutation, { loading: closingJob }] = useMutation(MUTATE_JOB_STATE);
+    const [rerunJobHomologyScreening, { loading: rerunningScreening }] = useMutation(RERUN_JOB_HOMOLOGY_SCREENING);
+    const [loadScreeningBatch, { data: screeningBatchData, loading: screeningBatchLoading, error: screeningBatchError }] = useLazyQuery<{ screeningBatch: ScreeningBatch | null }>(GET_SCREENING_BATCH, {
+        fetchPolicy: 'network-only'
+    });
+    const [homologyModalOpen, setHomologyModalOpen] = useState(false);
+    // Mints the customer's hosted verification URL. Staff only ever copy it or
+    // open the hosted page for a customer on a call — never the embed.
+    const [startJobCustomerVerification, { loading: mintingVerificationLink }] = useMutation(START_JOB_CUSTOMER_VERIFICATION);
     const [withdrawFromCustomer] = useMutation(WITHDRAW_JOB_FROM_CUSTOMER);
     const [withdrawAcceptance] = useMutation(WITHDRAW_JOB_ACCEPTANCE);
     const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
@@ -276,6 +295,80 @@ export default function TechnicianView() {
             refetchInvoices(),
             apolloClient.refetchQueries({ include: [GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS] })
         ]);
+    };
+
+    const handleRerunHomologyScreening = async () => {
+        if (!id) return;
+        try {
+            await rerunJobHomologyScreening({ variables: { jobId: id } });
+            await refetchJob();
+        } catch (e) {
+            window.alert(formatGqlError(e, 'Could not run homology screening.'));
+        }
+    };
+
+    const handleHomologyDetails = () => {
+        const batchId = jobData?.homologyScreening?.batchId;
+        if (!batchId) return;
+        setHomologyModalOpen(true);
+        void loadScreeningBatch({ variables: { id: batchId } });
+    };
+
+    /**
+     * A fresh hosted verification URL for this job's customer. Minted on every
+     * click rather than cached: the server owns the link's lifetime, and a
+     * stale one copied into an email is worse than a round trip.
+     */
+    const mintCustomerVerificationUrl = async (): Promise<string> => {
+        if (!id) throw new Error('No job to verify.');
+        const result = await startJobCustomerVerification({ variables: { jobId: id } });
+        const url: string | undefined = result.data?.startJobCustomerVerification?.url;
+        if (!url) throw new Error('No verification link was returned.');
+        return url;
+    };
+
+    /**
+     * Copy the customer's verification link for staff to send on. The
+     * clipboard is not always available (insecure origin, permission denied,
+     * focus lost while the mutation ran), so the URL is shown for hand-copying
+     * when the write fails rather than silently dropped.
+     */
+    const handleCopyVerificationLink = async () => {
+        // Also reached from the status-pane icon and the details chip, which
+        // stay enabled (a disabled Tooltip child is a MUI warning), so the
+        // re-entry guard lives here rather than on each control.
+        if (mintingVerificationLink) return;
+        let url: string;
+        try {
+            url = await mintCustomerVerificationUrl();
+        } catch (e) {
+            window.alert(formatGqlError(e, 'Could not create a verification link.'));
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(url);
+        } catch {
+            window.alert(`Copy this verification link for the customer:\n\n${url}`);
+        }
+    };
+
+    /**
+     * Open the hosted verification page in a new tab, for staff walking a
+     * customer through it on a call. Mint and open stay inside this click
+     * handler so the `window.open` still counts as the user's gesture.
+     */
+    const handleOpenHostedVerification = async () => {
+        if (mintingVerificationLink) return;
+        try {
+            const url = await mintCustomerVerificationUrl();
+            // The mint is an await, so the open can land outside the gesture
+            // window and be blocked. Fall back to showing the link.
+            if (!openHostedVerification(url)) {
+                window.alert(`Your browser blocked the new tab. Open this verification link for the customer:\n\n${url}`);
+            }
+        } catch (e) {
+            window.alert(formatGqlError(e, 'Could not open hosted verification.'));
+        }
     };
 
     const handleReviewSubmitted = () => refreshJobPage();
@@ -461,8 +554,32 @@ export default function TechnicianView() {
     const invoiceBlocked = invoiceBlockedMessage(sowFullData ? { activeStatus: sowStatus.active?.status ?? null, versions: sowStatus.sow?.versions ?? [] } : null);
     const issueBlockedReason = sowLoading || sowStatus.loading ? 'Checking the Statement of Work…' : invoiceBlocked;
     const jobStatusPaneColor = chipStatusBackground(jobData ? jobStatusColor(jobState) : 'default');
-    const biosecurity = PLACEHOLDER_BIOSECURITY;
+    // Homology and Customer are the screenings with something behind them:
+    // SecureDNA and Aclid run on submission and the job carries their verdicts.
+    // The other three are placeholders.
+    const aclid = jobData?.aclidScreening ?? null;
+    const biosecurity = biosecurityFromJob(jobData);
     const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
+    // Homology's line names the provider that answered: SecureDNA's summary,
+    // Aclid's regulatory verdict when it screened, and the SecureDNA-backup
+    // sentence when Aclid did not answer. `homologyBackup` is that last
+    // sentence alone, for the pane.
+    const { note: homologyNote, backup: homologyBackup } = staffHomologyNote(jobData?.homologyScreening, aclid);
+    const customerNote = customerDetail(aclid);
+    const homologyBatchId = jobData?.homologyScreening?.batchId as string | undefined;
+    const homologyDetailsAvailable = Boolean(homologyBatchId);
+    // The pane's one line explains the rollup, so homology's note belongs there
+    // only when homology is what the rollup is reporting. Otherwise it would
+    // read as an explanation of a status it has nothing to do with — "In
+    // Progress ... 1 sequence cleared by SecureDNA". The one exception is a
+    // SecureDNA backup: that Aclid did not answer is worth a line on the pane
+    // whatever the rollup says. The details always carry the full note.
+    const paneNote = biosecurityComposite === biosecurity.HOMOLOGY ? homologyNote : homologyBackup;
+    const homologyBusy = biosecurity.HOMOLOGY === 'IN_PROGRESS' || rerunningScreening;
+    // Staff can hand the customer their verification link while Aclid has a
+    // screen for this job and has not passed them. Copying is the action; the
+    // embed is the customer's to run on their own page.
+    const customerLinkAvailable = Boolean(aclid?.screenId) && biosecurity.CUSTOMER !== 'PASSED';
     const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
     return (
@@ -722,31 +839,92 @@ export default function TechnicianView() {
                     statusPane={
                         <StatusPaneHeader
                             status={biosecurityStatusLabel(biosecurityComposite)}
-                            description="Metadata, homology, and customer screening have not run yet."
+                            description={paneNote ?? "Rolled up from primary and additional screening."}
                         >
-                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 1 }}>
-                                {BIOSECURITY_SCREENINGS.map((screening) => (
-                                    <Chip
-                                        key={screening.key}
-                                        size="small"
-                                        variant="outlined"
-                                        color={biosecurityStatusColor(biosecurity[screening.key])}
-                                        label={`${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`}
-                                    />
-                                ))}
+                            {/* A glance at the five, in card order. The labels live in
+                                the details below; repeating them here would make the
+                                collapsed card the same list twice. Homology opens the
+                                SecureDNA batch; Customer copies the verification link. */}
+                            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1 }}>
+                                {BIOSECURITY_SCREENINGS.map((screening) => {
+                                    const statusLabel = biosecurityStatusLabel(biosecurity[screening.key]);
+                                    const action =
+                                        screening.key === 'HOMOLOGY' && homologyDetailsAvailable
+                                            ? { label: 'View homology screening details', onClick: handleHomologyDetails }
+                                            : screening.key === 'CUSTOMER' && customerLinkAvailable
+                                                ? { label: COPY_VERIFICATION_LINK, onClick: handleCopyVerificationLink }
+                                                : null;
+                                    const title = action
+                                        ? `${action.label} — ${statusLabel}`
+                                        : `${screening.label}: ${statusLabel}`;
+                                    const icon = <BiosecurityStatusIcon status={biosecurity[screening.key]} />;
+                                    return (
+                                        <Tooltip key={screening.key} title={title}>
+                                            {action ? (
+                                                <IconButton
+                                                    size="small"
+                                                    aria-label={action.label}
+                                                    onClick={action.onClick}
+                                                    sx={{ p: 0.25 }}
+                                                >
+                                                    {icon}
+                                                </IconButton>
+                                            ) : (
+                                                <Box sx={{ display: 'flex' }}>
+                                                    {icon}
+                                                </Box>
+                                            )}
+                                        </Tooltip>
+                                    );
+                                })}
                             </Box>
                         </StatusPaneHeader>
                     }
                     actions={
-                        <Button variant="outlined" size="small" disabled sx={railBtnSx}>
-                            Run screening
-                        </Button>
+                        <>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                sx={railBtnSx}
+                                disabled={!id || homologyBusy}
+                                onClick={handleRerunHomologyScreening}
+                            >
+                                {homologyBusy ? 'Screening…' : 'Run screening'}
+                            </Button>
+                            {customerLinkAvailable && (
+                                <>
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        sx={railBtnSx}
+                                        disabled={!id || mintingVerificationLink}
+                                        onClick={handleCopyVerificationLink}
+                                    >
+                                        {mintingVerificationLink ? 'Creating link…' : COPY_VERIFICATION_LINK}
+                                    </Button>
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        sx={railBtnSx}
+                                        disabled={!id || mintingVerificationLink}
+                                        onClick={handleOpenHostedVerification}
+                                    >
+                                        Open hosted verification
+                                    </Button>
+                                </>
+                            )}
+                        </>
                     }
                     details={
-                        <Typography variant="body2" color="text.secondary">
-                            Biosecurity screening is not wired up yet. Metadata, homology, and customer screening will
-                            report here once they run.
-                        </Typography>
+                        <BiosecurityScreeningSections
+                            screenings={biosecurity}
+                            notes={{ HOMOLOGY: homologyNote, CUSTOMER: customerNote }}
+                            homologyDetailsAvailable={homologyDetailsAvailable}
+                            onHomologyDetails={handleHomologyDetails}
+                            customerDetailsAvailable={customerLinkAvailable}
+                            onCustomerDetails={handleCopyVerificationLink}
+                            customerClickLabel={COPY_VERIFICATION_LINK}
+                        />
                     }
                 />
 
@@ -869,6 +1047,13 @@ export default function TechnicianView() {
                     jobTime={jobTime}
                     jobState={jobState}
                     customerHasNotSeenEdits={customerHasNotSeenEdits}
+                />
+                <ScreeningBatchDetailsModal
+                    open={homologyModalOpen}
+                    batch={screeningBatchData?.screeningBatch ?? null}
+                    loading={screeningBatchLoading}
+                    error={screeningBatchError ? formatGqlError(screeningBatchError, 'Could not load homology screening details.') : null}
+                    onClose={() => setHomologyModalOpen(false)}
                 />
                 <SowEditorModal
                     open={sowModalOpen}

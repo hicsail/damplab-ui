@@ -19,6 +19,7 @@ import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import PlaceIcon from "@mui/icons-material/Place";
 import PublicIcon from "@mui/icons-material/Public";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
+import GppGoodIcon from "@mui/icons-material/GppGood";
 import type { HomeMenuItemId } from "./homeMenu";
 
 /**
@@ -41,6 +42,7 @@ export const MENU_ICONS: Record<HomeMenuItemId, React.ReactNode> = {
   jobs: <ViewStreamIcon />,
   "staff-submit-job": <SupervisorAccountOutlinedIcon />,
   "my-bench": <ScienceIcon />,
+  screener: <GppGoodIcon />,
   "inventory-availability": <PrecisionManufacturingIcon />,
   "inventory-schedule": <EventAvailableIcon />,
   "release-notes": <FormatListBulletedIcon />,

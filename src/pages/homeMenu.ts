@@ -42,6 +42,7 @@ export type HomeMenuItemId =
   | "jobs"
   | "staff-submit-job"
   | "my-bench"
+  | "screener"
   | "inventory-availability"
   | "inventory-schedule"
   | "release-notes"
@@ -188,6 +189,12 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
         label: "My Bench",
         to: "/technician_bench",
         visible: needs(PERMISSIONS.BenchUse),
+      },
+      {
+        id: "screener",
+        label: "Screener",
+        to: "/screener",
+        visible: needs(PERMISSIONS.JobsViewAll),
       },
     ],
   },

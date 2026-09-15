@@ -71,6 +71,7 @@ export default [
     // merged jobs page, clicked a job and bounced to `/`. The merge is what made
     // that path reachable for the first time.
     route("/technician_view/:id", "./pages/TechnicianView.tsx"),
+    route("/screener", "./pages/Screener.tsx"),
   ]),
   layout("./layouts/PrivateRouteBench.tsx", [
     route("/technician_bench", "./pages/TechnicianBench.tsx"),

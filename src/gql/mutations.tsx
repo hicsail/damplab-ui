@@ -306,6 +306,38 @@ export const MUTATE_JOB_STATE = gql`
   }
 `;
 
+export const RERUN_JOB_HOMOLOGY_SCREENING = gql`
+  mutation RerunJobHomologyScreening($jobId: ID!) {
+    rerunJobHomologyScreening(jobId: $jobId) {
+      id
+      homologyScreening {
+        status
+        startedAt
+        completedAt
+        sequenceCount
+        detail
+        batchId
+      }
+    }
+  }
+`;
+
+export const START_JOB_CUSTOMER_VERIFICATION = gql`
+  mutation StartJobCustomerVerification($jobId: ID!) {
+    startJobCustomerVerification(jobId: $jobId) { url }
+  }
+`;
+
+export const REFRESH_JOB_ACLID_SCREENING = gql`
+  mutation RefreshJobAclidScreening($jobId: ID!) {
+    refreshJobAclidScreening(jobId: $jobId) {
+      id
+      homologyScreening { status startedAt completedAt sequenceCount detail batchId }
+      aclidScreening { screenId homologyStatus customerStatus regulatoryStatus verificationStatus decisionStatus detail sequenceCount }
+    }
+  }
+`;
+
 export const SAVE_JOB_WORKFLOWS = gql`
   mutation SaveJobWorkflows($input: SaveJobWorkflowsInput!) {
     saveJobWorkflows(input: $input) {

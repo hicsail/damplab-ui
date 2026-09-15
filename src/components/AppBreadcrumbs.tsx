@@ -34,6 +34,7 @@ const STATIC: Record<string, string> = {
   "/lab-status-tv": "Lab Status TV",
   "/lab-assistant": "AI Lab Assistant",
   "/technician_bench": "My Bench",
+  "/screener": "Screener",
   "/inventory-calendar": "Inventory Schedule",
   "/usage-billing": "Billing",
   "/dashboard": "Jobs",

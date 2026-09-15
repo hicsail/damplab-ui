@@ -27,6 +27,17 @@ describe('job review GraphQL contracts', () => {
     }
   });
 
+  /**
+   * The customer card composites Homology with the other rows, so a query that
+   * does not select `homologyScreening` does not read Unavailable — it lets the
+   * card say Passed once KYC clears, on a job whose homology failed.
+   */
+  it('requests the homology verdict in both job-detail queries, not just the staff one', () => {
+    for (const document of [GET_JOB_BY_ID, GET_OWN_JOB_BY_ID]) {
+      expect(compact(document)).toMatch(/homologyScreening \{[^}]*\bstatus\b[^}]*\bdetail\b[^}]*\bbatchId\b[^}]*\}/);
+    }
+  });
+
   it('requests review and acceptance facts in both job-detail queries', () => {
     const expectedFields = ['customerActionRequired', 'acceptedJobVersionNumber', 'acceptedBillingFingerprint'];
 

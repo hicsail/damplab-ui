@@ -1,11 +1,12 @@
 import React, { useState, useContext, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router';
 import { useApolloClient, useMutation, useQuery } from '@apollo/client';
-import { Alert, Box, Button, Chip, Typography, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
+import { Alert, Box, Button, Chip, IconButton, Tooltip, Typography, Link as MuiLink, List, ListItem, ListItemText } from '@mui/material';
 
 import InvoicePanel from '../components/billing/InvoicePanel';
 import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
-import { CANCEL_JOB, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION } from '../gql/mutations';
+import { CANCEL_JOB, REFRESH_JOB_ACLID_SCREENING, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION, START_JOB_CUSTOMER_VERIFICATION } from '../gql/mutations';
+import { openHostedVerification } from '../aclid/verificationWidget';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
@@ -14,6 +15,8 @@ import JobEquipmentBookingPanel from '../components/booking/JobEquipmentBookingP
 import JobPaymentsPanel from '../components/billing/JobPaymentsPanel';
 import ProcessCard                from '../components/technician/ProcessCard';
 import StatusPaneHeader           from '../components/technician/StatusPaneHeader';
+import { BIOSECURITY_SCREENINGS, biosecurityFromJob, biosecurityStatusColor, biosecurityStatusLabel, compositeBiosecurityStatus, customerDetail } from '../components/technician/biosecurityStatus';
+import BiosecurityScreeningSections, { BiosecurityStatusIcon } from '../components/technician/BiosecurityScreeningSections';
 import { CommentsSection }        from '../components/CommentsSection';
 import ResubmitJobModal          from '../components/ResubmitJobModal';
 import RequestEditAccessModal    from '../components/RequestEditAccessModal';
@@ -147,6 +150,61 @@ export default function Tracking() {
         }
     };
 
+    // Identity verification runs here and only here: the customer is the one
+    // being verified. The staff page copies or opens the hosted URL rather than
+    // completing KYC as the technician.
+    const [startJobCustomerVerification] = useMutation(START_JOB_CUSTOMER_VERIFICATION);
+    const [refreshJobAclidScreening] = useMutation(REFRESH_JOB_ACLID_SCREENING);
+    const [verifyingIdentity, setVerifyingIdentity] = useState(false);
+
+    // Pull Aclid's latest verdict onto the job, then re-read the job so the card
+    // reports it. Failures are swallowed: this runs right after opening the
+    // hosted page, where there is nothing sensible to do with an error, and the
+    // Refresh Job button is always there to try again.
+    const refreshAclid = async () => {
+        if (!id) return;
+        try {
+            await refreshJobAclidScreening({ variables: { jobId: id } });
+            await refetch();
+        } catch {
+            // Reported on the next explicit refresh instead.
+        }
+    };
+
+    /**
+     * Start (or resume) identity verification on Aclid's hosted page.
+     *
+     * Embed is skipped: `verify.aclid.bio` sends `X-Frame-Options` /
+     * `frame-ancestors` that refuse localhost (and any origin they have not
+     * allow-listed). The widget script still loads, so a "script failed →
+     * hosted" fallback never fires — the customer just sees "refused to
+     * connect" in a blank iframe. Hosted is the path that works until Aclid
+     * allow-lists Canvas origins. The card refreshes after the tab opens so
+     * it reads In Progress while they finish.
+     */
+    const handleVerifyIdentity = async () => {
+        // Also reached from the status-pane icon and the details chip, which
+        // stay enabled (a disabled Tooltip child is a MUI warning), so the
+        // re-entry guard lives here rather than on each control.
+        if (!id || verifyingIdentity) return;
+        setVerifyingIdentity(true);
+        try {
+            const result = await startJobCustomerVerification({ variables: { jobId: id } });
+            const url: string | undefined = result.data?.startJobCustomerVerification?.url;
+            if (!url) throw new Error('No verification link was returned.');
+            // One GraphQL round-trip past the click; if the browser still
+            // blocks the tab, give them the URL rather than a silent no-op.
+            if (!openHostedVerification(url)) {
+                window.alert(`Your browser blocked the verification window. Open this link to verify your identity:\n\n${url}`);
+            }
+            await refreshAclid();
+        } catch (e) {
+            window.alert(formatGqlError(e, 'Could not start identity verification.'));
+        } finally {
+            setVerifyingIdentity(false);
+        }
+    };
+
     const activeSow = sowFullData?.activeVersion ?? null;
     const visibleActiveSow = activeSow?.visibleToCustomer === true ? activeSow : null;
     const lifecycle = deriveCustomerLifecycle({
@@ -252,6 +310,21 @@ export default function Tracking() {
     // the *customer* can see, and the server has already filtered this list to
     // exactly that. The rail labels stay hidden — those would name the lab's.
     const customerJobVersion = partyVersionLabel(latestCustomerVisibleJobVersion(versions));
+
+    // The same five screenings the staff card shows, read from the same job
+    // fields, so the two pages agree on this job's biosecurity. Homology is
+    // read-only here — SecureDNA's batch is the lab's to open. Customer is the
+    // one the reader can act on: while Aclid has a screen for this job and has
+    // not passed them, clicking it opens identity verification.
+    const aclid = job?.aclidScreening ?? null;
+    const biosecurity = biosecurityFromJob(job);
+    const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
+    const customerNote = customerDetail(aclid);
+    const customerVerificationAvailable = Boolean(aclid?.screenId) && biosecurity.CUSTOMER !== 'PASSED';
+    const showVerifyIdentity = biosecurity.CUSTOMER === 'IN_PROGRESS';
+    // As on the staff card: the pane's line explains the rollup, so Customer's
+    // note sits there only when Customer is what the rollup is reporting.
+    const biosecurityPaneNote = biosecurityComposite === biosecurity.CUSTOMER ? customerNote : null;
 
     const workflowCard = (
         <>
@@ -520,10 +593,80 @@ export default function Tracking() {
                     }
                 />
 
+                <ProcessCard
+                    title="Biosecurity"
+                    // Open while identity verification is waiting on the reader:
+                    // this is the card they have to act on, and the action lives
+                    // in its rail.
+                    defaultExpanded={showVerifyIdentity}
+                    customerBadge={null}
+                    staffBadge={null}
+                    statusPaneSx={{ bgcolor: chipStatusBackground(biosecurityStatusColor(biosecurityComposite)) }}
+                    statusPane={
+                        <StatusPaneHeader
+                            status={biosecurityStatusLabel(biosecurityComposite)}
+                            description={biosecurityPaneNote ?? 'Rolled up from primary and additional screening.'}
+                        >
+                            {/* A glance at the five, in card order — the same row as
+                                the staff card, with Customer rather than Homology as
+                                the one that acts as a button. */}
+                            <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 1 }}>
+                                {BIOSECURITY_SCREENINGS.map((screening) => {
+                                    const customerClickable =
+                                        screening.key === 'CUSTOMER' && customerVerificationAvailable;
+                                    const title = customerClickable
+                                        ? `Open identity verification — ${biosecurityStatusLabel(biosecurity[screening.key])}`
+                                        : `${screening.label}: ${biosecurityStatusLabel(biosecurity[screening.key])}`;
+                                    const icon = <BiosecurityStatusIcon status={biosecurity[screening.key]} />;
+                                    return (
+                                        <Tooltip key={screening.key} title={title}>
+                                            {customerClickable ? (
+                                                <IconButton
+                                                    size="small"
+                                                    aria-label="Open identity verification"
+                                                    onClick={handleVerifyIdentity}
+                                                    sx={{ p: 0.25 }}
+                                                >
+                                                    {icon}
+                                                </IconButton>
+                                            ) : (
+                                                <Box sx={{ display: 'flex' }}>
+                                                    {icon}
+                                                </Box>
+                                            )}
+                                        </Tooltip>
+                                    );
+                                })}
+                            </Box>
+                        </StatusPaneHeader>
+                    }
+                    actions={
+                        showVerifyIdentity ? (
+                            <Button
+                                variant="contained"
+                                size="small"
+                                sx={railBtnSx}
+                                disabled={!id || verifyingIdentity}
+                                onClick={handleVerifyIdentity}
+                            >
+                                {verifyingIdentity ? 'Opening…' : 'Verify identity'}
+                            </Button>
+                        ) : undefined
+                    }
+                    details={
+                        <BiosecurityScreeningSections
+                            screenings={biosecurity}
+                            notes={{ CUSTOMER: customerNote }}
+                            customerDetailsAvailable={customerVerificationAvailable}
+                            onCustomerDetails={handleVerifyIdentity}
+                        />
+                    }
+                />
+
                 {/* Always rendered, like the staff page's SOW card: "the lab has not
                     sent you one" is a status, and a card that appears out of nowhere
                     partway through a job is harder to follow than one that changes
-                    colour. No Biosecurity card — that one is staff-only. */}
+                    colour. */}
                 <Box ref={sowSectionRef} tabIndex={-1} sx={{ outline: 'none' }}>
                     <SowCustomerView jobId={id || ''} onDeclined={refreshJobPage} />
                 </Box>
