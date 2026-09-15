@@ -49,15 +49,17 @@ interface Props {
   homologyDetailsAvailable?: boolean;
   onHomologyDetails?: () => void;
   /**
-   * Customer has an Aclid screen the reader can act on — the customer's own job
-   * page uses this to open identity verification. Staff never get it: they
-   * must not run the embed as themselves.
+   * Customer has an Aclid screen the reader can act on. The customer's own job
+   * page uses this to open identity verification; the staff page uses it to
+   * copy the customer's verification link. Staff never run the embed as
+   * themselves, so `customerClickLabel` says what the click actually does.
    */
   customerDetailsAvailable?: boolean;
   onCustomerDetails?: () => void;
+  customerClickLabel?: string;
 }
 
-const CLICK_LABELS: Partial<Record<BiosecurityScreeningKey, string>> = {
+const CLICK_LABELS: Record<'HOMOLOGY' | 'CUSTOMER', string> = {
   HOMOLOGY: 'View homology screening details',
   CUSTOMER: 'Open identity verification'
 };
@@ -68,11 +70,17 @@ export default function BiosecurityScreeningSections({
   homologyDetailsAvailable = false,
   onHomologyDetails,
   customerDetailsAvailable = false,
-  onCustomerDetails
+  onCustomerDetails,
+  customerClickLabel = CLICK_LABELS.CUSTOMER
 }: Props): React.JSX.Element {
   const clickHandlerFor = (key: BiosecurityScreeningKey): (() => void) | undefined => {
     if (key === 'HOMOLOGY' && homologyDetailsAvailable) return onHomologyDetails;
     if (key === 'CUSTOMER' && customerDetailsAvailable) return onCustomerDetails;
+    return undefined;
+  };
+  const clickLabelFor = (key: BiosecurityScreeningKey): string | undefined => {
+    if (key === 'HOMOLOGY') return CLICK_LABELS.HOMOLOGY;
+    if (key === 'CUSTOMER') return customerClickLabel;
     return undefined;
   };
   return (
@@ -88,7 +96,7 @@ export default function BiosecurityScreeningSections({
               const statusLabel = biosecurityStatusLabel(status);
               const note = notes?.[screening.key];
               const onClick = clickHandlerFor(screening.key);
-              const clickLabel = onClick ? CLICK_LABELS[screening.key] : undefined;
+              const clickLabel = onClick ? clickLabelFor(screening.key) : undefined;
               const tooltip = clickLabel
                 ? `${clickLabel} — ${statusLabel}${note ? ` — ${note}` : ''}`
                 : note

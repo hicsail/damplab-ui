@@ -179,3 +179,47 @@ export function homologyDetail(result?: HomologyScreeningResult | null): string 
   if (status === 'IN_PROGRESS') return 'Screening with SecureDNA…';
   return result?.detail?.trim() || null;
 }
+
+/**
+ * The SecureDNA-backup sentence out of a homology detail, if there is one. The
+ * server joins the Aclid and SecureDNA legs with `; `, so this picks the clause
+ * that says SecureDNA stood in for Aclid rather than the whole line.
+ */
+export function homologyBackupSentence(detail?: string | null): string | null {
+  return (
+    detail
+      ?.split(';')
+      .map((s) => s.trim())
+      .find((s) => /backup/i.test(s)) || null
+  );
+}
+
+/**
+ * Homology's line for staff, who need to know which provider answered.
+ *
+ * SecureDNA's summary comes first. When Aclid also screened this job its
+ * regulatory verdict follows, then its detail. A SecureDNA-backup sentence is
+ * kept even on a pass, where `homologyDetail` would otherwise drop the detail
+ * in favour of the count that cleared: "3 sequences cleared by SecureDNA" is
+ * true, but staff need to see it was SecureDNA because Aclid did not answer.
+ */
+export function staffHomologyNote(
+  homology?: HomologyScreeningResult | null,
+  aclid?: AclidScreeningResult | null
+): { note: string | null; backup: string | null } {
+  const parts: string[] = [];
+  const push = (part: string | null | undefined) => {
+    const trimmed = part?.trim();
+    if (trimmed && !parts.some((p) => p.includes(trimmed))) parts.push(trimmed);
+  };
+
+  push(homologyDetail(homology));
+  if (aclid?.screenId) {
+    if (aclid.regulatoryStatus) push(`Aclid regulatory status: ${aclid.regulatoryStatus.replace(/_/g, ' ')}`);
+    push(aclid.detail);
+  }
+  const backup = homologyBackupSentence(homology?.detail) ?? homologyBackupSentence(aclid?.detail);
+  push(backup);
+
+  return { note: parts.length ? parts.join(' · ') : null, backup };
+}

@@ -8,8 +8,10 @@ import {
   biosecurityStatusLabel,
   compositeBiosecurityStatus,
   customerDetail,
+  homologyBackupSentence,
   homologyDetail,
   homologyStatusFrom,
+  staffHomologyNote,
   type BiosecurityScreeningStatus,
   type BiosecurityScreenings
 } from './biosecurityStatus';
@@ -223,5 +225,76 @@ describe('homologyDetail', () => {
 
   it('says a screen is running rather than leaving it unexplained', () => {
     expect(homologyDetail({ status: 'IN_PROGRESS' })).toBe('Screening with SecureDNA…');
+  });
+});
+
+describe('homologyBackupSentence', () => {
+  it('picks the SecureDNA-backup clause out of a multi-leg detail', () => {
+    expect(
+      homologyBackupSentence('SecureDNA backup after Aclid error: timeout; 2 sequences cleared')
+    ).toBe('SecureDNA backup after Aclid error: timeout');
+  });
+
+  it('is null when no leg was a backup', () => {
+    expect(homologyBackupSentence('Aclid not_controlled')).toBeNull();
+    expect(homologyBackupSentence(null)).toBeNull();
+    expect(homologyBackupSentence(undefined)).toBeNull();
+  });
+});
+
+describe('staffHomologyNote', () => {
+  it("is SecureDNA's line alone when Aclid did not screen this job", () => {
+    expect(staffHomologyNote({ status: 'PASSED', sequenceCount: 2 }, null)).toEqual({
+      note: '2 sequences cleared by SecureDNA',
+      backup: null
+    });
+    expect(staffHomologyNote(null, null)).toEqual({ note: null, backup: null });
+  });
+
+  it("adds Aclid's regulatory verdict and detail when a screen exists", () => {
+    expect(
+      staffHomologyNote(
+        { status: 'FAILED', detail: 'Aclid controlled' },
+        { screenId: 'scr_1', regulatoryStatus: 'controlled', detail: 'Regulated agent match' }
+      )
+    ).toEqual({
+      note: 'Aclid controlled · Aclid regulatory status: controlled · Regulated agent match',
+      backup: null
+    });
+  });
+
+  it('ignores Aclid fields when there is no screen, even if they are populated', () => {
+    expect(
+      staffHomologyNote({ status: 'UNAVAILABLE', detail: 'Aclid skipped: sequences shorter than 30 bp' }, { screenId: null, regulatoryStatus: 'controlled' })
+    ).toEqual({ note: 'Aclid skipped: sequences shorter than 30 bp', backup: null });
+  });
+
+  it('keeps the SecureDNA-backup sentence on a pass, where homologyDetail would drop it', () => {
+    const result = staffHomologyNote(
+      { status: 'PASSED', sequenceCount: 3, detail: 'SecureDNA backup after Aclid error: 401 Unauthorized; 3 sequence(s) cleared' },
+      { screenId: null, detail: 'Aclid 401 Unauthorized' }
+    );
+    expect(result.backup).toBe('SecureDNA backup after Aclid error: 401 Unauthorized');
+    expect(result.note).toBe('3 sequences cleared by SecureDNA · SecureDNA backup after Aclid error: 401 Unauthorized');
+  });
+
+  it('does not repeat a backup sentence homologyDetail already surfaced', () => {
+    const result = staffHomologyNote(
+      { status: 'FAILED', detail: 'SecureDNA backup after Aclid error: timeout; SecureDNA denied synthesis' },
+      null
+    );
+    expect(result.backup).toBe('SecureDNA backup after Aclid error: timeout');
+    expect(result.note).toBe('SecureDNA backup after Aclid error: timeout; SecureDNA denied synthesis');
+  });
+
+  it('reads a backup sentence off the Aclid detail when the homology detail lacks one', () => {
+    const result = staffHomologyNote(
+      { status: 'PASSED', sequenceCount: 1 },
+      { screenId: 'scr_2', regulatoryStatus: 'not_controlled', detail: 'SecureDNA backup ran alongside' }
+    );
+    expect(result.backup).toBe('SecureDNA backup ran alongside');
+    expect(result.note).toBe(
+      '1 sequence cleared by SecureDNA · Aclid regulatory status: not controlled · SecureDNA backup ran alongside'
+    );
   });
 });
