@@ -16,6 +16,8 @@ declare global {
 
 let loadPromise: Promise<AclidWidget> | null = null;
 
+const WIDGET_LOAD_FAILED = 'ACLID_WIDGET_LOAD_FAILED';
+
 export function customerJobPath(jobId: string): string {
   return `/client_view/${jobId}`;
 }
@@ -25,27 +27,44 @@ function aclidFromWindow(): AclidWidget | undefined {
   return typeof aclid?.showEmbeddedVerification === 'function' ? aclid : undefined;
 }
 
+function rejectWidgetLoadFailed(reject: (reason: Error) => void, script: HTMLScriptElement) {
+  script.remove();
+  reject(new Error(WIDGET_LOAD_FAILED));
+}
+
 function waitForScript(script: HTMLScriptElement): Promise<AclidWidget> {
+  if (script.dataset.loaded === 'error') {
+    script.remove();
+    return Promise.reject(new Error(WIDGET_LOAD_FAILED));
+  }
+
+  const ready = aclidFromWindow();
+  if (ready) {
+    return Promise.resolve(ready);
+  }
+
+  if (script.dataset.loaded === 'true') {
+    script.remove();
+    return Promise.reject(new Error(WIDGET_LOAD_FAILED));
+  }
+
   return new Promise((resolve, reject) => {
     const finish = () => {
-      const ready = aclidFromWindow();
-      if (ready) {
-        resolve(ready);
+      const widget = aclidFromWindow();
+      if (widget) {
+        script.dataset.loaded = 'true';
+        resolve(widget);
         return;
       }
-      reject(new Error('ACLID_WIDGET_LOAD_FAILED'));
+      rejectWidgetLoadFailed(reject, script);
     };
 
     script.addEventListener('load', finish, { once: true });
     script.addEventListener(
       'error',
-      () => reject(new Error('ACLID_WIDGET_LOAD_FAILED')),
+      () => rejectWidgetLoadFailed(reject, script),
       { once: true },
     );
-
-    if (script.dataset.loaded === 'true') {
-      finish();
-    }
   });
 }
 
@@ -54,26 +73,15 @@ function injectWidgetScript(): Promise<AclidWidget> {
     `script[src="${ACLID_WIDGET_SRC}"]`,
   );
   if (existing) {
-    return waitForScript(existing);
+    if (existing.dataset.loaded === 'true') {
+      return waitForScript(existing);
+    }
+    existing.remove();
   }
 
   const script = document.createElement('script');
   script.src = ACLID_WIDGET_SRC;
   script.async = true;
-  script.addEventListener(
-    'load',
-    () => {
-      script.dataset.loaded = 'true';
-    },
-    { once: true },
-  );
-  script.addEventListener(
-    'error',
-    () => {
-      script.dataset.loaded = 'error';
-    },
-    { once: true },
-  );
   document.head.appendChild(script);
   return waitForScript(script);
 }
