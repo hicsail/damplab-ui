@@ -1,12 +1,10 @@
 import type { ChipStatusColor } from '../../utils/technicianProcessStatus';
 
 /**
- * Biosecurity screening — placeholder.
+ * Biosecurity screening statuses for the technician card.
  *
- * Nothing here talks to the server yet. The five screenings, their two groups
- * and their rollup are modelled properly so the card renders in the same idiom
- * as Job and SOW, but every job reports `PLACEHOLDER_BIOSECURITY`. When
- * screening becomes real, that const is the only thing to replace.
+ * Homology and Customer read from the job; the other three screenings still
+ * report `PLACEHOLDER_BIOSECURITY` until their backends exist.
  */
 
 export type BiosecurityScreeningStatus = 'UNAVAILABLE' | 'IN_PROGRESS' | 'PASSED' | 'FAILED';
@@ -97,18 +95,30 @@ export function compositeBiosecurityStatus(
 }
 
 /**
- * The four screenings that have no implementation behind them yet. Homology is
- * real — see `biosecurityFromJob` — so it is deliberately absent here rather
- * than carrying a fake value something could read by mistake.
+ * The four screenings that have no implementation behind them yet, plus Customer
+ * when Aclid has not reported. Homology is real — see `biosecurityFromJob` — so
+ * it is deliberately absent here rather than carrying a fake value.
  */
 export const PLACEHOLDER_BIOSECURITY: Omit<BiosecurityScreenings, 'HOMOLOGY'> = Object.freeze({
-  CUSTOMER: 'IN_PROGRESS',
+  CUSTOMER: 'UNAVAILABLE',
   METADATA: 'UNAVAILABLE',
   WATERMARKING: 'UNAVAILABLE',
   FUNCTIONAL: 'UNAVAILABLE'
 });
 
-/** What the server reports for the one screening that actually runs. */
+/** GraphQL-shaped Aclid screening snapshot on the job. */
+export interface AclidScreeningResult {
+  screenId?: string | null;
+  homologyStatus?: string | null;
+  customerStatus?: string | null;
+  regulatoryStatus?: string | null;
+  verificationStatus?: string | null;
+  decisionStatus?: string | null;
+  detail?: string | null;
+  sequenceCount?: number | null;
+}
+
+/** What the server reports for SecureDNA homology screening. */
 export interface HomologyScreeningResult {
   status?: string | null;
   detail?: string | null;
@@ -135,15 +145,31 @@ export function homologyStatusFrom(result?: HomologyScreeningResult | null): Bio
   }
 }
 
-/** The full set the card renders: a live Homology beside four placeholders. */
-export function biosecurityFromJob(job?: { homologyScreening?: HomologyScreeningResult | null } | null): BiosecurityScreenings {
-  return { ...PLACEHOLDER_BIOSECURITY, HOMOLOGY: homologyStatusFrom(job?.homologyScreening) };
+/** The full set the card renders from job screening fields. */
+export function biosecurityFromJob(
+  job?: {
+    homologyScreening?: HomologyScreeningResult | null;
+    aclidScreening?: AclidScreeningResult | null;
+  } | null
+): BiosecurityScreenings {
+  return {
+    ...PLACEHOLDER_BIOSECURITY,
+    HOMOLOGY: homologyStatusFrom(job?.homologyScreening),
+    CUSTOMER: homologyStatusFrom({ status: job?.aclidScreening?.customerStatus })
+  };
 }
 
 /**
  * The one-line "why" under a screening, when there is one worth showing.
  * Passed needs no explanation; the others do.
  */
+export function customerDetail(aclid?: AclidScreeningResult | null): string | null {
+  const status = homologyStatusFrom({ status: aclid?.customerStatus });
+  if (status === 'IN_PROGRESS') return 'Complete identity verification';
+  if (status === 'PASSED') return null;
+  return aclid?.detail?.trim() || null;
+}
+
 export function homologyDetail(result?: HomologyScreeningResult | null): string | null {
   const status = homologyStatusFrom(result);
   if (status === 'PASSED') {

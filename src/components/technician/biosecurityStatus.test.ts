@@ -7,6 +7,7 @@ import {
   biosecurityStatusColor,
   biosecurityStatusLabel,
   compositeBiosecurityStatus,
+  customerDetail,
   homologyDetail,
   homologyStatusFrom,
   type BiosecurityScreeningStatus,
@@ -58,8 +59,8 @@ describe('compositeBiosecurityStatus', () => {
     expect(compositeBiosecurityStatus({ HOMOLOGY: 'PASSED' })).toBe('PASSED');
   });
 
-  it('is in progress for the placeholder every job currently reports', () => {
-    expect(compositeBiosecurityStatus(PLACEHOLDER_BIOSECURITY)).toBe('IN_PROGRESS');
+  it('is unavailable for the four screenings that have no implementation yet', () => {
+    expect(compositeBiosecurityStatus(PLACEHOLDER_BIOSECURITY)).toBe('UNAVAILABLE');
   });
 });
 
@@ -112,7 +113,7 @@ describe('BIOSECURITY_SCREENING_GROUPS', () => {
 describe('PLACEHOLDER_BIOSECURITY', () => {
   it('holds the four screenings with nothing behind them yet', () => {
     expect(PLACEHOLDER_BIOSECURITY).toEqual({
-      CUSTOMER: 'IN_PROGRESS',
+      CUSTOMER: 'UNAVAILABLE',
       METADATA: 'UNAVAILABLE',
       WATERMARKING: 'UNAVAILABLE',
       FUNCTIONAL: 'UNAVAILABLE'
@@ -123,7 +124,7 @@ describe('PLACEHOLDER_BIOSECURITY', () => {
    * Homology is real, so it must not sit here carrying a fake value that
    * something could read by mistake — `biosecurityFromJob` supplies it.
    */
-  it('does not carry a value for the screening that actually runs', () => {
+  it('does not carry a value for homology — biosecurityFromJob supplies it', () => {
     expect(PLACEHOLDER_BIOSECURITY).not.toHaveProperty('HOMOLOGY');
   });
 });
@@ -153,8 +154,18 @@ describe('biosecurityFromJob', () => {
   it("puts the job's verdict on Homology and leaves the other four placeholder", () => {
     const screenings = biosecurityFromJob({ homologyScreening: { status: 'FAILED' } });
     expect(screenings.HOMOLOGY).toBe('FAILED');
-    expect(screenings.CUSTOMER).toBe('IN_PROGRESS');
+    expect(screenings.CUSTOMER).toBe('UNAVAILABLE');
     expect(screenings.METADATA).toBe('UNAVAILABLE');
+  });
+
+  it('reads Customer from aclidScreening.customerStatus, Unavailable when absent', () => {
+    expect(biosecurityFromJob(null).CUSTOMER).toBe('UNAVAILABLE');
+    expect(biosecurityFromJob({ aclidScreening: { customerStatus: 'PASSED' } }).CUSTOMER).toBe('PASSED');
+    expect(biosecurityFromJob({ aclidScreening: { customerStatus: 'FAILED' } }).CUSTOMER).toBe('FAILED');
+  });
+
+  it('rolls up to Unavailable when nothing ran, not In Progress', () => {
+    expect(compositeBiosecurityStatus(biosecurityFromJob(null))).toBe('UNAVAILABLE');
   });
 
   it('covers every screening the card renders', () => {
@@ -165,8 +176,29 @@ describe('biosecurityFromJob', () => {
     expect(compositeBiosecurityStatus(biosecurityFromJob({ homologyScreening: { status: 'FAILED' } }))).toBe('FAILED');
   });
 
-  it('rolls up to In Progress while homology is unavailable, on the strength of the others', () => {
-    expect(compositeBiosecurityStatus(biosecurityFromJob(null))).toBe('IN_PROGRESS');
+});
+
+describe('customerDetail', () => {
+  it('prompts identity verification while customer screening is in progress', () => {
+    expect(customerDetail({ customerStatus: 'IN_PROGRESS' })).toBe('Complete identity verification');
+  });
+
+  it('needs no line when customer verification passed', () => {
+    expect(customerDetail({ customerStatus: 'PASSED' })).toBeNull();
+  });
+
+  it("surfaces the server's reason for a failure or an unavailable screen", () => {
+    expect(customerDetail({ customerStatus: 'FAILED', detail: 'Identity could not be verified' })).toBe(
+      'Identity could not be verified'
+    );
+    expect(customerDetail({ customerStatus: 'UNAVAILABLE', detail: 'Aclid customer check not started' })).toBe(
+      'Aclid customer check not started'
+    );
+  });
+
+  it('is null when there is nothing worth saying', () => {
+    expect(customerDetail(null)).toBeNull();
+    expect(customerDetail({ customerStatus: 'UNAVAILABLE', detail: '   ' })).toBeNull();
   });
 });
 
