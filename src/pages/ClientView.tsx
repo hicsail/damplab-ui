@@ -6,7 +6,7 @@ import { Alert, Box, Button, Chip, IconButton, Tooltip, Typography, Link as MuiL
 import InvoicePanel from '../components/billing/InvoicePanel';
 import { GET_INVOICES_BY_JOB_ID, GET_OWN_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { CANCEL_JOB, REFRESH_JOB_ACLID_SCREENING, REJECT_JOB_REVIEW, RESTORE_JOB_VERSION, START_JOB_CUSTOMER_VERIFICATION } from '../gql/mutations';
-import { loadAclidWidget, openHostedVerification } from '../aclid/verificationWidget';
+import { openHostedVerification } from '../aclid/verificationWidget';
 import { buildReasonedJobInput, retryOperationId } from '../utils/jobReview';
 import { formatGqlError } from '../utils/gqlError';
 import { JobSubmitterSummary, summarizeJobSubmitter } from '../utils/jobSubmitter';
@@ -151,15 +151,15 @@ export default function Tracking() {
     };
 
     // Identity verification runs here and only here: the customer is the one
-    // being verified, so the embed is theirs to complete. The staff page links
-    // to this page rather than opening the embed as the technician.
+    // being verified. The staff page copies or opens the hosted URL rather than
+    // completing KYC as the technician.
     const [startJobCustomerVerification] = useMutation(START_JOB_CUSTOMER_VERIFICATION);
     const [refreshJobAclidScreening] = useMutation(REFRESH_JOB_ACLID_SCREENING);
     const [verifyingIdentity, setVerifyingIdentity] = useState(false);
 
     // Pull Aclid's latest verdict onto the job, then re-read the job so the card
-    // reports it. Failures are swallowed: this runs from the widget's success
-    // callback, where there is nothing sensible to do with an error, and the
+    // reports it. Failures are swallowed: this runs right after opening the
+    // hosted page, where there is nothing sensible to do with an error, and the
     // Refresh Job button is always there to try again.
     const refreshAclid = async () => {
         if (!id) return;
@@ -172,10 +172,15 @@ export default function Tracking() {
     };
 
     /**
-     * Start (or resume) identity verification. The embedded widget is the
-     * first choice; if its script cannot load or refuses to open, fall back to
-     * the hosted page in a new tab so the customer can still finish. Either way
-     * the card refreshes straight after, so it reads In Progress while they do.
+     * Start (or resume) identity verification on Aclid's hosted page.
+     *
+     * Embed is skipped: `verify.aclid.bio` sends `X-Frame-Options` /
+     * `frame-ancestors` that refuse localhost (and any origin they have not
+     * allow-listed). The widget script still loads, so a "script failed →
+     * hosted" fallback never fires — the customer just sees "refused to
+     * connect" in a blank iframe. Hosted is the path that works until Aclid
+     * allow-lists Canvas origins. The card refreshes after the tab opens so
+     * it reads In Progress while they finish.
      */
     const handleVerifyIdentity = async () => {
         // Also reached from the status-pane icon and the details chip, which
@@ -187,17 +192,10 @@ export default function Tracking() {
             const result = await startJobCustomerVerification({ variables: { jobId: id } });
             const url: string | undefined = result.data?.startJobCustomerVerification?.url;
             if (!url) throw new Error('No verification link was returned.');
-            try {
-                const widget = await loadAclidWidget();
-                widget.showEmbeddedVerification({ verificationUrl: url, onSuccess: () => { void refreshAclid(); } });
-            } catch {
-                // Last resort, and the popup is the likeliest thing to be
-                // blocked here: the open is two awaits past the click, so it no
-                // longer counts as the customer's gesture. Show them the link
-                // rather than leaving nothing to happen.
-                if (!openHostedVerification(url)) {
-                    window.alert(`Your browser blocked the verification window. Open this link to verify your identity:\n\n${url}`);
-                }
+            // One GraphQL round-trip past the click; if the browser still
+            // blocks the tab, give them the URL rather than a silent no-op.
+            if (!openHostedVerification(url)) {
+                window.alert(`Your browser blocked the verification window. Open this link to verify your identity:\n\n${url}`);
             }
             await refreshAclid();
         } catch (e) {
