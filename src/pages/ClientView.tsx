@@ -191,7 +191,13 @@ export default function Tracking() {
                 const widget = await loadAclidWidget();
                 widget.showEmbeddedVerification({ verificationUrl: url, onSuccess: () => { void refreshAclid(); } });
             } catch {
-                openHostedVerification(url);
+                // Last resort, and the popup is the likeliest thing to be
+                // blocked here: the open is two awaits past the click, so it no
+                // longer counts as the customer's gesture. Show them the link
+                // rather than leaving nothing to happen.
+                if (!openHostedVerification(url)) {
+                    window.alert(`Your browser blocked the verification window. Open this link to verify your identity:\n\n${url}`);
+                }
             }
             await refreshAclid();
         } catch (e) {

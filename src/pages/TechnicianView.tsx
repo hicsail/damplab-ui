@@ -360,7 +360,12 @@ export default function TechnicianView() {
     const handleOpenHostedVerification = async () => {
         if (mintingVerificationLink) return;
         try {
-            openHostedVerification(await mintCustomerVerificationUrl());
+            const url = await mintCustomerVerificationUrl();
+            // The mint is an await, so the open can land outside the gesture
+            // window and be blocked. Fall back to showing the link.
+            if (!openHostedVerification(url)) {
+                window.alert(`Your browser blocked the new tab. Open this verification link for the customer:\n\n${url}`);
+            }
         } catch (e) {
             window.alert(formatGqlError(e, 'Could not open hosted verification.'));
         }

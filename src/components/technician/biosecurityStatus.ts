@@ -170,13 +170,31 @@ export function customerDetail(aclid?: AclidScreeningResult | null): string | nu
   return aclid?.detail?.trim() || null;
 }
 
-export function homologyDetail(result?: HomologyScreeningResult | null): string | null {
+/**
+ * Which provider is behind this Homology row, from the row's own provenance.
+ *
+ * `batchId` is SecureDNA's — it is the stored batch — and an Aclid screen id is
+ * Aclid's. In the default `aclid` mode SecureDNA never runs, so crediting it
+ * would tell a technician that two providers agreed when only one answered.
+ * With no provenance either way the row is SecureDNA's, which is what every job
+ * screened before Aclid existed is.
+ */
+function homologyProvider(result?: HomologyScreeningResult | null, aclid?: AclidScreeningResult | null): string {
+  const secureDna = Boolean(result?.batchId);
+  const aclidRan = Boolean(aclid?.screenId);
+  if (aclidRan && secureDna) return 'SecureDNA and Aclid';
+  if (aclidRan) return 'Aclid';
+  return 'SecureDNA';
+}
+
+export function homologyDetail(result?: HomologyScreeningResult | null, aclid?: AclidScreeningResult | null): string | null {
   const status = homologyStatusFrom(result);
+  const provider = homologyProvider(result, aclid);
   if (status === 'PASSED') {
     const count = result?.sequenceCount ?? 0;
-    return count > 0 ? `${count} sequence${count === 1 ? '' : 's'} cleared by SecureDNA` : null;
+    return count > 0 ? `${count} sequence${count === 1 ? '' : 's'} cleared by ${provider}` : null;
   }
-  if (status === 'IN_PROGRESS') return 'Screening with SecureDNA…';
+  if (status === 'IN_PROGRESS') return `Screening with ${provider}…`;
   return result?.detail?.trim() || null;
 }
 
@@ -197,11 +215,12 @@ export function homologyBackupSentence(detail?: string | null): string | null {
 /**
  * Homology's line for staff, who need to know which provider answered.
  *
- * SecureDNA's summary comes first. When Aclid also screened this job its
- * regulatory verdict follows, then its detail. A SecureDNA-backup sentence is
- * kept even on a pass, where `homologyDetail` would otherwise drop the detail
- * in favour of the count that cleared: "3 sequences cleared by SecureDNA" is
- * true, but staff need to see it was SecureDNA because Aclid did not answer.
+ * The row's summary comes first, naming the provider that actually produced it.
+ * When Aclid also screened this job its regulatory verdict follows, then its
+ * detail. A SecureDNA-backup sentence is kept even on a pass, where
+ * `homologyDetail` would otherwise drop the detail in favour of the count that
+ * cleared: "3 sequences cleared by SecureDNA" is true, but staff need to see it
+ * was SecureDNA because Aclid did not answer.
  */
 export function staffHomologyNote(
   homology?: HomologyScreeningResult | null,
@@ -213,7 +232,7 @@ export function staffHomologyNote(
     if (trimmed && !parts.some((p) => p.includes(trimmed))) parts.push(trimmed);
   };
 
-  push(homologyDetail(homology));
+  push(homologyDetail(homology, aclid));
   if (aclid?.screenId) {
     if (aclid.regulatoryStatus) push(`Aclid regulatory status: ${aclid.regulatoryStatus.replace(/_/g, ' ')}`);
     push(aclid.detail);

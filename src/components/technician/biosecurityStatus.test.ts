@@ -178,6 +178,21 @@ describe('biosecurityFromJob', () => {
     expect(compositeBiosecurityStatus(biosecurityFromJob({ homologyScreening: { status: 'FAILED' } }))).toBe('FAILED');
   });
 
+  /**
+   * The invariant the customer card broke while its query left
+   * `homologyScreening` unselected: a KYC pass must never let the card read
+   * Passed over a failed homology verdict. A false clear on a safety verdict,
+   * shown to the person whose sequence was flagged.
+   */
+  it('stays Failed when homology failed and the customer passed KYC', () => {
+    const screenings = biosecurityFromJob({
+      homologyScreening: { status: 'FAILED' },
+      aclidScreening: { customerStatus: 'PASSED' }
+    });
+    expect(screenings.HOMOLOGY).toBe('FAILED');
+    expect(screenings.CUSTOMER).toBe('PASSED');
+    expect(compositeBiosecurityStatus(screenings)).toBe('FAILED');
+  });
 });
 
 describe('customerDetail', () => {
@@ -225,6 +240,22 @@ describe('homologyDetail', () => {
 
   it('says a screen is running rather than leaving it unexplained', () => {
     expect(homologyDetail({ status: 'IN_PROGRESS' })).toBe('Screening with SecureDNA…');
+  });
+
+  /**
+   * In the default `aclid` mode SecureDNA never runs, so the row has no batch.
+   * Crediting it anyway tells a technician two providers agreed.
+   */
+  it('credits the provider that actually screened', () => {
+    const aclidOnly = { screenId: 'scr_1' };
+    expect(homologyDetail({ status: 'PASSED', sequenceCount: 1, batchId: null }, aclidOnly)).toBe('1 sequence cleared by Aclid');
+    expect(homologyDetail({ status: 'IN_PROGRESS', batchId: null }, aclidOnly)).toBe('Screening with Aclid…');
+    expect(homologyDetail({ status: 'PASSED', sequenceCount: 2, batchId: 'batch-1' }, aclidOnly)).toBe(
+      '2 sequences cleared by SecureDNA and Aclid'
+    );
+    expect(homologyDetail({ status: 'PASSED', sequenceCount: 2, batchId: 'batch-1' }, { screenId: null })).toBe(
+      '2 sequences cleared by SecureDNA'
+    );
   });
 });
 
@@ -289,12 +320,21 @@ describe('staffHomologyNote', () => {
 
   it('reads a backup sentence off the Aclid detail when the homology detail lacks one', () => {
     const result = staffHomologyNote(
-      { status: 'PASSED', sequenceCount: 1 },
+      { status: 'PASSED', sequenceCount: 1, batchId: 'batch-1' },
       { screenId: 'scr_2', regulatoryStatus: 'not_controlled', detail: 'SecureDNA backup ran alongside' }
     );
     expect(result.backup).toBe('SecureDNA backup ran alongside');
     expect(result.note).toBe(
-      '1 sequence cleared by SecureDNA · Aclid regulatory status: not controlled · SecureDNA backup ran alongside'
+      '1 sequence cleared by SecureDNA and Aclid · Aclid regulatory status: not controlled · SecureDNA backup ran alongside'
     );
+  });
+
+  /** The default mode, and so what the lab sees on nearly every job. */
+  it('does not credit SecureDNA on a row only Aclid produced', () => {
+    const result = staffHomologyNote(
+      { status: 'PASSED', sequenceCount: 1, batchId: null },
+      { screenId: 'scr_3', regulatoryStatus: 'not_controlled' }
+    );
+    expect(result.note).toBe('1 sequence cleared by Aclid · Aclid regulatory status: not controlled');
   });
 });
