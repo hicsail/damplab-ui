@@ -48,14 +48,33 @@ interface Props {
   /** Homology has a stored batch to open; the chip then acts as a button. */
   homologyDetailsAvailable?: boolean;
   onHomologyDetails?: () => void;
+  /**
+   * Customer has an Aclid screen the reader can act on — the customer's own job
+   * page uses this to open identity verification. Staff never get it: they
+   * must not run the embed as themselves.
+   */
+  customerDetailsAvailable?: boolean;
+  onCustomerDetails?: () => void;
 }
+
+const CLICK_LABELS: Partial<Record<BiosecurityScreeningKey, string>> = {
+  HOMOLOGY: 'View homology screening details',
+  CUSTOMER: 'Open identity verification'
+};
 
 export default function BiosecurityScreeningSections({
   screenings,
   notes,
   homologyDetailsAvailable = false,
-  onHomologyDetails
+  onHomologyDetails,
+  customerDetailsAvailable = false,
+  onCustomerDetails
 }: Props): React.JSX.Element {
+  const clickHandlerFor = (key: BiosecurityScreeningKey): (() => void) | undefined => {
+    if (key === 'HOMOLOGY' && homologyDetailsAvailable) return onHomologyDetails;
+    if (key === 'CUSTOMER' && customerDetailsAvailable) return onCustomerDetails;
+    return undefined;
+  };
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {BIOSECURITY_SCREENING_GROUPS.map((group) => (
@@ -68,10 +87,10 @@ export default function BiosecurityScreeningSections({
               const status = screenings[screening.key] ?? 'UNAVAILABLE';
               const statusLabel = biosecurityStatusLabel(status);
               const note = notes?.[screening.key];
-              const homologyClickable =
-                screening.key === 'HOMOLOGY' && homologyDetailsAvailable && Boolean(onHomologyDetails);
-              const tooltip = homologyClickable
-                ? `View homology screening details — ${statusLabel}${note ? ` — ${note}` : ''}`
+              const onClick = clickHandlerFor(screening.key);
+              const clickLabel = onClick ? CLICK_LABELS[screening.key] : undefined;
+              const tooltip = clickLabel
+                ? `${clickLabel} — ${statusLabel}${note ? ` — ${note}` : ''}`
                 : note
                   ? `${screening.label}: ${statusLabel} — ${note}`
                   : `${screening.label}: ${statusLabel}`;
@@ -102,17 +121,17 @@ export default function BiosecurityScreeningSections({
               );
               return (
                 <Tooltip key={screening.key} title={tooltip}>
-                  {homologyClickable ? (
+                  {onClick && clickLabel ? (
                     <ButtonBase
-                      onClick={onHomologyDetails}
-                      aria-label="View homology screening details"
+                      onClick={onClick}
+                      aria-label={clickLabel}
                       sx={{
                         borderRadius: 1,
                         textAlign: 'left',
-                        '&:hover .homology-chip': { bgcolor: 'action.hover' }
+                        '&:hover .screening-chip': { bgcolor: 'action.hover' }
                       }}
                     >
-                      <Box className="homology-chip" sx={{ width: '100%' }}>
+                      <Box className="screening-chip" sx={{ width: '100%' }}>
                         {chip}
                       </Box>
                     </ButtonBase>
