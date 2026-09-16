@@ -300,6 +300,8 @@ export default function Tracking() {
     const cardWorkflows = current
         ? overlayLiveSampleSheets(versionWorkflowsAsCards(current.workflows, services ?? []), workflows)
         : workflows;
+    /** Presentation only; replaceSampleSheet re-checks the job's state server-side. */
+    const canReplaceSampleSheets = !!job && job.state !== 'CLOSED' && job.state !== 'CANCELLED' && job.state !== 'REJECTED';
 
     // The same rail metrics the staff job page uses, so the two pages line up.
     const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
@@ -345,7 +347,7 @@ export default function Tracking() {
                     />
                 </Box>
             )}
-            <JobWorkflowCards workflows={cardWorkflows} diff={graphDiff} currentVersion={current} baselineVersion={baseline} />
+            <JobWorkflowCards workflows={cardWorkflows} diff={graphDiff} currentVersion={current} baselineVersion={baseline} sampleSheets={{ jobId: id || '', canEdit: canReplaceSampleSheets, onChanged: refreshJobPage }} />
         </>
     );
 
@@ -569,7 +571,7 @@ export default function Tracking() {
                             <SampleSheetSection
                                 jobId={id || ''}
                                 slots={getSampleSheets(workflows)}
-                                canEdit={!!job && job.state !== 'CLOSED' && job.state !== 'CANCELLED' && job.state !== 'REJECTED'}
+                                canEdit={canReplaceSampleSheets}
                                 onChanged={refreshJobPage}
                             />
                             {getParameterFiles().length > 0 && (

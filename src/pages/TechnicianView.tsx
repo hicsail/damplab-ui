@@ -508,6 +508,8 @@ export default function TechnicianView() {
     // The three conditions this turns on are spelled out at hasUnseenStaffEdits.
     const customerHasNotSeenEdits = hasUnseenStaffEdits(versions);
     const cardWorkflows = isHistoricVersion ? overlayLiveSampleSheets(versionWorkflowsAsCards(currentVersion?.workflows, services ?? []), workflows) : workflows;
+    /** Presentation only; replaceSampleSheet re-checks the job's state server-side. */
+    const canReplaceSampleSheets = !!jobData && jobData.state !== 'CLOSED' && jobData.state !== 'CANCELLED' && jobData.state !== 'REJECTED';
 
     const workflowCard = (
         <>
@@ -533,6 +535,7 @@ export default function TechnicianView() {
                 diff={graphDiff}
                 currentVersion={currentVersion}
                 baselineVersion={baselineVersion}
+                sampleSheets={{ jobId: id || '', canEdit: canReplaceSampleSheets, onChanged: refreshJobPage }}
             />
         </>
     );
@@ -800,7 +803,7 @@ export default function TechnicianView() {
                             <SampleSheetSection
                                 jobId={id || ''}
                                 slots={getSampleSheets(workflows)}
-                                canEdit={!!jobData && jobData.state !== 'CLOSED' && jobData.state !== 'CANCELLED' && jobData.state !== 'REJECTED'}
+                                canEdit={canReplaceSampleSheets}
                                 onChanged={refreshJobPage}
                             />
                             {getParameterFiles().length > 0 && (

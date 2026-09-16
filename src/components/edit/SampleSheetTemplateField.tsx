@@ -66,8 +66,9 @@ export default function SampleSheetTemplateField({ serviceId, parameter, canWrit
   return (
     <Stack spacing={1}>
       <Typography variant='body2' color='text.secondary'>
-        Customers download this blank template, fill in one row per sample, and attach it to the operation. The number of rows below the header is shown as the
-        sample count, so keep the column headings in the first row with nothing above them.
+        Customers download this blank template, fill in one row per sample, and attach it to the operation. The number of rows below the header is the sample
+        count, so keep the column headings in the first row with nothing above them. When the operation's pricing is “Based on selected options”, this
+        parameter's price is charged once per sample row, at the customer's category.
       </Typography>
 
       {error && <Alert severity='error' onClose={() => setError(null)}>{error}</Alert>}

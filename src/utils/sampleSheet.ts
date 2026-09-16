@@ -17,14 +17,13 @@ import * as XLSX from 'xlsx';
  * one, and why the number is shown to the person who packed the samples.
  */
 
-export const SAMPLE_SHEET_PARAM_TYPE = 'sampleSheet';
+export { SAMPLE_SHEET_PARAM_TYPE, isSampleSheetParam, parseSampleSheetValue, sampleCountFromValue, sampleCountLabel } from './sampleSheetValue';
+export type { StoredSampleSheet } from './sampleSheetValue';
 
 /** `accept` for the file pickers. Legacy `.xls` is not supported. */
 export const SAMPLE_SHEET_ACCEPT = '.xlsx,.csv';
 
 export const SAMPLE_SHEET_MAX_BYTES = 10 * 1024 * 1024;
-
-export const isSampleSheetParam = (param: any): boolean => !!param && typeof param === 'object' && param.type === SAMPLE_SHEET_PARAM_TYPE;
 
 /** A spreadsheet this browser cannot count, with a message meant for the customer. */
 export class SampleSheetError extends Error {
@@ -33,39 +32,6 @@ export class SampleSheetError extends Error {
     this.name = 'SampleSheetError';
   }
 }
-
-/** The stored value of a sampleSheet parameter, once it has been uploaded. */
-export interface StoredSampleSheet {
-  filename: string;
-  key?: string;
-  contentType?: string;
-  size?: number;
-  sampleCount?: number;
-  uploadedAt?: string;
-  /** Short-lived download URL, added by the server when the job is read. */
-  url?: string;
-}
-
-/**
- * The file record behind a formData value. Stored as a JSON string (like a
- * `file` parameter); comes back from the server as an object with `url`; and
- * on the canvas, before submission, is a pending-file object carrying the
- * chosen `File`. All three answer here.
- */
-export const parseSampleSheetValue = (value: unknown): StoredSampleSheet | null => {
-  if (value === null || value === undefined || value === '') return null;
-  let parsed: any = value;
-  if (typeof value === 'string') {
-    try {
-      parsed = JSON.parse(value);
-    } catch {
-      return null;
-    }
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || typeof parsed.filename !== 'string') return null;
-  const sampleCount = typeof parsed.sampleCount === 'number' && Number.isFinite(parsed.sampleCount) ? parsed.sampleCount : undefined;
-  return { ...parsed, sampleCount };
-};
 
 const cellHasContent = (cell: unknown): boolean => cell !== null && cell !== undefined && String(cell).trim() !== '';
 
@@ -106,5 +72,3 @@ export const countSampleSheetFile = async (file: File): Promise<number> => {
   if (file.size > SAMPLE_SHEET_MAX_BYTES) throw new SampleSheetError('The samples spreadsheet must be smaller than 10 MB.');
   return countSampleSheetBytes(await file.arrayBuffer());
 };
-
-export const sampleCountLabel = (count: number): string => `${count} ${count === 1 ? 'sample' : 'samples'}`;
