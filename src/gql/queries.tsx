@@ -532,6 +532,28 @@ export const ACTIVITY_EVENTS = gql`
   }
 `;
 
+export const JOB_ACTIVITY_TIMELINE = gql`
+  query JobActivityTimeline($jobId: ID!, $limit: Int, $before: DateTime) {
+    jobActivityTimeline(jobId: $jobId, limit: $limit, before: $before) {
+      id
+      createdAt
+      type
+      message
+      actorDisplayName
+      jobId
+      jobVersionNumber
+      sowId
+      sowVersionNumber
+      invoiceId
+      invoiceNumber
+      commentId
+      workflowId
+      workflowNodeId
+      serviceName
+    }
+  }
+`;
+
 // get workflows from gql
 export const GET_WORKFLOWS_BY_STATE = gql`
   query GetWorkflowsByState($state: WorkflowState!) {
@@ -600,8 +622,14 @@ export const GET_WORKFLOWS_FOR_LAB_MONITOR = gql`
 
 // Lab monitor: only approved-job workflows, with nodes and service names (for service-level cards)
 export const GET_LAB_MONITOR_OPERATIONS = gql`
-  query GetLabMonitorOperations($state: WorkflowState!, $includeUnsignedSow: Boolean) {
-    getWorkflowsByStateForLabMonitor(state: $state, includeUnsignedSow: $includeUnsignedSow) {
+  query GetLabMonitorOperations(
+    $state: WorkflowState!
+    $includeUnsignedSow: Boolean
+  ) {
+    getWorkflowsByStateForLabMonitor(
+      state: $state
+      includeUnsignedSow: $includeUnsignedSow
+    ) {
       id
       state
       job {
@@ -633,7 +661,11 @@ export const GET_LAB_MONITOR_NODES = gql`
     $archiveFilter: NodeArchiveFilter
     $includeUnsignedSow: Boolean
   ) {
-    getLabMonitorNodes(nodeState: $nodeState, archiveFilter: $archiveFilter, includeUnsignedSow: $includeUnsignedSow) {
+    getLabMonitorNodes(
+      nodeState: $nodeState
+      archiveFilter: $archiveFilter
+      includeUnsignedSow: $includeUnsignedSow
+    ) {
       _id
       id
       label
@@ -2043,7 +2075,7 @@ export const SOW_VERSION_FIELDS = gql`
       allowsTextOverride
       allowsEmpty
       allowsInitials
-    requiresInitials
+      requiresInitials
     }
     inputs {
       projectManager
