@@ -90,7 +90,7 @@ export default function BiosecurityScreeningSections({
           <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
             {group.label}
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
             {group.screenings.map((screening) => {
               const status = screenings[screening.key] ?? 'UNAVAILABLE';
               const statusLabel = biosecurityStatusLabel(status);
@@ -112,8 +112,7 @@ export default function BiosecurityScreeningSections({
                     py: 0.5,
                     borderRadius: 1,
                     border: '1px solid',
-                    borderColor: 'divider',
-                    width: '100%'
+                    borderColor: 'divider'
                   }}
                 >
                   <BiosecurityStatusIcon status={status} />
@@ -139,9 +138,7 @@ export default function BiosecurityScreeningSections({
                         '&:hover .screening-chip': { bgcolor: 'action.hover' }
                       }}
                     >
-                      <Box className="screening-chip" sx={{ width: '100%' }}>
-                        {chip}
-                      </Box>
+                      <Box className="screening-chip">{chip}</Box>
                     </ButtonBase>
                   ) : (
                     chip
