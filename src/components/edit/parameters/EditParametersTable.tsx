@@ -51,6 +51,7 @@ const TYPE_LABELS: Record<string, string> = {
   string: 'Text',
   number: 'Number',
   file: 'File upload',
+  sampleSheet: 'Samples spreadsheet',
   boolean: 'Yes/No',
   dropdown: 'Pick from list',
   table: 'Table'

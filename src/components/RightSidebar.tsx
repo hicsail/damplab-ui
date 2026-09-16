@@ -30,12 +30,14 @@ interface SidebarProps {
     readOnly?: boolean;
     /** Parameter ids edited relative to the job editor's diff baseline, keyed by node id. Only the job editor passes this. */
     changedParamIdsByNode?: Map<string, Set<string>>;
+    /** False in the job editor, which cannot upload a samples spreadsheet; see Params. */
+    sampleSheetUploadable?: boolean;
     /** When set (job editor), price using the job owner's category rather than the logged-in user's. */
     customerCategory?: string | null;
 }
 
 export default function ContextTestComponent(props: SidebarProps) {
-    const {readOnly, changedParamIdsByNode, customerCategory: customerCategoryProp} = props;
+    const {readOnly, changedParamIdsByNode, customerCategory: customerCategoryProp, sampleSheetUploadable} = props;
 
     const api_url = import.meta.env.VITE_MPI_API || '';
     
@@ -369,6 +371,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                                 onFormDataChange={() => setPricingTick((t) => t + 1)}
                                 changedParamIds={changedParamIdsByNode?.get(activeNode?.id)}
                                 readOnly={readOnly}
+                                sampleSheetUploadable={sampleSheetUploadable}
                             />
                         </div>
                     )

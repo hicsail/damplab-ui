@@ -16,7 +16,8 @@ import RefreshIcon                                    from '@mui/icons-material/
 import { GET_INVOICES_BY_JOB_ID, GET_JOB_BY_ID, GET_SOW_BY_JOB_ID, GET_SOW_EDITOR_STATE, GET_JOB_EQUIPMENT_BOOKING, GET_INVENTORY_AVAILABILITY, GET_JOB_BALANCE, GET_JOB_CHARGES, GET_JOB_PAYMENTS } from '../gql/queries';
 import { JobSubmitterSummary, summarizeJobSubmitter }                                              from '../utils/jobSubmitter';
 import { CREATE_SOW_FOR_JOB, MUTATE_JOB_STATE, RERUN_JOB_HOMOLOGY_SCREENING, START_JOB_CUSTOMER_VERIFICATION, WITHDRAW_JOB_FROM_CUSTOMER, WITHDRAW_JOB_ACCEPTANCE, RESTORE_JOB_VERSION }  from '../gql/mutations';
-import JobWorkflowCards, { getParameterFiles as getJobParameterFiles } from '../components/JobWorkflowCards';
+import JobWorkflowCards, { getParameterFiles as getJobParameterFiles, getSampleSheets, overlayLiveSampleSheets } from '../components/JobWorkflowCards';
+import SampleSheetSection from '../components/SampleSheetSection';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { diffJobGraphs, hasUnseenStaffEdits, jobVersionDisplayLabel, latestVersion, selectedDiffPair } from '../utils/jobGraphDiff';
 import JobVersionHistory from '../components/JobVersionHistory';
@@ -506,7 +507,7 @@ export default function TechnicianView() {
     // Whether accepting would bind the customer to edits they have never seen.
     // The three conditions this turns on are spelled out at hasUnseenStaffEdits.
     const customerHasNotSeenEdits = hasUnseenStaffEdits(versions);
-    const cardWorkflows = isHistoricVersion ? versionWorkflowsAsCards(currentVersion?.workflows, services ?? []) : workflows;
+    const cardWorkflows = isHistoricVersion ? overlayLiveSampleSheets(versionWorkflowsAsCards(currentVersion?.workflows, services ?? []), workflows) : workflows;
 
     const workflowCard = (
         <>
@@ -796,6 +797,12 @@ export default function TechnicianView() {
                                     </List>
                                 </Box>
                             )}
+                            <SampleSheetSection
+                                jobId={id || ''}
+                                slots={getSampleSheets(workflows)}
+                                canEdit={!!jobData && jobData.state !== 'CLOSED' && jobData.state !== 'CANCELLED' && jobData.state !== 'REJECTED'}
+                                onChanged={refreshJobPage}
+                            />
                             {getParameterFiles().length > 0 && (
                                 <Box sx={{ mb: 2 }}>
                                     <Typography variant="subtitle2" sx={{ mb: 1 }}>Parameter Files</Typography>

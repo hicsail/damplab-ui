@@ -553,3 +553,18 @@ describe('diffJobGraphs — reserved parameter own names (R4)', () => {
     expect(diff.paramDiffs[0].name).toBe('Number of plates');
   });
 });
+
+describe('diffJobGraphs — file-shaped values', () => {
+    const wf = (value: unknown) => [{ nodes: [{ id: 'n1', label: 'Op', serviceId: 's1', additionalInstructions: '', formData: [{ id: 'samples', name: 'Samples', value }] }], edges: [] }];
+    const stored = JSON.stringify({ filename: 'samples-5.xlsx', key: 'workflow-parameters/u/x', sampleCount: 5 });
+
+    it('reads a version’s JSON string and the live resolver’s object as the same file', () => {
+        const diff = diffJobGraphs(wf(stored) as any, wf({ filename: 'samples-5.xlsx', key: 'workflow-parameters/u/x', sampleCount: 5, url: 'https://s3/x' }) as any);
+        expect(diff.hasChanges).toBe(false);
+    });
+
+    it('still reports a different file as a change', () => {
+        const diff = diffJobGraphs(wf(stored) as any, wf({ filename: 'samples-3.csv', key: 'workflow-parameters/u/y', sampleCount: 3 }) as any);
+        expect(diff.byNodeId.get('n1')?.paramDiffs.map((p) => [p.before, p.after])).toEqual([['samples-5.xlsx', 'samples-3.csv']]);
+    });
+});

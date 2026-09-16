@@ -7,6 +7,7 @@ import {
   CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS,
 } from '../gql/mutations';
 import { transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
+import { isSampleSheetParam } from './sampleSheet';
 
 export type PendingParamFile = {
   __kind: 'pending-file';
@@ -15,6 +16,8 @@ export type PendingParamFile = {
   filename: string;
   contentType: string;
   size: number;
+  /** Set on a samples spreadsheet: rows below the header, read when it was picked. */
+  sampleCount?: number;
 };
 
 type UploadedParamFile = {
@@ -23,6 +26,7 @@ type UploadedParamFile = {
   contentType: string;
   size: number;
   uploadedAt: string;
+  sampleCount?: number;
 };
 
 const isPendingParamFile = (value: unknown): value is PendingParamFile =>
@@ -86,6 +90,7 @@ export async function submitCanvasJob(
       file: File;
       contentType: string;
       size: number;
+      sampleCount?: number;
     }> = [];
 
     const addFileForUpload = (file: PendingParamFile): string => {
@@ -95,6 +100,7 @@ export async function submitCanvasJob(
         file: file.file,
         contentType: file.contentType || 'application/octet-stream',
         size: file.size,
+        ...(typeof file.sampleCount === 'number' ? { sampleCount: file.sampleCount } : {}),
       });
       return clientToken;
     };
@@ -105,9 +111,11 @@ export async function submitCanvasJob(
       const wfNodes = Array.isArray(workflow) ? workflow : [workflow];
       wfNodes.forEach((node: any) => {
         const parameters = Array.isArray(node.data?.parameters) ? node.data.parameters : [];
+        // A samples spreadsheet is uploaded exactly like a file parameter; the
+        // only difference is the count that rides along in its stored value.
         const fileParamIds = new Set(
           parameters
-            .filter((p: any) => p?.type === 'file' && typeof p.id === 'string')
+            .filter((p: any) => (p?.type === 'file' || isSampleSheetParam(p)) && typeof p.id === 'string')
             .map((p: any) => p.id)
         );
         (node.data.formData || []).forEach((entry: any) => {
@@ -177,14 +185,17 @@ export async function submitCanvasJob(
       })
     );
 
+    const sampleCountByToken = new Map(filesToUpload.filter((f) => typeof f.sampleCount === 'number').map((f) => [f.clientToken, f.sampleCount as number]));
     const uploadedMetaByToken = new Map<string, UploadedParamFile>();
     uploads.forEach((u) => {
+      const sampleCount = sampleCountByToken.get(u.clientToken);
       uploadedMetaByToken.set(u.clientToken, {
         filename: u.filename,
         key: u.key,
         contentType: u.contentType,
         size: u.size,
         uploadedAt: new Date().toISOString(),
+        ...(sampleCount !== undefined ? { sampleCount } : {}),
       });
     });
 

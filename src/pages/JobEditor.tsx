@@ -681,6 +681,7 @@ export default function JobEditor() {
                             <RightSidebar
                                 changedParamIdsByNode={changedParamIdsByNode}
                                 readOnly={readOnly}
+                                sampleSheetUploadable={false}
                                 customerCategory={job?.customerCategory ?? undefined}
                             />
                         </div>
