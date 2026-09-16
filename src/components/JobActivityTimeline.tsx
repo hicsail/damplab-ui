@@ -60,6 +60,33 @@ const CATEGORIES = [
   "Comment",
 ] as const;
 
+/** Clickable chip that closes the drawer so the user can see the section behind it. */
+function ReferenceChip({
+  label,
+  onClose,
+}: {
+  label: string;
+  onClose: () => void;
+}): React.JSX.Element {
+  return (
+    <Chip
+      label={label}
+      size="small"
+      variant="outlined"
+      clickable
+      onClick={onClose}
+      sx={{
+        mt: 0.5,
+        mr: 0.5,
+        height: 20,
+        fontSize: 11,
+        cursor: "pointer",
+        "&:hover": { bgcolor: "action.hover", borderColor: "primary.main" },
+      }}
+    />
+  );
+}
+
 interface Props {
   jobId: string;
   open: boolean;
@@ -207,22 +234,27 @@ export default function JobActivityTimeline({
                       ? ` \u00B7 ${event.actorDisplayName}`
                       : ""}
                   </Typography>
-                  {event.invoiceNumber && (
-                    <Chip
-                      label={`Invoice ${event.invoiceNumber}`}
-                      size="small"
-                      variant="outlined"
-                      sx={{ mt: 0.5, height: 20, fontSize: 11 }}
-                    />
-                  )}
-                  {event.sowVersionNumber != null && (
-                    <Chip
-                      label={`SOW v${event.sowVersionNumber}`}
-                      size="small"
-                      variant="outlined"
-                      sx={{ mt: 0.5, ml: 0.5, height: 20, fontSize: 11 }}
-                    />
-                  )}
+
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
+                    {event.jobVersionNumber != null && (
+                      <ReferenceChip
+                        label={`Version ${event.jobVersionNumber}`}
+                        onClose={onClose}
+                      />
+                    )}
+                    {event.sowVersionNumber != null && (
+                      <ReferenceChip
+                        label={`SOW v${event.sowVersionNumber}`}
+                        onClose={onClose}
+                      />
+                    )}
+                    {event.invoiceNumber && (
+                      <ReferenceChip
+                        label={`Invoice ${event.invoiceNumber}`}
+                        onClose={onClose}
+                      />
+                    )}
+                  </Box>
                 </Box>
               </Box>
             ))}
