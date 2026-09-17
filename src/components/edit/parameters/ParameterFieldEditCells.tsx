@@ -25,6 +25,7 @@ const PARAMETER_TYPE_LABELS: Record<string, string> = {
   string: "Text",
   number: "Number",
   file: "File upload",
+  sampleSheet: "Samples spreadsheet",
   boolean: "Yes/No",
   dropdown: "Pick from list",
   table: "Table",
@@ -500,6 +501,7 @@ export function ParameterTypeSelect(props: GridRenderEditCellParams) {
         <MenuItem value={"string"}>Text</MenuItem>
         <MenuItem value={"number"}>Number</MenuItem>
         <MenuItem value={"file"}>File upload</MenuItem>
+        <MenuItem value={"sampleSheet"}>Samples spreadsheet</MenuItem>
         <MenuItem value={"boolean"}>Yes/No</MenuItem>
         <MenuItem value={"dropdown"}>Pick from list</MenuItem>
         <MenuItem value={"table"}>Table</MenuItem>

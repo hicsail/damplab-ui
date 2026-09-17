@@ -52,6 +52,7 @@ export const resolveParameterName = (entry: any, paramDef?: any): string | undef
   (entry?.id === RUN_COUNT_PARAM_ID ? RUN_COUNT_PARAM_NAME : undefined) ||
   (typeof entry?.id === 'string' ? EQUIPMENT_PARAM_NAMES[entry.id] : undefined);
 import type { CustomerCategory } from './customerCategory';
+import { isSampleSheetParam, sampleCountFromValue } from './sampleSheetValue';
 export type { CustomerCategory };
 
 interface ServiceParameterOption {
@@ -294,6 +295,15 @@ export const calculateParameterCostWithCategory = (
 
     const unitPrice = resolveCategoryPrice(param, customerCategory);
     if (unitPrice === undefined) continue;
+
+    // A samples spreadsheet bills per row — the count stored with the file.
+    // Mirrors the sampleSheet branch in the backend's service-pricing.util.ts.
+    if (isSampleSheetParam(param)) {
+      const count = sampleCountFromValue(entry.value);
+      if (count === undefined || count === 0) continue;
+      total += unitPrice * count;
+      continue;
+    }
 
     // A multiplier parameter that carries its own price is billed `price x value`
     // and is excluded from the line's global multiplier below — otherwise the

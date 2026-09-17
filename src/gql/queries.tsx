@@ -2311,3 +2311,10 @@ export const MY_NOTIFICATION_PREFERENCES = gql`
     }
   }
 `;
+
+// Samples spreadsheets
+export const GET_SAMPLE_SHEET_TEMPLATE_URL = gql`
+  query SampleSheetTemplateUrl($serviceId: ID!, $parameterId: String!) {
+    sampleSheetTemplateUrl(serviceId: $serviceId, parameterId: $parameterId)
+  }
+`;

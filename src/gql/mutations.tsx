@@ -1232,3 +1232,22 @@ export const UPDATE_NOTIFICATION_PREFERENCES = gql`
     }
   }
 `;
+
+// Samples spreadsheets
+export const SAMPLE_SHEET_TEMPLATE_UPLOAD_URL = gql`
+  mutation SampleSheetTemplateUploadUrl($input: SampleSheetTemplateUploadRequest!) {
+    sampleSheetTemplateUploadUrl(input: $input) {
+      uploadUrl
+      key
+    }
+  }
+`;
+
+export const REPLACE_SAMPLE_SHEET = gql`
+  mutation ReplaceSampleSheet($input: ReplaceSampleSheetInput!) {
+    replaceSampleSheet(input: $input) {
+      _id
+      formData
+    }
+  }
+`;

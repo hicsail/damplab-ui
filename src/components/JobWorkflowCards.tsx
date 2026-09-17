@@ -9,6 +9,8 @@ import { diffWordsWithSpace } from 'diff';
 import { resolveParameterName } from '../utils/servicePricing';
 import SowDiffText from './sow/SowDiffText';
 import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
+import { isSampleSheetParam, parseSampleSheetValue, sampleCountLabel } from '../utils/sampleSheetValue';
+import { SampleSheetReplaceButton } from './SampleSheetSection';
 
 /**
  * The per-workflow summary cards shown on both job views.
@@ -20,13 +22,32 @@ import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../
  * With no `diff` supplied this renders exactly as the two copies did.
  */
 
-export const formatParameterValue = (parameterDef: any, value: unknown): string => {
+/**
+ * A file-shaped value as stored on a job version: the JSON string the node
+ * keeps, rather than the object the live node resolver returns. Anything else
+ * comes back unchanged.
+ */
+const parseStoredFileValue = (value: unknown): unknown => {
+    if (typeof value !== 'string' || !value.startsWith('{')) return value;
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' && typeof parsed.filename === 'string' ? parsed : value;
+    } catch {
+        return value;
+    }
+};
+
+export const formatParameterValue = (parameterDef: any, rawValue: unknown): string => {
+    const value = parseStoredFileValue(rawValue);
     const base = (() => {
         if (Array.isArray(value)) return value.map((v) => String(v ?? '')).filter(Boolean).join(', ');
         if (value === null || value === undefined || value === '') return '';
         if (typeof value === 'object') {
             const v = value as any;
-            if (typeof v.filename === 'string' && v.filename.trim() !== '') return v.filename;
+            if (typeof v.filename === 'string' && v.filename.trim() !== '') {
+                // A samples spreadsheet carries its row count; say it next to the name.
+                return typeof v.sampleCount === 'number' ? `${v.filename} (${sampleCountLabel(v.sampleCount)})` : v.filename;
+            }
             if (typeof v.name === 'string' && v.name.trim() !== '') return v.name;
             return '[File attached]';
         }
@@ -109,6 +130,86 @@ export const getParameterFiles = (workflows: any[]): Array<{ label: string; file
     return files;
 };
 
+/** One samples-spreadsheet parameter on one operation of a job, filled in or not. */
+export interface SampleSheetSlot {
+    /** The node's database id — what `replaceSampleSheet` takes. */
+    nodeDbId: string;
+    nodeLabel: string;
+    parameterId: string;
+    parameterName: string;
+    filename?: string;
+    url?: string;
+    sampleCount?: number;
+}
+
+/**
+ * Every samples-spreadsheet slot across a job's live workflows. A parameter
+ * with nothing attached yet is still a slot, so the job page can offer the
+ * first upload as well as a replacement.
+ */
+/** The slot for one sampleSheet parameter on a node, or null when the node has no database id. */
+export const sampleSheetSlot = (node: any, param: any, value: unknown): SampleSheetSlot | null => {
+    const nodeDbId = node?._id;
+    if (typeof nodeDbId !== 'string' || !param || typeof param.id !== 'string') return null;
+    const stored = parseSampleSheetValue(value);
+    return {
+        nodeDbId,
+        nodeLabel: node.label ?? node?.service?.name ?? 'Operation',
+        parameterId: param.id,
+        parameterName: param.name ?? 'Samples spreadsheet',
+        filename: stored?.filename,
+        url: stored?.url,
+        sampleCount: stored?.sampleCount
+    };
+};
+
+export const getSampleSheets = (workflows: any[]): SampleSheetSlot[] => {
+    const slots: SampleSheetSlot[] = [];
+    (workflows ?? []).forEach((workflow: any) => {
+        (workflow?.nodes ?? []).forEach((node: any) => {
+            const serviceParams = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
+            const entries = normalizeFormEntries(node?.formData);
+            serviceParams.filter((p: any) => isSampleSheetParam(p)).forEach((param: any) => {
+                const slot = sampleSheetSlot(node, param, entries.find((entry) => entry.id === param.id)?.value);
+                if (slot) slots.push(slot);
+            });
+        });
+    });
+    return slots;
+};
+
+/**
+ * Version snapshots are what the customer's cards render, and a replaced
+ * samples spreadsheet never writes a version — it is the working list, not
+ * the agreed spec. Without this the card would keep naming the sheet that was
+ * submitted while the section above it names the one the lab actually has.
+ * Overlays the live node's sampleSheet values onto the card nodes, matched by
+ * canvas id; every other parameter is left exactly as the version recorded it.
+ */
+export const overlayLiveSampleSheets = (cardWorkflows: any[], liveWorkflows: any[]): any[] => {
+    if (!Array.isArray(cardWorkflows) || cardWorkflows === liveWorkflows) return cardWorkflows;
+    const liveByNodeId = new Map<string, any>();
+    (liveWorkflows ?? []).forEach((workflow: any) => (workflow?.nodes ?? []).forEach((node: any) => { if (node?.id) liveByNodeId.set(node.id, node); }));
+    if (!liveByNodeId.size) return cardWorkflows;
+
+    return cardWorkflows.map((workflow: any) => ({
+        ...workflow,
+        nodes: (workflow?.nodes ?? []).map((node: any) => {
+            const live = liveByNodeId.get(node?.id);
+            const params = Array.isArray(live?.service?.parameters) ? live.service.parameters : [];
+            const sheetIds = new Set(params.filter((p: any) => isSampleSheetParam(p)).map((p: any) => p.id));
+            if (!sheetIds.size) return node;
+            const liveValues = new Map(normalizeFormEntries(live.formData).filter((e) => sheetIds.has(e.id)).map((e) => [e.id, e.value]));
+            return {
+                ...node,
+                // The database id too, so the inline Replace button has a node to write to.
+                _id: node?._id ?? live._id,
+                formData: normalizeFormEntries(node?.formData).map((entry) => (liveValues.has(entry.id) ? { ...entry, value: liveValues.get(entry.id) } : entry))
+            };
+        })
+    }));
+};
+
 const ADDED_BG = 'rgba(46, 125, 50, 0.10)';
 const CHANGED_BG = 'rgba(237, 108, 2, 0.10)';
 const REMOVED_BG = 'rgba(211, 47, 47, 0.08)';
@@ -122,9 +223,15 @@ interface Props {
     /** The two versions `diff` was computed from, used to caption it. */
     currentVersion?: JobVersionLike | null;
     baselineVersion?: JobVersionLike | null;
+    /**
+     * When present, each operation's samples-spreadsheet line carries its own
+     * Upload/Replace button. `canEdit` is presentation only; the server
+     * re-checks the caller and the job's state.
+     */
+    sampleSheets?: { jobId: string; canEdit: boolean; onChanged: () => Promise<unknown> | void };
 }
 
-export default function JobWorkflowCards({ workflows, fallbackName, diff, currentVersion, baselineVersion }: Props): React.JSX.Element {
+export default function JobWorkflowCards({ workflows, fallbackName, diff, currentVersion, baselineVersion, sampleSheets }: Props): React.JSX.Element {
     /**
      * Nodes the baseline had that no longer exist anywhere on the job. They have
      * no workflow to sit under any more, so they are appended to the first card
@@ -222,9 +329,11 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                                         </Box>
                                                     );
                                                 }
+                                                const sheetSlot = sampleSheets?.canEdit && isSampleSheetParam(paramDef) ? sampleSheetSlot(node, paramDef, rawValue) : null;
                                                 return (
-                                                    <Typography key={entry.id} variant='body2' color='text.secondary'>
-                                                        {label}: {formatParameterValue(paramDef, rawValue)}
+                                                    <Typography key={entry.id} variant='body2' color='text.secondary' component='div' sx={sheetSlot ? { display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' } : undefined}>
+                                                        <span>{label}: {formatParameterValue(paramDef, rawValue) || (sheetSlot ? 'no spreadsheet yet' : '')}</span>
+                                                        {sheetSlot && <SampleSheetReplaceButton jobId={sampleSheets!.jobId} slot={sheetSlot} onChanged={sampleSheets!.onChanged} />}
                                                     </Typography>
                                                 );
                                             })}

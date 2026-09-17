@@ -57,7 +57,10 @@ import {
 } from "../gql/mutations";
 import JobWorkflowCards, {
   getParameterFiles as getJobParameterFiles,
+  getSampleSheets,
+  overlayLiveSampleSheets,
 } from "../components/JobWorkflowCards";
+import SampleSheetSection from "../components/SampleSheetSection";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import {
   diffJobGraphs,
@@ -654,8 +657,17 @@ export default function TechnicianView() {
   // The three conditions this turns on are spelled out at hasUnseenStaffEdits.
   const customerHasNotSeenEdits = hasUnseenStaffEdits(versions);
   const cardWorkflows = isHistoricVersion
-    ? versionWorkflowsAsCards(currentVersion?.workflows, services ?? [])
+    ? overlayLiveSampleSheets(
+        versionWorkflowsAsCards(currentVersion?.workflows, services ?? []),
+        workflows,
+      )
     : workflows;
+  /** Presentation only; replaceSampleSheet re-checks the job's state server-side. */
+  const canReplaceSampleSheets =
+    !!jobData &&
+    jobData.state !== "CLOSED" &&
+    jobData.state !== "CANCELLED" &&
+    jobData.state !== "REJECTED";
 
   const workflowCard = (
     <>
@@ -685,6 +697,11 @@ export default function TechnicianView() {
         diff={graphDiff}
         currentVersion={currentVersion}
         baselineVersion={baselineVersion}
+        sampleSheets={{
+          jobId: id || "",
+          canEdit: canReplaceSampleSheets,
+          onChanged: refreshJobPage,
+        }}
       />
     </>
   );
@@ -1065,6 +1082,12 @@ export default function TechnicianView() {
                   </List>
                 </Box>
               )}
+              <SampleSheetSection
+                jobId={id || ""}
+                slots={getSampleSheets(workflows)}
+                canEdit={canReplaceSampleSheets}
+                onChanged={refreshJobPage}
+              />
               {getParameterFiles().length > 0 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1 }}>

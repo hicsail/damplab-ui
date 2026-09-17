@@ -74,7 +74,10 @@ import { AppContext } from "../contexts/App";
 import { UserContext } from "../contexts/UserContext";
 import JobWorkflowCards, {
   getParameterFiles as getJobParameterFiles,
+  getSampleSheets,
+  overlayLiveSampleSheets,
 } from "../components/JobWorkflowCards";
+import SampleSheetSection from "../components/SampleSheetSection";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import SendIcon from "@mui/icons-material/Send";
 import ThumbUpIcon from "@mui/icons-material/ThumbUpAltOutlined";
@@ -434,8 +437,17 @@ export default function Tracking() {
   // `job.workflows` is no longer the customer graph source.
   const latest = latestVersion(versions);
   const cardWorkflows = current
-    ? versionWorkflowsAsCards(current.workflows, services ?? [])
+    ? overlayLiveSampleSheets(
+        versionWorkflowsAsCards(current.workflows, services ?? []),
+        workflows,
+      )
     : workflows;
+  /** Presentation only; replaceSampleSheet re-checks the job's state server-side. */
+  const canReplaceSampleSheets =
+    !!job &&
+    job.state !== "CLOSED" &&
+    job.state !== "CANCELLED" &&
+    job.state !== "REJECTED";
 
   // The same rail metrics the staff job page uses, so the two pages line up.
   const railBtnSx = {
@@ -497,6 +509,11 @@ export default function Tracking() {
         diff={graphDiff}
         currentVersion={current}
         baselineVersion={baseline}
+        sampleSheets={{
+          jobId: id || "",
+          canEdit: canReplaceSampleSheets,
+          onChanged: refreshJobPage,
+        }}
       />
     </>
   );
@@ -768,6 +785,12 @@ export default function Tracking() {
                   </List>
                 </Box>
               )}
+              <SampleSheetSection
+                jobId={id || ""}
+                slots={getSampleSheets(workflows)}
+                canEdit={canReplaceSampleSheets}
+                onChanged={refreshJobPage}
+              />
               {getParameterFiles().length > 0 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1 }}>
