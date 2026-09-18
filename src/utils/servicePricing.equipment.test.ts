@@ -7,6 +7,7 @@ import {
   EQUIPMENT_START_PARAM_ID,
   RUN_COUNT_PARAM_ID,
   calculateServiceCost,
+  effectivePricingMode,
   equipmentFactor,
   equipmentWeeks,
   resolveParameterName
@@ -99,5 +100,29 @@ describe('resolveParameterName', () => {
 
   it('still prefers a name the entry carries for itself', () => {
     expect(resolveParameterName({ id: EQUIPMENT_START_PARAM_ID, name: 'Kickoff' })).toBe('Kickoff');
+  });
+});
+
+/**
+ * Twin of the backend's `effectivePricingMode` cases. An equipment-use operation is
+ * priced as its hourly rate times the window whatever its stored pricing mode says
+ * — "Based on selected options" priced it at $0 on the canvas and the SOW alike.
+ */
+describe('effectivePricingMode — equipment use always prices by the operation', () => {
+  it('reads the flag when the service record carries it', () => {
+    expect(effectivePricingMode({ pricingMode: 'PARAMETER', equipmentUse: true })).toBe('SERVICE');
+    expect(effectivePricingMode({ pricingMode: 'PARAMETER', equipmentUse: false })).toBe('PARAMETER');
+    expect(effectivePricingMode({ pricingMode: undefined })).toBe('SERVICE');
+  });
+
+  it('reads the reserved equipment window off a canvas node that has no flag', () => {
+    expect(effectivePricingMode({ pricingMode: 'PARAMETER' }, equipmentFormData('2026-01-01', '2026-01-29', 10))).toBe('SERVICE');
+    expect(effectivePricingMode({ pricingMode: 'PARAMETER' }, [{ id: RUN_COUNT_PARAM_ID, value: 2 }])).toBe('PARAMETER');
+  });
+
+  it('prices an equipment-use node left in PARAMETER mode from its tier price', () => {
+    const service = { pricingMode: 'PARAMETER', pricing: { internal: 500, externalMarket: 1000 }, parameters: [] };
+    expect(calculateServiceCost(service, equipmentFormData('2026-01-01', '2026-01-15', 5), undefined, 'EXTERNAL_CUSTOMER_MARKET' as any)).toBe(10000);
+    expect(calculateServiceCost(service, equipmentFormData('2026-01-01', '2026-01-15', 5), undefined, 'INTERNAL_CUSTOMERS' as any)).toBe(5000);
   });
 });

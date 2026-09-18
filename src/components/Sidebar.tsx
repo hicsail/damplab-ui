@@ -1,4 +1,4 @@
-import React, { useState, useEffect, MouseEvent, useContext, useRef } from 'react';
+import React, { useState, useEffect, MouseEvent, useContext, useMemo, useRef } from 'react';
 import { useQuery } from '@apollo/client';
 import {
   Box,
@@ -27,12 +27,29 @@ import { addNodesAndEdgesFromBundle } from '../controllers/GraphHelpers';
 import { Service }       from '../types/Service';
 import { CanvasContext } from '../contexts/Canvas';
 import { AppContext }    from '../contexts/App';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { ImagesBundlesDict, ImagesServicesDict } from '../assets/icons';
 
 
 export default () => {
-  const {services, bundles}  = useContext(AppContext);
+  const {services: allServices, bundles: allBundles}  = useContext(AppContext);
   const {setNodes, setEdges} = useContext(CanvasContext);
+  const { can } = usePermissions();
+
+  // Equipment-use operations are only for unassisted equipment users (and staff).
+  // A plain client does not get them on the palette, nor a bundle that would put
+  // one on the canvas. Server-side twin: `assertMaySubmitEquipmentUse` in
+  // createJob refuses the submission if one arrives anyway (a loaded JSON, say).
+  const mayUseEquipment = can(PERMISSIONS.JobEquipmentUse);
+  const services = useMemo(
+    () => (mayUseEquipment ? allServices : allServices.filter((service: Service) => (service as any).equipmentUse !== true)),
+    [allServices, mayUseEquipment]
+  );
+  const bundles = useMemo(() => {
+    if (mayUseEquipment) return allBundles;
+    const hidden = new Set(allServices.filter((service: Service) => (service as any).equipmentUse === true).map((service: Service) => service.id));
+    return allBundles.filter((bundle: any) => !(Array.isArray(bundle.services) ? bundle.services : []).some((id: unknown) => hidden.has(String(id))));
+  }, [allBundles, allServices, mayUseEquipment]);
 
   const [category,         setCategory]         = useState('');
   const [alignment,        setAlignment]        = useState('services');
@@ -90,13 +107,16 @@ export default () => {
       // filter services by search text
       setFilteredServices(services.filter((service: Service) => service.name.toLowerCase().includes(searchText.toLowerCase())));
     }
-    else if (category !== '' && searchText !== '') {
-      // filter services by search text
-      setFilteredServices(categories.find((cat: any) => cat.id === category).services.filter((service: Service) => service.name.toLowerCase().includes(searchText.toLowerCase())));
-    }
     else {
-      // set filtered services as category.services
-      setFilteredServices(categories.find((cat: any) => cat.id === category).services);
+      // Category services come from their own query, so the equipment-use rule is
+      // applied by membership in the (already filtered) palette list.
+      const allowed = new Set(services.map((service: Service) => service.id));
+      const inCategory = (categories.find((cat: any) => cat.id === category)?.services ?? []).filter((service: Service) => allowed.has(service.id));
+      setFilteredServices(
+        searchText !== ''
+          ? inCategory.filter((service: Service) => service.name.toLowerCase().includes(searchText.toLowerCase()))
+          : inCategory
+      );
     }
   }, [category, services, searchText, categories]);
 

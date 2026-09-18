@@ -176,8 +176,8 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
   {
     title: "Technician Tools",
     items: [
-      // Q7: the matrix gives this to Equipment Users and not Technicians. It stays
-      // filed here because the section is topical.
+      // Q7 gave this to Equipment Users and not Technicians; since 2026-09-18 it is
+      // Administrator only. It stays filed here because the section is topical.
       {
         id: "staff-submit-job",
         label: "Staff submit job",

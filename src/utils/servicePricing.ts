@@ -104,6 +104,25 @@ const normalizePricingMode = (value: unknown): ServicePricingMode => {
   return 'SERVICE';
 };
 
+/**
+ * The pricing mode a line is actually priced under. Twin of `effectivePricingMode`
+ * in damplab-backend/src/pricing/service-pricing.util.ts.
+ *
+ * An equipment-use operation is priced as its own hourly rate times the booked
+ * window; "Based on selected options" has nothing to price there and came to $0.
+ * A canvas node carries no `equipmentUse` flag, so the reserved equipment window
+ * in its formData — injected only for equipment-use services — is the tell.
+ */
+export const effectivePricingMode = (
+  service: { pricingMode?: unknown; equipmentUse?: unknown } | null | undefined,
+  rawFormData?: unknown
+): ServicePricingMode => {
+  if (service?.equipmentUse === true) return 'SERVICE';
+  const formData = normalizeFormDataToArray(rawFormData, new Set());
+  if (formData.some((entry) => entry.id === EQUIPMENT_START_PARAM_ID)) return 'SERVICE';
+  return normalizePricingMode(service?.pricingMode);
+};
+
 const normalizePrice = (value: unknown): number | undefined => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -484,6 +503,7 @@ const getMultiplier = (
 export const calculateServiceCost = (
   service: {
     pricingMode?: unknown;
+    equipmentUse?: unknown;
     price?: unknown;
     internalPrice?: unknown;
     externalPrice?: unknown;
@@ -504,7 +524,7 @@ export const calculateServiceCost = (
   fallbackCost?: unknown,
   customerCategory?: CustomerCategory
 ): number => {
-  const pricingMode = normalizePricingMode(service?.pricingMode);
+  const pricingMode = effectivePricingMode(service, rawFormData);
   let baseCost = 0;
 
   if (pricingMode === 'PARAMETER') {

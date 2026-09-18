@@ -33,8 +33,6 @@ export default [
       id: "admin-services-catalog-legacy",
     }),
     route("/bugs", "./pages/Bugs.tsx"),
-    // Static page, no queries behind it, and the matrix gives it to everyone.
-    route("/release_notes", "./pages/ReleaseNotes.tsx"),
     // announcements:read is baseline, so this sits in the baseline tier. What
     // differs per person is which rows the server sends.
     route("/announcements", "./pages/AnnouncementsFeed.tsx"),
@@ -75,6 +73,10 @@ export default [
   ]),
   layout("./layouts/PrivateRouteBench.tsx", [
     route("/technician_bench", "./pages/TechnicianBench.tsx"),
+  ]),
+  // Static page, no queries behind it; the route is the only gate there is.
+  layout("./layouts/PrivateRouteReleaseNotes.tsx", [
+    route("/release_notes", "./pages/ReleaseNotes.tsx"),
   ]),
   layout("./layouts/PrivateRouteInventoryRead.tsx", [
     route("/inventory", "./pages/Inventory.tsx"),

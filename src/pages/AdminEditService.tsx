@@ -116,7 +116,9 @@ export default function AdminEditService() {
     setServiceCategoryNumber(row.serviceCategoryNumber ?? '');
     setServiceCategoryName(row.serviceCategoryName ?? '');
     setUnit(row.unit ?? '');
-    setPricingMode(row.pricingMode ?? 'SERVICE');
+    // A record written before the rule existed may still say PARAMETER; the form
+    // shows what the save will send, so it is coerced here and not just on toggle.
+    setPricingMode(row.equipmentUse === true ? 'SERVICE' : row.pricingMode ?? 'SERVICE');
     setAllowMultipleRuns(row.allowMultipleRuns === true);
     setEquipmentUse(row.equipmentUse === true);
     setInternalPrice(
@@ -478,8 +480,16 @@ export default function AdminEditService() {
           onChange={(event) => setPricingMode(event.target.value as 'SERVICE' | 'PARAMETER')}
         >
           <MenuItem value="SERVICE">Service price</MenuItem>
-          <MenuItem value="PARAMETER">Based on selected options</MenuItem>
+          <MenuItem value="PARAMETER" disabled={equipmentUse}>
+            Based on selected options
+          </MenuItem>
         </Select>
+        {equipmentUse ? (
+          <FormHelperText>
+            An equipment-use operation is priced by its hourly rate times the booked window, so it always uses the
+            service price.
+          </FormHelperText>
+        ) : null}
       </FormControl>
 
       <FormControlLabel
@@ -492,7 +502,17 @@ export default function AdminEditService() {
       </FormHelperText>
 
       <FormControlLabel
-        control={<Checkbox checked={equipmentUse} onChange={(event) => setEquipmentUse(event.target.checked)} />}
+        control={
+          <Checkbox
+            checked={equipmentUse}
+            onChange={(event) => {
+              setEquipmentUse(event.target.checked);
+              // Server-side twin: DampLabServices refuses the PARAMETER + equipment-use
+              // combination, so the form never offers it.
+              if (event.target.checked) setPricingMode('SERVICE');
+            }}
+          />
+        }
         label="Equipment use"
       />
       <FormHelperText sx={{ mt: -1.5, ml: 4 }}>
