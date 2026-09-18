@@ -41,6 +41,6 @@ export const ASSIGNABLE_ACCESS_TIERS: readonly AccessTier[] = [ACCESS_TIERS.Admi
 export const ACCESS_TIER_HINTS: Record<string, string> = {
   ADMINISTRATOR: 'Full access, including customer management and billing.',
   TECHNICIAN: 'All jobs, the catalog editor, protocol library and lab layout.',
-  EQUIPMENT_USER: 'Own jobs, inventory booking and scheduling, My Bench.',
+  EQUIPMENT_USER: 'Own jobs, equipment-use operations, inventory booking and scheduling.',
   CLIENT: 'The baseline every signed-in user has. Carries no access group.'
 };

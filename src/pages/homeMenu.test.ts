@@ -10,10 +10,11 @@ import { ACCESS_TIERS } from '../constants/accessTiers';
  * The backend resolves them for real; here they stand in for what `myPermissions`
  * would return, so the menu can be checked per role without a server.
  */
-const CLIENT_PERMISSIONS: PermissionName[] = [PERMISSIONS.JobsView, PERMISSIONS.CatalogView, PERMISSIONS.ReleaseNotesView, PERMISSIONS.AnnouncementsRead, PERMISSIONS.TrainingRead, PERMISSIONS.BugsReport];
+const CLIENT_PERMISSIONS: PermissionName[] = [PERMISSIONS.JobsView, PERMISSIONS.CatalogView, PERMISSIONS.AnnouncementsRead, PERMISSIONS.TrainingRead, PERMISSIONS.BugsReport];
 
 const TECHNICIAN_PERMISSIONS: PermissionName[] = [
   ...CLIENT_PERMISSIONS,
+  PERMISSIONS.ReleaseNotesView,
   PERMISSIONS.JobsViewAll,
   PERMISSIONS.BugBacklogView,
   PERMISSIONS.CatalogEditorRead,
@@ -32,14 +33,12 @@ const TECHNICIAN_PERMISSIONS: PermissionName[] = [
 
 const EQUIPMENT_USER_PERMISSIONS: PermissionName[] = [
   ...CLIENT_PERMISSIONS,
-  PERMISSIONS.JobSubmitForClient,
+  PERMISSIONS.JobEquipmentUse,
   PERMISSIONS.InventoryRead,
   PERMISSIONS.InventoryBook,
-  // Amended after the transcription: equipment users reach the Inventory Schedule
-  // and My Bench. See docs/access-matrix.md, "Amendments to the transcription".
-  PERMISSIONS.InventorySchedule,
-  PERMISSIONS.BenchUse,
-  PERMISSIONS.LabMonitorView
+  // Narrowed 2026-09-18: no Staff submit job, My Bench or Lab Monitors. See
+  // docs/access-matrix.md, "Amendments to the transcription".
+  PERMISSIONS.InventorySchedule
 ];
 
 const user = (permissions: PermissionName[], isDamplabStaff = false): HomeMenuUser => ({ permissions, permissionsLoaded: true, isDamplabStaff });
@@ -115,10 +114,9 @@ describe('homepage sections match the access matrix', () => {
  * and which whole sections therefore disappear.
  */
 describe('what each role sees', () => {
-  it('shows a plain client only the baseline buttons — no Book Inventory, no Bug Backlog', () => {
+  it('shows a plain client only the baseline buttons — no Book Inventory, no Bug Backlog, no Release Notes', () => {
     expect(labelsBySection(CLIENT)).toEqual({
       'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'DAMP Lab Website'],
-      'Admin Operational Tools': ['Release Notes'],
     });
   });
 
@@ -132,14 +130,10 @@ describe('what each role sees', () => {
     });
   });
 
-  it('shows an equipment user My Bench and the Inventory Schedule, per the matrix amendment', () => {
+  it('shows an equipment user the client set plus inventory, and none of the staff sections', () => {
     expect(labelsBySection(EQUIPMENT_USER)).toEqual({
       'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'DAMP Lab Website'],
-      // Q7 still holds: an equipment user may submit for a client, a technician may not.
-      'Technician Tools': ['Staff submit job', 'My Bench'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
-      'Admin Operational Tools': ['Release Notes'],
-      'Admin Management Tools': ['Lab Monitor North', 'Lab Monitor South'],
     });
   });
 

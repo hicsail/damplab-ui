@@ -12,6 +12,7 @@ export const PERMISSIONS = {
   JobsView: 'jobs:view',
   JobsViewAll: 'jobs:view-all',
   JobSubmitForClient: 'job:submit-for-client',
+  JobEquipmentUse: 'job:equipment-use',
   ReleaseNotesView: 'releasenotes:view',
   AnnouncementsRead: 'announcements:read',
   AnnouncementsWrite: 'announcements:write',

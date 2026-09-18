@@ -72,8 +72,8 @@ export default function StaffJobSubmit() {
   const [lastSubmittedJob, setLastSubmittedJob] = useState<{ id: string; jobId?: string } | null>(null);
 
   // This redirect, not the route table, is what actually gates this page --
-  // /staff_submit lives in the baseline layout. Q7: the matrix gives this to
-  // Administrators and Equipment Users, and NOT to Technicians.
+  // /staff_submit lives in the baseline layout. Administrator only since
+  // 2026-09-18 (Q7 had given it to Equipment Users as well).
   if (!can(PERMISSIONS.JobSubmitForClient)) {
     return <Navigate to="/checkout" replace />;
   }
@@ -83,9 +83,9 @@ export default function StaffJobSubmit() {
    * not the empty canvas.
    *
    * Which job page depends on the submitter. `/technician_view/:id` is gated by
-   * `jobs:view-all`, and an Equipment User holds `job:submit-for-client` without
-   * it (Q7 again) — sending them there would bounce them straight back out. The
-   * client-facing tracking page is reachable by everyone authenticated.
+   * `jobs:view-all`; a submitter holding `job:submit-for-client` without it would
+   * bounce straight back out, so the check stays even though today's grant makes
+   * the two coincide. The client-facing tracking page is reachable by everyone.
    */
   const jobPageFor = (jobId: string): string =>
     can(PERMISSIONS.JobsViewAll) ? `/technician_view/${jobId}` : `/client_view/${jobId}`;
