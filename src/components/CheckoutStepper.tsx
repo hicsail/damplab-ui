@@ -6,7 +6,7 @@ import { DeleteForeverSharp, PlusOne } from '@mui/icons-material';
 
 // import { MUTATE_NODE_STATUS } from '../gql/mutations';
 import { AppContext }         from '../contexts/App';
-import { ImagesServicesDict } from '../assets/icons';
+import { getServiceIcon }   from '../assets/icons';
 import { resolveParameterName } from '../utils/servicePricing';
 
 
@@ -83,7 +83,7 @@ export default function WorkflowStepper(workflow: any) {
                 {workflowServices.map((service: any, index: number) => (
                     <Step key={service.id} style={{ maxWidth: 250, minWidth: 50, paddingLeft: 50, paddingRight: 50 }}>
                         <StepButton onClick={selectStep(index)}>
-                            <StepLabel StepIconComponent={() => <img src={ImagesServicesDict[service.name]} height="50" alt="Service icon"/>}>
+                            <StepLabel StepIconComponent={() => <img src={getServiceIcon(service.name)} height="50" alt="Service icon"/>}>
                                 <div style={{display: 'flex', alignItems: 'end' }}>
                                 <Badge   anchorOrigin={{vertical: 'top', horizontal: 'right'}} badgeContent={
                                     <div>
@@ -135,7 +135,7 @@ export default function WorkflowStepper(workflow: any) {
                             {/* URL (e.g. to Google Drive) from the DB... */}
                             {/* <img src={workflow.workflow[activeStep].data.icon} alt=" " style={{ width: 20 }} /> */}
                             {/* Local files in src/assets/icons folder... */}
-                            <img src={ImagesServicesDict[workflow.workflow[activeStep].data.name]} alt=" " style={{ width: 20 }} />
+                            <img src={getServiceIcon(workflow.workflow[activeStep].data.name)} alt=" " style={{ width: 20 }} />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>

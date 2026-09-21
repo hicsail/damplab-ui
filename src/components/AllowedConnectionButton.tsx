@@ -1,7 +1,7 @@
 import { Button } from '@mui/material';
 
 import { addNodeToCanvasWithEdge } from '../controllers/GraphHelpers';
-import { ImagesServicesDict }      from '../assets/icons';
+import { getServiceIcon }        from '../assets/icons';
 
 
 export default function NodeButton(data: any) {
@@ -11,7 +11,7 @@ export default function NodeButton(data: any) {
     // URL (e.g. to Google Drive) from the DB...
     // const icon = node.icon;
     // Local files in src/assets/icons folder...
-    const icon = ImagesServicesDict[label];
+    const icon = getServiceIcon(label);
 
     return (
         <div>

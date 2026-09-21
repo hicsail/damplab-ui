@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextOperationsPerWorkflow } from './TechnicianBench';
+import { ALL_JOBS, formatValue, jobOptionsFromOperations, nextOperationsPerWorkflow, operationsForJob, optionLabelLookup } from './TechnicianBench';
 
 /**
  * "Next step only" on My Bench.
@@ -73,5 +73,37 @@ describe('nextOperationsPerWorkflow', () => {
     const rows = [op({ _id: 'done', state: 2 }), op({ _id: 'todo', state: 0, workflowId: 'w2' })];
 
     expect(ids(nextOperationsPerWorkflow(rows))).toEqual(['todo']);
+  });
+});
+
+describe('job filter', () => {
+  const rows = [
+    op({ _id: 'a', job: { id: 'j1', name: 'Gibson', jobId: '101' } }),
+    op({ _id: 'b', job: { id: 'j2', name: 'Miniprep' } }),
+    op({ _id: 'c', job: { id: 'j1', name: 'Gibson', jobId: '101' } }),
+    op({ _id: 'd', job: null })
+  ];
+
+  it('lists each job once, in first-seen order, with its operation count', () => {
+    expect(jobOptionsFromOperations(rows)).toEqual([
+      { id: 'j1', label: 'Gibson · #101', count: 2 },
+      { id: 'j2', label: 'Miniprep', count: 1 }
+    ]);
+  });
+
+  it('keeps only the chosen job, and everything for "All jobs"', () => {
+    expect(ids(operationsForJob(rows, 'j1'))).toEqual(['a', 'c']);
+    expect(ids(operationsForJob(rows, ALL_JOBS))).toEqual(['a', 'b', 'c', 'd']);
+  });
+});
+
+describe('parameter display', () => {
+  const params = [{ id: 'ladder', options: [{ id: '1-kb-plus-ladder', name: '1 kb plus ladder' }] }];
+
+  it('shows a dropdown option by its name rather than its stored id', () => {
+    const labels = optionLabelLookup(params);
+    expect(formatValue('1-kb-plus-ladder', labels.ladder)).toBe('1 kb plus ladder');
+    expect(formatValue(['1-kb-plus-ladder'], labels.ladder)).toBe('1 kb plus ladder');
+    expect(formatValue('free text', labels.ladder)).toBe('free text');
   });
 });

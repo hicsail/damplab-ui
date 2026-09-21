@@ -28,7 +28,7 @@ import { Service }       from '../types/Service';
 import { CanvasContext } from '../contexts/Canvas';
 import { AppContext }    from '../contexts/App';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
-import { ImagesBundlesDict, ImagesServicesDict } from '../assets/icons';
+import { ImagesBundlesDict, getServiceIcon } from '../assets/icons';
 
 
 export default () => {
@@ -251,7 +251,7 @@ export default () => {
                     draggable
                   >
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: '100%' }}>
-                        {ImagesServicesDict[service.name] && <img src = {ImagesServicesDict[service.name]} alt = "img not found" style = {{ height: 40 }} /> }
+                        <img src = {getServiceIcon(service.name)} alt = "img not found" style = {{ height: 40 }} />
                         <div style={{ padding: 5, whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere', width: '100%', textAlign: 'center' }}>
                           {service.name}
                         </div>

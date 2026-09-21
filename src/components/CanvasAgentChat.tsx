@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { DeepChat } from 'deep-chat-react';
 import { Box, Fab, IconButton, Paper, Stack, Typography } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -7,6 +7,7 @@ import { CanvasContext } from '../contexts/Canvas';
 import { AppContext } from '../contexts/App';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { hydrateAgentWorkflow, AgentWorkflowSpec } from '../controllers/AgentWorkflowHydration';
+import { buildDemoWorkflowSpec, DemoAgentScript, findDemoScript, GIBSON_DEMO } from '../data/demoAgentScripts';
 
 /** Resolve the REST agent endpoint from the configured GraphQL backend URL. */
 function agentUrl(): string {
@@ -14,10 +15,62 @@ function agentUrl(): string {
   return backend.replace(/\/graphql\/?$/, '') + '/api/agent/chat';
 }
 
-export default function CanvasAgentChat() {
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// DeepChat props live at module scope so ChatWindow's props never change.
+const REQUEST_BODY_LIMITS = { maxMessages: -1 };
+const CHAT_STYLE = { width: '100%', height: '480px', border: 'none', borderRadius: '0px', backgroundColor: 'white' };
+const TEXT_INPUT = { placeholder: { text: 'e.g. Gibson Assembly then sequencing' } };
+const MESSAGE_STYLES = {
+  default: {
+    ai: { bubble: { backgroundColor: '#f1f5f9', color: '#111827', maxWidth: '85%' } },
+    user: { bubble: { backgroundColor: '#1976d2', color: 'white', maxWidth: '85%' } }
+  }
+};
+const INTRO_MESSAGES = [
+  {
+    text:
+      "Hi! Describe the lab workflow you want — an end goal, sample type, or the operations you have in mind — and I'll assemble it on the canvas. I'll ask questions if I need more detail."
+  },
+  {
+    // deep-chat submits a suggestion button's text as the user's message.
+    html: `<div class="deep-chat-temporary-message"><div style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">Try an example:</div><button class="deep-chat-button deep-chat-suggestion-button" style="text-align: left; line-height: 1.35; white-space: normal;">${escapeHtml(GIBSON_DEMO.prompt)}</button></div>`
+  }
+];
+
+/**
+ * The @lit/react wrapper re-assigns every property to <deep-chat> on each React
+ * render, whether or not it changed, and deep-chat re-initializes and drops the
+ * conversation when that happens. Canvas updates re-render CanvasAgentChat
+ * through context, so the chat sits behind memo with only stable props.
+ */
+const ChatWindow = memo(function ChatWindow({ connect }: { connect: any }) {
+  return (
+    <DeepChat
+      connect={connect}
+      // Include the FULL conversation in body.messages (default only sends the
+      // latest), so the handler can forward prior turns to the agent as history.
+      requestBodyLimits={REQUEST_BODY_LIMITS}
+      style={CHAT_STYLE}
+      introMessage={INTRO_MESSAGES}
+      textInput={TEXT_INPUT}
+      messageStyles={MESSAGE_STYLES}
+    />
+  );
+});
+
+interface CanvasAgentChatProps {
+  /** Called after a workflow lands on the canvas, e.g. to fit the view to it. */
+  onWorkflowApplied?: () => void;
+}
+
+export default function CanvasAgentChat({ onWorkflowApplied }: CanvasAgentChatProps = {}) {
   const [open, setOpen] = useState(false);
   const { setNodes, setEdges } = useContext(CanvasContext);
-  const { services } = useContext(AppContext);
+  const { services, bundles } = useContext(AppContext);
   const userContext: UserContextProps = useContext(UserContext);
   const [lastNote, setLastNote] = useState<string | null>(null);
 
@@ -26,15 +79,19 @@ export default function CanvasAgentChat() {
   // bump the root context), it resets and the messages vanish. So we build the
   // handler ONCE (stable identity) and have it read live values from refs.
   const servicesRef = useRef(services);
+  const bundlesRef = useRef(bundles);
+  const onAppliedRef = useRef(onWorkflowApplied);
   const setNodesRef = useRef(setNodes);
   const setEdgesRef = useRef(setEdges);
   const getTokenRef = useRef(userContext.userProps?.getAccessToken);
   useEffect(() => {
     servicesRef.current = services;
+    bundlesRef.current = bundles;
+    onAppliedRef.current = onWorkflowApplied;
     setNodesRef.current = setNodes;
     setEdgesRef.current = setEdges;
     getTokenRef.current = userContext.userProps?.getAccessToken;
-  }, [services, setNodes, setEdges, userContext.userProps]);
+  }, [services, bundles, onWorkflowApplied, setNodes, setEdges, userContext.userProps]);
 
   // Replace the canvas with the agent's proposed workflow, hydrated against the
   // live catalog. Replacing (not appending) matches "describe it → see it".
@@ -47,6 +104,7 @@ export default function CanvasAgentChat() {
       }
       setNodesRef.current?.(nodes as any);
       setEdgesRef.current?.(edges as any);
+      onAppliedRef.current?.();
       setLastNote(
         missingServiceIds.length > 0
           ? `Rendered ${nodes.length} step(s). Skipped ${missingServiceIds.length} unknown service(s).`
@@ -55,6 +113,21 @@ export default function CanvasAgentChat() {
     } catch (e: any) {
       setLastNote(`Could not render the workflow: ${e?.message ?? 'error'}`);
     }
+  };
+
+  // Scripted demo reply: a pause while the loading bubble shows, the reply
+  // streamed word by word, then the workflow applied — no backend call.
+  const playDemoScript = async (script: DemoAgentScript, signals: any) => {
+    await sleep(2200);
+    signals.onOpen();
+    const tokens = script.reply.match(/\S+\s*|\s+/g) ?? [script.reply];
+    for (const token of tokens) {
+      signals.onResponse({ text: token });
+      await sleep(35);
+    }
+    await sleep(400);
+    applyWorkflow(buildDemoWorkflowSpec(script, servicesRef.current || [], bundlesRef.current || []));
+    signals.onClose();
   };
 
   // DeepChat custom request handler: streams SSE from the backend, appends text
@@ -69,6 +142,12 @@ export default function CanvasAgentChat() {
           const msgs: any[] = Array.isArray(body?.messages) ? body.messages : [];
           const last = msgs[msgs.length - 1];
           const message = last?.text ?? '';
+
+          const demo = findDemoScript(message);
+          if (demo) {
+            await playDemoScript(demo, signals);
+            return;
+          }
           const history = msgs
             .slice(0, -1)
             .filter((m) => m && typeof m.text === 'string')
@@ -181,24 +260,7 @@ export default function CanvasAgentChat() {
       {/* DeepChat needs an explicit pixel height — it does NOT size to a flex
           parent. Without this its message list grows unbounded and the input
           box gets pushed out of the clipped panel. */}
-      <DeepChat
-        connect={connect as any}
-        // Include the FULL conversation in body.messages (default only sends the
-        // latest), so the handler can forward prior turns to the agent as history.
-        requestBodyLimits={{ maxMessages: -1 }}
-        style={{ width: '100%', height: '480px', border: 'none', borderRadius: '0px', backgroundColor: 'white' }}
-        introMessage={{
-          text:
-            "Hi! Describe the lab workflow you want — an end goal, sample type, or the operations you have in mind — and I'll assemble it on the canvas. I'll ask questions if I need more detail."
-        }}
-        textInput={{ placeholder: { text: 'e.g. Gibson Assembly then sequencing' } }}
-        messageStyles={{
-          default: {
-            ai: { bubble: { backgroundColor: '#f1f5f9', color: '#111827', maxWidth: '85%' } },
-            user: { bubble: { backgroundColor: '#1976d2', color: 'white', maxWidth: '85%' } }
-          }
-        }}
-      />
+      <ChatWindow connect={connect} />
 
       {lastNote && (
         <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider', bgcolor: '#f8fafc', flexShrink: 0 }}>

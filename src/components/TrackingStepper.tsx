@@ -7,7 +7,7 @@ import DoneIcon    from '@mui/icons-material/Done';
 import PendingIcon from '@mui/icons-material/Pending';
 
 import { AppContext }         from '../contexts/App';
-import { ImagesServicesDict } from '../assets/icons';
+import { getServiceIcon }   from '../assets/icons';
 import { resolveParameterName } from '../utils/servicePricing';
 
 
@@ -127,7 +127,7 @@ export default function TrackingStepper(workflow: any) {
                             {/* URL (e.g. to Google Drive) from the DB... */}
                             {/* <img src={workflow.workflow[activeStep].data.icon} alt=" " style={{ width: 20 }} /> */}
                             {/* Local files in src/assets/icons folder... */}
-                            <img src={ImagesServicesDict[workflow.workflow[activeStep].data.name]} alt=" " style={{ width: 20 }} />
+                            <img src={getServiceIcon(workflow.workflow[activeStep].data.name)} alt=" " style={{ width: 20 }} />
                         </div>
                         <div className='name'>
                             <Typography variant='subtitle1'>

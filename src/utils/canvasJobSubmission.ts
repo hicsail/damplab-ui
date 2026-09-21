@@ -22,12 +22,23 @@ export type PendingParamFile = {
 
 type UploadedParamFile = {
   filename: string;
-  key: string;
+  /** Absent when the file was never stored (local dev without a bucket); see allowUnstoredParamFiles. */
+  key?: string;
+  /** Set instead of `key` when the upload was skipped. */
+  notUploaded?: true;
   contentType: string;
   size: number;
   uploadedAt: string;
   sampleCount?: number;
 };
+
+/**
+ * On the local dev server a parameter file that can't be stored (no bucket
+ * configured, MinIO not running) is recorded by name only instead of failing
+ * the submission. Deployed builds still fail, so a real job never silently
+ * loses a file.
+ */
+const allowUnstoredParamFiles = import.meta.env.DEV;
 
 const isPendingParamFile = (value: unknown): value is PendingParamFile =>
   !!value &&
@@ -141,59 +152,75 @@ export async function submitCanvasJob(
       return clonedWorkflows;
     }
 
-    const uploadMetaResult = await client.mutate({
-      mutation: CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS,
-      variables: {
-        files: filesToUpload.map((f) => ({
-          clientToken: f.clientToken,
-          filename: f.file.name,
-          contentType: f.contentType,
-          size: f.size,
-        })),
-      },
-      context: {
-        headers: {
-          authorization: token ? `Bearer ${token}` : '',
-        },
-      },
-    });
-
-    const uploads: Array<{
+    type ParamUpload = {
       clientToken: string;
       filename: string;
       uploadUrl: string;
       key: string;
       contentType: string;
       size: number;
-    }> = uploadMetaResult.data?.createWorkflowParameterUploadUrls ?? [];
+    };
+
+    let uploads: ParamUpload[] = [];
+    try {
+      const uploadMetaResult = await client.mutate({
+        mutation: CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS,
+        variables: {
+          files: filesToUpload.map((f) => ({
+            clientToken: f.clientToken,
+            filename: f.file.name,
+            contentType: f.contentType,
+            size: f.size,
+          })),
+        },
+        context: {
+          headers: {
+            authorization: token ? `Bearer ${token}` : '',
+          },
+        },
+      });
+      uploads = uploadMetaResult.data?.createWorkflowParameterUploadUrls ?? [];
+    } catch (e) {
+      if (!allowUnstoredParamFiles) throw e;
+      console.warn('[dev] Parameter file storage unavailable; submitting file names only.', e);
+    }
     const uploadByToken = new Map(uploads.map((u) => [u.clientToken, u]));
 
+    const storedTokens = new Set<string>();
     await Promise.all(
       filesToUpload.map(async (f) => {
         const upload = uploadByToken.get(f.clientToken);
-        if (!upload) throw new Error(`Upload URL not found for file token ${f.clientToken}`);
-        const response = await fetch(upload.uploadUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': upload.contentType || 'application/octet-stream',
-          },
-          body: f.file,
-        });
-        if (!response.ok) {
-          throw new Error(`Failed to upload parameter file ${f.file.name}`);
+        try {
+          if (!upload) throw new Error(`Upload URL not found for file token ${f.clientToken}`);
+          const response = await fetch(upload.uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': upload.contentType || 'application/octet-stream',
+            },
+            body: f.file,
+          });
+          if (!response.ok) {
+            throw new Error(`Failed to upload parameter file ${f.file.name}`);
+          }
+          storedTokens.add(f.clientToken);
+        } catch (e) {
+          if (!allowUnstoredParamFiles) throw e;
+          if (upload) console.warn(`[dev] Could not store ${f.file.name}; submitting its name only.`, e);
         }
       })
     );
 
     const sampleCountByToken = new Map(filesToUpload.filter((f) => typeof f.sampleCount === 'number').map((f) => [f.clientToken, f.sampleCount as number]));
     const uploadedMetaByToken = new Map<string, UploadedParamFile>();
-    uploads.forEach((u) => {
-      const sampleCount = sampleCountByToken.get(u.clientToken);
-      uploadedMetaByToken.set(u.clientToken, {
-        filename: u.filename,
-        key: u.key,
-        contentType: u.contentType,
-        size: u.size,
+    filesToUpload.forEach((f) => {
+      const sampleCount = sampleCountByToken.get(f.clientToken);
+      const upload = uploadByToken.get(f.clientToken);
+      const stored = storedTokens.has(f.clientToken) && upload;
+      uploadedMetaByToken.set(f.clientToken, {
+        filename: stored ? upload.filename : f.file.name,
+        ...(stored ? { key: upload.key } : { notUploaded: true as const }),
+        contentType: stored ? upload.contentType : f.contentType,
+        size: stored ? upload.size : f.size,
         uploadedAt: new Date().toISOString(),
         ...(sampleCount !== undefined ? { sampleCount } : {}),
       });
