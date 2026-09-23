@@ -83,7 +83,9 @@ import EditNoteIcon from "@mui/icons-material/EditNote";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import HistoryIcon from "@mui/icons-material/History";
-import JobActivityTimeline from "../components/JobActivityTimeline";
+import JobActivityTimeline, {
+  TimelineSection,
+} from "../components/JobActivityTimeline";
 import {
   deriveCustomerLifecycle,
   validResponseAction,
@@ -180,6 +182,24 @@ export default function Tracking() {
   const sowFullData = sowByJobIdResult?.sowByJobId ?? null;
   const [refreshing, setRefreshing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const jobSectionRef = useRef<HTMLDivElement>(null);
+  const invoiceSectionRef = useRef<HTMLDivElement>(null);
+  const commentsSectionRef = useRef<HTMLDivElement>(null);
+  const handleTimelineNavigate = (section: TimelineSection) => {
+    const refs: Record<
+      TimelineSection,
+      React.RefObject<HTMLDivElement | null>
+    > = {
+      job: jobSectionRef,
+      sow: sowSectionRef,
+      invoice: invoiceSectionRef,
+      comments: commentsSectionRef,
+    };
+    refs[section]?.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
 
   const refreshJobPage = async () => {
     await Promise.all([
@@ -679,131 +699,133 @@ export default function Tracking() {
           </Alert>
         )}
 
-        <ProcessCard
-          title="Job"
-          defaultExpanded={!isJobProcessSettled(job?.state)}
-          customerBadge={jobParties.customer}
-          staffBadge={jobParties.staff}
-          // Same status, same chip, same colour as the staff card. The two
-          // pages were reporting this job differently — "Accepted / v5.3"
-          // against "Statement of Work withdrawn / Accepted" — which makes
-          // the lab and the client unable to describe a job to each other.
-          // The lifecycle line survives as the description, which is the one
-          // place the two pages should differ: it is addressed to the reader.
-          statusPaneSx={{
-            bgcolor: chipStatusBackground(jobStatusColor(job?.state)),
-          }}
-          statusPane={
-            <StatusPaneHeader
-              status={jobStatusLabel(job?.state)}
-              chips={
-                customerJobVersion === "—" ? undefined : (
-                  <Chip
-                    size="small"
-                    label={customerJobVersion}
-                    color={jobStatusColor(job?.state)}
-                  />
-                )
-              }
-              reference={
-                <>
-                  <b>Job ID:</b> {job?.jobId ?? id}
-                </>
-              }
-              description={lifecycle.body}
-            />
-          }
-          actions={
-            /* Contained, like the staff card's own View/Edit Job: it is the
+        <div ref={jobSectionRef}>
+          <ProcessCard
+            title="Job"
+            defaultExpanded={!isJobProcessSettled(job?.state)}
+            customerBadge={jobParties.customer}
+            staffBadge={jobParties.staff}
+            // Same status, same chip, same colour as the staff card. The two
+            // pages were reporting this job differently — "Accepted / v5.3"
+            // against "Statement of Work withdrawn / Accepted" — which makes
+            // the lab and the client unable to describe a job to each other.
+            // The lifecycle line survives as the description, which is the one
+            // place the two pages should differ: it is addressed to the reader.
+            statusPaneSx={{
+              bgcolor: chipStatusBackground(jobStatusColor(job?.state)),
+            }}
+            statusPane={
+              <StatusPaneHeader
+                status={jobStatusLabel(job?.state)}
+                chips={
+                  customerJobVersion === "—" ? undefined : (
+                    <Chip
+                      size="small"
+                      label={customerJobVersion}
+                      color={jobStatusColor(job?.state)}
+                    />
+                  )
+                }
+                reference={
+                  <>
+                    <b>Job ID:</b> {job?.jobId ?? id}
+                  </>
+                }
+                description={lifecycle.body}
+              />
+            }
+            actions={
+              /* Contained, like the staff card's own View/Edit Job: it is the
                            one thing this card does, and an outlined button alone in an
                            otherwise empty rail reads as disabled. */
-            <Button
-              variant="contained"
-              size="small"
-              startIcon={
-                <AccountTreeIcon
-                  sx={{ transform: "rotate(90deg) scaleY(-1)" }}
-                />
-              }
-              onClick={() => navigate(`/job_editor/${id}`)}
-              sx={railBtnSx}
-            >
-              {lifecycle.primaryAction === "EDIT_WORKFLOW"
-                ? "View/Edit Job"
-                : "View workflow"}
-            </Button>
-          }
-          details={
-            <>
-              {attachments.length > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Attachments
-                  </Typography>
-                  <List dense>
-                    {attachments.map((att, idx) => (
-                      <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
-                        <ListItemText
-                          primary={
-                            att.url ? (
-                              <MuiLink
-                                href={att.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {att.filename}
-                              </MuiLink>
-                            ) : (
-                              att.filename
-                            )
-                          }
-                          secondary={
-                            att.uploadedAt
-                              ? new Date(att.uploadedAt).toLocaleString()
-                              : undefined
-                          }
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              )}
-              {getParameterFiles().length > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Parameter Files
-                  </Typography>
-                  <List dense>
-                    {getParameterFiles().map((f, idx) => (
-                      <ListItem
-                        key={`${f.label}-${f.filename}-${idx}`}
-                        sx={{ pl: 0 }}
-                      >
-                        <ListItemText
-                          primary={
-                            f.url ? (
-                              <MuiLink
-                                href={f.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {f.filename}
-                              </MuiLink>
-                            ) : (
-                              f.filename
-                            )
-                          }
-                          secondary={f.label}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              )}
-              {workflowCard}
-            </>
-          }
-        />
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={
+                  <AccountTreeIcon
+                    sx={{ transform: "rotate(90deg) scaleY(-1)" }}
+                  />
+                }
+                onClick={() => navigate(`/job_editor/${id}`)}
+                sx={railBtnSx}
+              >
+                {lifecycle.primaryAction === "EDIT_WORKFLOW"
+                  ? "View/Edit Job"
+                  : "View workflow"}
+              </Button>
+            }
+            details={
+              <>
+                {attachments.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Attachments
+                    </Typography>
+                    <List dense>
+                      {attachments.map((att, idx) => (
+                        <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
+                          <ListItemText
+                            primary={
+                              att.url ? (
+                                <MuiLink
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {att.filename}
+                                </MuiLink>
+                              ) : (
+                                att.filename
+                              )
+                            }
+                            secondary={
+                              att.uploadedAt
+                                ? new Date(att.uploadedAt).toLocaleString()
+                                : undefined
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+                {getParameterFiles().length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Parameter Files
+                    </Typography>
+                    <List dense>
+                      {getParameterFiles().map((f, idx) => (
+                        <ListItem
+                          key={`${f.label}-${f.filename}-${idx}`}
+                          sx={{ pl: 0 }}
+                        >
+                          <ListItemText
+                            primary={
+                              f.url ? (
+                                <MuiLink
+                                  href={f.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {f.filename}
+                                </MuiLink>
+                              ) : (
+                                f.filename
+                              )
+                            }
+                            secondary={f.label}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+                {workflowCard}
+              </>
+            }
+          />
+        </div>
 
         <ProcessCard
           title="Biosecurity"
@@ -898,25 +920,29 @@ export default function Tracking() {
                     job, and one sentence for one who is but cannot book yet. */}
         <JobEquipmentBookingPanel jobId={id || ""} />
 
-        <InvoicePanel
-          jobId={id || ""}
-          jobDisplayId={data?.ownJobById?.jobId ?? null}
-          jobName={jobName}
-          customerCategory={data?.ownJobById?.customerCategory ?? null}
-          sow={sowFullData}
-        />
+        <div ref={invoiceSectionRef}>
+          <InvoicePanel
+            jobId={id || ""}
+            jobDisplayId={data?.ownJobById?.jobId ?? null}
+            jobName={jobName}
+            customerCategory={data?.ownJobById?.customerCategory ?? null}
+            sow={sowFullData}
+          />
+        </div>
 
         {/* Payments belong to the job; every invoice version restates them. */}
         <JobPaymentsPanel jobId={id || ""} />
 
         {/* Comments Section */}
-        <CommentsSection
-          jobId={id || ""}
-          currentUser={{
-            email: workflowEmail,
-            isStaff: false,
-          }}
-        />
+        <div ref={commentsSectionRef}>
+          <CommentsSection
+            jobId={id || ""}
+            currentUser={{
+              email: workflowEmail,
+              isStaff: false,
+            }}
+          />
+        </div>
         {responseAction && (
           <ResubmitJobModal
             action={responseAction}
@@ -997,6 +1023,7 @@ export default function Tracking() {
             jobId={id}
             open={historyOpen}
             onClose={() => setHistoryOpen(false)}
+            onNavigate={handleTimelineNavigate}
           />
         )}
       </div>

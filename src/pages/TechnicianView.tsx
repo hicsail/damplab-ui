@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   useQuery,
@@ -90,7 +90,9 @@ import ReasonDialog from "../components/ReasonDialog";
 import Can from "../components/PermissionGate";
 import { PERMISSIONS } from "../hooks/usePermissions";
 import { CommentsSection } from "../components/CommentsSection";
-import JobActivityTimeline from "../components/JobActivityTimeline";
+import JobActivityTimeline, {
+  TimelineSection,
+} from "../components/JobActivityTimeline";
 import { UserContext } from "../contexts/UserContext";
 import { AppContext } from "../contexts/App";
 import { statusColor } from "../components/sow/sowTypes";
@@ -413,6 +415,25 @@ export default function TechnicianView() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const jobSectionRef = useRef<HTMLDivElement>(null);
+  const sowSectionRef = useRef<HTMLDivElement>(null);
+  const invoiceSectionRef = useRef<HTMLDivElement>(null);
+  const commentsSectionRef = useRef<HTMLDivElement>(null);
+  const handleTimelineNavigate = (section: TimelineSection) => {
+    const refs: Record<
+      TimelineSection,
+      React.RefObject<HTMLDivElement | null>
+    > = {
+      job: jobSectionRef,
+      sow: sowSectionRef,
+      invoice: invoiceSectionRef,
+      comments: commentsSectionRef,
+    };
+    refs[section]?.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
 
   const refreshJobPage = async () => {
     await Promise.all([
@@ -879,235 +900,237 @@ export default function TechnicianView() {
           </Box>
         )}
 
-        <ProcessCard
-          title="Job"
-          defaultExpanded={!isJobProcessSettled(jobState)}
-          customerBadge={jobParties.customer}
-          staffBadge={jobParties.staff}
-          customerVersion={jobCustomerVersion}
-          staffVersion={jobStaffVersion}
-          statusPaneSx={{ bgcolor: jobStatusPaneColor }}
-          statusPane={
-            jobData ? (
-              <StatusPaneHeader
-                status={jobStatusLabel(jobState)}
-                chips={
-                  // partyVersionLabel returns '—' when the customer has seen
-                  // nothing yet; a chip reading "—" is worse than no chip.
-                  jobCustomerVersion === "—" ? undefined : (
-                    <Chip
-                      size="small"
-                      label={jobCustomerVersion}
-                      color={jobStatusColor(jobState)}
+        <div ref={jobSectionRef}>
+          <ProcessCard
+            title="Job"
+            defaultExpanded={!isJobProcessSettled(jobState)}
+            customerBadge={jobParties.customer}
+            staffBadge={jobParties.staff}
+            customerVersion={jobCustomerVersion}
+            staffVersion={jobStaffVersion}
+            statusPaneSx={{ bgcolor: jobStatusPaneColor }}
+            statusPane={
+              jobData ? (
+                <StatusPaneHeader
+                  status={jobStatusLabel(jobState)}
+                  chips={
+                    // partyVersionLabel returns '—' when the customer has seen
+                    // nothing yet; a chip reading "—" is worse than no chip.
+                    jobCustomerVersion === "—" ? undefined : (
+                      <Chip
+                        size="small"
+                        label={jobCustomerVersion}
+                        color={jobStatusColor(jobState)}
+                      />
+                    )
+                  }
+                  reference={
+                    <>
+                      <b>Job ID:</b> {jobData?.jobId ?? id}
+                    </>
+                  }
+                  description={jobStatusText}
+                />
+              ) : (
+                <StatusPaneHeader
+                  status="Job not loaded"
+                  description="This job could not be loaded. Check the ID or try again."
+                />
+              )
+            }
+            actions={
+              <>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={
+                    <AccountTreeIcon
+                      sx={{ transform: "rotate(90deg) scaleY(-1)" }}
                     />
-                  )
-                }
-                reference={
-                  <>
-                    <b>Job ID:</b> {jobData?.jobId ?? id}
-                  </>
-                }
-                description={jobStatusText}
-              />
-            ) : (
-              <StatusPaneHeader
-                status="Job not loaded"
-                description="This job could not be loaded. Check the ID or try again."
-              />
-            )
-          }
-          actions={
-            <>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={
-                  <AccountTreeIcon
-                    sx={{ transform: "rotate(90deg) scaleY(-1)" }}
-                  />
-                }
-                onClick={() => navigate(`/job_editor/${id}`)}
-                disabled={jobState === "CLOSED" || jobState === "CANCELLED"}
-                sx={railBtnSx}
-              >
-                View/Edit Job
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                color="error"
-                startIcon={<RateReviewIcon />}
-                onClick={handleOpenModal}
-                disabled={
-                  !["SUBMITTED", "CHANGES_REQUESTED", "ACCEPTED"].includes(
-                    jobState ?? "",
-                  )
-                }
-                sx={railBtnSx}
-              >
-                Review Job
-              </Button>
-              {/* The client asked for the editor. Granting it is an
+                  }
+                  onClick={() => navigate(`/job_editor/${id}`)}
+                  disabled={jobState === "CLOSED" || jobState === "CANCELLED"}
+                  sx={railBtnSx}
+                >
+                  View/Edit Job
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  color="error"
+                  startIcon={<RateReviewIcon />}
+                  onClick={handleOpenModal}
+                  disabled={
+                    !["SUBMITTED", "CHANGES_REQUESTED", "ACCEPTED"].includes(
+                      jobState ?? "",
+                    )
+                  }
+                  sx={railBtnSx}
+                >
+                  Review Job
+                </Button>
+                {/* The client asked for the editor. Granting it is an
                                 ordinary review decision (Request edits), so this
                                 only says a request is outstanding — it is cleared
                                 by the next decision, whatever that decision is. */}
-              {jobData?.editAccessRequestedAt && (
-                <Chip
-                  size="small"
-                  color="warning"
-                  variant="outlined"
-                  icon={<EditNoteIcon />}
-                  label="Client requested edit access"
-                  sx={{ alignSelf: "stretch" }}
-                />
-              )}
-              {jobState === "CHANGES_REQUESTED" && (
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="warning"
-                  startIcon={<UndoIcon />}
-                  onClick={() => setWithdrawKind("customer")}
-                  disabled={withdrawing}
-                  sx={railBtnSx}
-                >
-                  {withdrawing ? "Withdrawing…" : "Withdraw from customer"}
-                </Button>
-              )}
-              {jobState === "ACCEPTED" && (
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="warning"
-                  startIcon={<UndoIcon />}
-                  onClick={() => setWithdrawKind("acceptance")}
-                  disabled={withdrawing}
-                  sx={railBtnSx}
-                >
-                  {withdrawing ? "Withdrawing…" : "Withdraw acceptance"}
-                </Button>
-              )}
-              {id ? (
-                <PDFDownloadLink
-                  document={
-                    <JobPDFDocument
-                      jobId={id}
-                      jobName={jobName}
-                      jobUsername={jobUsername}
-                      jobEmail={jobEmail}
-                      jobInstitution={jobInstitution}
-                      jobNotes={jobNotes}
-                      jobTime={jobTime}
-                      workflows={workflows}
-                    />
-                  }
-                  fileName={`DAMP-Order-${id}.pdf`}
-                  style={{ textDecoration: "none", width: "100%" }}
-                >
-                  {({ loading }) => (
-                    <Button
-                      color="primary"
-                      size="small"
-                      variant="outlined"
-                      startIcon={<PictureAsPdfIcon />}
-                      sx={railBtnSx}
-                    >
-                      {loading ? "Loading document..." : "Download Summary"}
-                    </Button>
-                  )}
-                </PDFDownloadLink>
-              ) : (
-                <Button
-                  color="primary"
-                  size="small"
-                  variant="outlined"
-                  startIcon={<PictureAsPdfIcon />}
-                  disabled
-                  sx={railBtnSx}
-                >
-                  Download Summary
-                </Button>
-              )}
-            </>
-          }
-          details={
-            <>
-              {attachments.length > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Attachments
-                  </Typography>
-                  <List dense>
-                    {attachments.map((att, idx) => (
-                      <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
-                        <ListItemText
-                          primary={
-                            att.url ? (
-                              <MuiLink
-                                href={att.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {att.filename}
-                              </MuiLink>
-                            ) : (
-                              att.filename
-                            )
-                          }
-                          secondary={
-                            att.uploadedAt
-                              ? new Date(att.uploadedAt).toLocaleString()
-                              : undefined
-                          }
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              )}
-              {getParameterFiles().length > 0 && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Parameter Files
-                  </Typography>
-                  <List dense>
-                    {getParameterFiles().map((f, idx) => (
-                      <ListItem
-                        key={`${f.label}-${f.filename}-${idx}`}
-                        sx={{ pl: 0 }}
-                      >
-                        <ListItemText
-                          primary={
-                            f.url ? (
-                              <MuiLink
-                                href={f.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {f.filename}
-                              </MuiLink>
-                            ) : (
-                              f.filename
-                            )
-                          }
-                          secondary={f.label}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              )}
-              {attachments.length === 0 &&
-                getParameterFiles().length === 0 &&
-                cardWorkflows.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    No workflow details to show yet.
-                  </Typography>
+                {jobData?.editAccessRequestedAt && (
+                  <Chip
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    icon={<EditNoteIcon />}
+                    label="Client requested edit access"
+                    sx={{ alignSelf: "stretch" }}
+                  />
                 )}
-              {workflowCard}
-            </>
-          }
-        />
+                {jobState === "CHANGES_REQUESTED" && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="warning"
+                    startIcon={<UndoIcon />}
+                    onClick={() => setWithdrawKind("customer")}
+                    disabled={withdrawing}
+                    sx={railBtnSx}
+                  >
+                    {withdrawing ? "Withdrawing…" : "Withdraw from customer"}
+                  </Button>
+                )}
+                {jobState === "ACCEPTED" && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="warning"
+                    startIcon={<UndoIcon />}
+                    onClick={() => setWithdrawKind("acceptance")}
+                    disabled={withdrawing}
+                    sx={railBtnSx}
+                  >
+                    {withdrawing ? "Withdrawing…" : "Withdraw acceptance"}
+                  </Button>
+                )}
+                {id ? (
+                  <PDFDownloadLink
+                    document={
+                      <JobPDFDocument
+                        jobId={id}
+                        jobName={jobName}
+                        jobUsername={jobUsername}
+                        jobEmail={jobEmail}
+                        jobInstitution={jobInstitution}
+                        jobNotes={jobNotes}
+                        jobTime={jobTime}
+                        workflows={workflows}
+                      />
+                    }
+                    fileName={`DAMP-Order-${id}.pdf`}
+                    style={{ textDecoration: "none", width: "100%" }}
+                  >
+                    {({ loading }) => (
+                      <Button
+                        color="primary"
+                        size="small"
+                        variant="outlined"
+                        startIcon={<PictureAsPdfIcon />}
+                        sx={railBtnSx}
+                      >
+                        {loading ? "Loading document..." : "Download Summary"}
+                      </Button>
+                    )}
+                  </PDFDownloadLink>
+                ) : (
+                  <Button
+                    color="primary"
+                    size="small"
+                    variant="outlined"
+                    startIcon={<PictureAsPdfIcon />}
+                    disabled
+                    sx={railBtnSx}
+                  >
+                    Download Summary
+                  </Button>
+                )}
+              </>
+            }
+            details={
+              <>
+                {attachments.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Attachments
+                    </Typography>
+                    <List dense>
+                      {attachments.map((att, idx) => (
+                        <ListItem key={`${att.filename}-${idx}`} sx={{ pl: 0 }}>
+                          <ListItemText
+                            primary={
+                              att.url ? (
+                                <MuiLink
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {att.filename}
+                                </MuiLink>
+                              ) : (
+                                att.filename
+                              )
+                            }
+                            secondary={
+                              att.uploadedAt
+                                ? new Date(att.uploadedAt).toLocaleString()
+                                : undefined
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+                {getParameterFiles().length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                      Parameter Files
+                    </Typography>
+                    <List dense>
+                      {getParameterFiles().map((f, idx) => (
+                        <ListItem
+                          key={`${f.label}-${f.filename}-${idx}`}
+                          sx={{ pl: 0 }}
+                        >
+                          <ListItemText
+                            primary={
+                              f.url ? (
+                                <MuiLink
+                                  href={f.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {f.filename}
+                                </MuiLink>
+                              ) : (
+                                f.filename
+                              )
+                            }
+                            secondary={f.label}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
+                {attachments.length === 0 &&
+                  getParameterFiles().length === 0 &&
+                  cardWorkflows.length === 0 && (
+                    <Typography variant="body2" color="text.secondary">
+                      No workflow details to show yet.
+                    </Typography>
+                  )}
+                {workflowCard}
+              </>
+            }
+          />
+        </div>
 
         <ProcessCard
           title="Biosecurity"
@@ -1226,132 +1249,140 @@ export default function TechnicianView() {
           }
         />
 
-        <ProcessCard
-          title="Statement of Work"
-          defaultExpanded={
-            !isSowProcessSettled(
-              sowStatus.active?.status ?? sowStatus.current?.status,
-            )
-          }
-          customerBadge={sowParties.customer}
-          staffBadge={sowParties.staff}
-          customerVersion={sowCustomerVersion}
-          staffVersion={sowStaffVersion}
-          statusPaneSx={{ bgcolor: sowStatusPaneColor }}
-          statusPane={
-            <SowStatusSummary
-              sow={sowStatus.sow}
-              active={sowStatus.active}
-              current={sowStatus.current}
-              hasUnsentDraft={sowStatus.hasUnsentDraft}
-            />
-          }
-          actions={
-            <>
-              <Button
-                color={sowData ? "primary" : "secondary"}
-                variant="contained"
-                size="small"
-                startIcon={<DescriptionIcon />}
-                onClick={handleOpenSOWModal}
-                disabled={!jobData || creatingSow || sowStatus.outWithCustomer}
-                sx={railBtnSx}
-              >
-                {creatingSow
-                  ? "Generating…"
-                  : sowData
-                    ? "Manage SOW"
-                    : "Generate SOW"}
-              </Button>
-              {sowStatus.outWithCustomer && (
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="warning"
-                  startIcon={<UndoIcon />}
-                  onClick={sowStatus.requestWithdraw}
-                  disabled={sowStatus.busy}
-                  sx={railBtnSx}
-                >
-                  Withdraw from client
-                </Button>
-              )}
-              {sowStatus.everIssued && !sowStatus.alreadyCancelled && (
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="error"
-                  startIcon={<CancelIcon />}
-                  onClick={sowStatus.requestCancel}
-                  disabled={sowStatus.busy}
-                  sx={railBtnSx}
-                >
-                  Cancel SOW
-                </Button>
-              )}
-              {sowStatus.sow && sowStatus.forPdf && (
-                <SowPdfDownloadButton
-                  sowNumber={sowStatus.sow.sowNumber}
-                  version={sowStatus.forPdf}
-                  button={(label, loading) => (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<PictureAsPdfIcon />}
-                      disabled={loading}
-                      sx={railBtnSx}
-                    >
-                      {label}
-                    </Button>
-                  )}
-                />
-              )}
-            </>
-          }
-          details={
-            sowStatus.sow ? (
-              <SowStatusDetails
-                repair={sowStatus.repair}
-                missingFields={sowStatus.missingFields}
+        <div ref={sowSectionRef}>
+          <ProcessCard
+            title="Statement of Work"
+            defaultExpanded={
+              !isSowProcessSettled(
+                sowStatus.active?.status ?? sowStatus.current?.status,
+              )
+            }
+            customerBadge={sowParties.customer}
+            staffBadge={sowParties.staff}
+            customerVersion={sowCustomerVersion}
+            staffVersion={sowStaffVersion}
+            statusPaneSx={{ bgcolor: sowStatusPaneColor }}
+            statusPane={
+              <SowStatusSummary
+                sow={sowStatus.sow}
                 active={sowStatus.active}
+                current={sowStatus.current}
+                hasUnsentDraft={sowStatus.hasUnsentDraft}
               />
-            ) : (
-              <Typography variant="body2" color="text.secondary">
-                No Statement of Work has been generated for this job yet.
-              </Typography>
-            )
-          }
-        />
+            }
+            actions={
+              <>
+                <Button
+                  color={sowData ? "primary" : "secondary"}
+                  variant="contained"
+                  size="small"
+                  startIcon={<DescriptionIcon />}
+                  onClick={handleOpenSOWModal}
+                  disabled={
+                    !jobData || creatingSow || sowStatus.outWithCustomer
+                  }
+                  sx={railBtnSx}
+                >
+                  {creatingSow
+                    ? "Generating…"
+                    : sowData
+                      ? "Manage SOW"
+                      : "Generate SOW"}
+                </Button>
+                {sowStatus.outWithCustomer && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="warning"
+                    startIcon={<UndoIcon />}
+                    onClick={sowStatus.requestWithdraw}
+                    disabled={sowStatus.busy}
+                    sx={railBtnSx}
+                  >
+                    Withdraw from client
+                  </Button>
+                )}
+                {sowStatus.everIssued && !sowStatus.alreadyCancelled && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="error"
+                    startIcon={<CancelIcon />}
+                    onClick={sowStatus.requestCancel}
+                    disabled={sowStatus.busy}
+                    sx={railBtnSx}
+                  >
+                    Cancel SOW
+                  </Button>
+                )}
+                {sowStatus.sow && sowStatus.forPdf && (
+                  <SowPdfDownloadButton
+                    sowNumber={sowStatus.sow.sowNumber}
+                    version={sowStatus.forPdf}
+                    button={(label, loading) => (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<PictureAsPdfIcon />}
+                        disabled={loading}
+                        sx={railBtnSx}
+                      >
+                        {label}
+                      </Button>
+                    )}
+                  />
+                )}
+              </>
+            }
+            details={
+              sowStatus.sow ? (
+                <SowStatusDetails
+                  repair={sowStatus.repair}
+                  missingFields={sowStatus.missingFields}
+                  active={sowStatus.active}
+                />
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No Statement of Work has been generated for this job yet.
+                </Typography>
+              )
+            }
+          />
+        </div>
 
         {/* Read-only for staff, plus the pause switch when they hold
                     billing:view. Booking is the customer's act; confirming usage
                     stays on the Inventory schedule. */}
         <JobEquipmentBookingPanel jobId={id || ""} staffView />
 
-        <InvoicePanel
-          jobId={id || ""}
-          jobDisplayId={jobData?.jobId ?? null}
-          jobName={jobName}
-          customerCategory={jobData?.customerCategory ?? null}
-          sow={sowFullData}
-          staffView
-          issueBlockedReason={issueBlockedReason}
-          documentStale={!!sowFullData?.documentStale}
-          onChanged={refreshJobPage}
-        />
+        <div ref={invoiceSectionRef}>
+          <InvoicePanel
+            jobId={id || ""}
+            jobDisplayId={jobData?.jobId ?? null}
+            jobName={jobName}
+            customerCategory={jobData?.customerCategory ?? null}
+            sow={sowFullData}
+            staffView
+            issueBlockedReason={issueBlockedReason}
+            documentStale={!!sowFullData?.documentStale}
+            onChanged={refreshJobPage}
+          />
+        </div>
 
         {/* Payments belong to the job; every invoice version restates them. */}
         <JobPaymentsPanel jobId={id || ""} staffView />
 
-        <CommentsSection
-          jobId={id || ""}
-          currentUser={{
-            email:
-              userContext.userProps?.idTokenParsed?.email ??
-              "technician@bu.edu",
-            isStaff: true,
-          }}
-        />
+        <div ref={commentsSectionRef}>
+          <CommentsSection
+            jobId={id || ""}
+            currentUser={{
+              email:
+                userContext.userProps?.idTokenParsed?.email ??
+                "technician@bu.edu",
+              isStaff: true,
+            }}
+          />
+        </div>
 
         {sowStatus.dialog}
         {withdrawKind && (
@@ -1403,6 +1434,7 @@ export default function TechnicianView() {
             jobId={id}
             open={historyOpen}
             onClose={() => setHistoryOpen(false)}
+            onNavigate={handleTimelineNavigate}
           />
         )}
       </div>
