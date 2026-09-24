@@ -30,10 +30,12 @@ import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckIcon from '@mui/icons-material/Check';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import { GET_BACKLOG_CARDS, GET_BACKLOG_CARD } from '../gql/queries';
-import { ADD_BACKLOG_COMMENT } from '../gql/mutations';
+import { ADD_BACKLOG_COMMENT, NOTIFY_BUG_DEPLOYED_TO_STAGING } from '../gql/mutations';
 
 /** Severity → chip colour. Mirrors the /bugs page so the two read consistently. */
 const SEV_COLOR: Record<string, 'error' | 'warning' | 'info' | 'default'> = {
@@ -227,8 +229,20 @@ export default function Backlog() {
 function CardDialog({ id, onClose, onCommented }: { id: string; onClose: () => void; onCommented: () => void }) {
   const { data, loading, error, refetch } = useQuery(GET_BACKLOG_CARD, { variables: { id }, fetchPolicy: 'network-only' });
   const [addComment, { loading: posting }] = useMutation(ADD_BACKLOG_COMMENT);
+  const [notifyDeployed, { loading: notifying }] = useMutation(NOTIFY_BUG_DEPLOYED_TO_STAGING);
+  const [notifySuccess, setNotifySuccess] = useState(false);
   const [body, setBody] = useState('');
   const [err, setErr] = useState<string | null>(null);
+
+  const handleNotifyDeployed = async () => {
+    try {
+      await notifyDeployed({ variables: { cardId: id } });
+      setNotifySuccess(true);
+      setTimeout(() => setNotifySuccess(false), 3000);
+    } catch (e: any) {
+      setErr(e?.graphQLErrors?.[0]?.message || e?.message || 'Could not notify the reporter.');
+    }
+  };
 
   const card = data?.backlogCard?.card;
   const comments: any[] = data?.backlogCard?.comments ?? [];
@@ -294,6 +308,19 @@ function CardDialog({ id, onClose, onCommented }: { id: string; onClose: () => v
                 </Typography>
               </Stack>
             </Paper>
+
+            {card.clickupUrl && card.reporterEmail && card.sourceBugId && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={notifySuccess ? <CheckIcon /> : <NotificationsActiveIcon />}
+                onClick={handleNotifyDeployed}
+                disabled={notifying || notifySuccess}
+                color={notifySuccess ? 'success' : 'primary'}
+              >
+                {notifying ? 'Notifying…' : notifySuccess ? 'Notified!' : 'Notify reporter: deployed to staging'}
+              </Button>
+            )}
 
             {card.summary && <Section title="Summary" body={card.summary} />}
             {card.stepsToReproduce && <Section title="Steps to reproduce" body={card.stepsToReproduce} />}

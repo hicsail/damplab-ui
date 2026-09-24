@@ -956,6 +956,12 @@ export const UNARCHIVE_JOB = gql`
   }
 `;
 
+export const NOTIFY_BUG_DEPLOYED_TO_STAGING = gql`
+  mutation NotifyBugDeployedToStaging($cardId: ID!) {
+    notifyBugDeployedToStaging(cardId: $cardId)
+  }
+`;
+
 export const ADD_BACKLOG_COMMENT = gql`
   mutation AddBacklogComment($cardId: ID!, $body: String!) {
     addBacklogComment(cardId: $cardId, body: $body) {
