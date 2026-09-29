@@ -1,4 +1,4 @@
-import { idFromName } from '../../../utils/idFromName';
+import { idFromName, makeUniqueIds } from '../../../utils/idFromName';
 import { validateParameter } from './ParameterValidation';
 
 export interface EditableParameter {
@@ -9,6 +9,14 @@ export interface EditableParameter {
   [key: string]: any;
 }
 
+// Mirrors ParameterValidation.tsx's own (unexported) shape. validateParameter's
+// declared return type is the single-item interface, not an array, though it
+// returns an array at runtime (pre-existing mismatch — see typecheck baseline).
+interface ParameterValidationError {
+  field: string;
+  errorMsg: string;
+}
+
 export const createDragKey = (): string =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -16,40 +24,6 @@ export const createDragKey = (): string =>
 
 export function withDragKeys(parameters: ReadonlyArray<any>): EditableParameter[] {
   return parameters.map((p) => ({ ...p, _dragKey: createDragKey() }));
-}
-
-/**
- * Like `makeUniqueIds`, but a locked parameter's id is reserved up front and
- * never renamed — an unlocked parameter colliding with it (or with another
- * unlocked one) is the one that gets suffixed. With every `locked` entry
- * `false` this is exactly `makeUniqueIds`'s own sequential dedup.
- */
-function makeUniqueIdsWithLocks<T extends { id?: string; name?: string }>(items: T[], locked: boolean[]): T[] {
-  const used = new Set<string>();
-
-  items.forEach((item, index) => {
-    if (!locked[index]) return;
-    const base = item.id?.trim() || idFromName(item.name ?? '');
-    if (base) used.add(base);
-  });
-
-  return items.map((item, index) => {
-    const base = item.id?.trim() || idFromName(item.name ?? '');
-    if (!base) return item;
-
-    if (locked[index]) {
-      return item.id === base ? item : { ...item, id: base };
-    }
-
-    let next = base;
-    let i = 2;
-    while (used.has(next)) {
-      next = `${base}_${i}`;
-      i += 1;
-    }
-    used.add(next);
-    return item.id === next ? item : { ...item, id: next };
-  });
 }
 
 export function prepareParametersForSave(
@@ -75,12 +49,24 @@ export function prepareParametersForSave(
     }
     return next;
   });
+
+  // A locked parameter's id is reserved up front and never touched by dedup;
+  // only the unlocked ones are run through makeUniqueIds, seeded with the
+  // reserved ids, so a colliding unlocked parameter is the one suffixed.
   const locked = parameters.map((p) => isIdLocked?.(p) === true);
-  const unique = makeUniqueIdsWithLocks(normalized as Array<{ id?: string; name?: string }>, locked);
+  const reservedIds = normalized.filter((_, index) => locked[index]).map((p) => p.id).filter((id): id is string => !!id);
+  const unlockedWithIndex = normalized.map((p, index) => ({ p, index })).filter(({ index }) => !locked[index]);
+  const dedupedUnlocked = makeUniqueIds(unlockedWithIndex.map(({ p }) => p), reservedIds);
+
+  const unique = normalized.slice();
+  unlockedWithIndex.forEach(({ index }, k) => {
+    unique[index] = dedupedUnlocked[k];
+  });
+
   const validationErrors = unique.flatMap((parameter, index) =>
-    // validateParameter's declared return type is the single-item interface, not an array,
-    // though it returns an array at runtime (pre-existing mismatch — see baseline).
-    (validateParameter(parameter as any) as unknown as any[]).map((error: any) => `Parameter ${index + 1}: ${error.field} - ${error.errorMsg}`)
+    (validateParameter(parameter as any) as unknown as ParameterValidationError[]).map(
+      (error) => `Parameter ${index + 1}: ${error.field} - ${error.errorMsg}`
+    )
   );
   return { parameters: unique, errors: [...tableParseErrors, ...validationErrors] };
 }
