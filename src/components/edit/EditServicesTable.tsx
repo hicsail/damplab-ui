@@ -31,6 +31,20 @@ import { OperationsUploadPreview, OperationsUploadSummary } from './OperationsUp
 
 type ServiceRow = Record<string, unknown> & { id: GridRowId };
 
+/**
+ * Fix round 1: Upload (`disabled={!setsData || !deletedData}`) was going stuck
+ * with no explanation whenever either query errored — the only message on
+ * screen talked about Download. Names which list is missing; null when both
+ * queries are fine (pure, so it's tested directly rather than through the DOM).
+ */
+export function uploadUnavailableMessage(setsError: unknown, deletedError: unknown): string | null {
+  const missing: string[] = [];
+  if (setsError) missing.push('parameter sets');
+  if (deletedError) missing.push('deleted operations');
+  if (missing.length === 0) return null;
+  return `Upload is unavailable: couldn't load ${missing.join(' and ')}.`;
+}
+
 function formatPricingSummary(row: Record<string, unknown>): string {
   const pricing = (row as any).pricing ?? {};
   const parts: string[] = [];
@@ -70,7 +84,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   const exportFields = useMemo(() => offeredFields(operationExportFields(setNameById), canSeeInternal), [setNameById, canSeeInternal]);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const { data: deletedData } = useQuery(GET_DELETED_SERVICE_IDS, { fetchPolicy: 'network-only', skip: !canWrite });
+  const { data: deletedData, error: deletedError } = useQuery(GET_DELETED_SERVICE_IDS, { fetchPolicy: 'network-only', skip: !canWrite });
   const [parsedUpload, setParsedUpload] = useState<ParsedOperationsSheet | null>(null);
   const [uploadFileName, setUploadFileName] = useState('');
   // Ruling D3: sets→refs is setRefsFrom (utils/serviceParameters.ts), not an inline map.
@@ -83,9 +97,18 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   useEffect(() => {
     // Parameter sets failed to load: the parameterSets column falls back to raw
     // set ids (see operationExportFields), so the download stays usable — just
-    // tell the user why the names look wrong.
-    if (setsError) setErrorMessage('Failed to load parameter sets; the download will show set ids instead of names.');
-  }, [setsError]);
+    // tell the user why the names look wrong. Task 10's behaviour, unchanged.
+    const parts: string[] = [];
+    if (setsError) parts.push('Failed to load parameter sets; the download will show set ids instead of names.');
+    // Fix round 1: Upload needs both lists to classify rows, so a failure here
+    // must name Upload specifically rather than leaving it stuck with no
+    // explanation (the message above only ever talked about Download).
+    if (canWrite) {
+      const uploadMessage = uploadUnavailableMessage(setsError, deletedError);
+      if (uploadMessage) parts.push(uploadMessage);
+    }
+    if (parts.length > 0) setErrorMessage(parts.join(' '));
+  }, [setsError, deletedError, canWrite]);
 
   const filteredRows = useMemo(() => {
     const q = searchString.trim().toLowerCase();

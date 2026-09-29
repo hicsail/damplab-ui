@@ -111,7 +111,11 @@ export function OperationsUploadPreview({ parsed, fileName, existing, sets, open
         }
       });
     } catch (e) {
+      // Fix round 1: don't let the audit record vanish silently — the row-level
+      // work already happened, so this must surface in the completion summary
+      // rather than only the console, or "Import complete" would be a lie.
       console.error('Failed to create upload log:', e);
+      summary.errors.push(`The upload history record could not be saved: ${formatGqlError(e)}`);
     }
     setImporting(false);
     onComplete(summary);
