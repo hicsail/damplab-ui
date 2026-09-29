@@ -44,6 +44,7 @@ import {
 import SowCustomerView from "../components/sow/SowCustomerView";
 import JobEquipmentBookingPanel from "../components/booking/JobEquipmentBookingPanel";
 import JobPaymentsPanel from "../components/billing/JobPaymentsPanel";
+import ResultsPanel from "../components/ResultsPanel";
 import ProcessCard from "../components/technician/ProcessCard";
 import StatusPaneHeader from "../components/technician/StatusPaneHeader";
 import {
@@ -931,6 +932,8 @@ export default function Tracking() {
 
         {/* Payments belong to the job; every invoice version restates them. */}
         <JobPaymentsPanel jobId={id || ""} />
+
+        <ResultsPanel jobDisplayId={data?.ownJobById?.jobId ?? null} />
 
         {/* Comments Section */}
         <CommentsSection

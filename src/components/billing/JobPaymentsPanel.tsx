@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@apollo/client';
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, TextField, Tooltip, Typography } from '@mui/material';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import CloseIcon from '@mui/icons-material/Close';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { format } from 'date-fns';
 import { GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
 import { RECORD_JOB_PAYMENT, VOID_JOB_PAYMENT } from '../../gql/mutations';
@@ -134,6 +135,35 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
     }
   };
 
+  // Demo only: "Refresh..." reads as checking for an online payment, but it
+  // records one for whatever is due right now, as if the client had just paid.
+  const demoRefresh = async (): Promise<void> => {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const fresh = await balanceQuery.refetch();
+      const due = Math.round((Number(fresh.data?.jobBalance?.balanceDue) || 0) * 100) / 100;
+      if (due > 0) {
+        await recordPayment({
+          variables: {
+            input: {
+              jobId,
+              amount: due,
+              receivedOn: new Date().toISOString(),
+              reference: 'Online card payment',
+              note: null
+            }
+          }
+        });
+      }
+      await refresh();
+    } catch (error) {
+      setActionError(formatSaveError(error, 'this payment'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitVoid = async (reason: string): Promise<void> => {
     if (!voidTarget) return;
     setBusy(true);
@@ -190,11 +220,18 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
         }
         actions={
           staffView ? (
-            <Can permission={PERMISSIONS.BillingWrite}>
-              <Button variant="contained" size="small" startIcon={<PaymentsIcon />} onClick={openRecord} sx={railBtnSx}>
-                Record payment
-              </Button>
-            </Can>
+            <>
+              <Can permission={PERMISSIONS.BillingWrite}>
+                <Button variant="contained" size="small" startIcon={<PaymentsIcon />} onClick={openRecord} sx={railBtnSx}>
+                  Record payment
+                </Button>
+              </Can>
+              <Can permission={PERMISSIONS.BillingWrite}>
+                <Button variant="outlined" size="small" startIcon={<RefreshIcon />} disabled={busy} onClick={demoRefresh} sx={railBtnSx}>
+                  {busy ? 'Refreshing…' : 'Refresh...'}
+                </Button>
+              </Can>
+            </>
           ) : undefined
         }
         details={

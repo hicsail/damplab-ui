@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, List, ListItem, ListItemText, Tooltip, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItem, ListItemText, Tooltip, Typography } from '@mui/material';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import CancelIcon from '@mui/icons-material/Cancel';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { GET_INVOICES_BY_JOB_ID } from '../../gql/queries';
 import { VOID_INVOICE } from '../../gql/mutations';
 import {
@@ -67,6 +69,8 @@ export default function InvoicePanel({ jobId, jobDisplayId, jobName, customerCat
   const [voidTarget, setVoidTarget] = useState<any | null>(null);
   const [voiding, setVoiding] = useState(false);
   const [viewing, setViewing] = useState<any | null>(null);
+  // Demo only: opens a checkout dialog that never finishes loading; online payment is not built yet.
+  const [payOpen, setPayOpen] = useState(false);
 
   const invoices: any[] = invoicesQuery.data?.invoicesByJobId ?? [];
   const current = currentInvoice<any>(invoices);
@@ -151,6 +155,11 @@ export default function InvoicePanel({ jobId, jobDisplayId, jobName, customerCat
         statusPane={statusPane}
         actions={
           <>
+            {!staffView && current && status !== 'PAID' && (
+              <Button variant="contained" size="small" startIcon={<CreditCardIcon />} onClick={() => setPayOpen(true)} sx={railBtnSx}>
+                Pay Invoice...
+              </Button>
+            )}
             {staffView && (
               <Can permission={PERMISSIONS.BillingWrite}>
                 <Tooltip title={issueBlockedReason ?? ''} disableHoverListener={!issueBlockedReason}>
@@ -266,6 +275,23 @@ export default function InvoicePanel({ jobId, jobDisplayId, jobName, customerCat
         <DialogActions>
           {viewing && pdfLink(viewing, 'Download PDF', false)}
           <Button onClick={() => setViewing(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={payOpen} onClose={() => setPayOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Pay invoice</DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 4 }}>
+            <CircularProgress />
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <LockOutlinedIcon sx={{ fontSize: 16 }} />
+              Connecting to secure payment…
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPayOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
         </DialogActions>
       </Dialog>
     </>
