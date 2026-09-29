@@ -63,7 +63,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
 
   const [, setRowModesModel] = useState<GridRowModesModel>({});
 
-  const { data: setsData } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
+  const { data: setsData, error: setsError } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
   const setNameById = useMemo(() => new Map(setRefsFrom(setsData).map((s) => [s.id, s.name])), [setsData]);
   const exportFields = useMemo(() => offeredFields(operationExportFields(setNameById), canSeeInternal), [setNameById, canSeeInternal]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -71,6 +71,13 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   useEffect(() => {
     setRows(services as ServiceRow[]);
   }, [services]);
+
+  useEffect(() => {
+    // Parameter sets failed to load: the parameterSets column falls back to raw
+    // set ids (see operationExportFields), so the download stays usable — just
+    // tell the user why the names look wrong.
+    if (setsError) setErrorMessage('Failed to load parameter sets; the download will show set ids instead of names.');
+  }, [setsError]);
 
   const filteredRows = useMemo(() => {
     const q = searchString.trim().toLowerCase();
@@ -539,7 +546,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           {/* Download is a read of data already on screen; upload is a bulk
               create/update, so only that half is gated. */}
-          <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!setsData} onClick={() => setPickerOpen(true)}>
+          <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!setsData && !setsError} onClick={() => setPickerOpen(true)}>
             Download
           </Button>
           {canWrite && (

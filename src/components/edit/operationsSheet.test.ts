@@ -36,4 +36,12 @@ describe('operations sheet (pin 24)', () => {
       ['op1', 'PCR', 'buffer', 'Buffer', 'dropdown', 'N', 'Buffers', 'PBS; TE']
     ]);
   });
+
+  it('falls back to the raw set id when the sets query errored (or the id is otherwise unresolved)', () => {
+    const op: OperationLike = { ...pcr, parameterSetIds: ['s1', 'unknown-set'] };
+    const fields = operationExportFields(sets);
+    const wb = buildOperationsWorkbook([op], fields, new Set(fields.map((f) => f.key)));
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets.Operations);
+    expect(rows[0]).toMatchObject({ parameterSets: 'Buffers; unknown-set' });
+  });
 });
