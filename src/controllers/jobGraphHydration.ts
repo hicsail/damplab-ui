@@ -2,6 +2,7 @@ import { generateFormDataFromParams, createNodeObject, serviceAllowsMultipleRuns
 import { getWorkflowsFromGraph } from './GraphHelpers';
 import { NodeParameter } from '../types/CanvasTypes';
 import { EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { isSampleSheetParam } from '../utils/sampleSheetValue';
 import { applyNodeChanges, NodeChange } from 'reactflow';
 
 /**
@@ -578,4 +579,30 @@ export const buildSaveWorkflowsInput = (nodes: any[], edges: any[]): any[] => {
                 .map((edge: any) => ({ id: String(edge.id), source: edge.source, target: edge.target }))
         };
     });
+};
+
+/**
+ * The customer's editor hydrates from a version snapshot, but a samples sheet
+ * the lab swapped from its job page writes no version. Without this the
+ * customer's next save would send the old sheet back and undo the lab's swap.
+ * Only sampleSheet values are taken from the live nodes; everything else stays
+ * as the version recorded it (the live graph can hold a hidden staff draft).
+ */
+export const overlayLiveSampleSheetsOnCanvas = (nodes: any[], liveWorkflows: any[]): any[] => {
+  const liveById = new Map<string, any>();
+  (liveWorkflows ?? []).forEach((w: any) => (w?.nodes ?? []).forEach((n: any) => { if (n?.id) liveById.set(n.id, n); }));
+  if (!liveById.size) return nodes;
+  return nodes.map((node: any) => {
+    const live = liveById.get(node?.id);
+    const sheetIds = new Set((Array.isArray(live?.service?.parameters) ? live.service.parameters : []).filter((p: any) => isSampleSheetParam(p)).map((p: any) => p.id));
+    if (!sheetIds.size) return node;
+    const liveValues = new Map((Array.isArray(live.formData) ? live.formData : []).filter((e: any) => sheetIds.has(e?.id)).map((e: any) => [e.id, e.value]));
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        formData: (node?.data?.formData ?? []).map((entry: any) => (liveValues.has(entry?.id) ? { ...entry, value: liveValues.get(entry.id) } : entry))
+      }
+    };
+  });
 };
