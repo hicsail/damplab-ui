@@ -46,7 +46,13 @@ export const NOTIFICATION_EVENT_TYPES: readonly NotificationEventTypeDef[] = [
     eventType: "COMMENT_CREATED",
     label: "Comment Created",
     description: "A new comment was posted on a job",
-    supportsEmail: false,
+    supportsEmail: true,
+  },
+  {
+    eventType: "INTERNAL_COMMENT_CREATED",
+    label: "Internal Comment Created",
+    description: "A staff-only internal comment was posted on a job",
+    supportsEmail: true,
   },
   {
     eventType: "LAB_NODE_ASSIGNED",
@@ -59,5 +65,11 @@ export const NOTIFICATION_EVENT_TYPES: readonly NotificationEventTypeDef[] = [
     label: "Lab Node State Changed",
     description: "A lab node changed its processing state",
     supportsEmail: false,
+  },
+  {
+    eventType: "BUG_DEPLOYED_TO_STAGING",
+    label: "Bug Fix Deployed to Staging",
+    description: "A fix for a bug you reported has been deployed to staging",
+    supportsEmail: true,
   },
 ];

@@ -60,13 +60,18 @@ const CATEGORIES = [
   "Comment",
 ] as const;
 
-/** Clickable chip that closes the drawer so the user can see the section behind it. */
+/** Section the chip should scroll to when clicked. */
+export type TimelineSection = "job" | "sow" | "invoice" | "comments";
+
+/** Clickable chip that closes the drawer and scrolls to the relevant page section. */
 function ReferenceChip({
   label,
-  onClose,
+  section,
+  onNavigate,
 }: {
   label: string;
-  onClose: () => void;
+  section: TimelineSection;
+  onNavigate: (section: TimelineSection) => void;
 }): React.JSX.Element {
   return (
     <Chip
@@ -74,13 +79,15 @@ function ReferenceChip({
       size="small"
       variant="outlined"
       clickable
-      onClick={onClose}
+      onClick={() => onNavigate(section)}
       sx={{
         mt: 0.5,
         mr: 0.5,
         height: 20,
         fontSize: 11,
         cursor: "pointer",
+        color: "primary.main",
+        borderColor: "primary.light",
         "&:hover": { bgcolor: "action.hover", borderColor: "primary.main" },
       }}
     />
@@ -91,13 +98,20 @@ interface Props {
   jobId: string;
   open: boolean;
   onClose: () => void;
+  onNavigate?: (section: TimelineSection) => void;
 }
 
 export default function JobActivityTimeline({
   jobId,
   open,
   onClose,
+  onNavigate,
 }: Props): React.JSX.Element {
+  const handleNavigate = (section: TimelineSection) => {
+    onClose();
+    // Small delay so the drawer closes before scrolling
+    setTimeout(() => onNavigate?.(section), 150);
+  };
   const [filter, setFilter] = useState<string>("All");
   const { data, loading, fetchMore } = useQuery<{
     jobActivityTimeline: ActivityEvent[];
@@ -239,19 +253,22 @@ export default function JobActivityTimeline({
                     {event.jobVersionNumber != null && (
                       <ReferenceChip
                         label={`Version ${event.jobVersionNumber}`}
-                        onClose={onClose}
+                        section="job"
+                        onNavigate={handleNavigate}
                       />
                     )}
                     {event.sowVersionNumber != null && (
                       <ReferenceChip
                         label={`SOW v${event.sowVersionNumber}`}
-                        onClose={onClose}
+                        section="sow"
+                        onNavigate={handleNavigate}
                       />
                     )}
                     {event.invoiceNumber && (
                       <ReferenceChip
                         label={`Invoice ${event.invoiceNumber}`}
-                        onClose={onClose}
+                        section="invoice"
+                        onNavigate={handleNavigate}
                       />
                     )}
                   </Box>
