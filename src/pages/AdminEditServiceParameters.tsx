@@ -41,6 +41,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { AppContext } from '../contexts/App';
 import { UPDATE_SERVICE } from '../gql/queries';
+import { ownParametersOf } from '../utils/serviceParameters';
 import { validateParameter } from '../components/edit/parameters/ParameterValidation';
 import { idFromName, makeUniqueIds } from '../utils/idFromName';
 import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
@@ -143,7 +144,7 @@ export default function AdminEditServiceParameters() {
     setParameters((prev) =>
       prev.length
         ? prev
-        : (service.parameters ?? []).map((p: any) => ({ ...p, _dragKey: createId() }))
+        : ownParametersOf(service).map((p: any) => ({ ...p, _dragKey: createId() }))
     );
   }, [service]);
 

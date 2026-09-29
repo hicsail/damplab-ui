@@ -263,7 +263,6 @@ export default function AdminEditService() {
       pricingMode,
       allowMultipleRuns,
       equipmentUse,
-      parameters: row.parameters ?? [],
       paramGroups: row.paramGroups ?? [],
       allowedConnections: allowedConnectionIds,
       inventoryRequirements: inventoryRequirementIds,
