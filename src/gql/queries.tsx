@@ -132,6 +132,16 @@ export const GET_JOB_BY_ID = gql`
       clientDisplayName
       institute
       email
+      sub
+      clientEmail
+      primaryClientEmail
+      memberEmails
+      description
+      submittedBy {
+        sub
+        email
+        name
+      }
       customerCategory
       state
       customerActionRequired
@@ -209,6 +219,12 @@ export const GET_JOB_BY_ID = gql`
             }
           }
           formData
+          parameterSnapshot {
+            id
+            name
+            type
+            displayValue
+          }
           state
           additionalInstructions
           usedInventory
@@ -246,6 +262,12 @@ export const GET_JOB_BY_ID = gql`
             serviceId
             serviceName
             formData
+            parameterSnapshot {
+              id
+              name
+              type
+              displayValue
+            }
             additionalInstructions
             price
             position {
@@ -275,6 +297,16 @@ export const GET_OWN_JOB_BY_ID = gql`
       clientDisplayName
       institute
       email
+      sub
+      clientEmail
+      primaryClientEmail
+      memberEmails
+      description
+      submittedBy {
+        sub
+        email
+        name
+      }
       customerCategory
       state
       customerActionRequired
@@ -354,6 +386,12 @@ export const GET_OWN_JOB_BY_ID = gql`
             }
           }
           formData
+          parameterSnapshot {
+            id
+            name
+            type
+            displayValue
+          }
           state
           additionalInstructions
           usedInventory
@@ -391,6 +429,12 @@ export const GET_OWN_JOB_BY_ID = gql`
             serviceId
             serviceName
             formData
+            parameterSnapshot {
+              id
+              name
+              type
+              displayValue
+            }
             additionalInstructions
             price
             position {

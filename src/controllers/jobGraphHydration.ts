@@ -245,6 +245,7 @@ export const versionWorkflowsAsCards = (versionWorkflows: any[] | undefined, ser
                 label: snapshot?.label ?? snapshot?.serviceName ?? 'Removed service',
                 formData: snapshot?.formData ?? [],
                 price: snapshot?.price,
+                parameterSnapshot: snapshot?.parameterSnapshot ?? null,
                 // Named `service` to match the live shape the cards destructure.
                 service: service ?? { id: snapshot?.serviceId, name: snapshot?.serviceName, parameters: [] }
             };

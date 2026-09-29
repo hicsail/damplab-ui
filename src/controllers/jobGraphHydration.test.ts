@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, mergeSavedFormData, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from './jobGraphHydration';
+import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, mergeSavedFormData, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts, versionWorkflowsAsCards } from './jobGraphHydration';
 import { getWorkflowsFromGraph } from './GraphHelpers';
 import { EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_PARAM_IDS, EQUIPMENT_START_PARAM_ID } from '../utils/servicePricing';
 
@@ -624,5 +624,13 @@ describe('mergeSavedFormData — equipment parameters', () => {
     // Behaviour 4: toggling the flag never touches nodes that already exist.
     const merged = mergeSavedFormData(parameters, [{ id: 'vol', value: 5 }], 'n1', { equipmentUse: true });
     expect(merged.some((p) => EQUIPMENT_PARAM_IDS.includes(p.id))).toBe(false);
+  });
+});
+
+describe('versionWorkflowsAsCards — parameter snapshot', () => {
+  it('carries the version node snapshot onto the card node', () => {
+    const snapshot = [{ id: 'gone', name: 'Old parameter', type: 'text', displayValue: 'x' }];
+    const cards = versionWorkflowsAsCards([{ workflowId: 'w1', name: 'W', nodes: [{ id: 'a', serviceId: 'svc', serviceName: 'Svc', formData: [], parameterSnapshot: snapshot }] }], []);
+    expect(cards[0].nodes[0].parameterSnapshot).toEqual(snapshot);
   });
 });
