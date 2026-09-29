@@ -21,6 +21,16 @@ import {
 export default [
   route("/canvas", "./pages/MainFlow.tsx"),
   route("/login", "./pages/LoginForm.tsx"),
+  // Public documentation: no sign-in required, like /canvas and /login above. The
+  // page list lives in pages/docs/docsPages.ts; keep the two in step.
+  layout("./layouts/PublicDocsLayout.tsx", [
+    route("/docs", "./pages/docs/DocsIndex.tsx"),
+    route("/docs/about", "./pages/docs/DocsAbout.tsx"),
+    route("/docs/tech-stack", "./pages/docs/DocsTechStack.tsx"),
+    route("/docs/graphql", "./pages/docs/DocsGraphql.tsx"),
+    route("/docs/biosecurity", "./pages/docs/DocsBiosecurity.tsx"),
+    route("/docs/resources", "./pages/docs/DocsResources.tsx"),
+  ]),
   layout("./layouts/PrivateRouteAuthed.tsx", [
     index("./pages/Home.tsx"),
     route("/training", "./pages/Training.tsx"),

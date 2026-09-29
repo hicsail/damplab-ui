@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, Link as RouterLink } from 'react-router';
 import { Box, Button } from '@mui/material';
 import { UserContext, UserContextProps } from "../contexts/UserContext";
 
@@ -19,6 +19,10 @@ export default function LoginForm() {
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
       <Button variant="contained" onClick={() => userContext.keycloak.login()}>
         Log in
+      </Button>
+      {/* /docs is public, so this is the one link here that works before signing in. */}
+      <Button component={RouterLink} to="/docs" color="inherit" sx={{ mt: 2, textTransform: 'none' }}>
+        Learn about DAMPLab Canvas
       </Button>
     </Box>
   );
