@@ -167,6 +167,8 @@ const TIER_KEYS: Record<PricingColumn, { nested: string; flat: string }> = {
   pricingExternalNoSalary: { nested: 'externalNoSalary', flat: 'externalNoSalaryPrice' },
   pricingLegacy: { nested: 'legacy', flat: 'price' }
 };
+/** The pricing column a flat mutation key came from, for reading its before-value the same way `tierPrice` would. */
+const COLUMN_BY_FLAT = new Map<string, PricingColumn>(Object.entries(TIER_KEYS).map(([column, keys]) => [keys.flat, column as PricingColumn]));
 
 /** The operation's current tiers as a clean input object — explicit keys only, so no `__typename`. */
 export function existingPricing(op: OperationLike | undefined): Record<'internal' | 'external' | 'externalAcademic' | 'externalMarket' | 'externalNoSalary' | 'legacy', number | null> {
@@ -175,7 +177,7 @@ export function existingPricing(op: OperationLike | undefined): Record<'internal
     internal: op ? tierPrice(op, 'pricingInternal') : null,
     external,
     externalAcademic: op ? tierPrice(op, 'pricingExternalAcademic') : null,
-    externalMarket: op?.pricing?.externalMarket ?? op?.externalMarketPrice ?? external,
+    externalMarket: op ? tierPrice(op, 'pricingExternalMarket') : null,
     externalNoSalary: op ? tierPrice(op, 'pricingExternalNoSalary') : null,
     legacy: op ? tierPrice(op, 'pricingLegacy') : null
   };
@@ -236,11 +238,25 @@ export function buildOperationUpdateChanges(row: ParsedOperationRow, selected: R
   return out;
 }
 
-/** Upload-log "before": the existing value of every field the change sets. */
+/**
+ * Upload-log "before": the existing value of every field the change sets. Price
+ * keys — flat or the generic `externalPrice` — are read through `tierPrice`/
+ * `existingPricing` (nested `pricing` preferred), not the raw flat field, because
+ * Task 12's `GET_SERVICES` never selects most flat price fields: reading them
+ * directly would log a wrong `null` "before" whenever the real price lives only
+ * in `pricing`.
+ */
 export function beforeSnapshot(existing: OperationLike, changes: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(changes)) {
-    out[key] = key === 'pricing' ? existingPricing(existing) : ((existing as any)[key] ?? null);
+    if (key === 'pricing') {
+      out[key] = existingPricing(existing);
+    } else if (key === 'externalPrice') {
+      out[key] = existingPricing(existing).external;
+    } else {
+      const column = COLUMN_BY_FLAT.get(key);
+      out[key] = column ? tierPrice(existing, column) : ((existing as any)[key] ?? null);
+    }
   }
   return out;
 }

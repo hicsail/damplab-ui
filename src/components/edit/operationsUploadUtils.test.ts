@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 import {
-  beforeSnapshot, buildOperationCreateInput, buildOperationUpdateChanges, OperationsParseContext, OPTIONAL_UPLOAD_COLUMNS,
+  beforeSnapshot, buildOperationCreateInput, buildOperationUpdateChanges, existingPricing, OperationsParseContext, OPTIONAL_UPLOAD_COLUMNS,
   parseOperationsSheet, pickOperationsSheet
 } from './operationsUploadUtils';
 import { OPERATION_COLUMNS } from './operationsSheet';
@@ -137,6 +137,19 @@ describe('building mutations (pins 28, 31)', () => {
 
   it('snapshots the before-values of exactly the changed fields', () => {
     expect(beforeSnapshot(pcr, { description: 'x', unit: 'rxn' })).toEqual({ description: 'Amplify', unit: null });
+  });
+
+  it('reads price before-values from nested pricing, not raw flat fields Task 12 may not query (Fix round 1)', () => {
+    const nestedOnly: any = { id: 'op4', name: 'Nested', pricing: { internal: 5, externalAcademic: 7, externalMarket: 9, externalNoSalary: 6, legacy: 10, external: 9 } };
+    const changes = { internalPrice: 1, externalAcademicPrice: 1, externalMarketPrice: 1, externalNoSalaryPrice: 1, price: 1, externalPrice: 1 };
+    expect(beforeSnapshot(nestedOnly, changes)).toEqual({
+      internalPrice: 5, externalAcademicPrice: 7, externalMarketPrice: 9, externalNoSalaryPrice: 6, price: 10, externalPrice: 9
+    });
+  });
+
+  it('existingPricing.externalMarket prefers nested pricing.external over a flat externalMarketPrice, matching tierPrice order (Fix round 1)', () => {
+    const op: any = { id: 'op5', name: 'Mixed', pricing: { external: 20 }, externalMarketPrice: 99 };
+    expect(existingPricing(op).externalMarket).toBe(20);
   });
 
   it('offers every column but id and name as optional', () => {
