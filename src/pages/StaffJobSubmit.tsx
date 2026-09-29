@@ -211,10 +211,10 @@ export default function StaffJobSubmit() {
       </Typography>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        This uses the same job pipeline as the customer checkout. Pricing review is skipped. The job is
-        submitted under your staff account, and the client name and email below are what attach it to the
-        client: the name is the display name on SOWs and customer-facing documents, and the email is what
-        lets the client see the job in their own dashboard.
+        This uses the same job pipeline as the customer checkout. Pricing review is skipped. The job
+        belongs to the first client email below, and you are recorded as having submitted it on the
+        client's behalf. The client name is the display name on SOWs and customer-facing documents, and
+        the email is what lets the client see the job in their own dashboard.
       </Typography>
 
       <Button variant="outlined" onClick={() => navigate('/canvas')} sx={{ mb: 3, textTransform: 'none' }}>
