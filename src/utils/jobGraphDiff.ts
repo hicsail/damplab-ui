@@ -133,7 +133,24 @@ const flattenEdgeKeys = (workflows: SnapshotWorkflow[] | undefined): Set<string>
 };
 
 /** Human-readable form of a stored parameter value, for display and for text diffing. */
-export const formatParamValue = (value: any): string => {
+/**
+ * A file or samples-spreadsheet value as a version stores it: the JSON string
+ * the node keeps. The live node resolver returns the parsed object instead, so
+ * without this the same file compared as `{"filename":…}` against `name.xlsx`
+ * and every file parameter read as edited the moment the editor opened.
+ */
+const parseFileShapedString = (value: any): any => {
+    if (typeof value !== 'string' || !value.startsWith('{')) return value;
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' && typeof parsed.filename === 'string' ? parsed : value;
+    } catch {
+        return value;
+    }
+};
+
+export const formatParamValue = (rawValue: any): string => {
+    const value = parseFileShapedString(rawValue);
     if (value === null || value === undefined || value === '') return '';
     if (Array.isArray(value)) return value.map(formatParamValue).filter(Boolean).join(', ');
     if (typeof value === 'object') {

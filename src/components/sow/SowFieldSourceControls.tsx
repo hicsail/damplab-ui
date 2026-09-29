@@ -541,12 +541,16 @@ export default function SowFieldSourceControls({ fieldKey, inputs, administrator
               Add adjustment
             </Button>
             <Box sx={{ textAlign: 'right' }}>
-              <Typography variant="body2" color="text.secondary">
-                Total {formatCurrency(feeTotals.totalCost)}
-              </Typography>
+              {/* Same rule as the document (buildFeeSchedule): an equipment-only
+                  SOW with no adjustment contracts for nothing, so no $0 total. */}
+              {!(feeTotals.baseCost === 0 && feeTotals.estimatedEquipmentCost > 0 && (inputs.adjustments ?? []).length === 0) && (
+                <Typography variant="body2" color="text.secondary">
+                  Total {formatCurrency(feeTotals.totalCost)}
+                </Typography>
+              )}
               {feeTotals.estimatedEquipmentCost > 0 && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                  Estimated equipment usage (not included in Total) {formatCurrency(feeTotals.estimatedEquipmentCost)}
+                  Estimated equipment usage {formatCurrency(feeTotals.estimatedEquipmentCost)}
                 </Typography>
               )}
             </Box>

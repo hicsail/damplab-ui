@@ -52,6 +52,7 @@ export const resolveParameterName = (entry: any, paramDef?: any): string | undef
   (entry?.id === RUN_COUNT_PARAM_ID ? RUN_COUNT_PARAM_NAME : undefined) ||
   (typeof entry?.id === 'string' ? EQUIPMENT_PARAM_NAMES[entry.id] : undefined);
 import type { CustomerCategory } from './customerCategory';
+import { isSampleSheetParam, sampleCountFromValue } from './sampleSheetValue';
 export type { CustomerCategory };
 
 interface ServiceParameterOption {
@@ -101,6 +102,25 @@ const normalizePricingMode = (value: unknown): ServicePricingMode => {
     if (upper === 'PARAMETER') return 'PARAMETER';
   }
   return 'SERVICE';
+};
+
+/**
+ * The pricing mode a line is actually priced under. Twin of `effectivePricingMode`
+ * in damplab-backend/src/pricing/service-pricing.util.ts.
+ *
+ * An equipment-use operation is priced as its own hourly rate times the booked
+ * window; "Based on selected options" has nothing to price there and came to $0.
+ * A canvas node carries no `equipmentUse` flag, so the reserved equipment window
+ * in its formData — injected only for equipment-use services — is the tell.
+ */
+export const effectivePricingMode = (
+  service: { pricingMode?: unknown; equipmentUse?: unknown } | null | undefined,
+  rawFormData?: unknown
+): ServicePricingMode => {
+  if (service?.equipmentUse === true) return 'SERVICE';
+  const formData = normalizeFormDataToArray(rawFormData, new Set());
+  if (formData.some((entry) => entry.id === EQUIPMENT_START_PARAM_ID)) return 'SERVICE';
+  return normalizePricingMode(service?.pricingMode);
 };
 
 const normalizePrice = (value: unknown): number | undefined => {
@@ -295,6 +315,15 @@ export const calculateParameterCostWithCategory = (
     const unitPrice = resolveCategoryPrice(param, customerCategory);
     if (unitPrice === undefined) continue;
 
+    // A samples spreadsheet bills per row — the count stored with the file.
+    // Mirrors the sampleSheet branch in the backend's service-pricing.util.ts.
+    if (isSampleSheetParam(param)) {
+      const count = sampleCountFromValue(entry.value);
+      if (count === undefined || count === 0) continue;
+      total += unitPrice * count;
+      continue;
+    }
+
     // A multiplier parameter that carries its own price is billed `price x value`
     // and is excluded from the line's global multiplier below — otherwise the
     // hours would scale every other parameter too. Mirrors
@@ -474,6 +503,7 @@ const getMultiplier = (
 export const calculateServiceCost = (
   service: {
     pricingMode?: unknown;
+    equipmentUse?: unknown;
     price?: unknown;
     internalPrice?: unknown;
     externalPrice?: unknown;
@@ -494,7 +524,7 @@ export const calculateServiceCost = (
   fallbackCost?: unknown,
   customerCategory?: CustomerCategory
 ): number => {
-  const pricingMode = normalizePricingMode(service?.pricingMode);
+  const pricingMode = effectivePricingMode(service, rawFormData);
   let baseCost = 0;
 
   if (pricingMode === 'PARAMETER') {

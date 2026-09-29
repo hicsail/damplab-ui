@@ -46,7 +46,13 @@ export const NOTIFICATION_EVENT_TYPES: readonly NotificationEventTypeDef[] = [
     eventType: "COMMENT_CREATED",
     label: "Comment Created",
     description: "A new comment was posted on a job",
-    supportsEmail: false,
+    supportsEmail: true,
+  },
+  {
+    eventType: "INTERNAL_COMMENT_CREATED",
+    label: "Internal Comment Created",
+    description: "A staff-only internal comment was posted on a job",
+    supportsEmail: true,
   },
   {
     eventType: "LAB_NODE_ASSIGNED",

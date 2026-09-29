@@ -30,6 +30,8 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import ParamTableOnForm from "./ParamTableOnForm";
 import { CanvasContext } from "../contexts/Canvas";
 import { normalizeBookerEmails, validateEquipmentValues } from "../utils/equipmentParams";
+import SampleSheetField from "./SampleSheetField";
+import { isSampleSheetParam } from "../utils/sampleSheet";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -57,6 +59,13 @@ interface ParamFormProps {
    * copy what was submitted instead of squinting at greyed-out text.
    */
   readOnly?: boolean;
+  /**
+   * Whether a samples spreadsheet can be picked here. True on the canvas,
+   * where parameter files are uploaded at submission; the job editor passes
+   * false because it has no upload step — sheets on a submitted job are
+   * replaced from the job page.
+   */
+  sampleSheetUploadable?: boolean;
 }
 
 type PendingParamFile = {
@@ -140,7 +149,7 @@ function EmailsField({
   );
 }
 
-export default function ({ activeNode, onFormDataChange, changedParamIds, readOnly = false }: ParamFormProps) {
+export default function ({ activeNode, onFormDataChange, changedParamIds, readOnly = false, sampleSheetUploadable = true }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
 
   /** Marks one parameter as edited relative to the diff baseline. */
@@ -185,7 +194,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
           : [obj.value ?? ""];
         initValues[obj.id] = arr;
       } else {
-        if (obj.type === "file") {
+        if (obj.type === "file" || isSampleSheetParam(obj)) {
           initValues[obj.id] = obj.value ?? null;
           return;
         }
@@ -213,7 +222,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
           if (!hasValue) errors[key] = "Required (at least one value)";
         }
       } else {
-        if (obj.type === "file") {
+        if (obj.type === "file" || isSampleSheetParam(obj)) {
           if (obj.required && !values[key]) errors[key] = "Required";
           return;
         }
@@ -561,6 +570,23 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                       </Box>
                     </Box>
                   </div>
+                );
+              }
+              if (isSampleSheetParam(param)) {
+                // The form entry carries only the fields generateFormDataFromParams
+                // copies; the template reference lives on the service's parameter
+                // definition, which the node keeps alongside.
+                const paramDef = (activeNode?.data?.parameters ?? []).find((p: any) => p?.id === param.id);
+                return (
+                  <SampleSheetField
+                    key={param.id}
+                    param={paramDef?.templateFile ? { ...param, templateFile: paramDef.templateFile } : param}
+                    value={formik.values[param.id]}
+                    serviceId={activeNode?.data?.serviceId}
+                    readOnly={readOnly}
+                    uploadable={sampleSheetUploadable}
+                    onChange={(next) => formik.setFieldValue(param.id, next)}
+                  />
                 );
               }
               if (param.type === "file") {

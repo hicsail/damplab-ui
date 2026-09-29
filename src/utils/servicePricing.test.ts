@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { splitContractedLines, sumLineCosts } from './servicePricing';
+import { calculateParameterCostWithCategory, splitContractedLines, sumLineCosts } from "./servicePricing";
 
 describe('splitContractedLines', () => {
   const equipment = { name: 'Plate reader', description: 'Plate reader — 10 hrs/wk x 4 wks (estimate; billed on actual hours)', cost: 400 };
@@ -36,5 +36,29 @@ describe('sumLineCosts', () => {
 
   it('is zero for nothing at all', () => {
     expect(sumLineCosts(null)).toBe(0);
+  });
+});
+
+describe('samples spreadsheet pricing (twin of the backend branch)', () => {
+  const parameters = [
+    { id: 'samples', name: 'Samples', type: 'sampleSheet', price: 3, pricing: { internal: 2 } },
+    { id: 'notes', name: 'Notes', type: 'string' }
+  ];
+  const sheet = (sampleCount: number) => JSON.stringify({ filename: 'samples.xlsx', key: 'workflow-parameters/u/x', sampleCount });
+
+  it('bills the parameter price once per sample row, at the customer’s category', () => {
+    expect(calculateParameterCostWithCategory(parameters, [{ id: 'samples', value: sheet(12) }], 'INTERNAL_CUSTOMERS')).toBe(24);
+    expect(calculateParameterCostWithCategory(parameters, [{ id: 'samples', value: sheet(12) }], undefined)).toBe(36);
+  });
+
+  it('reads the count off a pending canvas file and off the object the server returns', () => {
+    expect(calculateParameterCostWithCategory(parameters, [{ id: 'samples', value: { __kind: 'pending-file', filename: 'a.csv', sampleCount: 4 } }], undefined)).toBe(12);
+    expect(calculateParameterCostWithCategory(parameters, [{ id: 'samples', value: { filename: 'a.csv', url: 'u', sampleCount: 1 } }], undefined)).toBe(3);
+  });
+
+  it('bills nothing for no sheet, no rows, or no count', () => {
+    expect(calculateParameterCostWithCategory(parameters, [{ id: 'samples', value: null }], undefined)).toBe(0);
+    expect(calculateParameterCostWithCategory(parameters, [{ id: 'samples', value: sheet(0) }], undefined)).toBe(0);
+    expect(calculateParameterCostWithCategory(parameters, [{ id: 'samples', value: JSON.stringify({ filename: 'a.xlsx' }) }], undefined)).toBe(0);
   });
 });

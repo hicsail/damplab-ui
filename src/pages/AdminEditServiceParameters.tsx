@@ -47,11 +47,13 @@ import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { formatSaveError } from '../utils/gqlError';
 import { EQUIPMENT_PARAM_DEFS } from '../controllers/ReactFlowEvents';
+import SampleSheetTemplateField from '../components/edit/SampleSheetTemplateField';
 
 const TYPE_OPTIONS = [
   { value: 'string', label: 'Text' },
   { value: 'number', label: 'Number' },
   { value: 'file', label: 'File upload' },
+  { value: 'sampleSheet', label: 'Samples spreadsheet' },
   { value: 'boolean', label: 'Yes/No' },
   { value: 'dropdown', label: 'Pick from list' },
   { value: 'table', label: 'Table' }
@@ -769,6 +771,17 @@ export default function AdminEditServiceParameters() {
                         </Button>
                       </Box>
                     </Stack>
+                  </Grid>
+                )}
+
+                {selectedParameter.type === 'sampleSheet' && (
+                  <Grid size={12}>
+                    <SampleSheetTemplateField
+                      serviceId={String(service.id)}
+                      parameter={selectedParameter}
+                      canWrite={canWrite}
+                      onChange={(patch) => updateParameter(selectedParameterIndex, patch)}
+                    />
                   </Grid>
                 )}
 
