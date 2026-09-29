@@ -43,8 +43,8 @@ export const TAG_SUGGESTIONS = [
 ];
 const VALID_TAGS = new Set(TAG_SUGGESTIONS.map((t) => t.toLowerCase()));
 
-/** Normalize a header string for flexible matching. */
-const norm = (s: unknown): string => String(s ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+/** Normalize a header string for flexible matching. Exported for reuse by operationsUploadUtils. */
+export const norm = (s: unknown): string => String(s ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Map of normalized header → field key. */
 const HEADER_MAP: Record<string, keyof ParsedInventoryRow> = {
@@ -67,17 +67,33 @@ const HEADER_MAP: Record<string, keyof ParsedInventoryRow> = {
   hasservicecontract: 'hasServiceContract',
   servicecontractexpiration: 'serviceContractExpiration',
   contractexpiration: 'serviceContractExpiration',
+  // The header an older download wrote for the same field.
+  servicecontractexpirationdate: 'serviceContractExpiration',
   lm: 'dimensionL',
   wm: 'dimensionW',
   hm: 'dimensionH'
 };
 
+export function headerFieldFor(header: unknown): keyof ParsedInventoryRow | undefined {
+  return HEADER_MAP[norm(header)];
+}
+
+/** F6: the upload only ever parsed Excel; say so up front instead of accepting .csv. */
+export function isExcelFileName(name: string): boolean {
+  return /\.(xlsx|xls)$/i.test(name);
+}
+
+/** The download joins tags with ", "; the upload splits them back. */
+export function splitTags(raw: string): string[] {
+  return raw.split(',').map((t) => t.trim()).filter(Boolean);
+}
+
 function resolveHeaderIndices(headerRow: unknown[]): Record<string, number> {
   const indices: Record<string, number> = {};
   for (let i = 0; i < headerRow.length; i++) {
-    const key = norm(headerRow[i]);
-    if (key && HEADER_MAP[key]) {
-      indices[HEADER_MAP[key] as string] = i;
+    const field = headerFieldFor(headerRow[i]);
+    if (field) {
+      indices[field as string] = i;
     }
   }
   return indices;
@@ -112,6 +128,14 @@ export async function parseInventoryFile(file: File): Promise<{
   headerWarnings: string[];
 }> {
   const data = await processExcelFile(file);
+  return parseInventoryRows(data);
+}
+
+/** Parse already-loaded spreadsheet rows (header row first) into structured rows. */
+export function parseInventoryRows(data: unknown[][]): {
+  rows: ParsedInventoryRow[];
+  headerWarnings: string[];
+} {
   if (!data || data.length < 2) {
     throw new Error('Spreadsheet appears to be empty or missing data rows.');
   }
@@ -255,9 +279,11 @@ export function validateUploadRows(rows: ParsedInventoryRow[], rawQuantities?: s
     const row = rows[i];
 
     // Tag validation
-    if (row.tag && !VALID_TAGS.has(row.tag.toLowerCase())) {
-      row.warnings.push(`Tag "${row.tag}" is not in the predefined list.`);
-      warnings += 1;
+    for (const tag of splitTags(row.tag)) {
+      if (!VALID_TAGS.has(tag.toLowerCase())) {
+        row.warnings.push(`Tag "${tag}" is not in the predefined list.`);
+        warnings += 1;
+      }
     }
 
     // Blank quantity
@@ -270,9 +296,12 @@ export function validateUploadRows(rows: ParsedInventoryRow[], rawQuantities?: s
   return { errors, warnings };
 }
 
-function parseDimension(raw: string): { value: number; unit: string } | undefined {
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? { value: n, unit: 'm' } : undefined;
+/** "0.4" → metres; "40 cm" → { 40, cm } — the download writes the unit when it is not m. */
+export function parseDimension(raw: string): { value: number; unit: string } | undefined {
+  const match = /^\s*(\d*\.?\d+)\s*([A-Za-z]*)\s*$/.exec(raw ?? '');
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value > 0 ? { value, unit: match[2] || 'm' } : undefined;
 }
 
 /** Selectable columns for the upload preview. "name" is always included (not optional). */
@@ -297,7 +326,7 @@ export function buildCreateInput(row: ParsedInventoryRow, selectedColumns?: Set<
   const input: Record<string, unknown> = {
     name: row.name,
     type: include('type') ? row.type : 'EQUIPMENT',
-    tags: include('tag') ? (row.tag ? [row.tag] : []) : []
+    tags: include('tag') ? splitTags(row.tag) : []
   };
 
   if (include('station') && row.resolvedStationId) {
@@ -319,16 +348,24 @@ export function buildCreateInput(row: ParsedInventoryRow, selectedColumns?: Set<
 }
 
 /** Build the GraphQL changes for updating an existing inventory item. */
-export function buildUpdateChanges(row: ParsedInventoryRow, selectedColumns?: Set<UploadColumnKey>): Record<string, unknown> {
+export function buildUpdateChanges(
+  row: ParsedInventoryRow,
+  selectedColumns?: Set<UploadColumnKey>,
+  existing?: { placements?: Array<{ stationId: string; quantity: number }> | null }
+): Record<string, unknown> {
   const include = (col: UploadColumnKey): boolean => !selectedColumns || selectedColumns.has(col);
 
   const changes: Record<string, unknown> = {};
   if (row.name) changes.name = row.name;
 
   if (include('type')) changes.type = row.type;
-  if (include('tag')) changes.tags = row.tag ? [row.tag] : [];
+  if (include('tag')) changes.tags = splitTags(row.tag);
   if (include('station') && row.resolvedStationId) {
-    changes.placements = [{ stationId: row.resolvedStationId, quantity: row.quantity }];
+    // The sheet holds one placement. An item spread over several stations keeps
+    // them all unless the sheet's station or quantity actually differs.
+    const first = existing?.placements?.[0];
+    const unchanged = first && first.stationId === row.resolvedStationId && first.quantity === row.quantity;
+    if (!unchanged) changes.placements = [{ stationId: row.resolvedStationId, quantity: row.quantity }];
   }
   if (include('modelNumber')) changes.modelNumber = row.modelNumber || null;
   if (include('serialNumber')) changes.serialNumber = row.serialNumber || null;

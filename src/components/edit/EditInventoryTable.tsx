@@ -11,9 +11,11 @@ import { GridToolBar } from './GridToolBar';
 import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS, GET_STATIONS } from '../../gql/queries';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatSaveError } from '../../utils/gqlError';
-import { validateFileType } from '../data-translation/utils';
-import { parseInventoryFile, ParsedInventoryRow, UploadSummary } from './inventoryUploadUtils';
+import { isExcelFileName, parseInventoryFile, ParsedInventoryRow, UploadSummary } from './inventoryUploadUtils';
 import { InventoryUploadPreview } from './InventoryUploadPreview';
+import { FieldPickerDialog } from './FieldPickerDialog';
+import { offeredFields, worksheetFor } from './exportFields';
+import { inventoryExportFields } from './inventoryExport';
 import * as XLSX from 'xlsx';
 
 export interface EditInventoryTableProps {
@@ -47,6 +49,11 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewRows, setPreviewRows] = useState<ParsedInventoryRow[] | null>(null);
   const [uploadFileName, setUploadFileName] = useState('');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const exportFields = useMemo(
+    () => offeredFields(inventoryExportFields((stationId) => stationMap.get(stationId)), canSeeInternalFields),
+    [stationMap, canSeeInternalFields]
+  );
 
   useEffect(() => {
     setRows(data?.inventoryItems ?? []);
@@ -80,7 +87,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     if (!file) return;
     event.target.value = '';
 
-    if (!validateFileType(file.name)) {
+    if (!isExcelFileName(file.name)) {
       setErrorMessage('Please upload an .xlsx or .xls file.');
       return;
     }
@@ -108,28 +115,11 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
     setErrorMessage(`Import complete: ${parts.join(', ')}.`);
   };
 
-  const handleDownloadInventory = () => {
+  const handleDownloadInventory = (keys: string[]) => {
+    setPickerOpen(false);
     try {
-      const headers = ['Name', 'Type', 'Tag', 'Station', 'Quantity', 'Unique ID', 'Model #', 'Serial #', 'Service Contract Y/N', 'Service contract (expiration date)'];
-      const dataRows = rows.map((row: any) => {
-        const placement = row.placements?.[0];
-        return [
-          row.name ?? '',
-          row.type ?? '',
-          (row.tags ?? []).join(', '),
-          '', // Station name not resolved here — just leave blank for re-upload matching by uniqueId
-          placement?.quantity ?? '',
-          row.uniqueId ?? '',
-          row.modelNumber ?? '',
-          row.serialNumber ?? '',
-          row.hasServiceContract ? 'Y' : '',
-          row.serviceContractExpiration ? String(row.serviceContractExpiration).slice(0, 10) : ''
-        ];
-      });
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
-      ws['!cols'] = [{ wch: 38 }, { wch: 12 }, { wch: 22 }, { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 22 }, { wch: 30 }];
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+      XLSX.utils.book_append_sheet(wb, worksheetFor(rows, exportFields, new Set(keys)), 'Inventory');
       XLSX.writeFile(wb, 'damplab-inventory.xlsx');
     } catch (e) {
       console.error('Download failed:', e);
@@ -264,20 +254,25 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
 
   return (
     <Stack spacing={1}>
-      {canWrite && (
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button variant='outlined' startIcon={<DownloadIcon />} onClick={handleDownloadInventory}>
-            Download inventory
-          </Button>
-          <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>
-            Upload inventory
-          </Button>
-          <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history')}>
-            Upload history
-          </Button>
-          <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
-        </Box>
-      )}
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+        <Button variant='outlined' startIcon={<DownloadIcon />} onClick={() => setPickerOpen(true)}>
+          Download inventory
+        </Button>
+        {canWrite && (
+          <>
+            <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Upload inventory</Button>
+            <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history')}>Upload history</Button>
+            <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
+          </>
+        )}
+      </Box>
+      <FieldPickerDialog
+        open={pickerOpen}
+        title='Download inventory'
+        fields={exportFields}
+        onCancel={() => setPickerOpen(false)}
+        onConfirm={handleDownloadInventory}
+      />
       {previewRows && (
         <InventoryUploadPreview
           rows={previewRows}
