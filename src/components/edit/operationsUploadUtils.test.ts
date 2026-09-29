@@ -28,6 +28,19 @@ describe('pickOperationsSheet', () => {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['id'], ['op1']]), 'Sheet1');
     expect(pickOperationsSheet(wb)).toEqual([['id'], ['op1']]);
   });
+
+  it('never falls back to a Parameters sheet — the upload never imports parameters', () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['operationId', 'name'], ['op1', 'Temperature']]), 'Parameters');
+    expect(pickOperationsSheet(wb)).toEqual([]);
+  });
+
+  it('skips a leading Parameters sheet to fall back to a later, non-Parameters sheet', () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['operationId'], ['op1']]), 'Parameters');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['id'], ['op1']]), 'Sheet2');
+    expect(pickOperationsSheet(wb)).toEqual([['id'], ['op1']]);
+  });
 });
 
 describe('parseOperationsSheet (pins 26, 27, 28, 29)', () => {

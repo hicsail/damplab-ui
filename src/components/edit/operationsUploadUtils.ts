@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { norm } from './inventoryUploadUtils';
-import { OPERATION_COLUMNS, OperationColumn, OperationLike, OPERATIONS_SHEET_NAME, PRICING_COLUMNS, PricingColumn, tierPrice } from './operationsSheet';
+import { OPERATION_COLUMNS, OperationColumn, OperationLike, OPERATIONS_SHEET_NAME, PARAMETERS_SHEET_NAME, PRICING_COLUMNS, PricingColumn, tierPrice } from './operationsSheet';
 import type { SetRef } from '../../utils/serviceParameters';
 
 /**
@@ -39,8 +39,10 @@ const COLUMN_BY_NORM = new Map<string, OperationColumn>(OPERATION_COLUMNS.map((c
 const isPricing = (c: OperationColumn): c is PricingColumn => (PRICING_COLUMNS as readonly string[]).includes(c);
 const cellText = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0, 10) : v === null || v === undefined ? '' : String(v).trim());
 
+/** Never falls back to the Parameters sheet (read-only, never imported) — only to some other sheet, if any. */
 export function pickOperationsSheet(workbook: XLSX.WorkBook): unknown[][] {
-  const name = workbook.SheetNames.find((n) => n.trim().toLowerCase() === OPERATIONS_SHEET_NAME.toLowerCase()) ?? workbook.SheetNames[0];
+  const name = workbook.SheetNames.find((n) => n.trim().toLowerCase() === OPERATIONS_SHEET_NAME.toLowerCase())
+    ?? workbook.SheetNames.find((n) => n.trim().toLowerCase() !== PARAMETERS_SHEET_NAME.toLowerCase());
   if (!name) return [];
   return XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '' }) as unknown[][];
 }
