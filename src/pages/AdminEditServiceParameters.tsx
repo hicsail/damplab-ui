@@ -1,8 +1,10 @@
-import { useApolloClient } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
+  Box,
   Button,
   Divider,
+  Link,
   List,
   ListItemButton,
   ListItemText,
@@ -12,13 +14,13 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, Link as RouterLink } from 'react-router';
 import { AppContext } from '../contexts/App';
-import { UPDATE_SERVICE } from '../gql/queries';
-import { ownParametersOf } from '../utils/serviceParameters';
+import { GET_PARAMETER_SETS, UPDATE_SERVICE } from '../gql/queries';
+import { orderedSetRefs, overridingSetName, ownParametersOf, setParameterRows, setRefsFrom } from '../utils/serviceParameters';
 import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
-import { formatSaveError } from '../utils/gqlError';
+import { formatGqlError, formatSaveError } from '../utils/gqlError';
 import { EQUIPMENT_PARAM_DEFS } from '../controllers/ReactFlowEvents';
 import ParameterListEditor from '../components/edit/parameters/ParameterListEditor';
 import { EditableParameter, prepareParametersForSave, withDragKeys } from '../components/edit/parameters/parameterSave';
@@ -60,6 +62,43 @@ export default function AdminEditServiceParameters() {
         : [],
     [service, parameters]
   );
+
+  // Ruling D3: sets→refs is setRefsFrom (utils/serviceParameters.ts), not an inline map.
+  const { data: setsData, error: setsError } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
+  const allSets = useMemo(() => setRefsFrom(setsData, { withParameters: true }), [setsData]);
+  const attachedSetIds = service?.parameterSetIds;
+  const setRows = useMemo(
+    () => setParameterRows(attachedSetIds, allSets, parameters),
+    [attachedSetIds, allSets, parameters]
+  );
+
+  const setParametersFooter =
+    setRows.length > 0 ? (
+      <>
+        <Divider />
+        <Typography variant='subtitle2' sx={{ px: 1, pt: 1, color: 'text.secondary' }}>From parameter sets (read-only)</Typography>
+        {orderedSetRefs(attachedSetIds, allSets).map((set) => (
+          <Box key={set.id} sx={{ px: 1 }}>
+            <Link component={RouterLink} to={`/edit/parameter-sets/${set.id}`} variant='body2'>{set.name}</Link>
+            <List dense disablePadding>
+              {setRows.filter((r) => r.setId === set.id).map((r) => (
+                <ListItemButton key={`${set.id}-${r.parameter.id}`} disabled sx={{ pl: 2 }}>
+                  <ListItemText primary={r.parameter.name ?? r.parameter.id} secondary={r.overriddenByOwn ? 'overridden by this operation' : undefined} />
+                </ListItemButton>
+              ))}
+            </List>
+          </Box>
+        ))}
+      </>
+    ) : null;
+
+  // The footer silently disappearing when the operation does have sets attached
+  // would read as "no overlap to worry about" rather than "couldn't check" — so
+  // a load failure is only worth mentioning when there is something to show.
+  const setsUnavailableWarning =
+    setsError && Array.isArray(attachedSetIds) && attachedSetIds.length > 0
+      ? `Failed to load this operation's parameter sets: ${formatGqlError(setsError)}`
+      : null;
 
   if (!service) {
     return (
@@ -127,6 +166,7 @@ export default function AdminEditServiceParameters() {
       </Typography>
 
       {!!errorMessage && <Alert severity='error'>{errorMessage}</Alert>}
+      {!!setsUnavailableWarning && <Alert severity='warning'>{setsUnavailableWarning}</Alert>}
 
       <Snackbar
         open={!!successMessage}
@@ -164,6 +204,11 @@ export default function AdminEditServiceParameters() {
               </>
             ) : null
           }
+          listFooter={setParametersFooter}
+          rowChip={(p) => {
+            const name = overridingSetName(p, attachedSetIds, allSets);
+            return name ? `overrides ${name}` : undefined;
+          }}
         />
       </ReadOnlyFieldset>
 
