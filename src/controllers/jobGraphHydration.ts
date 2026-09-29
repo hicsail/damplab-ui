@@ -588,6 +588,20 @@ export const buildSaveWorkflowsInput = (nodes: any[], edges: any[]): any[] => {
  * Only sampleSheet values are taken from the live nodes; everything else stays
  * as the version recorded it (the live graph can hold a hidden staff draft).
  */
+/**
+ * The node resolver decorates file and sampleSheet values with a short-lived
+ * presigned `url` on every read. Saving the canvas would persist it (nothing
+ * downstream strips it), so the overlay hands back the stored shape.
+ */
+const withoutPresignedUrl = (value: any): any => {
+  if (Array.isArray(value)) return value.map(withoutPresignedUrl);
+  if (value && typeof value === 'object' && 'url' in value) {
+    const { url: _url, ...stored } = value;
+    return stored;
+  }
+  return value;
+};
+
 export const overlayLiveSampleSheetsOnCanvas = (nodes: any[], liveWorkflows: any[]): any[] => {
   const liveById = new Map<string, any>();
   (liveWorkflows ?? []).forEach((w: any) => (w?.nodes ?? []).forEach((n: any) => { if (n?.id) liveById.set(n.id, n); }));
@@ -601,7 +615,7 @@ export const overlayLiveSampleSheetsOnCanvas = (nodes: any[], liveWorkflows: any
       ...node,
       data: {
         ...node.data,
-        formData: (node?.data?.formData ?? []).map((entry: any) => (liveValues.has(entry?.id) ? { ...entry, value: liveValues.get(entry.id) } : entry))
+        formData: (node?.data?.formData ?? []).map((entry: any) => (liveValues.has(entry?.id) ? { ...entry, value: withoutPresignedUrl(liveValues.get(entry.id)) } : entry))
       }
     };
   });

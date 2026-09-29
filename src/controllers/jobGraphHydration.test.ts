@@ -644,6 +644,15 @@ describe('overlayLiveSampleSheetsOnCanvas (customer editor)', () => {
     expect(canvas[0].data.formData[0].value).toBe('old');
   });
 
+  it('strips the presigned url the node resolver adds, so a save does not persist it', () => {
+    const canvas = [{ id: 'a', data: { formData: [{ id: 'sheet', value: 'old' }] } }];
+    const value = { key: 'workflow-parameters/u/x.xlsx', filename: 'x.xlsx', sampleCount: 3, url: 'https://s3.example/x?X-Amz-Signature=abc' };
+    const live = [{ nodes: [{ id: 'a', service: { parameters: [{ id: 'sheet', type: 'sampleSheet' }] }, formData: [{ id: 'sheet', value }] }] }];
+    const out = overlayLiveSampleSheetsOnCanvas(canvas, live);
+    expect(out[0].data.formData[0].value).toEqual({ key: 'workflow-parameters/u/x.xlsx', filename: 'x.xlsx', sampleCount: 3 });
+    expect(value.url).toBeDefined();
+  });
+
   it('leaves nodes without a live counterpart alone', () => {
     const canvas = [{ id: 'new', data: { formData: [{ id: 'sheet', value: 'x' }] } }];
     expect(overlayLiveSampleSheetsOnCanvas(canvas, [])).toEqual(canvas);
