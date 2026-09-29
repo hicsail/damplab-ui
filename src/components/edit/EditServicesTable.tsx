@@ -1,5 +1,5 @@
-import { useApolloClient } from '@apollo/client';
-import { CREATE_CATEGORY, CREATE_SERVICE, DELETE_SERVICE, UPDATE_SERVICE } from '../../gql/queries';
+import { useApolloClient, useQuery } from '@apollo/client';
+import { CREATE_CATEGORY, CREATE_SERVICE, DELETE_SERVICE, GET_PARAMETER_SETS, UPDATE_SERVICE } from '../../gql/queries';
 import {
   DataGrid,
   GridColDef,
@@ -21,6 +21,11 @@ import { useNavigate } from 'react-router';
 import { idFromName } from '../../utils/idFromName';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatSaveError } from '../../utils/gqlError';
+import * as XLSX from 'xlsx';
+import { FieldPickerDialog } from './FieldPickerDialog';
+import { offeredFields } from './exportFields';
+import { buildOperationsWorkbook, operationExportFields, OPERATIONS_FILE_NAME } from './operationsSheet';
+import { setRefsFrom } from '../../utils/serviceParameters';
 
 type ServiceRow = Record<string, unknown> & { id: GridRowId };
 
@@ -49,6 +54,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   const navigate = useNavigate();
   const { can } = usePermissions();
   const canWrite = can(PERMISSIONS.CatalogEditorWrite);
+  const canSeeInternal = can(PERMISSIONS.InternalFieldsRead);
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const { services, refreshCatalog } = useContext(AppContext);
   const client = useApolloClient();
@@ -56,6 +62,11 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [, setRowModesModel] = useState<GridRowModesModel>({});
+
+  const { data: setsData } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
+  const setNameById = useMemo(() => new Map(setRefsFrom(setsData).map((s) => [s.id, s.name])), [setsData]);
+  const exportFields = useMemo(() => offeredFields(operationExportFields(setNameById), canSeeInternal), [setNameById, canSeeInternal]);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     setRows(services as ServiceRow[]);
@@ -99,68 +110,13 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
     }
   };
 
-  const handleDownloadPricingSheet = () => {
+  const handleDownloadOperations = (keys: string[]) => {
+    setPickerOpen(false);
     try {
-      const headers = [
-        'id',
-        'name',
-        'description',
-        'serviceCategoryNumber',
-        'serviceCategoryName',
-        'unit',
-        'pricingInternal',
-        'pricingExternalAcademic',
-        'pricingExternalMarket',
-        'pricingExternalNoSalary',
-        'pricingLegacy'
-      ];
-      const dataLines = rows.map((row) => {
-        const id = row.id ?? '';
-        const name = (row as any).name ?? '';
-        const description = (row as any).description ?? '';
-        const serviceCategoryNumber = (row as any).serviceCategoryNumber ?? '';
-        const serviceCategoryName = (row as any).serviceCategoryName ?? '';
-        const unit = (row as any).unit ?? '';
-        const pricing = (row as any).pricing ?? {};
-        const internalPrice = pricing.internal ?? (row as any).internalPrice ?? '';
-        const externalAcademicPrice =
-          pricing.externalAcademic ?? (row as any).externalAcademicPrice ?? '';
-        const externalMarketPrice =
-          pricing.externalMarket ?? pricing.external ?? (row as any).externalMarketPrice ?? (row as any).externalPrice ?? '';
-        const externalNoSalaryPrice =
-          pricing.externalNoSalary ?? (row as any).externalNoSalaryPrice ?? '';
-        const legacyPrice = pricing.legacy ?? (row as any).price ?? '';
-        return [
-          id,
-          name,
-          description,
-          serviceCategoryNumber,
-          serviceCategoryName,
-          unit,
-          internalPrice,
-          externalAcademicPrice,
-          externalMarketPrice,
-          externalNoSalaryPrice,
-          legacyPrice
-        ]
-          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-          .join(',');
-      });
-
-      const csvContent = [headers.join(','), ...dataLines].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'services-pricing.csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      XLSX.writeFile(buildOperationsWorkbook(rows as any, exportFields, new Set(keys)), OPERATIONS_FILE_NAME);
     } catch (error) {
-      console.error('Error generating pricing CSV:', error);
-      setErrorMessage('Failed to generate pricing spreadsheet.');
+      console.error('Error generating operations spreadsheet:', error);
+      setErrorMessage('Failed to generate operations spreadsheet.');
     }
   };
 
@@ -583,8 +539,8 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           {/* Download is a read of data already on screen; upload is a bulk
               create/update, so only that half is gated. */}
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadPricingSheet}>
-            Download pricing sheet
+          <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!setsData} onClick={() => setPickerOpen(true)}>
+            Download
           </Button>
           {canWrite && (
             <>
@@ -618,6 +574,14 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
           }}
         />
       </Stack>
+      <FieldPickerDialog
+        open={pickerOpen}
+        title="Download operations"
+        note="A read-only Parameters sheet is always included."
+        fields={exportFields}
+        onCancel={() => setPickerOpen(false)}
+        onConfirm={handleDownloadOperations}
+      />
       <Snackbar
         open={!!errorMessage}
         autoHideDuration={6000}
