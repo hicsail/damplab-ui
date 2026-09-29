@@ -69,6 +69,10 @@ function dynamicTrail(path: string): Crumb[] | null {
     ];
   if ((m = path.match(/^\/edit\/services\/([^/]+)$/)))
     return [EDIT, { label: "Edit Service" }];
+  if (path === "/edit/parameter-sets/new")
+    return [EDIT, { label: "New Parameter Set" }];
+  if ((m = path.match(/^\/edit\/parameter-sets\/([^/]+)$/)))
+    return [EDIT, { label: "Edit Parameter Set" }];
   if ((m = path.match(/^\/edit\/bundles\/new$/)))
     return [EDIT, { label: "New Bundle" }];
   if ((m = path.match(/^\/edit\/bundles\/([^/]+)$/)))
