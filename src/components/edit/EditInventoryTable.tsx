@@ -261,7 +261,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         {canWrite && (
           <>
             <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Upload inventory</Button>
-            <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history')}>Upload history</Button>
+            <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history?type=INVENTORY')}>Upload history</Button>
             <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
           </>
         )}
