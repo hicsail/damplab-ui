@@ -1,4 +1,6 @@
+import { Link as RouterLink } from 'react-router';
 import { Box, Divider, Drawer, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography, Badge } from '@mui/material';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
 import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { useHomeMenuNavigate } from '../hooks/useHomeMenuNavigate';
 import { visibleHomeMenu, type HomeMenuItemDef } from '../pages/homeMenu';
@@ -63,6 +65,17 @@ export default function AppNavDrawer({ open, onClose }: { open: boolean; onClose
           ))}
         </List>
       ))}
+      {/* Outside HOME_MENU on purpose: that list is the spec for the backend's access
+          matrix, and the public docs are not a permissioned app page. */}
+      <Divider sx={{ mt: 'auto' }} />
+      <List dense>
+        <ListItemButton component={RouterLink} to="/docs" onClick={onClose}>
+          <ListItemIcon sx={{ minWidth: 40 }}>
+            <MenuBookOutlinedIcon />
+          </ListItemIcon>
+          <ListItemText primary="About & Documentation" />
+        </ListItemButton>
+      </List>
     </Drawer>
   );
 }

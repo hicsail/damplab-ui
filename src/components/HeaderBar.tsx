@@ -230,7 +230,7 @@ export default function HeaderBar() {
             }}
           >
             <img
-              src="damp-white-text.svg"
+              src="/damp-white-text.svg"
               style={{ height: "45px" }}
               alt="DAMP Logo"
             />
