@@ -582,13 +582,6 @@ export const buildSaveWorkflowsInput = (nodes: any[], edges: any[]): any[] => {
 };
 
 /**
- * The customer's editor hydrates from a version snapshot, but a samples sheet
- * the lab swapped from its job page writes no version. Without this the
- * customer's next save would send the old sheet back and undo the lab's swap.
- * Only sampleSheet values are taken from the live nodes; everything else stays
- * as the version recorded it (the live graph can hold a hidden staff draft).
- */
-/**
  * The node resolver decorates file and sampleSheet values with a short-lived
  * presigned `url` on every read. Saving the canvas would persist it (nothing
  * downstream strips it), so the overlay hands back the stored shape.
@@ -602,6 +595,13 @@ const withoutPresignedUrl = (value: any): any => {
   return value;
 };
 
+/**
+ * The customer's editor hydrates from a version snapshot, but a samples sheet
+ * the lab swapped from its job page writes no version. Without this the
+ * customer's next save would send the old sheet back and undo the lab's swap.
+ * Only sampleSheet values are taken from the live nodes; everything else stays
+ * as the version recorded it (the live graph can hold a hidden staff draft).
+ */
 export const overlayLiveSampleSheetsOnCanvas = (nodes: any[], liveWorkflows: any[]): any[] => {
   const liveById = new Map<string, any>();
   (liveWorkflows ?? []).forEach((w: any) => (w?.nodes ?? []).forEach((n: any) => { if (n?.id) liveById.set(n.id, n); }));
