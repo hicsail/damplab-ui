@@ -22,6 +22,7 @@ import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { getWorkflowsFromGraph } from '../controllers/GraphHelpers';
 import { submitCanvasJob } from '../utils/canvasJobSubmission';
+import { parseEmailList, splitClientEmails, JOB_DESCRIPTION_MAX_LENGTH } from '../utils/jobMembers';
 
 const CANVAS_AUTOSAVE_KEY = 'canvas:autosave';
 
@@ -55,7 +56,8 @@ export default function StaffJobSubmit() {
   const [formData, setFormData] = useState({
     jobName: '',
     clientName: '',
-    clientEmail: '',
+    clientEmails: '',
+    description: '',
     institute: '',
     notes: '',
   });
@@ -91,7 +93,7 @@ export default function StaffJobSubmit() {
     can(PERMISSIONS.JobsViewAll) ? `/technician_view/${jobId}` : `/client_view/${jobId}`;
 
   const handleInputChange =
-    (field: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    (field: keyof typeof formData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setFormData((prev) => ({ ...prev, [field]: e.target.value }));
     };
 
@@ -105,17 +107,21 @@ export default function StaffJobSubmit() {
     setAttachments(Array.from(files));
   };
 
+  const clientEmailList = parseEmailList(formData.clientEmails);
+  const { clientEmail, memberEmails } = splitClientEmails(clientEmailList.emails);
+
   const isFormValid = () =>
     formData.jobName.trim() !== '' &&
     formData.institute.trim() !== '' &&
-    formData.clientName.trim() !== '';
+    formData.clientName.trim() !== '' &&
+    clientEmailList.invalid.length === 0;
 
   const handleSubmit = async () => {
     if (!isFormValid() || workflows.length === 0) return;
 
     try {
       setJobLoading(true);
-      const notes = buildStaffNotes(formData.clientName, formData.clientEmail, formData.notes);
+      const notes = buildStaffNotes(formData.clientName, clientEmail ?? '', formData.notes);
 
       const created = await submitCanvasJob(apolloClient, {
         workflows,
@@ -125,7 +131,9 @@ export default function StaffJobSubmit() {
         institute: formData.institute.trim(),
         notes,
         clientDisplayName: formData.clientName.trim(),
-        clientEmail: formData.clientEmail.trim() || undefined,
+        clientEmail,
+        memberEmails,
+        description: formData.description,
         attachments,
         getAccessToken: () => userContext.userProps?.getAccessToken() ?? Promise.resolve(undefined),
       });
@@ -136,7 +144,8 @@ export default function StaffJobSubmit() {
       setFormData({
         jobName: '',
         clientName: '',
-        clientEmail: '',
+        clientEmails: '',
+        description: '',
         institute: '',
         notes: '',
       });
@@ -238,6 +247,18 @@ export default function StaffJobSubmit() {
         <Grid size={12}>
           <TextField
             fullWidth
+            label="Description (optional)"
+            multiline
+            minRows={2}
+            value={formData.description}
+            onChange={handleInputChange('description')}
+            inputProps={{ maxLength: JOB_DESCRIPTION_MAX_LENGTH }}
+            helperText={`A short summary shown at the top of the job page. ${formData.description.length}/${JOB_DESCRIPTION_MAX_LENGTH}`}
+          />
+        </Grid>
+        <Grid size={12}>
+          <TextField
+            fullWidth
             required
             label="Client name (display name on job)"
             value={formData.clientName}
@@ -254,11 +275,17 @@ export default function StaffJobSubmit() {
         <Grid size={12}>
           <TextField
             fullWidth
-            label="Client email (optional)"
-            type="email"
-            value={formData.clientEmail}
-            onChange={handleInputChange('clientEmail')}
-            helperText="The client's login email. Without it they cannot see this job or its SOW; it is also kept in the job notes as the contact on file."
+            label="Client emails (optional)"
+            multiline
+            minRows={2}
+            value={formData.clientEmails}
+            onChange={handleInputChange('clientEmails')}
+            error={clientEmailList.invalid.length > 0}
+            helperText={
+              clientEmailList.invalid.length > 0
+                ? `Not a valid email: ${clientEmailList.invalid.join(', ')}`
+                : "Login emails, separated by commas or new lines. The first is the primary client; the rest get the same access. With none, no client will see this job or its SOW. The primary is also kept in the job notes as the contact on file."
+            }
           />
         </Grid>
         <Grid size={12}>

@@ -40,7 +40,7 @@ type UploadedParamFile = {
  */
 const allowUnstoredParamFiles = import.meta.env.DEV;
 
-const isPendingParamFile = (value: unknown): value is PendingParamFile =>
+export const isPendingParamFile = (value: unknown): value is PendingParamFile =>
   !!value &&
   typeof value === 'object' &&
   (value as PendingParamFile).__kind === 'pending-file' &&
@@ -55,6 +55,8 @@ export type SubmitCanvasJobInput = {
   notes: string;
   clientDisplayName: string;
   clientEmail?: string;
+  memberEmails?: string[];
+  description?: string;
   attachments: File[];
   getAccessToken: () => Promise<string | undefined>;
 };
@@ -76,6 +78,8 @@ export async function submitCanvasJob(
     notes,
     clientDisplayName,
     clientEmail,
+    memberEmails,
+    description,
     attachments,
     getAccessToken,
   } = input;
@@ -254,6 +258,8 @@ export async function submitCanvasJob(
     institute,
     notes,
     ...(clientEmail ? { clientEmail } : {}),
+    ...(memberEmails && memberEmails.length > 0 ? { memberEmails } : {}),
+    ...(description?.trim() ? { description: description.trim() } : {}),
     workflows: workflowsWithUploadedParamFiles.map((workflow: any) => ({
       name: `Workflow-${workflow.id || workflow[0]?.id}`,
       nodes: transformNodesToGQL(Array.isArray(workflow) ? workflow : [workflow]),
