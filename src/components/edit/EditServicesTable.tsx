@@ -28,8 +28,12 @@ import { setRefsFrom } from '../../utils/serviceParameters';
 import { isExcelFileName } from './inventoryUploadUtils';
 import { parseOperationsSheet, ParsedOperationsSheet, readOperationsFile } from './operationsUploadUtils';
 import { OperationsUploadPreview, OperationsUploadSummary } from './OperationsUploadPreview';
+import { withoutHidden } from '../../utils/paletteVisibility';
+import { useShowHiddenOperations } from '../../hooks/useShowHiddenOperations';
+import { ShowHiddenOperationsToggle } from './ShowHiddenOperationsToggle';
+import { HiddenFromClientsChip } from './HiddenFromClientsChip';
 
-type ServiceRow = Record<string, unknown> & { id: GridRowId };
+type ServiceRow = Record<string, unknown> & { id: GridRowId; hiddenFromClients?: boolean | null };
 
 /**
  * Fix round 1: Upload (`disabled={!setsData || !deletedData}`) was going stuck
@@ -71,6 +75,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   const { can } = usePermissions();
   const canWrite = can(PERMISSIONS.CatalogEditorWrite);
   const canSeeInternal = can(PERMISSIONS.InternalFieldsRead);
+  const { canSeeHidden, showHidden, setShowHidden } = useShowHiddenOperations();
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const { services, refreshCatalog } = useContext(AppContext);
   const client = useApolloClient();
@@ -111,10 +116,11 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   }, [setsError, deletedError, canWrite]);
 
   const filteredRows = useMemo(() => {
+    const visible = withoutHidden(rows, showHidden);
     const q = searchString.trim().toLowerCase();
-    if (!q) return rows;
+    if (!q) return visible;
 
-    return rows.filter((row) => {
+    return visible.filter((row) => {
       const name = String((row as any).name ?? '').toLowerCase();
       if (name.includes(q)) return true;
 
@@ -129,7 +135,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
 
       return false;
     });
-  }, [rows, searchString]);
+  }, [rows, searchString, showHidden]);
 
   const handleDeletion = async (id: GridRowId) => {
     // Previously had no try/catch at all, so a refusal surfaced as an unhandled
@@ -227,7 +233,13 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
       headerName: 'Name',
       width: 500,
       flex: 1,
-      minWidth: 180
+      minWidth: 180,
+      renderCell: (params) => (
+        <>
+          {params.row.name}
+          {(params.row as any).hiddenFromClients && <HiddenFromClientsChip sx={{ ml: 1 }} />}
+        </>
+      )
     },
     {
       field: 'pricing',
@@ -311,6 +323,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
           {/* Task 10 fix (a9b5698..5363d79): a sets-query error must not leave Download
               stuck disabled forever — the export falls back to raw set ids. */}
           <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!setsData && !setsError} onClick={() => setPickerOpen(true)}>Download</Button>
+          {canSeeHidden && <ShowHiddenOperationsToggle showHidden={showHidden} setShowHidden={setShowHidden} />}
           {canWrite && (
             <>
               {/* Needs the set names and deleted ids to classify rows; never parse against empty lists. */}

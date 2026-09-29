@@ -20,6 +20,10 @@ import {
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { GET_ACTIVE_INVENTORY_ITEMS, GET_CATALOG_SERVICES } from '../gql/queries';
 import { INVENTORY_TYPE_OPTIONS } from '../components/edit/InventoryDetailFields';
+import { withoutHidden } from '../utils/paletteVisibility';
+import { useShowHiddenOperations } from '../hooks/useShowHiddenOperations';
+import { ShowHiddenOperationsToggle } from '../components/edit/ShowHiddenOperationsToggle';
+import { HiddenFromClientsChip } from '../components/edit/HiddenFromClientsChip';
 
 /**
  * The client-facing services catalog (despite the filename — the route is
@@ -96,6 +100,7 @@ interface CatalogRow {
   price?: number | null;
   pricingModeLabel?: string | null;
   parameterCount?: number | null;
+  hiddenFromClients?: boolean | null;
   pricing?: {
     internal?: number | null;
     externalAcademic?: number | null;
@@ -116,8 +121,12 @@ export default function AdminServicesCatalog() {
     error: inventoryError,
   } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network', skip: tab !== 'inventory' });
   const [selectedService, setSelectedService] = useState<CatalogRow | null>(null);
+  // For clients the server already omits hidden rows (pin 15); this toggle only
+  // serves staff's default-off view, gated on catalog-editor:read like the
+  // palette and operations table.
+  const { canSeeHidden, showHidden, setShowHidden } = useShowHiddenOperations();
 
-  const rows: CatalogRow[] = useMemo(() => data?.catalogServices ?? [], [data]);
+  const rows: CatalogRow[] = useMemo(() => withoutHidden(data?.catalogServices ?? [], showHidden), [data, showHidden]);
   const inventoryRows: InventoryRow[] = useMemo(() => inventoryData?.activeInventoryItems ?? [], [inventoryData]);
 
   /**
@@ -129,7 +138,18 @@ export default function AdminServicesCatalog() {
   const showsParameters = rows.some((row) => row.parameters != null);
 
   const columns: GridColDef[] = [
-    { field: 'name', headerName: 'Service', flex: 1, minWidth: 200 },
+    {
+      field: 'name',
+      headerName: 'Service',
+      flex: 1,
+      minWidth: 200,
+      renderCell: (params) => (
+        <>
+          {params.row.name}
+          {(params.row as CatalogRow).hiddenFromClients && <HiddenFromClientsChip sx={{ ml: 1 }} />}
+        </>
+      ),
+    },
     { field: 'description', headerName: 'Description', flex: 2, minWidth: 260 },
     { field: 'serviceCategoryName', headerName: 'Category', width: 180 },
     {
@@ -261,6 +281,12 @@ export default function AdminServicesCatalog() {
 
       {tab === 'operations' && error && <Alert severity="error">Could not load the catalog: {error.message}</Alert>}
       {tab === 'inventory' && inventoryError && <Alert severity="error">Could not load inventory: {inventoryError.message}</Alert>}
+
+      {canSeeHidden && tab === 'operations' && (
+        <Box>
+          <ShowHiddenOperationsToggle showHidden={showHidden} setShowHidden={setShowHidden} />
+        </Box>
+      )}
 
       <Card>
         <CardContent>

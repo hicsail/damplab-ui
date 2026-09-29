@@ -28,6 +28,10 @@ import { Service }       from '../types/Service';
 import { CanvasContext } from '../contexts/Canvas';
 import { AppContext }    from '../contexts/App';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { useShowHiddenOperations } from '../hooks/useShowHiddenOperations';
+import { visiblePaletteBundles, visiblePaletteServices } from '../utils/paletteVisibility';
+import { ShowHiddenOperationsToggle } from './edit/ShowHiddenOperationsToggle';
+import { HiddenFromClientsChip } from './edit/HiddenFromClientsChip';
 import { ImagesBundlesDict, getServiceIcon } from '../assets/icons';
 
 
@@ -40,16 +44,20 @@ export default () => {
   // A plain client does not get them on the palette, nor a bundle that would put
   // one on the canvas. Server-side twin: `assertMaySubmitEquipmentUse` in
   // createJob refuses the submission if one arrives anyway (a loaded JSON, say).
+  // Hidden operations follow the same rule — filtered here unless the viewer has
+  // catalog-editor:read and has turned the "show hidden" toggle on; the server
+  // twin is `assertMaySubmitHiddenServices`, and `catalogServices` filters them
+  // for clients regardless.
   const mayUseEquipment = can(PERMISSIONS.JobEquipmentUse);
+  const { canSeeHidden, showHidden, setShowHidden } = useShowHiddenOperations();
   const services = useMemo(
-    () => (mayUseEquipment ? allServices : allServices.filter((service: Service) => (service as any).equipmentUse !== true)),
-    [allServices, mayUseEquipment]
+    () => visiblePaletteServices(allServices, { mayUseEquipment, showHidden }),
+    [allServices, mayUseEquipment, showHidden]
   );
-  const bundles = useMemo(() => {
-    if (mayUseEquipment) return allBundles;
-    const hidden = new Set(allServices.filter((service: Service) => (service as any).equipmentUse === true).map((service: Service) => service.id));
-    return allBundles.filter((bundle: any) => !(Array.isArray(bundle.services) ? bundle.services : []).some((id: unknown) => hidden.has(String(id))));
-  }, [allBundles, allServices, mayUseEquipment]);
+  const bundles = useMemo(
+    () => visiblePaletteBundles(allBundles, allServices, { mayUseEquipment, showHidden }),
+    [allBundles, allServices, mayUseEquipment, showHidden]
+  );
 
   const [category,         setCategory]         = useState('');
   const [alignment,        setAlignment]        = useState('services');
@@ -197,7 +205,10 @@ export default () => {
             />
             <br/>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Chip size="small" label={`${filteredServices.length} results`} />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Chip size="small" label={`${filteredServices.length} results`} />
+                {canSeeHidden && <ShowHiddenOperationsToggle showHidden={showHidden} setShowHidden={setShowHidden} />}
+              </Box>
               <Tooltip title="Shortcut: press / to focus search">
                 <Typography variant="caption" color="text.secondary">Press / to search</Typography>
               </Tooltip>
@@ -255,6 +266,7 @@ export default () => {
                         <div style={{ padding: 5, whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere', width: '100%', textAlign: 'center' }}>
                           {service.name}
                         </div>
+                        {(service as any).hiddenFromClients && <HiddenFromClientsChip />}
                       </div>
                       <Tooltip title="Drag to canvas">
                         <DragIndicatorIcon fontSize="small" color="action" />
