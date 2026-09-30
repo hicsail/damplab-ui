@@ -26,3 +26,18 @@ export function visiblePaletteBundles<B extends { services?: ReadonlyArray<unkno
 export function withoutHidden<R extends { hiddenFromClients?: boolean | null }>(rows: ReadonlyArray<R>, showHidden: boolean): R[] {
   return showHidden ? [...rows] : rows.filter((row) => row.hiddenFromClients !== true);
 }
+
+/**
+ * The "Allowed connections" quick-add list on a canvas node (I1). Entries arrive as
+ * either a bare id or `{ id }` (RightSidebar's `connection.id ?? connection`), same
+ * shape ambiguity as a bundle's `services` (F1) — reuse the same `idOf` handling.
+ */
+export function visibleAllowedConnections<C>(
+  connections: ReadonlyArray<C>,
+  services: ReadonlyArray<{ id: string } & Flags>,
+  opts: PaletteOptions
+): C[] {
+  const blocked = new Set(services.filter((service) => excluded(service, opts)).map((service) => String(service.id)));
+  const idOf = (entry: C): string => String((entry as { id?: unknown } | null)?.id ?? entry);
+  return connections.filter((connection) => !blocked.has(idOf(connection)));
+}

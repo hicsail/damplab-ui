@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { visiblePaletteBundles, visiblePaletteServices, withoutHidden } from './paletteVisibility';
+import { visibleAllowedConnections, visiblePaletteBundles, visiblePaletteServices, withoutHidden } from './paletteVisibility';
 
 const services = [
   { id: 'a', name: 'PCR' },
@@ -32,5 +32,12 @@ describe('palette visibility (pins 15, 18, 20)', () => {
   it('filters table rows the same way', () => {
     expect(withoutHidden(services, false).map((s) => s.id)).toEqual(['a', 'eq']);
     expect(withoutHidden(services, true)).toHaveLength(3);
+  });
+
+  it('drops hidden and disallowed operations from a node\'s Allowed Connections (I1), object or bare-id entries alike', () => {
+    const connections = [{ id: 'a' }, 'eq', { id: 'old' }];
+    expect(visibleAllowedConnections(connections, services, { mayUseEquipment: false, showHidden: false })).toEqual([{ id: 'a' }]);
+    expect(visibleAllowedConnections(connections, services, { mayUseEquipment: true, showHidden: false })).toEqual([{ id: 'a' }, 'eq']);
+    expect(visibleAllowedConnections(connections, services, { mayUseEquipment: true, showHidden: true })).toEqual(connections);
   });
 });
