@@ -152,6 +152,11 @@ export default function BookInventory() {
       .map((c: any) => ({ label: c.label, start: c.start, end: c.end }));
   }, [availData, item, myOnItem]);
 
+  const overlapsExisting = useMemo(() => {
+    if (!start || !end || !timed) return false;
+    return busy.some((slot) => new Date(start) < new Date(slot.end) && new Date(slot.start) < new Date(end));
+  }, [start, end, busy, timed]);
+
   const reload = async (): Promise<void> => {
     await Promise.all([refetch(), !jobId && item && timed && canReadPool ? refetchAvailability() : Promise.resolve()]);
   };
@@ -340,10 +345,15 @@ export default function BookInventory() {
                     </Typography>
                     {estimate != null && <Chip color="primary" variant="outlined" label={`Estimated: $${estimate.toFixed(2)}`} />}
                     <Box sx={{ flex: 1 }} />
-                    <Button variant="contained" onClick={handleBook} disabled={booking}>
+                    <Button variant="contained" onClick={handleBook} disabled={booking || overlapsExisting}>
                       {booking ? 'Booking…' : 'Book'}
                     </Button>
                   </Stack>
+                )}
+                {overlapsExisting && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    This time slot overlaps with an existing booking. Choose a different time.
+                  </Alert>
                 )}
               </Stack>
             </CardContent>
