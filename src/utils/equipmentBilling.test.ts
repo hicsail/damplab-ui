@@ -15,7 +15,10 @@ import {
   invoiceStatusOf,
   invoiceTitle,
   invoiceVersionOf,
+  invoiceCharges,
   isLegacyInvoice,
+  NO_INVOICE_ISSUED,
+  paymentsCardFigures,
   paymentsCountLabel
 } from './equipmentBilling';
 
@@ -220,5 +223,48 @@ describe('confirmedUsageSuffix', () => {
 
   it('says nothing when the balance has not loaded', () => {
     expect(confirmedUsageSuffix(null)).toBe('');
+  });
+});
+
+describe('invoiceCharges (behaviour 12)', () => {
+  it("is a statement invoice's subtotal", () => {
+    expect(invoiceCharges({ kind: 'STATEMENT', subtotal: 500, totalCost: 999, balanceDue: 300 })).toBe(500);
+  });
+
+  it("falls back to totalCost for a legacy invoice that carries no balanceDue", () => {
+    expect(invoiceCharges({ kind: 'SOW', subtotal: 400, totalCost: 450 })).toBe(450);
+    expect(invoiceCharges({ kind: 'EQUIPMENT', subtotal: 40, totalCost: 45, balanceDue: null })).toBe(45);
+  });
+
+  it('keeps the subtotal for a legacy invoice that does carry balanceDue', () => {
+    expect(invoiceCharges({ kind: 'SOW', subtotal: 400, totalCost: 450, balanceDue: 400 })).toBe(400);
+  });
+});
+
+describe('paymentsCardFigures', () => {
+  const payments = [{ amount: 100 }, { amount: 50.1 }, { amount: 999, voidedAt: '2026-09-01' }];
+
+  it('states no charges, balance or deposit until an invoice is issued (behaviour 11)', () => {
+    const f = paymentsCardFigures([{ kind: 'STATEMENT', subtotal: 800, status: 'VOID' }], payments);
+    expect(f).toEqual({ invoice: null, charges: null, payments: 150.1, balance: null, deposit: null });
+    expect(NO_INVOICE_ISSUED).toBe('No invoice issued yet');
+  });
+
+  it("reads the current invoice's charges and deposit, and live non-voided payments (behaviour 12)", () => {
+    const deposit = { label: 'Deposit', amount: 200, dueDate: '2026-10-01', outstanding: 49.9 };
+    const invoices = [
+      { id: 'v1', kind: 'STATEMENT', subtotal: 300, status: 'SUPERSEDED', createdAt: '2026-09-01' },
+      { id: 'v2', kind: 'STATEMENT', subtotal: 800, status: 'ISSUED', createdAt: '2026-09-05', deposit }
+    ];
+    const f = paymentsCardFigures(invoices, payments);
+    expect(f.invoice?.id).toBe('v2');
+    expect(f.charges).toBe(800);
+    expect(f.payments).toBe(150.1);
+    expect(f.balance).toBe(649.9);
+    expect(f.deposit).toEqual(deposit);
+  });
+
+  it('is a credit when payments exceed the invoice', () => {
+    expect(paymentsCardFigures([{ kind: 'STATEMENT', subtotal: 100, status: 'PAID' }], [{ amount: 130 }]).balance).toBe(-30);
   });
 });

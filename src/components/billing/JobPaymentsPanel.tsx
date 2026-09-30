@@ -5,9 +5,9 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import CloseIcon from '@mui/icons-material/Close';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { format } from 'date-fns';
-import { GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
+import { GET_INVOICES_BY_JOB_ID, GET_JOB_BALANCE, GET_JOB_PAYMENTS } from '../../gql/queries';
 import { RECORD_JOB_PAYMENT, VOID_JOB_PAYMENT } from '../../gql/mutations';
-import { balanceHeading, balanceRailLabel, depositSummary, formatMoney, paymentsCountLabel } from '../../utils/equipmentBilling';
+import { balanceHeading, balanceRailLabel, depositSummary, formatMoney, invoiceTitle, NO_INVOICE_ISSUED, paymentsCardFigures, paymentsCountLabel } from '../../utils/equipmentBilling';
 import { chipStatusBackground } from '../../utils/technicianProcessStatus';
 import { formatGqlError, formatSaveError, isPermissionError } from '../../utils/gqlError';
 import ProcessCard from '../technician/ProcessCard';
@@ -28,9 +28,10 @@ const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyConten
 const todayIso = (): string => format(new Date(), 'yyyy-MM-dd');
 
 /**
- * The job page's Payments card: what the job has been charged, what has been
- * received against it, and the balance — live. Payments belong to the job,
- * never to one invoice; every invoice version restates them.
+ * The job page's Payments card. Charges, deposit and balance come from the
+ * current issued invoice; payments are live (they belong to the job, never to
+ * one invoice, and every invoice version restates them). Before any invoice
+ * is issued the card says so and lists payments only.
  *
  * Renders nothing at all when the caller may not read the job's billing — the
  * server answers ForbiddenException, exactly as `jobEquipmentBooking` answers
@@ -50,6 +51,8 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   const balanceQuery = useQuery(GET_JOB_BALANCE, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
   const paymentsQuery = useQuery(GET_JOB_PAYMENTS, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
 
+  const invoicesQuery = useQuery(GET_INVOICES_BY_JOB_ID, { variables: { jobId }, skip: !jobId, fetchPolicy: 'cache-and-network' });
+
   // A payment recorded or voided reissues the job's invoice server-side, so
   // the Invoice card's list is refetched along with this card's own figures.
   const [recordPayment] = useMutation(RECORD_JOB_PAYMENT, { refetchQueries: ['GetInvoicesByJobId'] });
@@ -58,9 +61,12 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   const balance = balanceQuery.data?.jobBalance;
   const payments: any[] = paymentsQuery.data?.jobPayments ?? [];
   const live = payments.filter((p) => !p.voidedAt);
+  const figures = paymentsCardFigures<any>(invoicesQuery.data?.invoicesByJobId ?? [], payments);
+  const invoicesFailed = !!invoicesQuery.error && !invoicesQuery.data;
+  const due = figures.balance ?? 0;
 
   if (!jobId) return null;
-  if (balanceQuery.loading && !balanceQuery.data) {
+  if ((balanceQuery.loading && !balanceQuery.data) || (invoicesQuery.loading && !invoicesQuery.data)) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
         <CircularProgress size={24} />
@@ -88,7 +94,7 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   }
 
   const refresh = async (): Promise<void> => {
-    await Promise.all([balanceQuery.refetch(), paymentsQuery.refetch()]);
+    await Promise.all([balanceQuery.refetch(), paymentsQuery.refetch(), invoicesQuery.refetch()]);
   };
 
   const closeRecord = (): void => {
@@ -136,24 +142,17 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   };
 
   // Demo only: "Refresh..." reads as checking for an online payment, but it
-  // records one for whatever is due right now, as if the client had just paid.
+  // records the balance of the current invoice, as if the client had just paid.
   const demoRefresh = async (): Promise<void> => {
     setBusy(true);
     setActionError(null);
     try {
-      const fresh = await balanceQuery.refetch();
-      const due = Math.round((Number(fresh.data?.jobBalance?.balanceDue) || 0) * 100) / 100;
-      if (due > 0) {
+      const [freshInvoices, freshPayments] = await Promise.all([invoicesQuery.refetch(), paymentsQuery.refetch()]);
+      const fresh = paymentsCardFigures<any>(freshInvoices.data?.invoicesByJobId ?? [], freshPayments.data?.jobPayments ?? []);
+      const amountDue = fresh.balance ?? 0;
+      if (fresh.invoice && amountDue > 0) {
         await recordPayment({
-          variables: {
-            input: {
-              jobId,
-              amount: due,
-              receivedOn: new Date().toISOString(),
-              reference: 'Online card payment',
-              note: null
-            }
-          }
+          variables: { input: { jobId, amount: amountDue, receivedOn: new Date().toISOString(), reference: 'Online card payment', note: null } }
         });
       }
       await refresh();
@@ -180,8 +179,12 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
   };
 
   const amountValid = Number(amount) > 0;
-  const status = balanceRailLabel(balance.balanceDue);
-  const description = `Charges to date ${formatMoney(balance.chargesToDate)} · Payments to date ${formatMoney(balance.paymentsToDate)} · ${balanceHeading(balance.balanceDue)} ${formatMoney(Math.abs(Number(balance.balanceDue) || 0))}`;
+  const status = invoicesFailed ? 'Invoice unavailable' : figures.invoice ? balanceRailLabel(due) : NO_INVOICE_ISSUED;
+  const description = figures.invoice
+    ? `Charges ${formatMoney(figures.charges)} · Payments ${formatMoney(figures.payments)} · ${balanceHeading(due)} ${formatMoney(Math.abs(due))}`
+    : invoicesFailed
+      ? null
+      : 'Charges and the balance appear here once the lab issues an invoice.';
 
   return (
     <>
@@ -189,28 +192,28 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
         title="Payments"
         defaultExpanded={payments.length > 0}
         customerBadge={live.length > 0 ? 'check' : null}
-        staffBadge={Number(balance.balanceDue) > 0 ? 'paper' : live.length > 0 ? 'check' : null}
-        customerVersion={balanceRailLabel(balance.balanceDue)}
+        staffBadge={due > 0 ? 'paper' : live.length > 0 ? 'check' : null}
+        customerVersion={figures.invoice ? balanceRailLabel(due) : 'No invoice yet'}
         staffVersion={paymentsCountLabel(live.length)}
-        statusPaneSx={{ bgcolor: chipStatusBackground(Number(balance.balanceDue) > 0 ? 'warning' : live.length > 0 ? 'success' : 'default') }}
+        statusPaneSx={{ bgcolor: chipStatusBackground(due > 0 ? 'warning' : live.length > 0 ? 'success' : 'default') }}
         statusPane={
           <StatusPaneHeader status={status} description={description}>
-            {Number(balance.depositOutstanding) > 0 && (
+            {figures.deposit && Number(figures.deposit.outstanding) > 0 && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                {depositSummary({ label: 'Deposit', amount: balance.depositAmount, dueDate: balance.depositDueDate, outstanding: balance.depositOutstanding })}
+                {depositSummary(figures.deposit)}
               </Typography>
             )}
-            {/* The invoice is a snapshot; this card is live. Said outright, so a
-                booking confirmed after issue moving these figures reads as
-                expected rather than as the two disagreeing. */}
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-              Live figures. The invoice states them as they stood when it was issued.
-            </Typography>
+            {figures.invoice && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                {`As stated on ${invoiceTitle(figures.invoice)}. Payments are live.`}
+              </Typography>
+            )}
             {balance.unconfirmedBookings > 0 && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                {`${balance.unconfirmedBookings} booking${balance.unconfirmedBookings === 1 ? '' : 's'} not yet confirmed, so not on this balance.`}
+                {`${balance.unconfirmedBookings} booking${balance.unconfirmedBookings === 1 ? '' : 's'} not yet confirmed, so not on any invoice yet.`}
               </Typography>
             )}
+            {invoicesFailed && <Alert severity="error" sx={{ mt: 1 }}>{formatGqlError(invoicesQuery.error, 'Could not load this job’s invoices.')}</Alert>}
             {actionError && (
               <Alert severity="error" sx={{ mt: 1 }} onClose={() => setActionError(null)}>
                 {actionError}
@@ -226,11 +229,13 @@ export default function JobPaymentsPanel({ jobId, staffView = false }: Props): R
                   Record payment
                 </Button>
               </Can>
-              <Can permission={PERMISSIONS.BillingWrite}>
-                <Button variant="outlined" size="small" startIcon={<RefreshIcon />} disabled={busy} onClick={demoRefresh} sx={railBtnSx}>
-                  {busy ? 'Refreshing…' : 'Refresh...'}
-                </Button>
-              </Can>
+              {figures.invoice && (
+                <Can permission={PERMISSIONS.BillingWrite}>
+                  <Button variant="outlined" size="small" startIcon={<RefreshIcon />} disabled={busy} onClick={demoRefresh} sx={railBtnSx}>
+                    {busy ? 'Refreshing…' : 'Refresh...'}
+                  </Button>
+                </Can>
+              )}
             </>
           ) : undefined
         }
