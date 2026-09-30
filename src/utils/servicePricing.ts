@@ -10,8 +10,10 @@ export const RUN_COUNT_PARAM_NAME = 'Number of runs';
  * The four reserved equipment-use parameter ids. Injected into a node's formData at
  * creation like the run count, never stored in service.parameters — so pricing,
  * diffing and display all read them straight out of formData.
- * Must stay in sync with the constants of the same names in
- * damplab-backend/src/pricing/service-pricing.util.ts.
+ * The id constants match those of the same names in
+ * damplab-backend/src/pricing/service-pricing.util.ts. EQUIPMENT_PARAM_IDS here
+ * deliberately omits the retired `__equipBookers`; the backend list keeps it on
+ * purpose so pricing excludes stored values. Do not re-sync the two lists.
  */
 export const EQUIPMENT_START_PARAM_ID = '__equipStart';
 export const EQUIPMENT_END_PARAM_ID = '__equipEnd';
