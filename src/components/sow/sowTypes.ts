@@ -393,7 +393,7 @@ export function toInputsPayload(inputs: SowVersionInputs, refreshFeeSchedule = f
 const STATUS_COLORS: Record<SowStatus, 'default' | 'info' | 'warning' | 'success' | 'error'> = {
   DRAFT: 'default',
   SENT: 'info',
-  SIGNED: 'success',
+  SIGNED: 'warning', // the customer has signed; the lab still has to countersign
   FINAL: 'success',
   CANCELLED: 'error'
 };
