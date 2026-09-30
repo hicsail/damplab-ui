@@ -7,6 +7,7 @@ import HelpOutlineIcon  from '@mui/icons-material/HelpOutline';
 
 import { diffWordsWithSpace } from 'diff';
 import { resolveParameterName } from '../utils/servicePricing';
+import { snapshotFallback } from '../utils/parameterSnapshot';
 import SowDiffText from './sow/SowDiffText';
 import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
 import { isSampleSheetParam, parseSampleSheetValue, sampleCountLabel } from '../utils/sampleSheetValue';
@@ -306,7 +307,8 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
                                             {normalizeFormEntries(node?.formData).map((entry: any) => {
                                                 const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
-                                                const label = resolveParameterName(entry, paramDef) || 'Parameter';
+                                                const fallback = snapshotFallback(node, entry.id, paramDef);
+                                                const label = fallback?.name || resolveParameterName(entry, paramDef) || 'Parameter';
                                                 const rawValue = entry.value ?? entry.resultParamValue;
                                                 const paramDiff = changedParamIds.has(entry.id)
                                                     ? nodeDiff!.paramDiffs.find((p) => p.id === entry.id)
@@ -327,6 +329,15 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                                             <Typography variant='body2' color='text.secondary'>{label}:</Typography>
                                                             <SowDiffText parts={parts} />
                                                         </Box>
+                                                    );
+                                                }
+                                                // The live service no longer defines this parameter: say what it was
+                                                // called and showed when the node was saved, not a bare id.
+                                                if (fallback) {
+                                                    return (
+                                                        <Typography key={entry.id} variant='body2' color='text.secondary'>
+                                                            {label}: {fallback.displayValue}
+                                                        </Typography>
                                                     );
                                                 }
                                                 const sheetSlot = sampleSheets?.canEdit && isSampleSheetParam(paramDef) ? sampleSheetSlot(node, paramDef, rawValue) : null;

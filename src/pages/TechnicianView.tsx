@@ -93,7 +93,14 @@ import ResultsPanel from "../components/ResultsPanel";
 import InvoicePanel from "../components/billing/InvoicePanel";
 import ReasonDialog from "../components/ReasonDialog";
 import Can from "../components/PermissionGate";
-import { PERMISSIONS } from "../hooks/usePermissions";
+import { PERMISSIONS, usePermissions } from "../hooks/usePermissions";
+import JobDescription from "../components/JobDescription";
+import JobPeopleLine from "../components/JobPeopleLine";
+import ManageJobMembersDialog from "../components/ManageJobMembersDialog";
+import { useJobCollaboration } from "../hooks/useJobCollaboration";
+import { jobPeople, viewerIsJobMember } from "../utils/jobMembers";
+import { useEffectiveUser } from "../hooks/useEffectiveUser";
+
 import { CommentsSection } from "../components/CommentsSection";
 import JobActivityTimeline, {
   TimelineSection,
@@ -221,6 +228,15 @@ export default function TechnicianView() {
       // Error handled by error state
     },
   });
+
+  const jobForPeople = data?.jobById;
+  const { userProps: viewerProps } = useEffectiveUser();
+  const { can } = usePermissions();
+  const viewer = { subject: viewerProps?.subject, email: viewerProps?.idTokenParsed?.email };
+  const people = jobPeople(jobForPeople);
+  const isMember = viewerIsJobMember(jobForPeople, viewer);
+  const [managingPeople, setManagingPeople] = useState(false);
+  const collaboration = useJobCollaboration(id, refetchJob);
 
   // Keep local UI in sync on every fetch/refetch (onCompleted alone does not always run on refetch).
   useEffect(() => {
@@ -925,7 +941,34 @@ export default function TechnicianView() {
               {submitter.onBehalfOf}
             </Typography>
           )}
+          {jobForPeople && (
+            <JobPeopleLine
+              primaryEmail={people.primary}
+              memberEmails={people.members}
+              canManage={isMember || Boolean(viewerProps?.isDamplabStaff)}
+              onManage={() => setManagingPeople(true)}
+            />
+          )}
         </Box>
+        {jobForPeople && (
+          <JobDescription
+            description={jobForPeople.description}
+            canEdit={isMember || can(PERMISSIONS.JobsViewAll)}
+            onSave={collaboration.saveDescription}
+          />
+        )}
+        {collaboration.error && !managingPeople && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={collaboration.clearError}>{collaboration.error}</Alert>
+        )}
+        <ManageJobMembersDialog
+          open={managingPeople}
+          primaryEmail={people.primary}
+          memberEmails={people.members}
+          onAdd={collaboration.addMember}
+          onRemove={collaboration.removeMember}
+          onClose={() => { setManagingPeople(false); collaboration.clearError(); }}
+          error={collaboration.error}
+        />
 
         {sowCreateError && (
           <Box sx={{ mb: 2 }}>

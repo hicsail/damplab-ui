@@ -106,3 +106,23 @@ describe('submitCanvasJob parameter files (dev server)', () => {
     expect(meta.notUploaded).toBeUndefined();
   });
 });
+
+describe('submitCanvasJob — members and description', () => {
+  beforeEach(() => vi.stubGlobal('localStorage', { setItem: () => {} }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const base = { workflows: [[node(null)]], edges: [], nodes: [], jobName: 'Demo', institute: 'BU', notes: '', clientDisplayName: 'Demo', attachments: [], getAccessToken: async () => 'token' };
+
+  it('sends memberEmails and a trimmed description', async () => {
+    const { client, jobInputs } = makeClient(async () => ({ data: {} }));
+    await submitCanvasJob(client, { ...base, memberEmails: ['a@x.org'], description: '  For lab 4 ' });
+    expect(jobInputs[0]).toMatchObject({ memberEmails: ['a@x.org'], description: 'For lab 4' });
+  });
+
+  it('omits both when empty', async () => {
+    const { client, jobInputs } = makeClient(async () => ({ data: {} }));
+    await submitCanvasJob(client, { ...base, memberEmails: [], description: '   ' });
+    expect(jobInputs[0]).not.toHaveProperty('memberEmails');
+    expect(jobInputs[0]).not.toHaveProperty('description');
+  });
+});

@@ -8,7 +8,8 @@ import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, Dial
 
 import { buildNodeParameters, createNodeObject } from '../controllers/ReactFlowEvents';
 import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/GraphHelpers';
-import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from '../controllers/jobGraphHydration';
+import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts, overlayLiveSampleSheetsOnCanvas } from '../controllers/jobGraphHydration';
+import { uploadPendingParamFiles } from '../utils/uploadPendingParamFiles';
 import { diffJobGraphs, latestVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
 import { canRevertVersions, customerMayEdit, editingBlockedMessage, staffEditBlockedReason } from '../utils/jobEditing';
 import { missedContentVersion, missedUnfilteredContent, pickersAfterSave, seedLoadedVersionNumber } from '../utils/jobEditorSave';
@@ -259,6 +260,7 @@ export default function JobEditor() {
                       lockedClientIds: lockedClientIdsFromJob(job)
                   })
                 : { nodes: [], edges: [] });
+            if (!readOnly) nextNodes = overlayLiveSampleSheetsOnCanvas(nextNodes, job.workflows ?? []);
         } else {
             const useSnapshot = isHistoric;
             const snapshotVersion = selected ?? (useSnapshot ? latest : null);
@@ -444,8 +446,11 @@ export default function JobEditor() {
     };
 
     const persistCanvas = async (missedVersionNumber: number | null) => {
+        // Files picked in the editor are uploaded first; the save then carries
+        // their stored keys and becomes a job version like any other edit (B20).
+        const workflows = await uploadPendingParamFiles(apolloClient, buildSaveWorkflowsInput(nodes, edges));
         await saveJobWorkflows({
-            variables: { input: { jobId: id, note: note.trim(), workflows: buildSaveWorkflowsInput(nodes, edges) } }
+            variables: { input: { jobId: id, note: note.trim(), workflows } }
         });
         setNote('');
         setMessage({ text: 'Changes saved.', severity: 'success' });
@@ -681,7 +686,7 @@ export default function JobEditor() {
                             <RightSidebar
                                 changedParamIdsByNode={changedParamIdsByNode}
                                 readOnly={readOnly}
-                                sampleSheetUploadable={false}
+                                sampleSheetUploadable={!readOnly}
                                 customerCategory={job?.customerCategory ?? undefined}
                             />
                         </div>

@@ -1280,3 +1280,33 @@ export const DELETE_PARAMETER_SET = gql`
     deleteParameterSet(id: $id)
   }
 `;
+
+// Job collaborators and description
+export const ADD_JOB_MEMBER = gql`
+  mutation AddJobMember($jobId: ID!, $email: String!) {
+    addJobMember(jobId: $jobId, email: $email) {
+      id
+      memberEmails
+      primaryClientEmail
+    }
+  }
+`;
+
+export const REMOVE_JOB_MEMBER = gql`
+  mutation RemoveJobMember($jobId: ID!, $email: String!) {
+    removeJobMember(jobId: $jobId, email: $email) {
+      id
+      memberEmails
+      primaryClientEmail
+    }
+  }
+`;
+
+export const SET_JOB_DESCRIPTION = gql`
+  mutation SetJobDescription($jobId: ID!, $description: String) {
+    setJobDescription(jobId: $jobId, description: $description) {
+      id
+      description
+    }
+  }
+`;

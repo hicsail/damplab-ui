@@ -7,6 +7,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { submitCanvasJob } from '../utils/canvasJobSubmission';
 import { formatGqlError } from '../utils/gqlError';
+import { parseEmailList, JOB_DESCRIPTION_MAX_LENGTH } from '../utils/jobMembers';
 import {
   Snackbar,
   Typography,
@@ -70,7 +71,9 @@ export default function FinalCheckout() {
   const [formData, setFormData] = useState({
     jobName: '',
     institute: '',
-    notes: ''
+    notes: '',
+    description: '',
+    memberEmails: ''
   });
 
   const [jobLoading, setJobLoading] = useState(false);
@@ -111,9 +114,11 @@ export default function FinalCheckout() {
   const { workflows, workflowCosts, totalCost, serviceDetails } = location.state?.orderSummary || {};
 
 
+  const members = parseEmailList(formData.memberEmails);
+
   const isFormValid = () => {
     return (
-      formData.jobName.trim() !== '' && formData.institute.trim() !== ''
+      formData.jobName.trim() !== '' && formData.institute.trim() !== '' && members.invalid.length === 0
     );
   };
 
@@ -122,7 +127,7 @@ export default function FinalCheckout() {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
-  const handleInputChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [field]: e.target.value }));
   };
 
@@ -155,6 +160,8 @@ const handleSubmitJob = async () => {
       jobName: formData.jobName,
       institute: formData.institute,
       notes: formData.notes,
+      memberEmails: members.emails.filter((e) => e !== email.trim().toLowerCase()),
+      description: formData.description,
       clientDisplayName: name,
       attachments,
       getAccessToken: () => userContext.userProps?.getAccessToken() ?? Promise.resolve(undefined),
@@ -249,6 +256,19 @@ const handleSubmitJob = async () => {
         />
       </Grid>
 
+      <Grid sx={{ mb: 3 }}>
+        <TextField
+          fullWidth
+          label="Description (optional)"
+          multiline
+          minRows={2}
+          value={formData.description}
+          onChange={handleInputChange('description')}
+          inputProps={{ maxLength: JOB_DESCRIPTION_MAX_LENGTH }}
+          helperText={`A short summary shown at the top of the job page. ${formData.description.length}/${JOB_DESCRIPTION_MAX_LENGTH}`}
+        />
+      </Grid>
+
       <Typography variant="h6" sx={{ mb: 1, textAlign: 'left', fontWeight: 500 }}>
         Contact Information
       </Typography>
@@ -286,6 +306,22 @@ const handleSubmitJob = async () => {
             onBlur={() => handleBlur('institute')}
             error={touched.institute && formData.institute === ''}
             helperText={touched.institute && formData.institute === '' ? 'This field is required' : ''}
+          />
+        </Grid>
+        <Grid sx={{ mb: 1 }}>
+          <TextField
+            label="Additional people (optional)"
+            value={formData.memberEmails}
+            fullWidth
+            multiline
+            minRows={2}
+            onChange={handleInputChange('memberEmails')}
+            error={members.invalid.length > 0}
+            helperText={
+              members.invalid.length > 0
+                ? `Not a valid email: ${members.invalid.join(', ')}`
+                : 'Emails of colleagues who should see and act on this job with you, separated by commas or new lines. You are the primary contact.'
+            }
           />
         </Grid>
       </Grid>

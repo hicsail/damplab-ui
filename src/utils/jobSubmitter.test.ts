@@ -68,3 +68,31 @@ describe('summarizeJobSubmitter', () => {
     expect(summary.organization).toBe('');
   });
 });
+
+describe('summarizeJobSubmitter — client-owned staff submissions (B30)', () => {
+  it('names the client from the owner fields and credits staff from submittedBy', () => {
+    const summary = summarizeJobSubmitter({
+      username: 'cara',
+      email: 'cara@bu.edu',
+      primaryClientEmail: 'cara@bu.edu',
+      clientEmail: 'cara@bu.edu',
+      clientDisplayName: 'Cara Rivera',
+      institute: 'Boston University',
+      submittedBy: { sub: 'admin-1', email: 'tech@damplab.org', name: 'Tess Technician' }
+    });
+    expect(summary.user).toBe('Cara Rivera (cara@bu.edu)');
+    expect(summary.onBehalfOf).toBe('Submitted on their behalf by Tess Technician (tech@damplab.org)');
+  });
+
+  it('never names the staff member as the user, even with no client display name', () => {
+    const summary = summarizeJobSubmitter({ email: 'new@bu.edu', clientEmail: 'new@bu.edu', primaryClientEmail: 'new@bu.edu', submittedBy: { sub: 'admin-1', email: 'tech@damplab.org', name: 'Tess' } });
+    expect(summary.user).toBe('new@bu.edu');
+    expect(summary.user).not.toContain('tech@damplab.org');
+  });
+
+  it('still reads a legacy, unmigrated staff submission (no submittedBy; username/email are the technician\'s)', () => {
+    const summary = summarizeJobSubmitter({ username: 'Tess Technician', email: 'tech@damplab.org', clientDisplayName: 'Cara Rivera', clientEmail: 'cara@bu.edu' });
+    expect(summary.user).toBe('Cara Rivera (cara@bu.edu)');
+    expect(summary.onBehalfOf).toBe('Submitted on their behalf by Tess Technician (tech@damplab.org)');
+  });
+});

@@ -44,6 +44,13 @@ import {
 import SowCustomerView from "../components/sow/SowCustomerView";
 import JobEquipmentBookingPanel from "../components/booking/JobEquipmentBookingPanel";
 import JobPaymentsPanel from "../components/billing/JobPaymentsPanel";
+import { PERMISSIONS, usePermissions } from "../hooks/usePermissions";
+import JobDescription from "../components/JobDescription";
+import JobPeopleLine from "../components/JobPeopleLine";
+import ManageJobMembersDialog from "../components/ManageJobMembersDialog";
+import { useJobCollaboration } from "../hooks/useJobCollaboration";
+import { jobPeople, viewerIsJobMember } from "../utils/jobMembers";
+import { useEffectiveUser } from "../hooks/useEffectiveUser";
 import ResultsPanel from "../components/ResultsPanel";
 import ProcessCard from "../components/technician/ProcessCard";
 import StatusPaneHeader from "../components/technician/StatusPaneHeader";
@@ -120,7 +127,6 @@ export default function Tracking() {
     onBehalfOf: null,
     organization: "",
   });
-  const [workflowEmail, setWorkflowEmail] = useState(""); // ▶ URLSearchParams {}
   const [workflows, setWorklows] = useState([]); // ▶ URLSearchParams {}
   // The catalogue, for re-attaching parameter definitions to a version snapshot.
   const { services } = useContext(AppContext);
@@ -151,7 +157,6 @@ export default function Tracking() {
     setJobName(job.name ?? "");
     setJobTime(job.submitted ?? "");
     setSubmitter(summarizeJobSubmitter(job));
-    setWorkflowEmail(job.email ?? "");
     setWorklows(job.workflows ?? []);
     setAttachments(job.attachments ?? []);
     const wfs = job.workflows ?? [];
@@ -230,6 +235,13 @@ export default function Tracking() {
   const [restoringVersion, setRestoringVersion] = useState(false);
 
   const job = data?.ownJobById;
+  const { userProps: viewerProps } = useEffectiveUser();
+  const { can } = usePermissions();
+  const viewer = { subject: viewerProps?.subject, email: viewerProps?.idTokenParsed?.email };
+  const people = jobPeople(job);
+  const isMember = viewerIsJobMember(job, viewer);
+  const [managingPeople, setManagingPeople] = useState(false);
+  const collaboration = useJobCollaboration(id, refetch);
 
   /**
    * Restore the version being viewed. Offered only while the lab has actually
@@ -463,13 +475,6 @@ export default function Tracking() {
         workflows,
       )
     : workflows;
-  /** Presentation only; replaceSampleSheet re-checks the job's state server-side. */
-  const canReplaceSampleSheets =
-    !!job &&
-    job.state !== "CLOSED" &&
-    job.state !== "CANCELLED" &&
-    job.state !== "REJECTED";
-
   // The same rail metrics the staff job page uses, so the two pages line up.
   const railBtnSx = {
     textTransform: "none" as const,
@@ -530,11 +535,6 @@ export default function Tracking() {
         diff={graphDiff}
         currentVersion={current}
         baselineVersion={baseline}
-        sampleSheets={{
-          jobId: id || "",
-          canEdit: canReplaceSampleSheets,
-          onChanged: refreshJobPage,
-        }}
       />
     </>
   );
@@ -706,7 +706,34 @@ export default function Tracking() {
               {submitter.onBehalfOf}
             </Typography>
           )}
+          {job && (
+            <JobPeopleLine
+              primaryEmail={people.primary}
+              memberEmails={people.members}
+              canManage={isMember || Boolean(viewerProps?.isDamplabStaff)}
+              onManage={() => setManagingPeople(true)}
+            />
+          )}
         </Box>
+        {job && (
+          <JobDescription
+            description={job.description}
+            canEdit={isMember || can(PERMISSIONS.JobsViewAll)}
+            onSave={collaboration.saveDescription}
+          />
+        )}
+        {collaboration.error && !managingPeople && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={collaboration.clearError}>{collaboration.error}</Alert>
+        )}
+        <ManageJobMembersDialog
+          open={managingPeople}
+          primaryEmail={people.primary}
+          memberEmails={people.members}
+          onAdd={collaboration.addMember}
+          onRemove={collaboration.removeMember}
+          onClose={() => { setManagingPeople(false); collaboration.clearError(); }}
+          error={collaboration.error}
+        />
         {commandError && (
           <Alert
             severity="error"
@@ -807,10 +834,11 @@ export default function Tracking() {
                     </List>
                   </Box>
                 )}
+                {/* Download only (B19): a customer swaps a sheet in the workflow editor, where it needs edit access and becomes a version. */}
                 <SampleSheetSection
                   jobId={id || ""}
                   slots={getSampleSheets(workflows)}
-                  canEdit={canReplaceSampleSheets}
+                  canEdit={false}
                   onChanged={refreshJobPage}
                 />
                 {getParameterFiles().length > 0 && (
@@ -964,7 +992,7 @@ export default function Tracking() {
           <CommentsSection
             jobId={id || ""}
             currentUser={{
-              email: workflowEmail,
+              email: viewerProps?.idTokenParsed?.email ?? "",
               isStaff: false,
             }}
           />

@@ -1,9 +1,10 @@
 /**
  * Who to name in a job's header.
  *
- * A job's `username`/`email` come from the submitter's access token, so on a job
- * staff entered for a client they are the technician's, not the customer's.
- * `clientDisplayName`/`clientEmail` are the client. Naming the wrong pair under
+ * On a new staff-submitted job, `username`/`email` are the client's (B28) and the
+ * staff member is `submittedBy`. Only legacy, unmigrated jobs still carry the
+ * technician in `username`/`email`; for those `clientDisplayName`/`clientEmail`
+ * are the client. Naming the wrong pair under
  * "User" credits the work to whoever typed it in; naming only the client hides
  * that a staff member acted on their behalf, which is exactly what a reader
  * checking a submission needs to know.
@@ -18,6 +19,8 @@ export interface JobSubmitterFields {
   clientDisplayName?: string | null;
   clientEmail?: string | null;
   institute?: string | null;
+  primaryClientEmail?: string | null;
+  submittedBy?: { sub?: string | null; email?: string | null; name?: string | null } | null;
 }
 
 export interface JobSubmitterSummary {
@@ -43,6 +46,17 @@ export function summarizeJobSubmitter(job: JobSubmitterFields): JobSubmitterSumm
   const submitterName = clean(job.username);
   const submitterEmail = clean(job.email);
   const organization = clean(job.institute);
+
+  // B28/B30: a staff-submitted job is the client's. Its owner fields are the
+  // client's; the staff member is only ever named from submittedBy.
+  if (job.submittedBy) {
+    const primary = clean(job.primaryClientEmail) || clean(job.clientEmail) || clean(job.email);
+    return {
+      user: nameWithEmail(clean(job.clientDisplayName) || clean(job.username), primary),
+      onBehalfOf: `Submitted on their behalf by ${nameWithEmail(clean(job.submittedBy.name), clean(job.submittedBy.email))}`,
+      organization
+    };
+  }
 
   if (clientEmail) {
     return {
