@@ -311,7 +311,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
                           </Tooltip>
                         )}
                         {mayConfirm(b) && (
-                          <Tooltip title={b.usageConfirmed ? 'Adjust confirmed usage' : 'Confirm usage'}>
+                          <Tooltip title={b.usageConfirmed ? 'Adjust recorded usage' : 'Record actual usage for billing'}>
                             <IconButton
                               size="small"
                               color={b.usageConfirmed ? 'default' : 'success'}
