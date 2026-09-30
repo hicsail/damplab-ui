@@ -251,12 +251,33 @@ export interface ValidationSummary {
 }
 
 /**
+ * Warnings this function itself pushes, matched to strip on a re-run before it
+ * re-derives them — never the ones parsing/station-resolution already own.
+ */
+const OWNED_WARNING_PATTERNS: RegExp[] = [
+  /^Duplicate uniqueId ".*" found in \d+ rows\.$/,
+  /^Tag ".*" is not in the predefined list\.$/,
+  /^Quantity blank — defaulting to 1\.$/
+];
+
+const isOwnedWarning = (warning: string): boolean => OWNED_WARNING_PATTERNS.some((pattern) => pattern.test(warning));
+
+/**
  * Run pre-upload validation checks on parsed rows. Mutates rows in-place (adds warnings).
  * Checks: unknown types, unknown tags, duplicate uniqueIds, blank quantities.
+ *
+ * The preview calls this on every re-render against the same row objects (F15) —
+ * idempotent by construction: it first drops any warning it previously added to
+ * a row, then re-derives its own from scratch, so two runs over unchanged input
+ * leave a row with exactly the warnings one run would produce.
  */
 export function validateUploadRows(rows: ParsedInventoryRow[], rawQuantities?: string[]): ValidationSummary {
   let errors = 0;
   let warnings = 0;
+
+  for (const row of rows) {
+    row.warnings = row.warnings.filter((warning) => !isOwnedWarning(warning));
+  }
 
   // Duplicate uniqueId detection
   const idFreq = new Map<string, number[]>();
