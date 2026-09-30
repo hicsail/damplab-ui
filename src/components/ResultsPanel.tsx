@@ -7,12 +7,16 @@ import StatusPaneHeader from './technician/StatusPaneHeader';
 import { chipStatusBackground } from '../utils/technicianProcessStatus';
 
 /**
- * The job page's Results card, on both the customer and the staff page.
+ * The job page's Results card. Staff page only: the client page does not render
+ * it (the human hid it from clients until results are real).
  *
  * Placeholder content for screen recordings: every job reads as completed with
  * the same generic findings until results are stored on the job. The lines
  * live here so they are easy to find and change.
  */
+/** Said on the card itself, so no one mistakes the placeholder for a real result. */
+export const RESULTS_DEMO_NOTE = 'Demo content — clients do not see this card.';
+
 const RESULT_LINES = [
   'Job has been completed successfully',
   'Sequencing result matches target sequence',
@@ -55,7 +59,7 @@ export default function ResultsPanel({ jobDisplayId }: Props): React.JSX.Element
         staffVersion="Complete"
         statusPaneSx={{ bgcolor: chipStatusBackground('success') }}
         statusPane={
-          <StatusPaneHeader status="Completed" reference={reportTitle}>
+          <StatusPaneHeader status="Completed" reference={reportTitle} description={RESULTS_DEMO_NOTE}>
             <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0, mt: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               {RESULT_LINES.map((line) => (
                 <CheckedLine key={line}>{line}</CheckedLine>

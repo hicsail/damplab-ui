@@ -1496,8 +1496,6 @@ export default function TechnicianView() {
 
         <ResultsPanel jobDisplayId={jobData?.jobId ?? null} />
 
-        <ResultsPanel jobDisplayId={jobData?.jobId ?? null} />
-
         <div ref={commentsSectionRef}>
           <CommentsSection
             jobId={id || ""}
