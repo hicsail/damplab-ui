@@ -4,7 +4,7 @@ import { Alert, Box, Button, Chip, CircularProgress, FormControl, InputLabel, Me
 import { addDays, startOfMonth } from 'date-fns';
 import { GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BOOKING } from '../../gql/queries';
 import { CANCEL_BOOKING, CREATE_JOB_EQUIPMENT_BOOKING, UPDATE_JOB_EQUIPMENT_BOOKING } from '../../gql/mutations';
-import { blockedMessage, defaultSlotFor, formatBookingWindow, LOCKED_MESSAGES } from '../../utils/jobEquipmentBooking';
+import { blockedMessage, defaultSlotFor, formatBookingWindow, LOCKED_MESSAGES, operationNotBookableMessage } from '../../utils/jobEquipmentBooking';
 import { formatGqlError, formatSaveError } from '../../utils/gqlError';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import JobEquipmentBookingDialog from './JobEquipmentBookingDialog';
@@ -221,7 +221,7 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
 
             {!mayBook && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                {schedulable.length === 0 ? 'Nothing on this operation is booked by the hour.' : 'You are not listed as a booker on this operation.'}
+                {operationNotBookableMessage(schedulable.length)}
               </Typography>
             )}
             {unschedulable.length > 0 && (

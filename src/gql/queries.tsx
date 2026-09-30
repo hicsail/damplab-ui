@@ -1733,7 +1733,6 @@ export const GET_JOB_EQUIPMENT_BOOKING = gql`
           rateType
           schedulable
         }
-        bookers
       }
       bookings {
         _id

@@ -68,6 +68,14 @@ export const LOCKED_MESSAGES = {
   NOT_ELIGIBLE: 'Ask the lab for equipment-user access to book.'
 } as const;
 
+/**
+ * The line under an operation the caller cannot book. Booking follows job
+ * membership, so the refusal speaks of the job — never of a per-operation list.
+ */
+export function operationNotBookableMessage(schedulableCount: number): string {
+  return schedulableCount === 0 ? 'Nothing on this operation is booked by the hour.' : 'Only people on this job can book this operation.';
+}
+
 export function blockedMessage(reason?: string | null): string {
   const trimmed = reason?.trim();
   return trimmed ? `Booking on this job is paused by the lab: ${trimmed}.` : 'Booking on this job is paused by the lab.';

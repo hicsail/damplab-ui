@@ -74,9 +74,9 @@ export default function InventoryCalendar() {
   const mySub = userProps?.subject;
   /**
    * Mirrors the server rule. A job-scoped booking's owner is the JOB, so its
-   * `ownerSub` is the job creator's — a listed booker who made the reservation
+   * `ownerSub` is the job creator's — a job member who made the reservation
    * would see no Cancel at all under the walk-up rule. The full rule (job creator,
-   * client email, listed booker of that operation, jobs:view-all) needs the job,
+   * anyone on the job, jobs:view-all) needs the job,
    * which this page does not load; whoever made the booking is the part of it this
    * page can answer, and the server refuses the rest.
    */
