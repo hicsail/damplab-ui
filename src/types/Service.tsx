@@ -27,6 +27,10 @@ export type Service = {
     // optional result params
     resultParams?: string[];
     parameters?: Parameter[];
+    /** Stored on the operation itself; `parameters` is these plus every Parameter Set's. */
+    ownParameters?: Parameter[];
+    parameterSetIds?: string[];
+    hiddenFromClients?: boolean;
     allowedConnections: string[];
     result?: any;
     categories: string[];

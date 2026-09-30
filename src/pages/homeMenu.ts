@@ -226,7 +226,7 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
       },
       {
         id: "catalog-inventory-editor",
-        label: "Catalog & Inventory Editor",
+        label: "Catalog Editor",
         to: "/edit",
         visible: needs(PERMISSIONS.CatalogEditorRead),
       },

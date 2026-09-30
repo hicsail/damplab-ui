@@ -104,6 +104,8 @@ export default [
       "./pages/AdminEditServiceParameters.tsx",
     ),
     route("/edit/services/:serviceId", "./pages/AdminEditService.tsx"),
+    route("/edit/parameter-sets/new", "./pages/AdminNewParameterSet.tsx"),
+    route("/edit/parameter-sets/:id", "./pages/AdminEditParameterSet.tsx"),
     route("/edit/bundles/new", "./pages/AdminNewBundle.tsx"),
     route("/edit/bundles/:bundleId", "./pages/AdminEditBundle.tsx"),
     route("/edit/sow-sections/:sectionKey", "./pages/AdminEditSowSection.tsx"),

@@ -1,5 +1,5 @@
-import { useApolloClient } from '@apollo/client';
-import { CREATE_CATEGORY, CREATE_SERVICE, DELETE_SERVICE, UPDATE_SERVICE } from '../../gql/queries';
+import { useApolloClient, useQuery } from '@apollo/client';
+import { CREATE_CATEGORY, DELETE_SERVICE, GET_DELETED_SERVICE_IDS, GET_PARAMETER_SETS } from '../../gql/queries';
 import {
   DataGrid,
   GridColDef,
@@ -11,18 +11,43 @@ import {
 import { Box, Button, Snackbar, Alert, Stack, Typography } from '@mui/material';
 import UploadIcon from '@mui/icons-material/Upload';
 import DownloadIcon from '@mui/icons-material/Download';
+import HistoryIcon from '@mui/icons-material/History';
 import { Edit, Delete } from '@mui/icons-material';
 import { ServiceList } from './ServiceList';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppContext } from '../../contexts/App';
 import { GridToolBar } from './GridToolBar';
-import { processCSVFile, processExcelFile, validateFileType } from '../data-translation/utils';
 import { useNavigate } from 'react-router';
-import { idFromName } from '../../utils/idFromName';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatSaveError } from '../../utils/gqlError';
+import * as XLSX from 'xlsx';
+import { FieldPickerDialog } from './FieldPickerDialog';
+import { offeredFields } from './exportFields';
+import { buildOperationsWorkbook, operationExportFields, OPERATIONS_FILE_NAME } from './operationsSheet';
+import { setRefsFrom } from '../../utils/serviceParameters';
+import { isExcelFileName } from './inventoryUploadUtils';
+import { parseOperationsSheet, ParsedOperationsSheet, readOperationsFile } from './operationsUploadUtils';
+import { OperationsUploadPreview, OperationsUploadSummary } from './OperationsUploadPreview';
+import { withoutHidden } from '../../utils/paletteVisibility';
+import { useShowHiddenOperations } from '../../hooks/useShowHiddenOperations';
+import { ShowHiddenOperationsToggle } from './ShowHiddenOperationsToggle';
+import { HiddenFromClientsChip } from './HiddenFromClientsChip';
 
-type ServiceRow = Record<string, unknown> & { id: GridRowId };
+type ServiceRow = Record<string, unknown> & { id: GridRowId; hiddenFromClients?: boolean | null };
+
+/**
+ * Fix round 1: Upload (`disabled={!setsData || !deletedData}`) was going stuck
+ * with no explanation whenever either query errored — the only message on
+ * screen talked about Download. Names which list is missing; null when both
+ * queries are fine (pure, so it's tested directly rather than through the DOM).
+ */
+export function uploadUnavailableMessage(setsError: unknown, deletedError: unknown): string | null {
+  const missing: string[] = [];
+  if (setsError) missing.push('parameter sets');
+  if (deletedError) missing.push('deleted operations');
+  if (missing.length === 0) return null;
+  return `Upload is unavailable: couldn't load ${missing.join(' and ')}.`;
+}
 
 function formatPricingSummary(row: Record<string, unknown>): string {
   const pricing = (row as any).pricing ?? {};
@@ -49,6 +74,8 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
   const navigate = useNavigate();
   const { can } = usePermissions();
   const canWrite = can(PERMISSIONS.CatalogEditorWrite);
+  const canSeeInternal = can(PERMISSIONS.InternalFieldsRead);
+  const { canSeeHidden, showHidden, setShowHidden } = useShowHiddenOperations();
   const [rows, setRows] = useState<ServiceRow[]>([]);
   const { services, refreshCatalog } = useContext(AppContext);
   const client = useApolloClient();
@@ -57,15 +84,43 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
 
   const [, setRowModesModel] = useState<GridRowModesModel>({});
 
+  const { data: setsData, error: setsError } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
+  const setNameById = useMemo(() => new Map(setRefsFrom(setsData).map((s) => [s.id, s.name])), [setsData]);
+  const exportFields = useMemo(() => offeredFields(operationExportFields(setNameById), canSeeInternal), [setNameById, canSeeInternal]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const { data: deletedData, error: deletedError } = useQuery(GET_DELETED_SERVICE_IDS, { fetchPolicy: 'network-only', skip: !canWrite });
+  const [parsedUpload, setParsedUpload] = useState<ParsedOperationsSheet | null>(null);
+  const [uploadFileName, setUploadFileName] = useState('');
+  // Ruling D3: sets→refs is setRefsFrom (utils/serviceParameters.ts), not an inline map.
+  const setRefs = useMemo(() => setRefsFrom(setsData), [setsData]);
+
   useEffect(() => {
     setRows(services as ServiceRow[]);
   }, [services]);
 
-  const filteredRows = useMemo(() => {
-    const q = searchString.trim().toLowerCase();
-    if (!q) return rows;
+  useEffect(() => {
+    // Parameter sets failed to load: the parameterSets column falls back to raw
+    // set ids (see operationExportFields), so the download stays usable — just
+    // tell the user why the names look wrong. Task 10's behaviour, unchanged.
+    const parts: string[] = [];
+    if (setsError) parts.push('Failed to load parameter sets; the download will show set ids instead of names.');
+    // Fix round 1: Upload needs both lists to classify rows, so a failure here
+    // must name Upload specifically rather than leaving it stuck with no
+    // explanation (the message above only ever talked about Download).
+    if (canWrite) {
+      const uploadMessage = uploadUnavailableMessage(setsError, deletedError);
+      if (uploadMessage) parts.push(uploadMessage);
+    }
+    if (parts.length > 0) setErrorMessage(parts.join(' '));
+  }, [setsError, deletedError, canWrite]);
 
-    return rows.filter((row) => {
+  const filteredRows = useMemo(() => {
+    const visible = withoutHidden(rows, showHidden);
+    const q = searchString.trim().toLowerCase();
+    if (!q) return visible;
+
+    return visible.filter((row) => {
       const name = String((row as any).name ?? '').toLowerCase();
       if (name.includes(q)) return true;
 
@@ -80,7 +135,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
 
       return false;
     });
-  }, [rows, searchString]);
+  }, [rows, searchString, showHidden]);
 
   const handleDeletion = async (id: GridRowId) => {
     // Previously had no try/catch at all, so a refusal surfaced as an unhandled
@@ -99,372 +154,48 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
     }
   };
 
-  const handleDownloadPricingSheet = () => {
+  const handleDownloadOperations = (keys: string[]) => {
+    setPickerOpen(false);
     try {
-      const headers = [
-        'id',
-        'name',
-        'description',
-        'serviceCategoryNumber',
-        'serviceCategoryName',
-        'unit',
-        'pricingInternal',
-        'pricingExternalAcademic',
-        'pricingExternalMarket',
-        'pricingExternalNoSalary',
-        'pricingLegacy'
-      ];
-      const dataLines = rows.map((row) => {
-        const id = row.id ?? '';
-        const name = (row as any).name ?? '';
-        const description = (row as any).description ?? '';
-        const serviceCategoryNumber = (row as any).serviceCategoryNumber ?? '';
-        const serviceCategoryName = (row as any).serviceCategoryName ?? '';
-        const unit = (row as any).unit ?? '';
-        const pricing = (row as any).pricing ?? {};
-        const internalPrice = pricing.internal ?? (row as any).internalPrice ?? '';
-        const externalAcademicPrice =
-          pricing.externalAcademic ?? (row as any).externalAcademicPrice ?? '';
-        const externalMarketPrice =
-          pricing.externalMarket ?? pricing.external ?? (row as any).externalMarketPrice ?? (row as any).externalPrice ?? '';
-        const externalNoSalaryPrice =
-          pricing.externalNoSalary ?? (row as any).externalNoSalaryPrice ?? '';
-        const legacyPrice = pricing.legacy ?? (row as any).price ?? '';
-        return [
-          id,
-          name,
-          description,
-          serviceCategoryNumber,
-          serviceCategoryName,
-          unit,
-          internalPrice,
-          externalAcademicPrice,
-          externalMarketPrice,
-          externalNoSalaryPrice,
-          legacyPrice
-        ]
-          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-          .join(',');
-      });
-
-      const csvContent = [headers.join(','), ...dataLines].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'services-pricing.csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      XLSX.writeFile(buildOperationsWorkbook(rows as any, exportFields, new Set(keys)), OPERATIONS_FILE_NAME);
     } catch (error) {
-      console.error('Error generating pricing CSV:', error);
-      setErrorMessage('Failed to generate pricing spreadsheet.');
+      console.error('Error generating operations spreadsheet:', error);
+      setErrorMessage('Failed to generate operations spreadsheet.');
     }
   };
 
-  const handleUploadPricingSheet = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadOperations = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
     event.target.value = '';
-
-    if (!validateFileType(file.name)) {
-      setErrorMessage('Please upload a .csv, .xlsx or .xls file.');
+    if (!file) return;
+    if (!isExcelFileName(file.name)) {
+      setErrorMessage('Please upload an .xlsx or .xls file.');
       return;
     }
-
     try {
-      let data: any[][];
-      if (file.name.toLowerCase().endsWith('.csv')) {
-        data = await processCSVFile(file);
-      } else {
-        data = await processExcelFile(file);
-      }
-
-      if (!data || data.length < 2) {
-        setErrorMessage('Spreadsheet appears to be empty or missing data rows.');
+      const aoa = await readOperationsFile(file);
+      const parsed = parseOperationsSheet(aoa, {
+        existing: services as any,
+        deletedIds: new Set<string>(deletedData?.deletedServiceIds ?? []),
+        sets: setRefs,
+        allowPricing: canSeeInternal
+      });
+      if (parsed.rows.length === 0) {
+        setErrorMessage('No rows found in the Operations sheet.');
         return;
       }
-
-      const [headerRow, ...dataRows] = data;
-      const normalizedHeaders = headerRow.map((h) => String(h || '').trim().toLowerCase());
-
-      const idIndex = normalizedHeaders.findIndex((h) => h === 'id' || h === 'service id');
-      const nameIndex = normalizedHeaders.findIndex((h) => h === 'name' || h === 'service name');
-      const internalPriceIndex =
-        normalizedHeaders.findIndex((h) => h === 'pricinginternal' || h === 'internalprice' || h === 'internal price');
-      const externalAcademicPriceIndex =
-        normalizedHeaders.findIndex(
-          (h) =>
-            h === 'pricingexternalacademic' ||
-            h === 'externalacademicprice' ||
-            h === 'external academic price' ||
-            h === 'external customer academic' ||
-            h === 'external customer (academic)'
-        );
-      const externalMarketPriceIndex =
-        normalizedHeaders.findIndex(
-          (h) =>
-            h === 'pricingexternalmarket' ||
-            h === 'externalmarketprice' ||
-            h === 'external market price' ||
-            h === 'pricingexternal' ||
-            h === 'externalprice' ||
-            h === 'external price' ||
-            h === 'external customer market' ||
-            h === 'external customer (market)'
-        );
-      const externalNoSalaryPriceIndex =
-        normalizedHeaders.findIndex(
-          (h) =>
-            h === 'pricingexternalnosalary' ||
-            h === 'externalnosalaryprice' ||
-            h === 'external no salary price' ||
-            h === 'external customer no salary' ||
-            h === 'external customer (no salary)'
-        );
-      const priceIndex =
-        normalizedHeaders.findIndex((h) => h === 'pricinglegacy' || h === 'price' || h === 'service price' || h === 'legacy price');
-
-      const descriptionIndex = normalizedHeaders.findIndex(
-        (h) => h === 'description' || h === 'service description'
-      );
-      const serviceCategoryNumberIndex = normalizedHeaders.findIndex(
-        (h) =>
-          h === 'servicecategorynumber' ||
-          h === 'service category number' ||
-          h === 'category number' ||
-          h === 'category no' ||
-          h === 'category #'
-      );
-      const serviceCategoryNameIndex = normalizedHeaders.findIndex(
-        (h) =>
-          h === 'servicecategoryname' ||
-          h === 'service category name' ||
-          h === 'category name'
-      );
-      const unitIndex = normalizedHeaders.findIndex((h) => h === 'unit' || h === 'service unit');
-
-      if (
-        idIndex === -1 ||
-        nameIndex === -1 ||
-        (internalPriceIndex === -1 &&
-          externalAcademicPriceIndex === -1 &&
-          externalMarketPriceIndex === -1 &&
-          externalNoSalaryPriceIndex === -1 &&
-          priceIndex === -1)
-      ) {
-        setErrorMessage(
-          'Spreadsheet must have columns for id, name, and at least one price column (internal, external academic, external market, external no salary, or fallback/legacy).'
-        );
-        return;
-      }
-
-      let updateCount = 0;
-      let createCount = 0;
-
-      for (const row of dataRows) {
-        const rawId = row[idIndex];
-        const rawName = row[nameIndex];
-        const rawInternalPrice = internalPriceIndex !== -1 ? row[internalPriceIndex] : undefined;
-        const rawExternalAcademicPrice = externalAcademicPriceIndex !== -1 ? row[externalAcademicPriceIndex] : undefined;
-        const rawExternalMarketPrice = externalMarketPriceIndex !== -1 ? row[externalMarketPriceIndex] : undefined;
-        const rawExternalNoSalaryPrice = externalNoSalaryPriceIndex !== -1 ? row[externalNoSalaryPriceIndex] : undefined;
-        const rawPrice = priceIndex !== -1 ? row[priceIndex] : undefined;
-        const rawDescription = descriptionIndex !== -1 ? row[descriptionIndex] : undefined;
-        const rawCategoryNumber =
-          serviceCategoryNumberIndex !== -1 ? row[serviceCategoryNumberIndex] : undefined;
-        const rawCategoryName = serviceCategoryNameIndex !== -1 ? row[serviceCategoryNameIndex] : undefined;
-        const rawUnit = unitIndex !== -1 ? row[unitIndex] : undefined;
-
-        const id = rawId !== undefined && rawId !== null ? String(rawId).trim() : '';
-        const name = rawName !== undefined && rawName !== null ? String(rawName).trim() : '';
-        const descriptionStr =
-          descriptionIndex !== -1 && rawDescription !== undefined && rawDescription !== null
-            ? String(rawDescription).trim()
-            : undefined;
-        const serviceCategoryNumberStr =
-          serviceCategoryNumberIndex !== -1 && rawCategoryNumber !== undefined && rawCategoryNumber !== null
-            ? String(rawCategoryNumber).trim()
-            : undefined;
-        const serviceCategoryNameStr =
-          serviceCategoryNameIndex !== -1 && rawCategoryName !== undefined && rawCategoryName !== null
-            ? String(rawCategoryName).trim()
-            : undefined;
-        const unitStr =
-          unitIndex !== -1 && rawUnit !== undefined && rawUnit !== null ? String(rawUnit).trim() : undefined;
-        const internalPriceStr =
-          rawInternalPrice !== undefined && rawInternalPrice !== null ? String(rawInternalPrice).trim() : '';
-        const externalAcademicPriceStr =
-          rawExternalAcademicPrice !== undefined && rawExternalAcademicPrice !== null ? String(rawExternalAcademicPrice).trim() : '';
-        const externalMarketPriceStr =
-          rawExternalMarketPrice !== undefined && rawExternalMarketPrice !== null ? String(rawExternalMarketPrice).trim() : '';
-        const externalNoSalaryPriceStr =
-          rawExternalNoSalaryPrice !== undefined && rawExternalNoSalaryPrice !== null ? String(rawExternalNoSalaryPrice).trim() : '';
-        const priceStr = rawPrice !== undefined && rawPrice !== null ? String(rawPrice).trim() : '';
-
-        const hasMetaInRow =
-          descriptionStr !== undefined ||
-          serviceCategoryNumberStr !== undefined ||
-          serviceCategoryNameStr !== undefined ||
-          unitStr !== undefined;
-        if (!id && !name && !priceStr && !hasMetaInRow) {
-          continue;
-        }
-
-        const parseMoney = (s: string): number | null => {
-          if (s === '') return null;
-          const n = Number(s.replace(/[^0-9.\-]/g, ''));
-          return Number.isFinite(n) ? n : null;
-        };
-
-        const internalPrice = parseMoney(internalPriceStr);
-        const externalAcademicPrice = parseMoney(externalAcademicPriceStr);
-        const externalMarketPrice = parseMoney(externalMarketPriceStr);
-        const externalNoSalaryPrice = parseMoney(externalNoSalaryPriceStr);
-        const price = parseMoney(priceStr);
-
-        const hasInvalid =
-          (internalPriceStr !== '' && (internalPrice === null || internalPrice < 0)) ||
-          (externalAcademicPriceStr !== '' && (externalAcademicPrice === null || externalAcademicPrice < 0)) ||
-          (externalMarketPriceStr !== '' && (externalMarketPrice === null || externalMarketPrice < 0)) ||
-          (externalNoSalaryPriceStr !== '' && (externalNoSalaryPrice === null || externalNoSalaryPrice < 0)) ||
-          (priceStr !== '' && (price === null || price < 0));
-        if (hasInvalid) {
-          console.warn('Skipping row with invalid price:', row);
-          continue;
-        }
-
-        if (id) {
-          const existingRow = rows.find((r) => String(r.id) === id);
-
-          if (existingRow) {
-            const changes: any = {};
-            if (name && name !== (existingRow as any).name) {
-              changes.name = name;
-            }
-            if (internalPriceStr !== '') {
-              changes.internalPrice = internalPrice;
-            }
-            if (externalAcademicPriceStr !== '') {
-              changes.externalAcademicPrice = externalAcademicPrice;
-            }
-            if (externalMarketPriceStr !== '') {
-              changes.externalMarketPrice = externalMarketPrice;
-              changes.externalPrice = externalMarketPrice;
-            }
-            if (externalNoSalaryPriceStr !== '') {
-              changes.externalNoSalaryPrice = externalNoSalaryPrice;
-            }
-            if (priceStr !== '') {
-              changes.price = price;
-            }
-            if (
-              internalPriceStr !== '' ||
-              externalAcademicPriceStr !== '' ||
-              externalMarketPriceStr !== '' ||
-              externalNoSalaryPriceStr !== '' ||
-              priceStr !== ''
-            ) {
-              changes.pricing = {
-                internal: internalPrice,
-                external: externalMarketPrice,
-                externalAcademic: externalAcademicPrice,
-                externalMarket: externalMarketPrice,
-                externalNoSalary: externalNoSalaryPrice,
-                legacy: price
-              };
-            }
-            if (descriptionStr !== undefined) {
-              changes.description = descriptionStr;
-            }
-            if (serviceCategoryNumberStr !== undefined) {
-              changes.serviceCategoryNumber = serviceCategoryNumberStr === '' ? null : serviceCategoryNumberStr;
-            }
-            if (serviceCategoryNameStr !== undefined) {
-              changes.serviceCategoryName = serviceCategoryNameStr === '' ? null : serviceCategoryNameStr;
-            }
-            if (unitStr !== undefined) {
-              changes.unit = unitStr === '' ? null : unitStr;
-            }
-
-            if (Object.keys(changes).length === 0) {
-              continue;
-            }
-
-            await client.mutate({
-              mutation: UPDATE_SERVICE,
-              variables: {
-                service: id,
-                changes
-              }
-            });
-            updateCount += 1;
-            continue;
-          }
-        }
-
-        if (!name) {
-          console.warn('Skipping row without name for new service:', row);
-          continue;
-        }
-
-        const newService: Record<string, unknown> = {
-          id: idFromName(name),
-          name,
-          icon: '',
-          price,
-          internalPrice,
-          externalPrice: externalMarketPrice,
-          externalAcademicPrice,
-          externalMarketPrice,
-          externalNoSalaryPrice,
-          pricing: {
-            internal: internalPrice,
-            external: externalMarketPrice,
-            externalAcademic: externalAcademicPrice,
-            externalMarket: externalMarketPrice,
-            externalNoSalary: externalNoSalaryPrice,
-            legacy: price
-          },
-          pricingMode: 'SERVICE',
-          parameters: [],
-          paramGroups: [],
-          allowedConnections: [],
-          description: descriptionStr !== undefined ? descriptionStr : '',
-          deliverables: []
-        };
-        if (serviceCategoryNumberStr !== undefined) {
-          newService.serviceCategoryNumber =
-            serviceCategoryNumberStr === '' ? null : serviceCategoryNumberStr;
-        }
-        if (serviceCategoryNameStr !== undefined) {
-          newService.serviceCategoryName = serviceCategoryNameStr === '' ? null : serviceCategoryNameStr;
-        }
-        if (unitStr !== undefined) {
-          newService.unit = unitStr === '' ? null : unitStr;
-        }
-
-        await client.mutate({
-          mutation: CREATE_SERVICE,
-          variables: {
-            service: newService
-          }
-        });
-        createCount += 1;
-      }
-
-      await refreshCatalog();
-
-      setErrorMessage(`Pricing upload complete: updated ${updateCount} service(s), created ${createCount} new service(s).`);
+      setUploadFileName(file.name);
+      setParsedUpload(parsed);
     } catch (error) {
-      console.error('Error processing pricing spreadsheet:', error);
-      setErrorMessage('Failed to process pricing spreadsheet.');
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to read the spreadsheet.');
     }
+  };
+
+  const handleUploadComplete = async (summary: OperationsUploadSummary) => {
+    setParsedUpload(null);
+    await refreshCatalog();
+    const failed = summary.errors.length ? ` ${summary.errors.length} failed: ${summary.errors.join(' ')}` : '';
+    setErrorMessage(`Import complete: ${summary.created} created, ${summary.updated} updated, ${summary.skipped} skipped.${failed}`);
   };
 
   const columns: GridColDef[] = [
@@ -502,7 +233,13 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
       headerName: 'Name',
       width: 500,
       flex: 1,
-      minWidth: 180
+      minWidth: 180,
+      renderCell: (params) => (
+        <>
+          {params.row.name}
+          {(params.row as any).hiddenFromClients && <HiddenFromClientsChip sx={{ ml: 1 }} />}
+        </>
+      )
     },
     {
       field: 'pricing',
@@ -583,24 +320,30 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           {/* Download is a read of data already on screen; upload is a bulk
               create/update, so only that half is gated. */}
-          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadPricingSheet}>
-            Download pricing sheet
-          </Button>
+          {/* Task 10 fix (a9b5698..5363d79): a sets-query error must not leave Download
+              stuck disabled forever — the export falls back to raw set ids. */}
+          <Button variant="outlined" startIcon={<DownloadIcon />} disabled={!setsData && !setsError} onClick={() => setPickerOpen(true)}>Download</Button>
+          {canSeeHidden && <ShowHiddenOperationsToggle showHidden={showHidden} setShowHidden={setShowHidden} />}
           {canWrite && (
             <>
-              <Button variant="contained" startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>
-                Upload pricing sheet
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                style={{ display: 'none' }}
-                onChange={handleUploadPricingSheet}
-              />
+              {/* Needs the set names and deleted ids to classify rows; never parse against empty lists. */}
+              <Button variant="contained" startIcon={<UploadIcon />} disabled={!setsData || !deletedData} onClick={() => fileInputRef.current?.click()}>Upload</Button>
+              <Button variant="outlined" startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history?type=OPERATION')}>Upload history</Button>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleUploadOperations} />
             </>
           )}
         </Box>
+        {parsedUpload && (
+          <OperationsUploadPreview
+            parsed={parsedUpload}
+            fileName={uploadFileName}
+            existing={services as any}
+            sets={setRefs}
+            open
+            onClose={() => setParsedUpload(null)}
+            onComplete={handleUploadComplete}
+          />
+        )}
         <DataGrid
           rows={filteredRows}
           columns={columns}
@@ -618,6 +361,14 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
           }}
         />
       </Stack>
+      <FieldPickerDialog
+        open={pickerOpen}
+        title="Download operations"
+        note="A read-only Parameters sheet is always included."
+        fields={exportFields}
+        onCancel={() => setPickerOpen(false)}
+        onConfirm={handleDownloadOperations}
+      />
       <Snackbar
         open={!!errorMessage}
         autoHideDuration={6000}

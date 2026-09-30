@@ -14,6 +14,9 @@ import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { trunc } from '../utils';
 import { calculateServiceCost } from '../utils/servicePricing';
 import { EQUIPMENT_SIDEBAR_CAPTION, hasEquipmentParams, orderEquipmentFirst } from '../utils/equipmentParams';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
+import { useShowHiddenOperations } from '../hooks/useShowHiddenOperations';
+import { visibleAllowedConnections } from '../utils/paletteVisibility';
 
 import { RecState } from '../types/Types';
 
@@ -45,9 +48,16 @@ export default function ContextTestComponent(props: SidebarProps) {
     const { services, hazards } = useContext(AppContext);
     const userContext: UserContextProps = useContext(UserContext);
     const customerCategory = customerCategoryProp ?? userContext.userProps?.customerCategory;
+    const { can } = usePermissions();
+    const mayUseEquipment = can(PERMISSIONS.JobEquipmentUse);
+    const { showHidden } = useShowHiddenOperations();
 
     const [ID, setID]                 = useState('');
     const activeNode                  = val.nodes.find((node: any) => node.id === val.activeComponentId);
+    // Pin 15: clients never see hidden operations on the canvas, and F13 keeps
+    // equipment-use ones behind job:equipment-use too — filter before offering
+    // them as one-click "Allowed Connections", not just in the palette.
+    const allowedConnections          = visibleAllowedConnections(activeNode?.data.allowedConnections ?? [], services, { mayUseEquipment, showHidden });
     const [openToast,  setOpenToast]  = useState(false);
     const [open,       setOpen]       = useState(false);
     const [, setPricingTick]          = useState(0);
@@ -441,15 +451,14 @@ export default function ContextTestComponent(props: SidebarProps) {
                 <div>
                     {
                         // return header with text Allowed Connections if allowedConnections list is not empty
-                        activeNode && activeNode.data.allowedConnections && activeNode.data.allowedConnections.length > 0 
+                        activeNode && allowedConnections.length > 0
                         ? <Typography variant="h6" sx={{ mt: 2 }}>Allowed Connections</Typography>
                         : null
                     }
                     {
-                        activeNode 
-                        && activeNode.data.allowedConnections 
-                        && activeNode.data.allowedConnections.length > 0 
-                        ? (activeNode.data.allowedConnections.map((connection: any) => {
+                        activeNode
+                        && allowedConnections.length > 0
+                        ? (allowedConnections.map((connection: any) => {
                             return (
                                 <NodeButton 
                                     key                  = {connection.id ?? connection}

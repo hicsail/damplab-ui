@@ -213,12 +213,12 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
               summary.skipped += 1;
               continue;
             }
-            const changes = buildUpdateChanges(row, selectedColumns);
+            const beforeItem = existingById.get(row.existingItemId);
+            const changes = buildUpdateChanges(row, selectedColumns, beforeItem as any);
             changes.lastModifiedBy = uploaderName;
             if (row.matchedIsDeleted && reactivateSet.has(i)) {
               changes.isDeleted = false;
             }
-            const beforeItem = existingById.get(row.existingItemId);
             const result = await client.mutate({
               mutation: UPDATE_INVENTORY_ITEM,
               variables: { item: row.existingItemId, changes }

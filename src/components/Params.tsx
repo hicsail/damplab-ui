@@ -32,6 +32,7 @@ import { CanvasContext } from "../contexts/Canvas";
 import { normalizeBookerEmails, validateEquipmentValues } from "../utils/equipmentParams";
 import SampleSheetField from "./SampleSheetField";
 import { isSampleSheetParam } from "../utils/sampleSheet";
+import { parameterSetHeadings } from "../utils/parameterSetGroups";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -303,6 +304,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     onFormDataChange?.();
   }, [formik.values]);
 
+  const setHeadings = parameterSetHeadings(activeNode?.data?.formData ?? [], activeNode?.data?.parameters);
 
   return (
     <div>
@@ -345,7 +347,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
           </AccordionSummary>
           <AccordionDetails>
         <div className="input-params" style={{ marginLeft: 8 }}>
-          {activeNode.data.formData.map((param: any) => wrapChanged(param, (() => {
+          {activeNode.data.formData.map((param: any, index: number) => <React.Fragment key={param.id ?? index}>{setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}{wrapChanged(param, (() => {
             if (param.paramType !== "result") {
               if (param.type === "date") {
                 const raw = formik.values[param.id];
@@ -754,7 +756,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
             } else {
               return null;
             }
-          })()))}
+          })())}</React.Fragment>)}
         </div>
           </AccordionDetails>
         </Accordion>

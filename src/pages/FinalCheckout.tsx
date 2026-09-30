@@ -6,6 +6,7 @@ import { CanvasContext } from "../contexts/Canvas";
 import { useLocation, useNavigate } from 'react-router';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { submitCanvasJob } from '../utils/canvasJobSubmission';
+import { formatGqlError } from '../utils/gqlError';
 import {
   Snackbar,
   Typography,
@@ -177,7 +178,7 @@ const handleSubmitJob = async () => {
     console.error('Job submission failed:', error);
     setSnackbarState({
       open: true,
-      message: 'Failed to submit job. Please try again.',
+      message: formatGqlError(error, 'Failed to submit job. Please try again.'),
       severity: 'error',
     });
   } finally {

@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction } from 'react';
 import { Select, FormControl, Stack, MenuItem, TextField } from '@mui/material';
 
-type EditTypes = 'Services' | 'Categories' | 'Bundles' | 'Inventory' | 'SOWs';
+export type EditTypes = 'Services' | 'Categories' | 'Bundles' | 'Inventory' | 'SOWs' | 'Parameter Sets';
 
 
 export interface ToolBarProps {
@@ -19,6 +19,7 @@ export const ToolBar: React.FC<ToolBarProps> = (props) => {
         {/* Switching between the edit views */}
         <Select value={props.editType} onChange={(event) => props.setEditType(event.target.value as EditTypes)}>
           <MenuItem value={'Services'}>Services</MenuItem>
+          <MenuItem value={'Parameter Sets'}>Parameter Sets</MenuItem>
           <MenuItem value={'Categories'}>Categories</MenuItem>
           <MenuItem value={'Bundles'}>Bundles</MenuItem>
           <MenuItem value={'Inventory'}>Inventory</MenuItem>
