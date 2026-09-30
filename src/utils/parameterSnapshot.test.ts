@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { snapshotFallback } from './parameterSnapshot';
+import { EQUIPMENT_BOOKERS_PARAM_ID } from './servicePricing';
 
 const node = { parameterSnapshot: [{ id: 'gone', name: 'Old parameter', type: 'text', displayValue: 'x' }, { id: '__runCount', name: 'Number of runs', displayValue: '2' }] };
 
@@ -18,5 +19,9 @@ describe('snapshotFallback', () => {
     expect(snapshotFallback({}, 'gone', undefined)).toBeNull();
     expect(snapshotFallback(node, 'other', undefined)).toBeNull();
     expect(snapshotFallback(null, 'gone', undefined)).toBeNull();
+  });
+  it('treats the retired booker list as reserved, so no snapshot row is substituted for it', () => {
+    const node = { parameterSnapshot: [{ id: EQUIPMENT_BOOKERS_PARAM_ID, name: 'Authorized booker emails', displayValue: 'a@b.com' }] };
+    expect(snapshotFallback(node, EQUIPMENT_BOOKERS_PARAM_ID, undefined)).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-import { EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from './servicePricing';
+import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from './servicePricing';
 
 /** Mirrors damplab-backend ParameterSnapshotEntry. */
 export interface ParameterSnapshotEntry {
@@ -9,7 +9,7 @@ export interface ParameterSnapshotEntry {
 }
 
 /** Ids the UI injects into formData that no service lists; the cards name these themselves. */
-const RESERVED_PARAM_IDS = new Set<string>([RUN_COUNT_PARAM_ID, ...EQUIPMENT_PARAM_IDS]);
+const RESERVED_PARAM_IDS = new Set<string>([RUN_COUNT_PARAM_ID, ...EQUIPMENT_PARAM_IDS, EQUIPMENT_BOOKERS_PARAM_ID]);
 
 /**
  * The snapshot entry to show for a saved value whose parameter is no longer in

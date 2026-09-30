@@ -526,8 +526,8 @@ export default function AdminEditService() {
         label="Equipment use"
       />
       <FormHelperText sx={{ mt: -1.5, ml: 4 }}>
-        Marks this as an equipment-booking operation. Its canvas nodes gain Start Date, End Date, Open End Date?,
-        Projected Hours per Week and Authorized booker emails, and its SOW line is estimated as the hourly rate
+        Marks this as an equipment-booking operation. Its canvas nodes gain Start Date, End Date, Open End Date? and
+        Projected Hours per Week, and its SOW line is estimated as the hourly rate
         multiplied by hours per week and the number of weeks. Requires at least one bookable item under Required
         inventory. Operations already on submitted jobs are unaffected.
       </FormHelperText>

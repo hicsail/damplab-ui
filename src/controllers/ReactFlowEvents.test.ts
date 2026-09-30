@@ -93,14 +93,13 @@ describe('serviceIsEquipmentUse', () => {
 });
 
 describe('EQUIPMENT_PARAM_DEFS', () => {
-  it('is exactly the five reserved parameters, in order, with the pinned labels and types', () => {
+  it('is exactly the four live equipment parameters, in order, with the pinned labels and types', () => {
     expect(EQUIPMENT_PARAM_DEFS.map((p) => p.id)).toEqual([...EQUIPMENT_PARAM_IDS]);
     expect(EQUIPMENT_PARAM_DEFS.map((p) => [p.id, p.name, p.type, p.required])).toEqual([
       [EQUIPMENT_START_PARAM_ID, 'Start Date', 'date', true],
       [EQUIPMENT_END_PARAM_ID, 'End Date', 'date', true],
       [EQUIPMENT_OPEN_END_PARAM_ID, 'Open End Date?', 'boolean', false],
-      [EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, 'Projected Hours per Week', 'number', true],
-      [EQUIPMENT_BOOKERS_PARAM_ID, 'Authorized booker emails', 'emails', false]
+      [EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, 'Projected Hours per Week', 'number', true]
     ]);
   });
 
@@ -114,7 +113,13 @@ describe('EQUIPMENT_PARAM_DEFS', () => {
 });
 
 describe('buildNodeParameters — equipment use', () => {
-  it('leaves the five off a service that is not equipment use', () => {
+  it('never offers the retired booker field on a new node (behaviour 4)', () => {
+    const { formData, parameters } = buildNodeParameters(service({ equipmentUse: true }), 'n1');
+    expect(formData.some((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID)).toBe(false);
+    expect(parameters.some((p: any) => p.id === EQUIPMENT_BOOKERS_PARAM_ID)).toBe(false);
+  });
+
+  it('leaves the four off a service that is not equipment use', () => {
     const { formData, parameters } = buildNodeParameters(service(), 'n1');
     for (const id of EQUIPMENT_PARAM_IDS) {
       expect(formData.some((p) => p.id === id)).toBe(false);
@@ -122,7 +127,7 @@ describe('buildNodeParameters — equipment use', () => {
     }
   });
 
-  it('adds all five to both the form entries and the parameter list', () => {
+  it('adds all four to both the form entries and the parameter list', () => {
     const { formData, parameters } = buildNodeParameters(service({ equipmentUse: true }), 'n1');
     expect(formData.map((p) => p.id)).toEqual(['vol', 'buf', ...EQUIPMENT_PARAM_IDS]);
     expect(parameters.map((p: any) => p.id)).toEqual(['vol', 'buf', ...EQUIPMENT_PARAM_IDS]);
@@ -135,7 +140,7 @@ describe('buildNodeParameters — equipment use', () => {
     expect(byId.get(EQUIPMENT_END_PARAM_ID)).toBe('');
     expect(byId.get(EQUIPMENT_HOURS_PER_WEEK_PARAM_ID)).toBe('');
     expect(byId.get(EQUIPMENT_OPEN_END_PARAM_ID)).toBe(false);
-    expect(byId.get(EQUIPMENT_BOOKERS_PARAM_ID)).toEqual([]);
+    expect(byId.has(EQUIPMENT_BOOKERS_PARAM_ID)).toBe(false);
   });
 
   it('stamps the node id on every injected entry', () => {

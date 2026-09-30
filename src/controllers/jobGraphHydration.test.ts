@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, mergeSavedFormData, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts, versionWorkflowsAsCards, overlayLiveSampleSheetsOnCanvas } from './jobGraphHydration';
 import { getWorkflowsFromGraph } from './GraphHelpers';
-import { EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_PARAM_IDS, EQUIPMENT_START_PARAM_ID } from '../utils/servicePricing';
+import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_PARAM_IDS, EQUIPMENT_START_PARAM_ID } from '../utils/servicePricing';
 
 const service = (id: string, parameters: any[] = []) => ({
   id,
@@ -592,6 +592,26 @@ describe('mergeSavedFormData — equipment parameters', () => {
     { id: 'vol', name: 'Volume', type: 'number', required: true },
     { id: 'buf', name: 'Buffer', type: 'string', required: false }
   ];
+
+  it('carries a stored booker list through unchanged, after the four, without offering it anew', () => {
+    const saved = [
+      { id: EQUIPMENT_START_PARAM_ID, value: '2026-01-01' },
+      { id: EQUIPMENT_END_PARAM_ID, value: '2026-01-29' },
+      { id: EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, value: 10 },
+      { id: EQUIPMENT_BOOKERS_PARAM_ID, value: ['a@b.com'] }
+    ];
+    const merged = mergeSavedFormData(parameters, saved, 'n1', { equipmentUse: true });
+    const retired = merged.filter((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID);
+    expect(retired).toHaveLength(1);
+    expect(retired[0].value).toEqual(['a@b.com']);
+    expect(merged[merged.length - 1].id).toBe(EQUIPMENT_BOOKERS_PARAM_ID);
+  });
+
+  it('adds no booker entry to a node that never stored one', () => {
+    const saved = [{ id: EQUIPMENT_START_PARAM_ID, value: '2026-01-01' }];
+    const merged = mergeSavedFormData(parameters, saved, 'n1', { equipmentUse: true });
+    expect(merged.some((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID)).toBe(false);
+  });
 
   it('keeps a saved booking window when the service is still equipment use', () => {
     const saved = [

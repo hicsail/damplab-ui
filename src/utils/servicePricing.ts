@@ -7,7 +7,7 @@ export const RUN_COUNT_PARAM_ID = '__runCount';
 export const RUN_COUNT_PARAM_NAME = 'Number of runs';
 
 /**
- * The five reserved equipment-use parameter ids. Injected into a node's formData at
+ * The four reserved equipment-use parameter ids. Injected into a node's formData at
  * creation like the run count, never stored in service.parameters — so pricing,
  * diffing and display all read them straight out of formData.
  * Must stay in sync with the constants of the same names in
@@ -17,15 +17,22 @@ export const EQUIPMENT_START_PARAM_ID = '__equipStart';
 export const EQUIPMENT_END_PARAM_ID = '__equipEnd';
 export const EQUIPMENT_OPEN_END_PARAM_ID = '__equipOpenEnd';
 export const EQUIPMENT_HOURS_PER_WEEK_PARAM_ID = '__equipHoursPerWeek';
+
+/**
+ * Retired. The old "Authorized booker emails" list: booking now follows job
+ * membership (people added with Manage). No longer injected on new nodes, rendered
+ * in the form, validated or diffed. Old jobs may still store a value; hydration
+ * carries it through unchanged and nothing reads it. Kept so those entries keep a
+ * label on read-only displays and stay recognisably reserved.
+ */
 export const EQUIPMENT_BOOKERS_PARAM_ID = '__equipBookers';
 
-/** The five, in the order the sidebar and the documents show them. */
+/** The four live ones, in the order the sidebar and the documents show them. */
 export const EQUIPMENT_PARAM_IDS: readonly string[] = [
   EQUIPMENT_START_PARAM_ID,
   EQUIPMENT_END_PARAM_ID,
   EQUIPMENT_OPEN_END_PARAM_ID,
   EQUIPMENT_HOURS_PER_WEEK_PARAM_ID,
-  EQUIPMENT_BOOKERS_PARAM_ID,
 ];
 
 /** Fixed labels. Staff cannot rename these in this run. */

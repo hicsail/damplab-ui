@@ -6,7 +6,6 @@ import {
   AccordionSummary,
   Alert,
   Checkbox,
-  Chip,
   FormControl,
   FormControlLabel,
   FormHelperText,
@@ -29,7 +28,7 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import ParamTableOnForm from "./ParamTableOnForm";
 import { CanvasContext } from "../contexts/Canvas";
-import { normalizeBookerEmails, validateEquipmentValues } from "../utils/equipmentParams";
+import { isRetiredEquipmentParam, validateEquipmentValues } from "../utils/equipmentParams";
 import SampleSheetField from "./SampleSheetField";
 import { isSampleSheetParam } from "../utils/sampleSheet";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
@@ -83,72 +82,6 @@ const isPendingParamFile = (value: unknown): value is PendingParamFile =>
   typeof value === "object" &&
   (value as PendingParamFile).__kind === "pending-file" &&
   typeof (value as PendingParamFile).filename === "string";
-
-/**
- * The `emails` param's text box, as its own component so the per-field draft
- * state is a real hook rather than something conjured inside the render
- * loop's `.map` callback.
- *
- * The box is controlled: `draft` is local state seeded from the joined
- * formik array and resynced whenever that array changes from the outside
- * (e.g. a chip's delete button, or a node switch). A `defaultValue` box
- * never re-reads after mount, so deleting a chip left the box showing the
- * stale, pre-delete list — and the next blur re-normalised that stale text
- * back into formik, silently resurrecting the address just removed.
- *
- * `initValues` turns a bare `[]` into `[""]` for every array-valued param
- * (a pre-existing sentinel this component does not own), so blanks are
- * filtered out of both the chip row and the joined text before display.
- */
-function EmailsField({
-  param,
-  value,
-  error,
-  readOnly,
-  onCommit,
-}: {
-  param: any;
-  value: string[];
-  error?: unknown;
-  readOnly: boolean;
-  onCommit: (next: string[]) => void;
-}) {
-  const emails = value.filter((email) => email !== "");
-  const joined = emails.join(", ");
-  const [draft, setDraft] = useState(joined);
-
-  useEffect(() => {
-    setDraft(joined);
-  }, [joined]);
-
-  return (
-    <div style={{ marginTop: 24 }}>
-      <TextField
-        size="small"
-        label={param.name}
-        placeholder="name@example.com, other@example.com"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => onCommit(normalizeBookerEmails(draft.split(",")))}
-        sx={{ width: "36ch" }}
-        InputLabelProps={{ shrink: true }}
-        InputProps={{ readOnly }}
-        error={Boolean(error)}
-        helperText={error ? String(error) : (param.description ? param.description : "Comma-separated. Optional.")}
-      />
-      <Box sx={{ mt: 0.5, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-        {emails.map((email) => (
-          <Chip
-            key={email}
-            label={email}
-            size="small"
-            onDelete={readOnly ? undefined : () => onCommit(emails.filter((e) => e !== email))}
-          />
-        ))}
-      </Box>
-    </div>
-  );
-}
 
 export default function ({ activeNode, onFormDataChange, changedParamIds, readOnly = false, sampleSheetUploadable = true }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
@@ -238,8 +171,8 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     });
 
     // The reserved equipment parameters carry rules the generic required-field pass
-    // cannot express: a date pair that must not invert, an integer floor, and a list of
-    // addresses. Returns nothing at all for a node that has none of them.
+    // cannot express: a date pair that must not invert, and an integer floor.
+    // Returns nothing at all for a node that has none of them.
     Object.assign(errors, validateEquipmentValues(values));
 
     setParamErrors(errors);
@@ -347,7 +280,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
           </AccordionSummary>
           <AccordionDetails>
         <div className="input-params" style={{ marginLeft: 8 }}>
-          {activeNode.data.formData.map((param: any, index: number) => <React.Fragment key={param.id ?? index}>{setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}{wrapChanged(param, (() => {
+          {activeNode.data.formData.map((param: any, index: number) => isRetiredEquipmentParam(param) ? null : <React.Fragment key={param.id ?? index}>{setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}{wrapChanged(param, (() => {
             if (param.paramType !== "result") {
               if (param.type === "date") {
                 const raw = formik.values[param.id];
@@ -406,19 +339,6 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                     />
                     {param.description ? <FormHelperText sx={{ ml: 4, mt: -0.5 }}>{param.description}</FormHelperText> : null}
                   </div>
-                );
-              }
-              if (param.type === "emails") {
-                const emails: string[] = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [];
-                return (
-                  <EmailsField
-                    key={param.id}
-                    param={param}
-                    value={emails}
-                    error={formik.errors[param.id]}
-                    readOnly={readOnly}
-                    onCommit={(next) => formik.setFieldValue(param.id, next)}
-                  />
                 );
               }
               if (param.type === "table") {

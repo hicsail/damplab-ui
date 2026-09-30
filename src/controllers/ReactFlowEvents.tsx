@@ -3,7 +3,6 @@ import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import {
     RUN_COUNT_PARAM_ID,
     RUN_COUNT_PARAM_NAME,
-    EQUIPMENT_BOOKERS_PARAM_ID,
     EQUIPMENT_END_PARAM_ID,
     EQUIPMENT_HOURS_PER_WEEK_PARAM_ID,
     EQUIPMENT_OPEN_END_PARAM_ID,
@@ -50,7 +49,7 @@ export const RUN_COUNT_PARAM_DEF = {
 export const serviceIsEquipmentUse = (service: any): boolean => service?.equipmentUse === true;
 
 /**
- * The five reserved equipment parameters as the sidebar's parameter list sees them.
+ * The four reserved equipment parameters as the sidebar's parameter list sees them.
  *
  * Deliberately not stored on the service: they are identical for every operation
  * that books equipment, and the ids are the lookup keys the booking and invoicing
@@ -98,16 +97,6 @@ export const EQUIPMENT_PARAM_DEFS: any[] = [
         options            : null,
         allowMultipleValues: false,
     },
-    {
-        id                 : EQUIPMENT_BOOKERS_PARAM_ID,
-        name               : EQUIPMENT_PARAM_NAMES[EQUIPMENT_BOOKERS_PARAM_ID],
-        type               : 'emails',
-        required           : false,
-        description        : 'Who else may book this equipment against this job. Optional.',
-        paramType          : 'input',
-        options            : null,
-        allowMultipleValues: false,
-    },
 ];
 
 /** The value an equipment form entry starts life with, per reserved id. */
@@ -116,10 +105,9 @@ const EQUIPMENT_INITIAL_VALUES: Record<string, any> = {
     [EQUIPMENT_END_PARAM_ID]          : '',
     [EQUIPMENT_OPEN_END_PARAM_ID]     : false,
     [EQUIPMENT_HOURS_PER_WEEK_PARAM_ID]: '',
-    [EQUIPMENT_BOOKERS_PARAM_ID]      : [],
 };
 
-/** The same five as form entries, which is where pricing and validation read them from. */
+/** The same four as form entries, which is where pricing and validation read them from. */
 const equipmentFormEntries = (nodeId: string): NodeParameter[] =>
     EQUIPMENT_PARAM_DEFS.map((def) => ({
         id                 : def.id,
@@ -138,7 +126,7 @@ const equipmentFormEntries = (nodeId: string): NodeParameter[] =>
     }));
 
 /**
- * The sidebar's parameter list, with the five appended when the node has them.
+ * The sidebar's parameter list, with the four appended when the node has them.
  * RightSidebar reads this list to pin the group to the top, so a node whose formData
  * carries them but whose parameter list does not gets them buried at the bottom.
  */

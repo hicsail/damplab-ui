@@ -1,7 +1,7 @@
 import { generateFormDataFromParams, createNodeObject, serviceAllowsMultipleRuns, withRunCountParam, withEquipmentParams } from './ReactFlowEvents';
 import { getWorkflowsFromGraph } from './GraphHelpers';
 import { NodeParameter } from '../types/CanvasTypes';
-import { EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 import { isSampleSheetParam } from '../utils/sampleSheetValue';
 import { applyNodeChanges, NodeChange } from 'reactflow';
 
@@ -60,11 +60,21 @@ export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId
     const includeEquipment = EQUIPMENT_PARAM_IDS.some((id) => savedById.has(id));
     const fresh = generateFormDataFromParams(parameters ?? [], nodeId, { includeRunCount, includeEquipment });
 
-    return fresh.map((param, index) => {
+    const merged = fresh.map((param, index) => {
         const matched = savedById.has(param.id) ? savedById.get(param.id) : savedList[index]?.value;
         if (matched === undefined || matched === null) return param;
         return { ...param, value: matched };
     });
+
+    // The retired booker list is no longer generated, but a node that stored one
+    // keeps it exactly as saved: the server's parametersDiffer counts a vanished
+    // non-empty value as an edit, and the design keeps stored values as they are.
+    // The form hides it (isRetiredEquipmentParam) and nothing reads it.
+    const retired = savedList.find((entry: any) => entry && entry.id === EQUIPMENT_BOOKERS_PARAM_ID);
+    if (retired && !merged.some((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID)) {
+        merged.push({ ...retired, id: EQUIPMENT_BOOKERS_PARAM_ID, nodeId, value: retired.value } as NodeParameter);
+    }
+    return merged;
 };
 
 /**

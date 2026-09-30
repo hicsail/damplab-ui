@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { diffJobGraphs, pickJobDiffBaseline, currentDiffPair, selectedDiffPair, latestContentVersion, latestVersion, jobStateLabel, jobStateColor, jobVersionDisplayLabel, jobVersionChip, JobVersionLike, SnapshotWorkflow } from './jobGraphDiff';
-import { EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_OPEN_END_PARAM_ID, EQUIPMENT_START_PARAM_ID, RUN_COUNT_PARAM_ID } from './servicePricing';
+import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_OPEN_END_PARAM_ID, EQUIPMENT_START_PARAM_ID, RUN_COUNT_PARAM_ID } from './servicePricing';
 
 function node(id: string, params: Record<string, any> = {}, over: Record<string, any> = {}) {
   return {
@@ -475,6 +475,14 @@ describe('the version a job page lands on', () => {
 });
 
 describe('diffJobGraphs — equipment parameters', () => {
+  it('ignores the retired booker list entirely', () => {
+    const before = [workflow([node('a', {}, { formData: [{ id: 'vol', value: 10 }, { id: EQUIPMENT_BOOKERS_PARAM_ID, value: ['a@b.com'] }] })])];
+    const after = [workflow([node('a', {}, { formData: [{ id: 'vol', value: 10 }] })])];
+    expect(diffJobGraphs(before, after).hasChanges).toBe(false);
+    const changedList = [workflow([node('a', {}, { formData: [{ id: 'vol', value: 10 }, { id: EQUIPMENT_BOOKERS_PARAM_ID, value: ['z@b.com'] }] })])];
+    expect(diffJobGraphs(before, changedList).hasChanges).toBe(false);
+  });
+
   it('reports a moved end date as a value change on that one parameter', () => {
     const before = [workflow([node('a', { [EQUIPMENT_START_PARAM_ID]: '2026-01-01', [EQUIPMENT_END_PARAM_ID]: '2026-01-29' })])];
     const after = [workflow([node('a', { [EQUIPMENT_START_PARAM_ID]: '2026-01-01', [EQUIPMENT_END_PARAM_ID]: '2026-02-05' })])];

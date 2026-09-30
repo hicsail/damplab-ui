@@ -7,7 +7,7 @@ import {
   EQUIPMENT_PARAM_IDS,
   EQUIPMENT_START_PARAM_ID
 } from './servicePricing';
-import { hasEquipmentParams, invalidBookerEmails, normalizeBookerEmails, orderEquipmentFirst, validateEquipmentValues } from './equipmentParams';
+import { hasEquipmentParams, isRetiredEquipmentParam, orderEquipmentFirst, validateEquipmentValues } from './equipmentParams';
 
 const values = (over: Record<string, any> = {}) => ({
   [EQUIPMENT_START_PARAM_ID]: '2026-01-01',
@@ -16,27 +16,6 @@ const values = (over: Record<string, any> = {}) => ({
   [EQUIPMENT_HOURS_PER_WEEK_PARAM_ID]: 10,
   [EQUIPMENT_BOOKERS_PARAM_ID]: [],
   ...over
-});
-
-describe('normalizeBookerEmails', () => {
-  it('trims, lowercases, drops blanks and deduplicates', () => {
-    expect(normalizeBookerEmails([' A@B.com ', 'a@b.com', '', '  ', 'c@d.org'])).toEqual(['a@b.com', 'c@d.org']);
-  });
-
-  it('accepts a single string and anything unusable as empty', () => {
-    expect(normalizeBookerEmails('A@B.com')).toEqual(['a@b.com']);
-    expect(normalizeBookerEmails(undefined)).toEqual([]);
-    expect(normalizeBookerEmails(null)).toEqual([]);
-    expect(normalizeBookerEmails(7)).toEqual([]);
-  });
-});
-
-describe('invalidBookerEmails', () => {
-  it('names only the entries that are not addresses', () => {
-    expect(invalidBookerEmails(['a@b.com', 'nope', 'x@y'])).toEqual(['nope', 'x@y']);
-    expect(invalidBookerEmails(['a@b.com'])).toEqual([]);
-    expect(invalidBookerEmails([])).toEqual([]);
-  });
 });
 
 describe('validateEquipmentValues', () => {
@@ -76,9 +55,8 @@ describe('validateEquipmentValues', () => {
     expect(validateEquipmentValues(values({ [EQUIPMENT_BOOKERS_PARAM_ID]: [] }))).toEqual({});
   });
 
-  it('names every malformed booker email', () => {
-    const errors = validateEquipmentValues(values({ [EQUIPMENT_BOOKERS_PARAM_ID]: ['a@b.com', 'nope'] }));
-    expect(errors[EQUIPMENT_BOOKERS_PARAM_ID]).toBe('Not a valid email address: nope');
+  it('never validates the retired booker list, so a stored typo cannot block submission', () => {
+    expect(validateEquipmentValues(values({ [EQUIPMENT_BOOKERS_PARAM_ID]: ['a@b.com', 'nope'] }))).toEqual({});
   });
 
   it('refuses a malformed date outright', () => {
@@ -87,7 +65,7 @@ describe('validateEquipmentValues', () => {
 });
 
 describe('orderEquipmentFirst', () => {
-  it('pulls the five to the front in their pinned order and keeps the rest as they were', () => {
+  it('pulls the four to the front in their pinned order and keeps the rest as they were', () => {
     const entries = [{ id: 'vol' }, { id: EQUIPMENT_HOURS_PER_WEEK_PARAM_ID }, { id: 'buf' }, { id: EQUIPMENT_START_PARAM_ID }];
     expect(orderEquipmentFirst(entries).map((e) => e.id)).toEqual([
       EQUIPMENT_START_PARAM_ID,
@@ -108,5 +86,13 @@ describe('hasEquipmentParams', () => {
     expect(hasEquipmentParams([{ id: 'vol' }])).toBe(false);
     expect(hasEquipmentParams([{ id: 'vol' }, { id: EQUIPMENT_PARAM_IDS[0] }])).toBe(true);
     expect(hasEquipmentParams(undefined)).toBe(false);
+  });
+});
+
+describe('isRetiredEquipmentParam', () => {
+  it('is true only for the retired booker list', () => {
+    expect(isRetiredEquipmentParam({ id: EQUIPMENT_BOOKERS_PARAM_ID })).toBe(true);
+    expect(isRetiredEquipmentParam({ id: EQUIPMENT_START_PARAM_ID })).toBe(false);
+    expect(isRetiredEquipmentParam(null)).toBe(false);
   });
 });
