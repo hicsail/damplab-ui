@@ -176,17 +176,19 @@ export default function Inventory() {
     });
   }, [items, heldBy, bookedNow, filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Group filtered items by type.
+  // Group filtered items by first tag (finer categorisation from bulk upload),
+  // falling back to type for items without tags.
   const grouped = useMemo(() => {
     const groups: Record<string, InventoryItemRow[]> = {};
     for (const it of filteredItems) {
-      const key = it.type || 'OTHER';
+      const key = (it as any).tags?.[0] || it.type || 'OTHER';
       (groups[key] ||= []).push(it);
     }
-    for (const k of Object.keys(groups)) {
-      groups[k].sort((a, b) => a.name.localeCompare(b.name));
+    const sorted: Record<string, InventoryItemRow[]> = {};
+    for (const k of Object.keys(groups).sort()) {
+      sorted[k] = groups[k].sort((a, b) => a.name.localeCompare(b.name));
     }
-    return groups;
+    return sorted;
   }, [filteredItems]);
 
   const inUseCount = useMemo(() => filteredItems.filter((i) => isBusy(i.id)).length, [filteredItems, heldBy, bookedNow]); // eslint-disable-line react-hooks/exhaustive-deps

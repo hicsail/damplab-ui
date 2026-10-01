@@ -1,5 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Link, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Link, Stack, Tooltip, Typography } from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import BuildOutlinedIcon from '@mui/icons-material/BuildOutlined';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -212,7 +213,7 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
 
       {protocol && protocol.steps.length > 0 && (
         <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-          {protocol.steps.map((step) => {
+          {protocol.steps.map((step, stepIndex) => {
             if (headers.has(step.id)) {
               return (
                 <Box
@@ -237,6 +238,15 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
               );
             }
             const checked = done.has(step.id);
+            // Enforce sequential order: a step can only be checked if all
+            // previous steps are already done, and unchecked only if no
+            // later steps are still done.
+            const prevDone = stepIndex === 0 || done.has(protocol.steps[stepIndex - 1].id);
+            const nextUndone = stepIndex === protocol.steps.length - 1 || !done.has(protocol.steps[stepIndex + 1].id);
+            const canCheck = !checked && prevDone;
+            const canUncheck = checked && nextUndone;
+            const enabled = canCheck || canUncheck;
+            const lockReason = !enabled && !checked ? 'Complete the previous step first' : !enabled && checked ? 'Uncheck later steps first' : '';
             return (
               <Box
                 key={step.id}
@@ -249,15 +259,21 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
                   borderColor: 'divider',
                   alignItems: 'flex-start',
                   bgcolor: checked ? 'success.light' : 'transparent',
+                  opacity: !enabled && !checked ? 0.5 : 1,
                   '&:last-of-type': { borderBottom: 'none' }
                 }}
               >
-                <Checkbox
-                  size="small"
-                  checked={checked}
-                  onChange={(e) => onToggleStep(step.id, e.target.checked)}
-                  sx={{ mt: -0.5 }}
-                />
+                <Tooltip title={lockReason} disableHoverListener={enabled}>
+                  <span>
+                    <Checkbox
+                      size="small"
+                      checked={checked}
+                      disabled={!enabled}
+                      onChange={(e) => onToggleStep(step.id, e.target.checked)}
+                      sx={{ mt: -0.5 }}
+                    />
+                  </span>
+                </Tooltip>
                 <Box sx={{ flex: 1, minWidth: 0, opacity: checked ? 0.7 : 1 }}>
                   {step.number && (
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>

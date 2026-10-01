@@ -16,6 +16,7 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -337,9 +338,13 @@ export default function TechnicianBench() {
                   {/* Actions */}
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
                     {st === 'QUEUED' && (
-                      <Button size="small" variant="contained" startIcon={<PlayArrowIcon />} onClick={() => handleStateChange(op._id, 'IN_PROGRESS')} sx={{ textTransform: 'none' }}>
-                        Start
-                      </Button>
+                      <Tooltip title={op.isReadyToStart === false ? 'Predecessor operations must be completed first' : ''} disableHoverListener={op.isReadyToStart !== false}>
+                        <span>
+                          <Button size="small" variant="contained" startIcon={<PlayArrowIcon />} onClick={() => handleStateChange(op._id, 'IN_PROGRESS')} disabled={op.isReadyToStart === false} sx={{ textTransform: 'none' }}>
+                            Start
+                          </Button>
+                        </span>
+                      </Tooltip>
                     )}
                     {st === 'IN_PROGRESS' && (
                       <Button size="small" variant="contained" color="success" startIcon={<CheckCircleIcon />} onClick={() => handleStateChange(op._id, 'COMPLETE')} sx={{ textTransform: 'none' }}>
