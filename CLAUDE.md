@@ -91,6 +91,47 @@ lab rather than letting them discover it.
 Order: merge → `:main` → staging (steps 1–6) → smoke-test on staging → tag `v*`
 → `:prod` → prod (steps 1–6) → deploy prod UI.
 
+### The `backfill-*` scripts (and `migrate-inventory-types`)
+
+Same place in the flow (after step 1's pull, before step 6), but **not** through
+`run()` above. These take only `--dry` (or nothing, which writes) and refuse any
+other flag, so skip the `--verify` steps. And `backfill-parameter-snapshots` also
+converts staff-submitted jobs to their client, which needs the Keycloak Admin API:
+`run()` passes only `MONGO_URI`, so that half would print a warning and be skipped.
+Run them through compose instead, which gives the container the backend service's
+whole environment (Mongo and Keycloak) on the image just pulled:
+
+```bash
+bf() {  # usage: bf <script> "<flags>"
+  aws ssm send-command --region us-east-1 --instance-ids "$INSTANCE" \
+    --document-name "AWS-RunShellScript" \
+    --parameters "commands=[\"cd /home/ubuntu/damplab && sudo docker compose run --rm --no-deps \
+      damplab-backend node $1 $2\"]"
+}
+
+# 0. Fresh dump first. The scheduled backup is weekly; these write in place with no undo.
+aws ssm send-command --region us-east-1 --instance-ids "$INSTANCE" \
+  --document-name "AWS-RunShellScript" \
+  --parameters 'commands=["sudo docker exec damplab-backend-db-1 mongodump --quiet --db damplab --archive --gzip > /home/ubuntu/pre-backfill-$(date +%F).archive.gz"]'
+
+bf dist/sow/backfill-sow-client-email.js "--dry"           # SOWs carrying the technician's address
+bf dist/sow/backfill-sow-client-email.js ""
+bf dist/workflow/backfill-parameter-snapshots.js "--dry"   # one line per job that changes owner
+bf dist/workflow/backfill-parameter-snapshots.js ""
+```
+
+Read each dry run before applying. `backfill-parameter-snapshots` must print a
+`--- staff-submitted job ownership ---` block; if it prints "Keycloak Admin API
+is not configured" instead, the conversion did not run. Every line in its dry run
+is a job that will become that client's: check them. The SOW backfill lists any
+corrected SOW already issued to a customer; its stored text keeps the old address
+until reissued. Both are idempotent and independent of order.
+
+`dist/inventory/migrate-inventory-types.js` maps only the old ROBOT / MACHINE /
+INSTRUMENT / OTHER values to EQUIPMENT and lists every other type as left alone.
+`type` has been free text since #72, so it is probably not needed: run `--dry`,
+and apply only if it reports something to migrate.
+
 ## AWS access
 
 IAM user `asad2` (account `135854645631`) has SSM access to both instances and
