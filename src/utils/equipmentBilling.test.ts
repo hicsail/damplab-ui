@@ -247,7 +247,7 @@ describe('paymentsCardFigures', () => {
   it('states no charges, balance or deposit until an invoice is issued (behaviour 11)', () => {
     const f = paymentsCardFigures([{ kind: 'STATEMENT', subtotal: 800, status: 'VOID' }], payments);
     expect(f).toEqual({ invoice: null, charges: null, payments: 150.1, balance: null, deposit: null });
-    expect(NO_INVOICE_ISSUED).toBe('No invoice issued yet');
+    expect(NO_INVOICE_ISSUED).toBe('No invoice');
   });
 
   it("reads the current invoice's charges and deposit, and live non-voided payments (behaviour 12)", () => {

@@ -207,7 +207,6 @@ export default () => {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Chip size="small" label={`${filteredServices.length} results`} />
-                {canSeeHidden && <ShowHiddenOperationsToggle showHidden={showHidden} setShowHidden={setShowHidden} />}
               </Box>
               <Tooltip title="Shortcut: press / to focus search">
                 <Typography variant="caption" color="text.secondary">Press / to search</Typography>
@@ -280,6 +279,11 @@ export default () => {
                 No services match your filters. Clear search or choose a different category.
               </Typography>
             ) : null}
+            {canSeeHidden && (
+              <Box sx={{ mt: 2, width: '100%' }}>
+                <ShowHiddenOperationsToggle showHidden={showHidden} setShowHidden={setShowHidden} />
+              </Box>
+            )}
           </div>
           ) : (
           <div>

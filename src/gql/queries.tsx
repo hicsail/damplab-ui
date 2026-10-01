@@ -1148,6 +1148,12 @@ export const GET_SOW_BY_JOB_ID = gql`
         status
         visibleToCustomer
         sourceJobVersionNumber
+        fields {
+          key
+          label
+          value
+          isEnabled
+        }
       }
       actionGate {
         canSign
