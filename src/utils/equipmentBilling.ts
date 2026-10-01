@@ -305,7 +305,7 @@ export function confirmedUsageSuffix(balance: { confirmedHours?: number | null; 
 }
 
 /** What the Payments card says in place of figures until the lab issues an invoice. */
-export const NO_INVOICE_ISSUED = 'No invoiceinvoice';
+export const NO_INVOICE_ISSUED = 'No invoice';
 
 export interface PaymentsCardDeposit {
   label?: string | null;
