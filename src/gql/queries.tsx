@@ -26,6 +26,9 @@ export const GET_SERVICES = gql`
       equipmentUse
       icon
       parameters
+      ownParameters
+      parameterSetIds
+      hiddenFromClients
       description
       paramGroups
       deliverables
@@ -60,6 +63,7 @@ export const GET_CATALOG_SERVICES = gql`
       price
       pricingModeLabel
       parameterCount
+      hiddenFromClients
       pricing {
         internal
         externalAcademic
@@ -132,6 +136,16 @@ export const GET_JOB_BY_ID = gql`
       clientDisplayName
       institute
       email
+      sub
+      clientEmail
+      primaryClientEmail
+      memberEmails
+      description
+      submittedBy {
+        sub
+        email
+        name
+      }
       customerCategory
       state
       customerActionRequired
@@ -209,6 +223,12 @@ export const GET_JOB_BY_ID = gql`
             }
           }
           formData
+          parameterSnapshot {
+            id
+            name
+            type
+            displayValue
+          }
           state
           additionalInstructions
           usedInventory
@@ -246,6 +266,12 @@ export const GET_JOB_BY_ID = gql`
             serviceId
             serviceName
             formData
+            parameterSnapshot {
+              id
+              name
+              type
+              displayValue
+            }
             additionalInstructions
             price
             position {
@@ -275,6 +301,16 @@ export const GET_OWN_JOB_BY_ID = gql`
       clientDisplayName
       institute
       email
+      sub
+      clientEmail
+      primaryClientEmail
+      memberEmails
+      description
+      submittedBy {
+        sub
+        email
+        name
+      }
       customerCategory
       state
       customerActionRequired
@@ -354,6 +390,12 @@ export const GET_OWN_JOB_BY_ID = gql`
             }
           }
           formData
+          parameterSnapshot {
+            id
+            name
+            type
+            displayValue
+          }
           state
           additionalInstructions
           usedInventory
@@ -391,6 +433,12 @@ export const GET_OWN_JOB_BY_ID = gql`
             serviceId
             serviceName
             formData
+            parameterSnapshot {
+              id
+              name
+              type
+              displayValue
+            }
             additionalInstructions
             price
             position {
@@ -840,6 +888,10 @@ export const UPDATE_SERVICE = gql`
       allowMultipleRuns
       equipmentUse
       icon
+      parameters
+      ownParameters
+      parameterSetIds
+      hiddenFromClients
       deliverables
       notes
       protocolIds
@@ -871,6 +923,9 @@ export const CREATE_SERVICE = gql`
       equipmentUse
       icon
       parameters
+      ownParameters
+      parameterSetIds
+      hiddenFromClients
       description
       paramGroups
       deliverables
@@ -1093,6 +1148,12 @@ export const GET_SOW_BY_JOB_ID = gql`
         status
         visibleToCustomer
         sourceJobVersionNumber
+        fields {
+          key
+          label
+          value
+          isEnabled
+        }
       }
       actionGate {
         canSign
@@ -1678,7 +1739,6 @@ export const GET_JOB_EQUIPMENT_BOOKING = gql`
           rateType
           schedulable
         }
-        bookers
       }
       bookings {
         _id
@@ -1738,6 +1798,7 @@ export const GET_UPLOAD_LOGS = gql`
   query UploadLogs {
     uploadLogs {
       id
+      entityType
       uploaderName
       uploaderSub
       fileName
@@ -1755,6 +1816,7 @@ export const GET_UPLOAD_LOG = gql`
   query UploadLog($id: ID!) {
     uploadLog(id: $id) {
       id
+      entityType
       uploaderName
       uploaderSub
       fileName
@@ -1772,6 +1834,49 @@ export const GET_UPLOAD_LOG = gql`
         after
       }
     }
+  }
+`;
+
+/**
+ * Shared field selection for a Parameter Set, used by both the queries below
+ * and (imported) by the Parameter Set mutations in `mutations.tsx`.
+ */
+export const PARAMETER_SET_FIELDS = `
+  id
+  name
+  description
+  parameters
+  updatedAt
+  usedBy { id name }
+`;
+
+export const GET_PARAMETER_SETS = gql`
+  query GetParameterSets {
+    parameterSets {
+      ${PARAMETER_SET_FIELDS}
+    }
+  }
+`;
+
+export const GET_PARAMETER_SET = gql`
+  query GetParameterSet($id: ID!) {
+    parameterSet(id: $id) {
+      ${PARAMETER_SET_FIELDS}
+      createdAt
+    }
+  }
+`;
+
+/** Soft-deleted operation ids: the operations upload warns rather than errors on these. */
+export const GET_DELETED_SERVICE_IDS = gql`
+  query GetDeletedServiceIds {
+    deletedServiceIds
+  }
+`;
+
+export const GET_CATALOG_EXPORT = gql`
+  query GetCatalogExport {
+    catalogExport
   }
 `;
 

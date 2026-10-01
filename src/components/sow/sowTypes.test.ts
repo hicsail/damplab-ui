@@ -18,6 +18,7 @@ import {
   serviceMultiplier,
   serviceUnitCost,
   signingAgreementText,
+  statusColor,
   SowActionGate,
   SowEditorState,
   SowField,
@@ -434,5 +435,19 @@ describe('feeScheduleIsStale: a price corrected in the catalog', () => {
       liveCustomerCategory: 'INTERNAL_CUSTOMERS'
     });
     expect(stale).toBe(false);
+  });
+});
+
+describe('statusColor (behaviour 14)', () => {
+  it('is orange once the customer signs, until the lab countersigns', () => {
+    expect(statusColor('SIGNED')).toBe('warning');
+  });
+
+  it('keeps the other statuses', () => {
+    expect(statusColor('DRAFT')).toBe('default');
+    expect(statusColor('SENT')).toBe('info');
+    expect(statusColor('FINAL')).toBe('success');
+    expect(statusColor('CANCELLED')).toBe('error');
+    expect(statusColor(null)).toBe('default');
   });
 });

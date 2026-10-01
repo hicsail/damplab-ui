@@ -77,8 +77,8 @@ function BookingHistory({ entries }: { entries: any[] }): React.JSX.Element {
  *
  * Every gate has a server-side twin — `jobEquipmentBooking` returns HIDDEN and no
  * data to a caller who is not on the job, and the mutations re-check. Cancel is
- * offered to every customer on the job; the server's own rule (creator, client
- * email, listed booker of that operation) refuses the rest with its message.
+ * offered to every customer on the job; the server's own rule (whoever made the
+ * booking, anyone on the job, or staff) refuses the rest with its message.
  */
 export default function JobEquipmentBookingPanel({ jobId, staffView = false }: Props): React.JSX.Element | null {
   const navigate = useNavigate();

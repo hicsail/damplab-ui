@@ -33,6 +33,7 @@ import RestrictionDigestion from "./services/Restriction Digestion.png";
 import RestrictionLigation from "./services/Restriction Ligation.png";
 import RNASequencingService from "./services/RNA-Sequencing.png";
 import SendSampleToSequencing from "./services/Send Sample to Sequencing.png";
+import DefaultServiceIcon from "./services/Default.svg";
 
 export const ImagesBundlesDict: { [id: string] : string; } = {
     'Modular Assembly and Cloning with Ordering'             : ModularAssemblyAndCloningWithOrdering,
@@ -75,3 +76,55 @@ export const ImagesServicesDict: { [id: string] : string; } = {
     'Next Generation Sequencing'                            : RNASequencingService,
     'Send Sample to Sequencing'                             : SendSampleToSequencing,
 };
+
+// Current catalog names that don't match a key above, mapped to the closest local art.
+// Icons are looked up by service name; the catalog's `icon` URL field is not used because
+// those Google Drive links are access-restricted and render as broken images.
+const ServiceIconAliases: { [id: string] : string; } = {
+    'Modular Cloning (Golden Gate)'                            : ModularCloning,
+    'Restriction Digestion'                                    : RestrictionDigestion,
+    'Gel Electrophoresis w/ Analysis'                          : PerformGelElectrophoresis,
+    'Gel Electrophoresis with Analysis'                        : PerformGelElectrophoresis,
+    'DNA Extraction'                                           : DNARNAExtraction,
+    'RNA Extraction'                                           : DNARNAExtraction,
+    'Glycerol Stocks Storage'                                  : GlycerolStockCreation,
+    'Prepare glycerol stock'                                   : GlycerolStockCreation,
+    'Rehydrate and Suspend Primers in Solution'                : RehydrateDNAOligo,
+    'Ordering DNA Fragments from third-party'                  : OrderingDNA,
+    'Design&order DNA fragments from Third party'              : OrderingDNA,
+    'Design and Order Primers from Third Party'                : DesignAndOrderPrimersFromThirdParty,
+    'Design&order primers+probe from Third party'              : DesignAndOrderPrimersFromThirdParty,
+    'Order primers from Third party'                           : DesignAndOrderPrimersFromThirdParty,
+    'Order primers+probe from Third party'                     : DesignAndOrderPrimersFromThirdParty,
+    'Perform PCR Reaction'                                     : PerformPCR,
+    'Colony PCR'                                               : PerformPCR,
+    'Temperature Gradient Test'                                : PerformPCR,
+    'Perform qPCR Reaction'                                    : QPCR,
+    'Send Sample for sequencing'                               : SendSampleToSequencing,
+    'Illumina NextSeq 2000 Sequencing'                         : RNASequencingService,
+    'Next Gen Sequencing (Illumina) Send-out'                  : RNASequencingService,
+    'Next Gen Sequencing (ONT) Send-out'                       : RNASequencingService,
+    'RNAseq Library prep'                                      : RNASequencingService,
+    '16S/ITS (Amplicon) Library Prep'                          : Library,
+    'Fragment analyzer via Tapestation'                        : Library,
+    'Overnight Innoculum Storage'                              : OvernightCellCulture,
+    'Prepare Liquid Culture Overnight Inoculum'                : PrepareLiquidOvernight,
+    'Heat-Shock Cell Transformation and Plate Verification'    : CellTransformation,
+    'Plasmid DNA Miniprep'                                     : PlasmidDNAMiniprep,
+    'Plasmid DNA Midiprep'                                     : PlasmidDNAMiniprep,
+    'Plasmid DNA Maxiprep'                                     : PlasmidDNAMiniprep,
+    'Plasmid, DNA/RNA, Oligos Storage'                         : PlasmidDNARNAFragmentsAndOligosStorage,
+    'Clean up& concentrate RNA'                                : CleanUpAndConcentrateDNA,
+    'PCR Cleanup'                                              : CleanUpAndConcentrateDNA,
+    'Qubit quantification'                                     : Spectrophotometric,
+    'Nanodop quantification'                                   : Spectrophotometric,
+    'BCA Protein Assay'                                        : Spectrophotometric,
+};
+
+export { DefaultServiceIcon };
+
+/** Local icon for a service name, falling back to a generic flask so nothing renders blank. */
+export function getServiceIcon(name?: string | null): string {
+    if (!name) return DefaultServiceIcon;
+    return ImagesServicesDict[name] ?? ServiceIconAliases[name] ?? DefaultServiceIcon;
+}

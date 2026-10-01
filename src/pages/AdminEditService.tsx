@@ -1,6 +1,7 @@
 import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Checkbox,
@@ -15,6 +16,7 @@ import {
   Select,
   Snackbar,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography
@@ -27,13 +29,14 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { GET_ACTIVE_INVENTORY_ITEMS, UPDATE_SERVICE } from '../gql/queries';
+import { GET_ACTIVE_INVENTORY_ITEMS, GET_PARAMETER_SETS, UPDATE_SERVICE } from '../gql/queries';
 import { AppContext } from '../contexts/App';
 import { DeliverablesEditor } from '../components/edit/DeliverablesEditor';
 import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
-import { formatSaveError } from '../utils/gqlError';
+import { formatGqlError, formatSaveError } from '../utils/gqlError';
 import { EQUIPMENT_USE_NEEDS_BOOKABLE_MESSAGE } from '../utils/equipmentParams';
+import { idsFromSetRefs, setRefsForIds, setRefsFrom } from '../utils/serviceParameters';
 
 const MENU_PROPS = {
   PaperProps: {
@@ -71,11 +74,15 @@ export default function AdminEditService() {
   const [fallbackPrice, setFallbackPrice] = useState('');
   const [allowedConnectionIds, setAllowedConnectionIds] = useState<string[]>([]);
   const [inventoryRequirementIds, setInventoryRequirementIds] = useState<string[]>([]);
+  const [parameterSetIds, setParameterSetIds] = useState<string[]>([]);
+  const [hiddenFromClients, setHiddenFromClients] = useState(false);
   const { data: inventoryData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
   const inventoryOptions: Array<{ id: string; name: string; type?: string; bookable?: boolean }> = useMemo(
     () => (inventoryData?.activeInventoryItems ?? []).map((i: any) => ({ id: String(i.id), name: i.name, type: i.type, bookable: i.bookable === true })),
     [inventoryData]
   );
+  const { data: setsData, error: setsError } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
+  const allSets = useMemo(() => setRefsFrom(setsData), [setsData]);
   /**
    * The editor's copy of the server's rule, shown before the save rather than after
    * it. The save is not disabled — the server is the authority and refuses the write
@@ -162,6 +169,8 @@ export default function AdminEditService() {
     );
     setDeliverables(Array.isArray(row.deliverables) ? [...row.deliverables] : []);
     setNotes(typeof row.notes === 'string' ? row.notes : '');
+    setHiddenFromClients(row.hiddenFromClients === true);
+    setParameterSetIds((row.parameterSetIds ?? []).map(String));
     // protocolIds is the ordered execution sequence. Older/cached rows may only
     // carry the deprecated single protocolId — seed from it in that case.
     const rawProtocolIds = Array.isArray(row.protocolIds)
@@ -263,14 +272,15 @@ export default function AdminEditService() {
       pricingMode,
       allowMultipleRuns,
       equipmentUse,
-      parameters: row.parameters ?? [],
       paramGroups: row.paramGroups ?? [],
       allowedConnections: allowedConnectionIds,
       inventoryRequirements: inventoryRequirementIds,
       description: description.trim(),
       deliverables,
       notes: notes.trim(),
-      protocolIds: protocolIds.map((p) => extractProtocolId(p)).filter((p) => !!p)
+      protocolIds: protocolIds.map((p) => extractProtocolId(p)).filter((p) => !!p),
+      parameterSetIds,
+      hiddenFromClients
     };
 
     try {
@@ -516,12 +526,37 @@ export default function AdminEditService() {
         label="Equipment use"
       />
       <FormHelperText sx={{ mt: -1.5, ml: 4 }}>
-        Marks this as an equipment-booking operation. Its canvas nodes gain Start Date, End Date, Open End Date?,
-        Projected Hours per Week and Authorized booker emails, and its SOW line is estimated as the hourly rate
+        Marks this as an equipment-booking operation. Its canvas nodes gain Start Date, End Date, Open End Date? and
+        Projected Hours per Week, and its SOW line is estimated as the hourly rate
         multiplied by hours per week and the number of weeks. Requires at least one bookable item under Required
         inventory. Operations already on submitted jobs are unaffected.
       </FormHelperText>
       {equipmentUseWarning ? <Alert severity="warning">{equipmentUseWarning}</Alert> : null}
+
+      <FormControlLabel
+        control={<Switch checked={hiddenFromClients} onChange={(event) => setHiddenFromClients(event.target.checked)} />}
+        label="Hidden from clients"
+      />
+      <FormHelperText sx={{ mt: -1 }}>
+        Retires the operation for clients: existing jobs keep it, but clients can no longer add it to a new job or see it in the catalog.
+      </FormHelperText>
+
+      {setsError ? (
+        <Alert severity="warning">Failed to load parameter sets: {formatGqlError(setsError)}</Alert>
+      ) : null}
+
+      <Autocomplete
+        multiple
+        options={allSets}
+        value={setRefsForIds(parameterSetIds, allSets)}
+        onChange={(_event, value) => setParameterSetIds(idsFromSetRefs(value))}
+        getOptionLabel={(option) => option.name}
+        isOptionEqualToValue={(a, b) => a.id === b.id}
+        filterSelectedOptions
+        renderInput={(params) => (
+          <TextField {...params} label="Parameter sets" helperText="Their parameters follow this operation's own, in the order chosen here. Edit them under Parameter Sets." />
+        )}
+      />
 
       <Box
         sx={{

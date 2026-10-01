@@ -16,6 +16,8 @@ interface Props {
   staffBadge: PartyBadge;
   /** Omitted on the customer's job page — see PartyStatusRail. */
   customerVersion?: string;
+  /** Replaces the rail's "Customer" caption. */
+  customerLabel?: string;
   staffVersion?: string;
   statusPane: React.ReactNode;
   statusPaneSx?: object;
@@ -41,6 +43,7 @@ export default function ProcessCard({
   customerBadge,
   staffBadge,
   customerVersion,
+  customerLabel,
   staffVersion,
   statusPane,
   statusPaneSx,
@@ -123,6 +126,7 @@ export default function ProcessCard({
               customerBadge={customerBadge}
               staffBadge={staffBadge}
               customerVersion={customerVersion}
+              customerLabel={customerLabel}
               staffVersion={staffVersion}
             />
             {actions && (

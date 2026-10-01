@@ -3,6 +3,7 @@
 // reached from `root.tsx` (HeaderBar -> AppNavDrawer -> useHomeMenuNavigate), which is
 // where that started to matter.
 import { gql } from "@apollo/client/index.js";
+import { PARAMETER_SET_FIELDS } from './queries';
 
 export const CREATE_JOB = gql`
   mutation createJob($createJobInput: CreateJobInput!) {
@@ -1254,6 +1255,58 @@ export const REPLACE_SAMPLE_SHEET = gql`
     replaceSampleSheet(input: $input) {
       _id
       formData
+    }
+  }
+`;
+
+export const CREATE_PARAMETER_SET = gql`
+  mutation CreateParameterSet($parameterSet: CreateParameterSet!) {
+    createParameterSet(parameterSet: $parameterSet) {
+      ${PARAMETER_SET_FIELDS}
+    }
+  }
+`;
+
+export const UPDATE_PARAMETER_SET = gql`
+  mutation UpdateParameterSet($id: ID!, $changes: ParameterSetChange!) {
+    updateParameterSet(id: $id, changes: $changes) {
+      ${PARAMETER_SET_FIELDS}
+    }
+  }
+`;
+
+export const DELETE_PARAMETER_SET = gql`
+  mutation DeleteParameterSet($id: ID!) {
+    deleteParameterSet(id: $id)
+  }
+`;
+
+// Job collaborators and description
+export const ADD_JOB_MEMBER = gql`
+  mutation AddJobMember($jobId: ID!, $email: String!) {
+    addJobMember(jobId: $jobId, email: $email) {
+      id
+      memberEmails
+      primaryClientEmail
+    }
+  }
+`;
+
+export const REMOVE_JOB_MEMBER = gql`
+  mutation RemoveJobMember($jobId: ID!, $email: String!) {
+    removeJobMember(jobId: $jobId, email: $email) {
+      id
+      memberEmails
+      primaryClientEmail
+    }
+  }
+`;
+
+export const SET_JOB_DESCRIPTION = gql`
+  mutation SetJobDescription($jobId: ID!, $description: String) {
+    setJobDescription(jobId: $jobId, description: $description) {
+      id
+      description
     }
   }
 `;

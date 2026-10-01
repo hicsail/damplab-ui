@@ -168,19 +168,18 @@ export const formatParamValue = (rawValue: any): string => {
  * The default an injected parameter takes when a snapshot predates it — the same
  * value buildNodeParameters seeds at node creation. Without these, adding the
  * equipment flag to a service would make every older job version look like it had
- * five parameters added.
+ * four parameters added.
  */
 const INJECTED_PARAM_DEFAULTS: Array<{ id: string; value: any }> = [
     { id: RUN_COUNT_PARAM_ID, value: 1 },
     { id: EQUIPMENT_START_PARAM_ID, value: '' },
     { id: EQUIPMENT_END_PARAM_ID, value: '' },
     { id: EQUIPMENT_OPEN_END_PARAM_ID, value: false },
-    { id: EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, value: '' },
-    { id: EQUIPMENT_BOOKERS_PARAM_ID, value: [] }
+    { id: EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, value: '' }
 ];
 
 /**
- * Whether a formData entry for a reserved id (run count or one of the five
+ * Whether a formData entry for a reserved id (run count or one of the four
  * equipment parameters) carries a real label of its own, rather than needing
  * the fixed one substituted in. A `__…` id is never a real label — the shared
  * test fixture stamps every entry's `name` as its own id, and R4 treats that
@@ -195,6 +194,9 @@ const paramEntries = (formData: any): Map<string, any> => {
             if (entry && typeof entry.id === 'string') entries.set(entry.id, entry);
         }
     }
+    // Retired and invisible: a stored booker list never reads as an edit.
+    entries.delete(EQUIPMENT_BOOKERS_PARAM_ID);
+
     // An absent run count or equipment parameter means the default value, so a
     // snapshot taken before the universal run-count entry (or the equipment
     // parameters) existed must compare equal to one that spells the default

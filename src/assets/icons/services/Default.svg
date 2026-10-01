@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 150" width="120" height="150">
+  <g stroke="#6b2a30" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+    <!-- flask body -->
+    <path d="M46 14 H74 M50 14 V56 L16 126 Q12 136 22 136 H98 Q108 136 104 126 L70 56 V14" fill="#eafdff"/>
+    <!-- liquid -->
+    <path d="M33 92 H87 L104 126 Q108 136 98 136 H22 Q12 136 16 126 Z" fill="#9db3d6"/>
+    <!-- bubbles -->
+    <circle cx="48" cy="114" r="6" fill="#d2f7d0"/>
+    <circle cx="70" cy="120" r="4" fill="#fdf8c8"/>
+    <circle cx="62" cy="104" r="3.5" fill="#e97a7c"/>
+  </g>
+</svg>

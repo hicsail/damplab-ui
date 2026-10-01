@@ -12,8 +12,10 @@ import {
   Divider,
   FormControlLabel,
   Link as MuiLink,
+  MenuItem,
   Stack,
   Switch,
+  TextField,
   Tooltip,
   Typography
 } from '@mui/material';
@@ -90,6 +92,36 @@ export function nextOperationsPerWorkflow(operations: any[]): any[] {
   });
 }
 
+/** Sentinel for the job filter's "every job" option. */
+export const ALL_JOBS = '';
+
+/**
+ * One option per job that has an operation on the bench, in first-seen order,
+ * labelled "Name · #jobId". Operations without a job are left out: there is
+ * nothing to name them by, and "All jobs" still shows them.
+ */
+export function jobOptionsFromOperations(operations: any[]): Array<{ id: string; label: string; count: number }> {
+  const byId = new Map<string, { id: string; label: string; count: number }>();
+  for (const op of operations) {
+    const job = op?.job;
+    if (!job?.id) continue;
+    const existing = byId.get(job.id);
+    if (existing) {
+      existing.count += 1;
+      continue;
+    }
+    const label = `${job.name || 'Job'}${job.jobId ? ` · #${job.jobId}` : ''}`;
+    byId.set(job.id, { id: job.id, label, count: 1 });
+  }
+  return Array.from(byId.values());
+}
+
+/** The operations belonging to one job, or all of them for ALL_JOBS. */
+export function operationsForJob(operations: any[], jobId: string): any[] {
+  if (jobId === ALL_JOBS) return operations;
+  return operations.filter((op) => op?.job?.id === jobId);
+}
+
 /** Build a paramId -> display name lookup from a service's parameter definitions. */
 function paramNameLookup(parameters: any): Record<string, string> {
   const out: Record<string, string> = {};
@@ -101,10 +133,29 @@ function paramNameLookup(parameters: any): Record<string, string> {
   return out;
 }
 
+/**
+ * paramId -> (option id -> option name) for dropdown parameters. A dropdown
+ * stores the option's id ("1-kb-plus-ladder"), which is not what anyone reads.
+ */
+export function optionLabelLookup(parameters: any): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {};
+  if (Array.isArray(parameters)) {
+    for (const p of parameters) {
+      if (!p || typeof p.id !== 'string' || !Array.isArray(p.options)) continue;
+      out[p.id] = {};
+      for (const o of p.options) {
+        if (o && o.id != null) out[p.id][String(o.id)] = String(o.name ?? o.id);
+      }
+    }
+  }
+  return out;
+}
+
 /** Format a single formData value (string | string[] | file object) for display. */
-function formatValue(value: any): string {
+export function formatValue(value: any, optionLabels?: Record<string, string>): string {
   if (value === null || value === undefined || value === '') return '—';
-  if (Array.isArray(value)) return value.map((v) => formatValue(v)).join(', ');
+  if (Array.isArray(value)) return value.map((v) => formatValue(v, optionLabels)).join(', ');
+  if (optionLabels && typeof value === 'string' && optionLabels[value]) return optionLabels[value];
   if (typeof value === 'object') return String(value.filename || value.name || JSON.stringify(value));
   return String(value);
 }
@@ -141,10 +192,18 @@ export default function TechnicianBench() {
     return ops;
   }, [data]);
 
+  // Options come from every assigned operation, not the "next only" subset, so
+  // a job stays pickable while all of its work is waiting on earlier steps.
+  const jobOptions = useMemo(() => jobOptionsFromOperations(allOperations), [allOperations]);
+  const [selectedJobId, setSelectedJobId] = useState<string>(ALL_JOBS);
+  // A job whose last operation left the bench (reassigned, or its job removed) falls back to all.
+  const jobFilter = jobOptions.some((j) => j.id === selectedJobId) ? selectedJobId : ALL_JOBS;
+  const jobOperations = useMemo(() => operationsForJob(allOperations, jobFilter), [allOperations, jobFilter]);
+
   // Sorted before filtering, so "the next one" in a workflow is the in-progress
   // operation where there is one, and the queued one otherwise.
-  const operations = useMemo(() => (nextOnly ? nextOperationsPerWorkflow(allOperations) : allOperations), [allOperations, nextOnly]);
-  const hiddenCount = allOperations.length - operations.length;
+  const operations = useMemo(() => (nextOnly ? nextOperationsPerWorkflow(jobOperations) : jobOperations), [jobOperations, nextOnly]);
+  const hiddenCount = jobOperations.length - operations.length;
 
   const handleStateChange = async (nodeId: string, newState: StateName) => {
     try {
@@ -179,6 +238,23 @@ export default function TechnicianBench() {
             Operations assigned to you. Open the linked protocol, check off steps, record notes and files, and mark work complete as you go.
           </Typography>
         </Box>
+        <TextField
+          select
+          size="small"
+          label="Job"
+          value={jobFilter}
+          onChange={(e) => setSelectedJobId(e.target.value)}
+          sx={{ minWidth: 260, maxWidth: 360 }}
+          SelectProps={{ displayEmpty: true }}
+          InputLabelProps={{ shrink: true }}
+        >
+          <MenuItem value={ALL_JOBS}>All jobs ({allOperations.length})</MenuItem>
+          {jobOptions.map((j) => (
+            <MenuItem key={j.id} value={j.id}>
+              {j.label} ({j.count})
+            </MenuItem>
+          ))}
+        </TextField>
         <FormControlLabel
           control={<Switch size="small" checked={nextOnly} onChange={(e) => handleNextOnlyChange(e.target.checked)} />}
           label={<Typography variant="body2">Next step only</Typography>}
@@ -202,7 +278,7 @@ export default function TechnicianBench() {
 
       {!loading && operations.length === 0 && (
         <Alert severity="info">
-          {allOperations.length > 0
+          {jobOperations.length > 0
             ? 'Nothing on your bench is ready to start — every operation assigned to you is waiting on earlier work, or is already complete. Turn off “Next step only” to see them all.'
             : 'You have no operations assigned to you right now. Operations are assigned from the Lab Monitor.'}
         </Alert>
@@ -231,6 +307,7 @@ export default function TechnicianBench() {
           const serverSteps: string[] = Array.isArray(op.completedSteps) ? op.completedSteps : [];
           const effectiveSteps = stepOverrides[op._id] ?? serverSteps;
           const names = paramNameLookup(service.parameters);
+          const optionLabels = optionLabelLookup(service.parameters);
           const entries: Array<{ id: string; value: any }> = Array.isArray(op.formData) ? op.formData : [];
 
           return (
@@ -301,7 +378,7 @@ export default function TechnicianBench() {
                               {names[entry.id] || entry.id}
                             </Typography>
                             <Typography component="dd" variant="body2" sx={{ m: 0, wordBreak: 'break-word' }}>
-                              {formatValue(entry.value)}
+                              {formatValue(entry.value, optionLabels[entry.id])}
                             </Typography>
                           </Box>
                         ))}
@@ -314,32 +391,46 @@ export default function TechnicianBench() {
                     )}
                   </Box>
 
-                  {/* Protocols, rendered in the admin-specified execution order */}
-                  {protocolIds.length > 0 ? (
-                    <Stack spacing={2}>
-                      {protocolIds.map((pid, index) => (
-                        <Box key={`${pid}-${index}`}>
-                          <Divider sx={{ mb: 1 }} />
-                          <Typography variant="overline" color="text.secondary" sx={{ display: 'block' }}>
-                            Protocol {index + 1} of {protocolIds.length}
-                          </Typography>
-                          <ProtocolViewer
-                            protocolId={pid}
-                            completedStepIds={effectiveSteps}
-                            onToggleStep={(stepId, done) => handleToggleStep(op._id, serverSteps, stepId, done)}
-                          />
-                        </Box>
-                      ))}
-                    </Stack>
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      No protocol linked to this service.{' '}
-                      {isStaff && <MuiLink component={RouterLink} to={`/edit/services/${service.id}`}>Add one in the service editor.</MuiLink>}
-                    </Typography>
-                  )}
+                  {/* Protocol steps with notes & files beside them; stacked on narrow screens. */}
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 3fr) minmax(260px, 1fr)' },
+                      gap: 2,
+                      alignItems: 'start'
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      {/* Protocols, rendered in the admin-specified execution order */}
+                      {protocolIds.length > 0 ? (
+                        <Stack spacing={2}>
+                          {protocolIds.map((pid, index) => (
+                            <Box key={`${pid}-${index}`}>
+                              <Divider sx={{ mb: 1 }} />
+                              <Typography variant="overline" color="text.secondary" sx={{ display: 'block' }}>
+                                Protocol {index + 1} of {protocolIds.length}
+                              </Typography>
+                              <ProtocolViewer
+                                protocolId={pid}
+                                completedStepIds={effectiveSteps}
+                                onToggleStep={(stepId, done) => handleToggleStep(op._id, serverSteps, stepId, done)}
+                              />
+                            </Box>
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          No protocol linked to this service.{' '}
+                          {isStaff && <MuiLink component={RouterLink} to={`/edit/services/${service.id}`}>Add one in the service editor.</MuiLink>}
+                        </Typography>
+                      )}
+                    </Box>
 
-                  {/* Notes + files (scoped to this operation) */}
-                  {job.id && <CommentsSection jobId={job.id} nodeId={op._id} variant="notes" currentUser={{ email, isStaff }} />}
+                    {/* Notes + files (scoped to this operation) */}
+                    <Box sx={{ minWidth: 0 }}>
+                      {job.id && <CommentsSection jobId={job.id} nodeId={op._id} variant="notes" currentUser={{ email, isStaff }} />}
+                    </Box>
+                  </Box>
                 </Stack>
               </AccordionDetails>
             </Accordion>

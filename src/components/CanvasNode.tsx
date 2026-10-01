@@ -5,7 +5,7 @@ import WarningIcon     from '@mui/icons-material/Warning';
 import CloseIcon       from '@mui/icons-material/Close';
 
 import { CanvasContext } from '../contexts/Canvas';
-import { ImagesServicesDict } from '../assets/icons';
+import { getServiceIcon }   from '../assets/icons';
 import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 
 
@@ -185,7 +185,7 @@ export default memo((input: Input) => {
                             {/* URL (e.g. to Google Drive) from the DB... */}
                             {/* <img src={data.data.icon} alt=" " style={{ width: 30 }} /> */}
                             {/* Local files in src/assets/icons folder... */}
-                            <img src={ImagesServicesDict[data.data.label]} alt=" " style={{ width: 30 }} />
+                            <img src={getServiceIcon(data.data.label)} alt=" " style={{ width: 30 }} />
                         </div>
                         <p style={{ fontSize: 12, marginLeft: 5, marginRight: 5, textDecoration: isGhost ? 'line-through' : 'none' }}>
                             {data.data.label}

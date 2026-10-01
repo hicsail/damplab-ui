@@ -68,7 +68,7 @@ describe('homepage sections match the access matrix', () => {
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
       // "Edit Announcements" is gone: /edit_announcements merged into /announcements,
       // whose editing controls are gated inside the page on announcements:write.
-      'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'Billing', 'AI Lab Assistant'],
+      'Admin Operational Tools': ['Release Notes', 'Catalog Editor', 'Protocol Library', 'Lab Layout', 'Billing', 'AI Lab Assistant'],
       'Admin Management Tools': ['User Management', 'API Keys', 'Data Translation', 'Lab Monitor North', 'Lab Monitor South', 'Lab Status TV'],
     });
   });
@@ -125,7 +125,7 @@ describe('what each role sees', () => {
       'Client Tools': ['Jobs', 'Order Services', 'Catalog', 'Book Inventory', 'Learning Hub', 'Announcements', 'Notification Preferences', 'Bugs', 'Bug Backlog', 'DAMP Lab Website'],
       'Technician Tools': ['My Bench', 'Screener'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
-      'Admin Operational Tools': ['Release Notes', 'Catalog & Inventory Editor', 'Protocol Library', 'Lab Layout', 'AI Lab Assistant'],
+      'Admin Operational Tools': ['Release Notes', 'Catalog Editor', 'Protocol Library', 'Lab Layout', 'AI Lab Assistant'],
       'Admin Management Tools': ['Lab Monitor North', 'Lab Monitor South'],
     });
   });
@@ -158,7 +158,7 @@ describe('what each role sees', () => {
     expect(feed.visible(STAFF)).toBe(true);
 
     // The property the removed pair used to demonstrate, kept on a surviving case:
-    // "Catalog" and "Catalog & Inventory Editor" read alike and gate differently.
+    // "Catalog" and "Catalog Editor" read alike and gate differently.
     const catalog = all.find((i) => i.id === 'catalog')!;
     const editor = all.find((i) => i.id === 'catalog-inventory-editor')!;
     expect(catalog.visible(CLIENT)).toBe(true);

@@ -21,36 +21,14 @@ export const EQUIPMENT_USE_NEEDS_BOOKABLE_MESSAGE =
   'An equipment-use operation needs at least one bookable inventory item in Required inventory.';
 
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
-/** Deliberately simple: this is a typo guard, not an RFC 5322 parser. */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const EQUIPMENT_ID_SET = new Set<string>(EQUIPMENT_PARAM_IDS);
-
-const asList = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value.map((v) => (v == null ? '' : String(v)));
-  if (typeof value === 'string') return [value];
-  return [];
-};
-
-/** Trimmed, lowercased, deduplicated, blanks dropped. */
-export const normalizeBookerEmails = (value: unknown): string[] => {
-  const seen = new Set<string>();
-  for (const raw of asList(value)) {
-    const email = raw.trim().toLowerCase();
-    if (email) seen.add(email);
-  }
-  return [...seen];
-};
-
-/** The normalized entries that are not addresses. */
-export const invalidBookerEmails = (value: unknown): string[] =>
-  normalizeBookerEmails(value).filter((email) => !EMAIL_RE.test(email));
 
 const isBlank = (value: unknown): boolean =>
   value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0);
 
 /**
- * The submission gate for the five reserved parameters, keyed by parameter id.
+ * The submission gate for the four reserved parameters, keyed by parameter id.
  *
  * Returns nothing at all for a node that carries none of them, so Params.tsx can
  * merge it into formik's errors unconditionally. The pricer deliberately does not
@@ -92,13 +70,10 @@ export const validateEquipmentValues = (values: Record<string, any>): Record<str
     }
   }
 
-  const badEmails = invalidBookerEmails(values[EQUIPMENT_BOOKERS_PARAM_ID]);
-  if (badEmails.length) errors[EQUIPMENT_BOOKERS_PARAM_ID] = `Not a valid email address: ${badEmails.join(', ')}`;
-
   return errors;
 };
 
-/** The five first, in their pinned order; everything else in the order it arrived. */
+/** The four first, in their pinned order; everything else in the order it arrived. */
 export const orderEquipmentFirst = <T extends { id?: unknown }>(entries: T[]): T[] => {
   const pinned: T[] = [];
   for (const id of EQUIPMENT_PARAM_IDS) {
@@ -111,3 +86,11 @@ export const orderEquipmentFirst = <T extends { id?: unknown }>(entries: T[]): T
 
 export const hasEquipmentParams = (entries: Array<{ id?: unknown }> | undefined): boolean =>
   Array.isArray(entries) && entries.some((e) => typeof e?.id === 'string' && EQUIPMENT_ID_SET.has(e.id));
+
+/**
+ * Whether a form entry is the retired booker list. The form never renders it — an
+ * old job, or a canvas draft from before the retirement, can still carry one — and
+ * nothing validates it, so a stored typo can never block a submission it cannot show.
+ */
+export const isRetiredEquipmentParam = (entry: { id?: unknown } | null | undefined): boolean =>
+  entry?.id === EQUIPMENT_BOOKERS_PARAM_ID;

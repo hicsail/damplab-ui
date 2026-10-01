@@ -55,6 +55,53 @@ interface ProtocolView {
   steps: ProtocolStep[];
 }
 
+/**
+ * Steps that only title a group of substeps. protocols.io has no header flag:
+ * a section title ("Sample Preparation") is an ordinary step numbered "3" whose
+ * work lives in "3.1", "3.2", … — so a step with substeps is treated as a header
+ * and gets no checkbox.
+ */
+export function headerStepIds(steps: Array<{ id: string; number: string }>): Set<string> {
+  const numbers = steps.map((s) => s.number).filter(Boolean);
+  return new Set(
+    steps.filter((s) => s.number && numbers.some((n) => n.startsWith(`${s.number}.`))).map((s) => s.id)
+  );
+}
+
+/**
+ * Styles for protocols.io step HTML. Its tables arrive unstyled with fixed
+ * `width="100"` header cells, so headers wrap and the grid has no lines.
+ */
+const stepBodySx = {
+  '& p': { m: 0, mb: 0.5 },
+  '& p:empty': { display: 'none' },
+  '& img': { maxWidth: '100%' },
+  '& figure': { m: 0, my: 1 },
+  '& .component-table-container': { overflowX: 'auto', maxWidth: '100%' },
+  '& table': { borderCollapse: 'collapse', width: 'auto', my: 0.5 },
+  '& th, & td': {
+    border: '1px solid',
+    borderColor: 'divider',
+    px: 1.25,
+    py: 0.5,
+    textAlign: 'left',
+    verticalAlign: 'top',
+    width: 'auto',
+  },
+  '& th': { whiteSpace: 'nowrap', bgcolor: 'grey.100', fontWeight: 600 },
+  '& .component-table-legend': { fontSize: '0.8rem', color: 'text.secondary', fontStyle: 'italic', mt: 0.5 },
+  '& .component-note': {
+    bgcolor: 'grey.50',
+    borderLeft: '3px solid',
+    borderColor: 'info.light',
+    px: 1.5,
+    py: 1,
+    borderRadius: 0.5,
+  },
+  fontSize: '0.9rem',
+  wordBreak: 'break-word',
+} as const;
+
 interface ProtocolViewerProps {
   protocolId: string;
   completedStepIds: string[];
@@ -112,8 +159,10 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
 
   const done = new Set(completedStepIds || []);
   const fallbackUrl = `https://www.protocols.io/view/${encodeURIComponent(protocolId)}`;
-  const total = protocol?.steps.length ?? 0;
-  const doneCount = protocol?.steps.filter((s) => done.has(s.id)).length ?? 0;
+  const headers = useMemo(() => headerStepIds(protocol?.steps ?? []), [protocol]);
+  const checkable = (protocol?.steps ?? []).filter((s) => !headers.has(s.id));
+  const total = checkable.length;
+  const doneCount = checkable.filter((s) => done.has(s.id)).length;
 
   return (
     <Box>
@@ -165,6 +214,29 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
       {protocol && protocol.steps.length > 0 && (
         <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           {protocol.steps.map((step, stepIndex) => {
+            if (headers.has(step.id)) {
+              return (
+                <Box
+                  key={step.id}
+                  sx={{
+                    px: 1.5,
+                    py: 0.75,
+                    bgcolor: 'grey.100',
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    '&:last-of-type': { borderBottom: 'none' }
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Step {step.number}
+                  </Typography>
+                  <Box
+                    sx={{ ...stepBodySx, fontWeight: 600, '& p': { m: 0, textAlign: 'left !important' } }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(step.html) }}
+                  />
+                </Box>
+              );
+            }
             const checked = done.has(step.id);
             // Enforce sequential order: a step can only be checked if all
             // previous steps are already done, and unchecked only if no
@@ -208,10 +280,7 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
                       Step {step.number}
                     </Typography>
                   )}
-                  <Box
-                    sx={{ '& p': { m: 0, mb: 0.5 }, '& img': { maxWidth: '100%' }, fontSize: '0.9rem', wordBreak: 'break-word' }}
-                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(step.html) }}
-                  />
+                  <Box sx={stepBodySx} dangerouslySetInnerHTML={{ __html: sanitizeHtml(step.html) }} />
                   {(() => {
                     const meta = stepMeta.get(step.id);
                     if (!meta) return null;

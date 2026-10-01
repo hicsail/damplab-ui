@@ -1,122 +1,29 @@
-import { useApolloClient } from '@apollo/client';
+import { useApolloClient, useQuery } from '@apollo/client';
 import {
   Alert,
   Box,
   Button,
   Divider,
-  Grid,
-  IconButton,
+  Link,
   List,
   ListItemButton,
   ListItemText,
-  MenuItem,
-  Paper,
   Snackbar,
   Stack,
-  TextField,
   Typography
 } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
-import {
-  DndContext,
-  DragEndEvent,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { useNavigate, useParams, Link as RouterLink } from 'react-router';
 import { AppContext } from '../contexts/App';
-import { UPDATE_SERVICE } from '../gql/queries';
-import { validateParameter } from '../components/edit/parameters/ParameterValidation';
-import { idFromName, makeUniqueIds } from '../utils/idFromName';
+import { GET_PARAMETER_SETS, UPDATE_SERVICE } from '../gql/queries';
+import { orderedSetRefs, overridingSetName, ownParametersOf, setParameterRows, setRefsFrom } from '../utils/serviceParameters';
 import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
-import { formatSaveError } from '../utils/gqlError';
+import { formatGqlError, formatSaveError } from '../utils/gqlError';
 import { EQUIPMENT_PARAM_DEFS } from '../controllers/ReactFlowEvents';
-import SampleSheetTemplateField from '../components/edit/SampleSheetTemplateField';
-
-const TYPE_OPTIONS = [
-  { value: 'string', label: 'Text' },
-  { value: 'number', label: 'Number' },
-  { value: 'file', label: 'File upload' },
-  { value: 'sampleSheet', label: 'Samples spreadsheet' },
-  { value: 'boolean', label: 'Yes/No' },
-  { value: 'dropdown', label: 'Pick from list' },
-  { value: 'table', label: 'Table' }
-];
-
-const createId = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-/**
- * Sortable row in the parameter list. The drag handle is the only listener
- * surface so that clicking the row body still selects the parameter.
- */
-function SortableParamRow({
-  dragKey,
-  label,
-  selected,
-  onSelect
-}: {
-  dragKey: string;
-  label: string;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: dragKey
-  });
-  return (
-    <Box
-      ref={setNodeRef}
-      sx={{
-        display: 'flex',
-        alignItems: 'stretch',
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.6 : 1,
-        backgroundColor: isDragging ? 'action.hover' : undefined,
-        borderRadius: 1
-      }}
-    >
-      <Box
-        {...attributes}
-        {...listeners}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          px: 0.5,
-          cursor: 'grab',
-          color: 'text.secondary',
-          touchAction: 'none',
-          '&:active': { cursor: 'grabbing' }
-        }}
-        aria-label='Drag to reorder parameter'
-      >
-        <DragIndicatorIcon fontSize='small' />
-      </Box>
-      <ListItemButton selected={selected} onClick={onSelect} sx={{ flex: 1 }}>
-        <ListItemText primary={label} secondary={undefined} />
-      </ListItemButton>
-    </Box>
-  );
-}
+import ParameterListEditor from '../components/edit/parameters/ParameterListEditor';
+import { EditableParameter, prepareParametersForSave, withDragKeys } from '../components/edit/parameters/parameterSave';
 
 export default function AdminEditServiceParameters() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -129,9 +36,8 @@ export default function AdminEditServiceParameters() {
     [serviceId, services]
   );
 
-  const [parameters, setParameters] = useState<any[]>([]);
+  const [parameters, setParameters] = useState<EditableParameter[]>([]);
   const [tableDataText, setTableDataText] = useState<Record<number, string>>({});
-  const [selectedParameterIndex, setSelectedParameterIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -140,11 +46,7 @@ export default function AdminEditServiceParameters() {
 
   useEffect(() => {
     if (!service) return;
-    setParameters((prev) =>
-      prev.length
-        ? prev
-        : (service.parameters ?? []).map((p: any) => ({ ...p, _dragKey: createId() }))
-    );
+    setParameters((prev) => (prev.length ? prev : withDragKeys(ownParametersOf(service))));
   }, [service]);
 
   // The five reserved equipment parameters, shown read-only above the service's
@@ -161,28 +63,42 @@ export default function AdminEditServiceParameters() {
     [service, parameters]
   );
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  // Ruling D3: sets→refs is setRefsFrom (utils/serviceParameters.ts), not an inline map.
+  const { data: setsData, error: setsError } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
+  const allSets = useMemo(() => setRefsFrom(setsData, { withParameters: true }), [setsData]);
+  const attachedSetIds = service?.parameterSetIds;
+  const setRows = useMemo(
+    () => setParameterRows(attachedSetIds, allSets, parameters),
+    [attachedSetIds, allSets, parameters]
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setParameters((prev) => {
-      const oldIndex = prev.findIndex((p) => p._dragKey === active.id);
-      const newIndex = prev.findIndex((p) => p._dragKey === over.id);
-      if (oldIndex < 0 || newIndex < 0) return prev;
-      const reordered = arrayMove(prev, oldIndex, newIndex);
-      // Keep the currently-selected parameter selected after the move.
-      setSelectedParameterIndex((current) => {
-        const currentKey = prev[current]?._dragKey;
-        const nextIndex = reordered.findIndex((p) => p._dragKey === currentKey);
-        return nextIndex >= 0 ? nextIndex : current;
-      });
-      return reordered;
-    });
-  };
+  const setParametersFooter =
+    setRows.length > 0 ? (
+      <>
+        <Divider />
+        <Typography variant='subtitle2' sx={{ px: 1, pt: 1, color: 'text.secondary' }}>From parameter sets (read-only)</Typography>
+        {orderedSetRefs(attachedSetIds, allSets).map((set) => (
+          <Box key={set.id} sx={{ px: 1 }}>
+            <Link component={RouterLink} to={`/edit/parameter-sets/${set.id}`} variant='body2'>{set.name}</Link>
+            <List dense disablePadding>
+              {setRows.filter((r) => r.setId === set.id).map((r) => (
+                <ListItemButton key={`${set.id}-${r.parameter.id}`} disabled sx={{ pl: 2 }}>
+                  <ListItemText primary={r.parameter.name ?? r.parameter.id} secondary={r.overriddenByOwn ? 'overridden by this operation' : undefined} />
+                </ListItemButton>
+              ))}
+            </List>
+          </Box>
+        ))}
+      </>
+    ) : null;
+
+  // The footer silently disappearing when the operation does have sets attached
+  // would read as "no overlap to worry about" rather than "couldn't check" — so
+  // a load failure is only worth mentioning when there is something to show.
+  const setsUnavailableWarning =
+    setsError && Array.isArray(attachedSetIds) && attachedSetIds.length > 0
+      ? `Failed to load this operation's parameter sets: ${formatGqlError(setsError)}`
+      : null;
 
   if (!service) {
     return (
@@ -201,78 +117,14 @@ export default function AdminEditServiceParameters() {
     );
   }
 
-  const updateParameter = (index: number, patch: Record<string, any>) => {
-    setParameters((prev) =>
-      prev.map((param, i) => (i === index ? { ...param, ...patch } : param))
-    );
-  };
-
-  const removeParameter = (index: number) => {
-    setParameters((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      setSelectedParameterIndex((current) => {
-        if (next.length === 0) return 0;
-        if (current > index) return current - 1;
-        if (current === index) return Math.max(0, current - 1);
-        return current;
-      });
-      return next;
-    });
-  };
-
-  const addParameter = () => {
-    setParameters((prev) => {
-      const next = [
-        ...prev,
-        {
-          id: '',
-          name: '',
-          description: '',
-          type: 'string',
-          paramType: 'input',
-          required: false,
-          allowMultipleValues: false,
-          isPriceMultiplier: false,
-          _dragKey: createId()
-        }
-      ];
-      setSelectedParameterIndex(next.length - 1);
-      return next;
-    });
-  };
-
   const handleSave = async () => {
     try {
       setErrorMessage(null);
       setSuccessMessage(null);
 
-      const tableParseErrors: string[] = [];
-      const normalizedParameters = parameters.map((parameter, index) => {
-        const { _dragKey: _strip, ...rest } = parameter;
-        const normalized = { ...rest };
-        if (!normalized.id || String(normalized.id).trim() === '') {
-          normalized.id = idFromName(normalized.name ?? '');
-        }
-        if (normalized.type === 'table') {
-          const raw = tableDataText[index];
-          if (raw && raw.trim()) {
-            try {
-              normalized.tableData = JSON.parse(raw);
-            } catch (_error) {
-              tableParseErrors.push(`Parameter ${index + 1} table setup must be valid JSON.`);
-            }
-          }
-        }
-        return normalized;
-      });
-      const normalizedWithUniqueIds = makeUniqueIds(normalizedParameters);
-
-      const validationErrors = normalizedWithUniqueIds.flatMap((parameter, index) =>
-        validateParameter(parameter).map((error) => `Parameter ${index + 1}: ${error.field} - ${error.errorMsg}`)
-      );
-
-      if (tableParseErrors.length > 0 || validationErrors.length > 0) {
-        setErrorMessage([...tableParseErrors, ...validationErrors].join(' '));
+      const { parameters: prepared, errors } = prepareParametersForSave(parameters, tableDataText);
+      if (errors.length) {
+        setErrorMessage(errors.join(' '));
         return;
       }
 
@@ -282,7 +134,7 @@ export default function AdminEditServiceParameters() {
         variables: {
           service: service.id,
           changes: {
-            parameters: normalizedWithUniqueIds
+            parameters: prepared
           }
         }
       });
@@ -295,8 +147,6 @@ export default function AdminEditServiceParameters() {
       setIsSaving(false);
     }
   };
-
-  const selectedParameter = parameters[selectedParameterIndex];
 
   return (
     <Stack spacing={3}>
@@ -316,6 +166,7 @@ export default function AdminEditServiceParameters() {
       </Typography>
 
       {!!errorMessage && <Alert severity='error'>{errorMessage}</Alert>}
+      {!!setsUnavailableWarning && <Alert severity='warning'>{setsUnavailableWarning}</Alert>}
 
       <Snackbar
         open={!!successMessage}
@@ -329,11 +180,15 @@ export default function AdminEditServiceParameters() {
       </Snackbar>
 
       <ReadOnlyFieldset canWrite={canWrite} noun='the service catalog'>
-
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '280px 1fr' }, gap: 2 }}>
-        <Paper variant='outlined' sx={{ p: 1, maxHeight: { md: '70vh' }, overflow: 'auto' }}>
-          <Stack spacing={1}>
-            {reservedParameters.length > 0 && (
+        <ParameterListEditor
+          parameters={parameters}
+          setParameters={setParameters}
+          tableDataText={tableDataText}
+          setTableDataText={setTableDataText}
+          canWrite={canWrite}
+          sampleSheetServiceId={String(service.id)}
+          listHeader={
+            reservedParameters.length > 0 ? (
               <>
                 <Typography variant='subtitle2' sx={{ px: 1, pt: 1, color: 'text.secondary' }}>
                   Reserved (equipment use)
@@ -347,472 +202,14 @@ export default function AdminEditServiceParameters() {
                 </List>
                 <Divider />
               </>
-            )}
-            <Typography variant='subtitle1' sx={{ px: 1, pt: 1 }}>
-              Parameters
-            </Typography>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={parameters.map((p) => p._dragKey)}
-                strategy={verticalListSortingStrategy}
-              >
-                <List dense disablePadding>
-                  {parameters.map((parameter, index) => (
-                    <SortableParamRow
-                      key={parameter._dragKey}
-                      dragKey={parameter._dragKey}
-                      label={parameter.name?.trim() ? parameter.name : 'Untitled parameter'}
-                      selected={selectedParameterIndex === index}
-                      onSelect={() => setSelectedParameterIndex(index)}
-                    />
-                  ))}
-                </List>
-              </SortableContext>
-            </DndContext>
-            <Box sx={{ p: 1 }}>
-              <Button fullWidth variant='outlined' startIcon={<AddIcon />} onClick={addParameter}>
-                Add parameter
-              </Button>
-            </Box>
-          </Stack>
-        </Paper>
-
-        <Paper variant='outlined' sx={{ p: 2 }}>
-          {!selectedParameter ? (
-            <Typography color='text.secondary'>
-              No parameters yet. Add a parameter to begin.
-            </Typography>
-          ) : (
-            <Stack spacing={2}>
-              <Stack direction='row' alignItems='center' justifyContent='space-between'>
-                <Typography variant='h6'>
-                  {selectedParameter.name?.trim() ? selectedParameter.name : 'Untitled parameter'}
-                </Typography>
-                <IconButton
-                  aria-label='Remove parameter'
-                  onClick={() => removeParameter(selectedParameterIndex)}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Stack>
-
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 12, md: 6 }}>
-                  <TextField
-                    label='Name'
-                    fullWidth
-                    required
-                    value={selectedParameter.name ?? ''}
-                    onChange={(event) => {
-                      const nextName = event.target.value;
-                      const currentName = selectedParameter.name ?? '';
-                      const currentId = String(selectedParameter.id ?? '');
-                      const currentDerived = idFromName(currentName);
-                      const shouldUpdateId = currentId.trim() === '' || currentId === currentDerived;
-                      updateParameter(selectedParameterIndex, {
-                        name: nextName,
-                        ...(shouldUpdateId ? { id: idFromName(nextName) } : {})
-                      });
-                    }}
-                  />
-                </Grid>
-                <Grid size={12}>
-                  <TextField
-                    label='Description'
-                    fullWidth
-                    value={selectedParameter.description ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, { description: event.target.value })
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    select
-                    label='Answer format'
-                    fullWidth
-                    value={selectedParameter.type ?? 'string'}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, { type: event.target.value })
-                    }
-                  >
-                    {TYPE_OPTIONS.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    select
-                    label='Required?'
-                    fullWidth
-                    value={selectedParameter.required ? 'yes' : 'no'}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        required: event.target.value === 'yes'
-                      })
-                    }
-                  >
-                    <MenuItem value='yes'>Yes</MenuItem>
-                    <MenuItem value='no'>No</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    select
-                    label='Allow multiple selections?'
-                    fullWidth
-                    value={selectedParameter.allowMultipleValues ? 'yes' : 'no'}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        allowMultipleValues: event.target.value === 'yes'
-                      })
-                    }
-                  >
-                    <MenuItem value='yes'>Yes</MenuItem>
-                    <MenuItem value='no'>No</MenuItem>
-                  </TextField>
-                </Grid>
-
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    label='Fallback price'
-                    type='number'
-                    inputProps={{ min: 0, step: '0.01' }}
-                    fullWidth
-                    value={selectedParameter.price ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        price: event.target.value === '' ? undefined : Number(event.target.value)
-                      })
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    label='Internal price'
-                    type='number'
-                    inputProps={{ min: 0, step: '0.01' }}
-                    fullWidth
-                    value={selectedParameter.internalPrice ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        internalPrice:
-                          event.target.value === '' ? undefined : Number(event.target.value)
-                      })
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    label='External customer (academic)'
-                    type='number'
-                    inputProps={{ min: 0, step: '0.01' }}
-                    fullWidth
-                    value={selectedParameter.externalAcademicPrice ?? selectedParameter.pricing?.externalAcademic ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        externalAcademicPrice:
-                          event.target.value === '' ? undefined : Number(event.target.value)
-                      })
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    label='External customer (market)'
-                    type='number'
-                    inputProps={{ min: 0, step: '0.01' }}
-                    fullWidth
-                    value={selectedParameter.externalMarketPrice ?? selectedParameter.pricing?.externalMarket ?? selectedParameter.externalPrice ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        externalMarketPrice:
-                          event.target.value === '' ? undefined : Number(event.target.value),
-                        externalPrice:
-                          event.target.value === '' ? undefined : Number(event.target.value)
-                      })
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    label='External customer (no salary)'
-                    type='number'
-                    inputProps={{ min: 0, step: '0.01' }}
-                    fullWidth
-                    value={selectedParameter.externalNoSalaryPrice ?? selectedParameter.pricing?.externalNoSalary ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        externalNoSalaryPrice:
-                          event.target.value === '' ? undefined : Number(event.target.value)
-                      })
-                    }
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 8 }}>
-                  <TextField
-                    label='Price note shown to customer'
-                    fullWidth
-                    value={selectedParameter.pricingExplanation ?? ''}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        pricingExplanation: event.target.value
-                      })
-                    }
-                  />
-                </Grid>
-
-                {(selectedParameter.type === 'string' || selectedParameter.type === 'number') && (
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      label='Starting value'
-                      fullWidth
-                      type={selectedParameter.type === 'number' ? 'number' : 'text'}
-                      value={selectedParameter.defaultValue ?? ''}
-                      onChange={(event) =>
-                        updateParameter(selectedParameterIndex, {
-                          defaultValue:
-                            event.target.value === ''
-                              ? undefined
-                              : selectedParameter.type === 'number'
-                                ? Number(event.target.value)
-                                : event.target.value
-                        })
-                      }
-                    />
-                  </Grid>
-                )}
-
-                {selectedParameter.type === 'number' && (
-                  <>
-                    <Grid size={{ xs: 12, md: 6 }}>
-                      <TextField
-                        select
-                        label='Use as price multiplier?'
-                        fullWidth
-                        helperText='When enabled, this numeric value multiplies the calculated service price.'
-                        value={selectedParameter.isPriceMultiplier ? 'yes' : 'no'}
-                        onChange={(event) =>
-                          updateParameter(selectedParameterIndex, {
-                            isPriceMultiplier: event.target.value === 'yes'
-                          })
-                        }
-                      >
-                        <MenuItem value='yes'>Yes</MenuItem>
-                        <MenuItem value='no'>No</MenuItem>
-                      </TextField>
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                      <TextField
-                        label='Minimum allowed value'
-                        type='number'
-                        fullWidth
-                        value={selectedParameter.rangeValueMin ?? ''}
-                        onChange={(event) =>
-                          updateParameter(selectedParameterIndex, {
-                            rangeValueMin:
-                              event.target.value === '' ? undefined : Number(event.target.value)
-                          })
-                        }
-                      />
-                    </Grid>
-                    <Grid size={{ xs: 12, md: 3 }}>
-                      <TextField
-                        label='Maximum allowed value'
-                        type='number'
-                        fullWidth
-                        value={selectedParameter.rangeValueMax ?? ''}
-                        onChange={(event) =>
-                          updateParameter(selectedParameterIndex, {
-                            rangeValueMax:
-                              event.target.value === '' ? undefined : Number(event.target.value)
-                          })
-                        }
-                      />
-                    </Grid>
-                  </>
-                )}
-
-                {selectedParameter.type === 'dropdown' && (
-                  <Grid size={12}>
-                    <Stack spacing={1}>
-                      <Typography variant='subtitle1'>Choices</Typography>
-                      <Typography variant='caption' color='text.secondary'>
-                        Prices are per customer category, matching the service-level pricing
-                        fields. Leave a category blank to charge the fallback price for it.
-                      </Typography>
-                      {(selectedParameter.options ?? []).map((option: any, optionIndex: number) => {
-                        const patchOption = (patch: Record<string, any>) => {
-                          const nextOptions = [...(selectedParameter.options ?? [])];
-                          nextOptions[optionIndex] = {
-                            ...nextOptions[optionIndex],
-                            id: nextOptions[optionIndex]?.id || createId(),
-                            ...patch
-                          };
-                          updateParameter(selectedParameterIndex, { options: nextOptions });
-                        };
-
-                        // Writes both the flat field and the nested `pricing` entry, and keeps
-                        // the legacy generic `external*` in step with market -- mirroring how
-                        // service-level pricing is persisted in AdminEditService.tsx.
-                        const patchPrice = (
-                          field: 'price' | 'internalPrice' | 'externalAcademicPrice' | 'externalMarketPrice' | 'externalNoSalaryPrice',
-                          pricingKey: 'legacy' | 'internal' | 'externalAcademic' | 'externalMarket' | 'externalNoSalary',
-                          rawValue: string
-                        ) => {
-                          const value = rawValue === '' ? undefined : Number(rawValue);
-                          const patch: Record<string, any> = {
-                            [field]: value,
-                            pricing: { ...(option.pricing ?? {}), [pricingKey]: value }
-                          };
-                          if (field === 'externalMarketPrice') {
-                            patch.externalPrice = value;
-                            patch.pricing.external = value;
-                          }
-                          patchOption(patch);
-                        };
-
-                        const priceValue = (
-                          field: string,
-                          pricingKey: string,
-                          legacyFallback?: unknown
-                        ) => option[field] ?? option.pricing?.[pricingKey] ?? legacyFallback ?? '';
-
-                        return (
-                        <Box
-                          key={`${option.id || 'option'}-${optionIndex}`}
-                          sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}
-                        >
-                          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 1 }}>
-                            <TextField
-                              label='Choice label'
-                              value={option.name ?? ''}
-                              onChange={(event) => patchOption({ name: event.target.value })}
-                            />
-                            <IconButton
-                              aria-label='Remove choice'
-                              onClick={() => {
-                                const nextOptions = (selectedParameter.options ?? []).filter(
-                                  (_: any, i: number) => i !== optionIndex
-                                );
-                                updateParameter(selectedParameterIndex, { options: nextOptions });
-                              }}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(5, 1fr)',
-                              gap: 1,
-                              mt: 1.5
-                            }}
-                          >
-                            <TextField
-                              label='Fallback price'
-                              type='number'
-                              size='small'
-                              value={priceValue('price', 'legacy')}
-                              onChange={(event) => patchPrice('price', 'legacy', event.target.value)}
-                            />
-                            <TextField
-                              label='Internal price'
-                              type='number'
-                              size='small'
-                              value={priceValue('internalPrice', 'internal')}
-                              onChange={(event) => patchPrice('internalPrice', 'internal', event.target.value)}
-                            />
-                            <TextField
-                              label='External customer (academic)'
-                              type='number'
-                              size='small'
-                              value={priceValue('externalAcademicPrice', 'externalAcademic')}
-                              onChange={(event) => patchPrice('externalAcademicPrice', 'externalAcademic', event.target.value)}
-                            />
-                            <TextField
-                              label='External customer (market)'
-                              type='number'
-                              size='small'
-                              // Pre-migration choices carried market pricing in the generic
-                              // `externalPrice`, so fall back to it for display.
-                              value={priceValue('externalMarketPrice', 'externalMarket', option.externalPrice)}
-                              onChange={(event) => patchPrice('externalMarketPrice', 'externalMarket', event.target.value)}
-                            />
-                            <TextField
-                              label='External customer (no salary)'
-                              type='number'
-                              size='small'
-                              value={priceValue('externalNoSalaryPrice', 'externalNoSalary')}
-                              onChange={(event) => patchPrice('externalNoSalaryPrice', 'externalNoSalary', event.target.value)}
-                            />
-                          </Box>
-                        </Box>
-                        );
-                      })}
-                      <Box>
-                        <Button
-                          variant='outlined'
-                          size='small'
-                          onClick={() =>
-                            updateParameter(selectedParameterIndex, {
-                              options: [...(selectedParameter.options ?? []), { id: createId(), name: '' }]
-                            })
-                          }
-                        >
-                          Add choice
-                        </Button>
-                      </Box>
-                    </Stack>
-                  </Grid>
-                )}
-
-                {selectedParameter.type === 'sampleSheet' && (
-                  <Grid size={12}>
-                    <SampleSheetTemplateField
-                      serviceId={String(service.id)}
-                      parameter={selectedParameter}
-                      canWrite={canWrite}
-                      onChange={(patch) => updateParameter(selectedParameterIndex, patch)}
-                    />
-                  </Grid>
-                )}
-
-                {selectedParameter.type === 'table' && (
-                  <Grid size={12}>
-                    <TextField
-                      label='Table setup (JSON)'
-                      multiline
-                      minRows={6}
-                      fullWidth
-                      value={
-                        tableDataText[selectedParameterIndex] ??
-                        (selectedParameter.tableData
-                          ? JSON.stringify(selectedParameter.tableData, null, 2)
-                          : '')
-                      }
-                      onChange={(event) =>
-                        setTableDataText((prev) => ({
-                          ...prev,
-                          [selectedParameterIndex]: event.target.value
-                        }))
-                      }
-                    />
-                  </Grid>
-                )}
-              </Grid>
-            </Stack>
-          )}
-        </Paper>
-      </Box>
-
+            ) : null
+          }
+          listFooter={setParametersFooter}
+          rowChip={(p) => {
+            const name = overridingSetName(p, attachedSetIds, allSets);
+            return name ? `overrides ${name}` : undefined;
+          }}
+        />
       </ReadOnlyFieldset>
 
       {/* Outside the fieldset — see ReadOnlyFieldset. */}

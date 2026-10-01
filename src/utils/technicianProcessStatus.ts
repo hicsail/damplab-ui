@@ -143,8 +143,9 @@ export function chipStatusBackground(color: ChipStatusColor): string {
 /**
  * Job lifecycle in the same five-colour vocabulary the SOW uses
  * (`STATUS_COLORS` in components/sow/sowTypes.ts). Sharing the palette merges
- * neighbours by design: ACCEPTED and COMPLETE are both green, exactly as SIGNED
- * and FINAL are on the SOW side.
+ * neighbours by design: ACCEPTED and COMPLETE are both green, the parallel of
+ * FINAL on the SOW side (SIGNED there is orange: customer-signed, awaiting the
+ * lab's countersignature).
  */
 const JOB_STATUS_COLORS: Record<string, ChipStatusColor> = {
   CREATING: 'default',

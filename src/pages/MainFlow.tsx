@@ -191,6 +191,7 @@ export default function MainFlow() {
                             onDragOver     = {onDragOver}
                             fitView
                             fitViewOptions = {fitViewOptions}
+                            minZoom        = {0.2}
                             style          = {{ width: '70%', height: '100%'}}
                         >
 
@@ -229,7 +230,7 @@ export default function MainFlow() {
                     </div>
                 </ReactFlowProvider>
             </div>
-            <CanvasAgentChat />
+            <CanvasAgentChat onWorkflowApplied={() => setTimeout(() => reactFlowInstance?.fitView({ ...fitViewOptions, duration: 800 }), 50)} />
         </>
     )
 }

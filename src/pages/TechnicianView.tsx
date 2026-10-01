@@ -20,6 +20,7 @@ import {
   ListItem,
   ListItemText,
   IconButton,
+  Stack,
 } from "@mui/material";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import DescriptionIcon from "@mui/icons-material/Description";
@@ -88,10 +89,18 @@ import {
 import ProcessCard from "../components/technician/ProcessCard";
 import JobEquipmentBookingPanel from "../components/booking/JobEquipmentBookingPanel";
 import JobPaymentsPanel from "../components/billing/JobPaymentsPanel";
+import ResultsPanel from "../components/ResultsPanel";
 import InvoicePanel from "../components/billing/InvoicePanel";
 import ReasonDialog from "../components/ReasonDialog";
 import Can from "../components/PermissionGate";
-import { PERMISSIONS } from "../hooks/usePermissions";
+import { PERMISSIONS, usePermissions } from "../hooks/usePermissions";
+import JobDescription from "../components/JobDescription";
+import JobPeopleLine from "../components/JobPeopleLine";
+import ManageJobMembersDialog from "../components/ManageJobMembersDialog";
+import { useJobCollaboration } from "../hooks/useJobCollaboration";
+import { jobPeople, viewerIsJobMember } from "../utils/jobMembers";
+import { useEffectiveUser } from "../hooks/useEffectiveUser";
+
 import { CommentsSection } from "../components/CommentsSection";
 import JobActivityTimeline, {
   TimelineSection,
@@ -125,6 +134,15 @@ import {
   customerDetail,
   staffHomologyNote,
 } from "../components/technician/biosecurityStatus";
+import {
+  BiosecurityDemoStages,
+  demoCustomerVerified,
+  demoLabPassed,
+  demoPaneText,
+  demoScreenings,
+  DEMO_CUSTOMER_NAME,
+  useBiosecurityDemo,
+} from "../components/technician/BiosecurityDemo";
 import BiosecurityScreeningSections, {
   BiosecurityStatusIcon,
 } from "../components/technician/BiosecurityScreeningSections";
@@ -210,6 +228,15 @@ export default function TechnicianView() {
       // Error handled by error state
     },
   });
+
+  const jobForPeople = data?.jobById;
+  const { userProps: viewerProps } = useEffectiveUser();
+  const { can } = usePermissions();
+  const viewer = { subject: viewerProps?.subject, email: viewerProps?.idTokenParsed?.email };
+  const people = jobPeople(jobForPeople);
+  const isMember = viewerIsJobMember(jobForPeople, viewer);
+  const [managingPeople, setManagingPeople] = useState(false);
+  const collaboration = useJobCollaboration(id, refetchJob);
 
   // Keep local UI in sync on every fetch/refetch (onCompleted alone does not always run on refetch).
   useEffect(() => {
@@ -803,6 +830,13 @@ export default function TechnicianView() {
   // embed is the customer's to run on their own page.
   const customerLinkAvailable =
     Boolean(aclid?.screenId) && biosecurity.CUSTOMER !== "PASSED";
+  // Scripted screening for screen recordings; page state only, gone on refresh.
+  const biosecurityDemo = useBiosecurityDemo();
+  const demoRun = biosecurityDemo.demo;
+  const shownBiosecurity = demoRun ? demoScreenings(demoRun) : biosecurity;
+  const demoPane = demoRun ? demoPaneText(demoRun) : null;
+  const demoCustomer = demoCustomerVerified(demoRun);
+  const demoLab = demoLabPassed(demoRun);
   const railBtnSx = {
     textTransform: "none" as const,
     width: "100%",
@@ -907,7 +941,34 @@ export default function TechnicianView() {
               {submitter.onBehalfOf}
             </Typography>
           )}
+          {jobForPeople && (
+            <JobPeopleLine
+              primaryEmail={people.primary}
+              memberEmails={people.members}
+              canManage={isMember || Boolean(viewerProps?.isDamplabStaff)}
+              onManage={() => setManagingPeople(true)}
+            />
+          )}
         </Box>
+        {jobForPeople && (
+          <JobDescription
+            description={jobForPeople.description}
+            canEdit={isMember || can(PERMISSIONS.JobsViewAll)}
+            onSave={collaboration.saveDescription}
+          />
+        )}
+        {collaboration.error && !managingPeople && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={collaboration.clearError}>{collaboration.error}</Alert>
+        )}
+        <ManageJobMembersDialog
+          open={managingPeople}
+          primaryEmail={people.primary}
+          memberEmails={people.members}
+          onAdd={collaboration.addMember}
+          onRemove={collaboration.removeMember}
+          onClose={() => { setManagingPeople(false); collaboration.clearError(); }}
+          error={collaboration.error}
+        />
 
         {sowCreateError && (
           <Box sx={{ mb: 2 }}>
@@ -1157,20 +1218,31 @@ export default function TechnicianView() {
 
         <ProcessCard
           title="Biosecurity"
-          customerBadge={null}
-          staffBadge={null}
-          customerVersion="—"
-          staffVersion="—"
+          customerBadge={demoCustomer ? "check" : null}
+          staffBadge={demoLab ? "check" : null}
+          customerLabel={demoCustomer ? DEMO_CUSTOMER_NAME : undefined}
+          customerVersion={demoCustomer ? "Verified" : "—"}
+          staffVersion={demoLab ? "Passed" : "—"}
+          defaultDetailsOpen={Boolean(demoRun)}
           statusPaneSx={{
             bgcolor: chipStatusBackground(
-              biosecurityStatusColor(biosecurityComposite),
+              demoPane
+                ? demoPane.color
+                : biosecurityStatusColor(biosecurityComposite),
             ),
           }}
           statusPane={
             <StatusPaneHeader
-              status={biosecurityStatusLabel(biosecurityComposite)}
+              status={
+                demoPane
+                  ? demoPane.status
+                  : biosecurityStatusLabel(biosecurityComposite)
+              }
               description={
-                paneNote ?? "Rolled up from primary and additional screening."
+                demoPane
+                  ? demoPane.description
+                  : (paneNote ??
+                    "Rolled up from primary and additional screening.")
               }
             >
               {/* A glance at the five, in card order. The labels live in
@@ -1180,7 +1252,7 @@ export default function TechnicianView() {
               <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", mt: 1 }}>
                 {BIOSECURITY_SCREENINGS.map((screening) => {
                   const statusLabel = biosecurityStatusLabel(
-                    biosecurity[screening.key],
+                    shownBiosecurity[screening.key],
                   );
                   const action =
                     screening.key === "HOMOLOGY" && homologyDetailsAvailable
@@ -1199,7 +1271,7 @@ export default function TechnicianView() {
                     : `${screening.label}: ${statusLabel}`;
                   const icon = (
                     <BiosecurityStatusIcon
-                      status={biosecurity[screening.key]}
+                      status={shownBiosecurity[screening.key]}
                     />
                   );
                   return (
@@ -1231,8 +1303,31 @@ export default function TechnicianView() {
                 disabled={!id || homologyBusy}
                 onClick={handleRerunHomologyScreening}
               >
-                {homologyBusy ? "Screening…" : "Run screening"}
+                {homologyBusy ? "Screening…" : "Rerun screening"}
               </Button>
+              {/* Gone once a run starts, so the recording shows only the result. */}
+              {!demoRun && (
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="success"
+                    sx={{ ...railBtnSx, justifyContent: "center", flex: 1 }}
+                    onClick={() => biosecurityDemo.start("pass")}
+                  >
+                    Run demo pass
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="error"
+                    sx={{ ...railBtnSx, justifyContent: "center", flex: 1 }}
+                    onClick={() => biosecurityDemo.start("fail")}
+                  >
+                    Run demo fail
+                  </Button>
+                </Stack>
+              )}
               {customerLinkAvailable && (
                 <>
                   <Button
@@ -1260,6 +1355,9 @@ export default function TechnicianView() {
             </>
           }
           details={
+            demoRun ? (
+              <BiosecurityDemoStages demo={demoRun} />
+            ) : (
             <BiosecurityScreeningSections
               screenings={biosecurity}
               notes={{ HOMOLOGY: homologyNote, CUSTOMER: customerNote }}
@@ -1269,6 +1367,7 @@ export default function TechnicianView() {
               onCustomerDetails={handleCopyVerificationLink}
               customerClickLabel={COPY_VERIFICATION_LINK}
             />
+            )
           }
         />
 
@@ -1394,6 +1493,8 @@ export default function TechnicianView() {
 
         {/* Payments belong to the job; every invoice version restates them. */}
         <JobPaymentsPanel jobId={id || ""} staffView />
+
+        <ResultsPanel jobDisplayId={jobData?.jobId ?? null} />
 
         <div ref={commentsSectionRef}>
           <CommentsSection

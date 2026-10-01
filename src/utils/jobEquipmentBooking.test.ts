@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockedMessage, bookingsForWeek, bookedHours, defaultSlotFor, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES, spansForDays, spansForWeek } from './jobEquipmentBooking';
+import { blockedMessage, bookingsForWeek, bookedHours, defaultSlotFor, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES, operationNotBookableMessage, spansForDays, spansForWeek } from './jobEquipmentBooking';
 
 describe('formatBookingWindow', () => {
   it('prints a closed window as a range', () => {
@@ -136,5 +136,17 @@ describe('bookedHours', () => {
         { kind: 'QUANTITY', status: 'RESERVED', startTime: null, endTime: null }
       ])
     ).toBe(2.5);
+  });
+});
+
+describe('operationNotBookableMessage', () => {
+  it('says nothing is bookable by the hour when no item is schedulable', () => {
+    expect(operationNotBookableMessage(0)).toBe('Nothing on this operation is booked by the hour.');
+  });
+
+  it('speaks of being on the job, never of a booker list (behaviour 10)', () => {
+    const text = operationNotBookableMessage(2);
+    expect(text).toBe('Only people on this job can book this operation.');
+    expect(text).not.toMatch(/listed|booker/i);
   });
 });

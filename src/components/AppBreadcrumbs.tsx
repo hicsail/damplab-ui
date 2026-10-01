@@ -41,7 +41,7 @@ const STATIC: Record<string, string> = {
   "/customer-management": "User Management",
   "/api-keys": "API Keys",
   "/inventory": "Inventory Availability",
-  "/edit": "Catalog & Inventory Editor",
+  "/edit": "Catalog Editor",
   "/release_notes": "Release Notes",
   "/announcements": "Announcements",
   "/data_translation": "Data Translation",
@@ -54,7 +54,7 @@ const STATIC: Record<string, string> = {
   "/notification-preferences": "Notification Preferences",
 };
 
-const EDIT: Crumb = { label: "Catalog & Inventory Editor", to: "/edit" };
+const EDIT: Crumb = { label: "Catalog Editor", to: "/edit" };
 
 /** Multi-level / dynamic routes -> explicit trail (below Home). Returns null if unmatched. */
 function dynamicTrail(path: string): Crumb[] | null {
@@ -69,12 +69,18 @@ function dynamicTrail(path: string): Crumb[] | null {
     ];
   if ((m = path.match(/^\/edit\/services\/([^/]+)$/)))
     return [EDIT, { label: "Edit Service" }];
+  if (path === "/edit/parameter-sets/new")
+    return [EDIT, { label: "New Parameter Set" }];
+  if ((m = path.match(/^\/edit\/parameter-sets\/([^/]+)$/)))
+    return [EDIT, { label: "Edit Parameter Set" }];
   if ((m = path.match(/^\/edit\/bundles\/new$/)))
     return [EDIT, { label: "New Bundle" }];
   if ((m = path.match(/^\/edit\/bundles\/([^/]+)$/)))
     return [EDIT, { label: "Edit Bundle" }];
   if ((m = path.match(/^\/edit\/inventory\/new$/)))
     return [EDIT, { label: "New Inventory Item" }];
+  if (path === "/edit/inventory/upload-history")
+    return [EDIT, { label: "Upload History" }];
   if ((m = path.match(/^\/edit\/inventory\/([^/]+)$/)))
     return [EDIT, { label: "Edit Inventory Item" }];
   // Section keys are camelCase ("invoiceProcedures"); the dash makes pretty() split them.

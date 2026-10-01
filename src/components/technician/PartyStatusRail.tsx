@@ -1,10 +1,10 @@
 import React from 'react';
 import { Avatar, Badge, Box, Typography } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import type { PartyBadge } from '../../utils/technicianProcessStatus';
 import { STATUS_PANE_MIN_HEIGHT } from '../CollapsibleStatusCard';
+import CustomerAvatar from '../../assets/avatars/customer-default.jpg';
 
 /**
  * Customer vs DAMP Lab icons with a paper (holds it) or check (committed) badge
@@ -24,6 +24,8 @@ interface Props {
   staffBadge: PartyBadge;
   customerVersion?: string;
   staffVersion?: string;
+  /** Replaces the "Customer" caption, e.g. with the verified customer's name. */
+  customerLabel?: string;
 }
 
 function PartyBadgeIcon({ badge }: { badge: PartyBadge }): React.JSX.Element | null {
@@ -80,7 +82,7 @@ function PartySlot({
   );
 }
 
-export default function PartyStatusRail({ customerBadge, staffBadge, customerVersion, staffVersion }: Props): React.JSX.Element {
+export default function PartyStatusRail({ customerBadge, staffBadge, customerVersion, staffVersion, customerLabel = 'Customer' }: Props): React.JSX.Element {
   return (
     <Box
       sx={{
@@ -92,13 +94,16 @@ export default function PartyStatusRail({ customerBadge, staffBadge, customerVer
       }}
     >
       <PartySlot
-        label="Customer"
+        label={customerLabel}
         version={customerVersion}
         badge={customerBadge}
         avatar={
-          <Avatar sx={{ width: ICON_SIZE, height: ICON_SIZE, bgcolor: 'grey.300', color: 'text.secondary', flexShrink: 0 }} aria-label="Customer">
-            <PersonIcon sx={{ fontSize: 34 }} />
-          </Avatar>
+          <Avatar
+            src={CustomerAvatar}
+            alt=""
+            sx={{ width: ICON_SIZE, height: ICON_SIZE, bgcolor: 'grey.300', flexShrink: 0 }}
+            aria-label="Customer"
+          />
         }
       />
       <PartySlot
@@ -112,7 +117,9 @@ export default function PartyStatusRail({ customerBadge, staffBadge, customerVer
               width: ICON_SIZE,
               height: ICON_SIZE,
               borderRadius: '50%',
-              bgcolor: 'tertiary.main',
+              border: '1px solid',
+              borderColor: 'tertiary.main',
+              bgcolor: 'white',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -122,7 +129,7 @@ export default function PartyStatusRail({ customerBadge, staffBadge, customerVer
           >
             <Box
               component="img"
-              src="/damp-white.svg"
+              src="/damp-color.png"
               alt=""
               sx={{
                 height: 36,

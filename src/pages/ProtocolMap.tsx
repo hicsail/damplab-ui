@@ -218,7 +218,7 @@ export default function ProtocolMap() {
             {!libraryLoading && library.length === 0 && (
               <Typography variant='body2' color='text.secondary'>
                 No service in the catalog references a protocol yet. Add protocol IDs on a service in
-                the Catalog &amp; Inventory Editor, or load one by ID below.
+                the Catalog Editor, or load one by ID below.
               </Typography>
             )}
             <Stack spacing={2}>

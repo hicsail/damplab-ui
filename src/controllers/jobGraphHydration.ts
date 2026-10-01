@@ -1,7 +1,8 @@
 import { generateFormDataFromParams, createNodeObject, serviceAllowsMultipleRuns, withRunCountParam, withEquipmentParams } from './ReactFlowEvents';
 import { getWorkflowsFromGraph } from './GraphHelpers';
 import { NodeParameter } from '../types/CanvasTypes';
-import { EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { isSampleSheetParam } from '../utils/sampleSheetValue';
 import { applyNodeChanges, NodeChange } from 'reactflow';
 
 /**
@@ -59,11 +60,21 @@ export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId
     const includeEquipment = EQUIPMENT_PARAM_IDS.some((id) => savedById.has(id));
     const fresh = generateFormDataFromParams(parameters ?? [], nodeId, { includeRunCount, includeEquipment });
 
-    return fresh.map((param, index) => {
+    const merged = fresh.map((param, index) => {
         const matched = savedById.has(param.id) ? savedById.get(param.id) : savedList[index]?.value;
         if (matched === undefined || matched === null) return param;
         return { ...param, value: matched };
     });
+
+    // The retired booker list is no longer generated, but a node that stored one
+    // keeps it exactly as saved: the server's parametersDiffer counts a vanished
+    // non-empty value as an edit, and the design keeps stored values as they are.
+    // The form hides it (isRetiredEquipmentParam) and nothing reads it.
+    const retired = savedList.find((entry: any) => entry && entry.id === EQUIPMENT_BOOKERS_PARAM_ID);
+    if (retired && !merged.some((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID)) {
+        merged.push({ ...retired, id: EQUIPMENT_BOOKERS_PARAM_ID, nodeId, value: retired.value } as NodeParameter);
+    }
+    return merged;
 };
 
 /**
@@ -245,6 +256,7 @@ export const versionWorkflowsAsCards = (versionWorkflows: any[] | undefined, ser
                 label: snapshot?.label ?? snapshot?.serviceName ?? 'Removed service',
                 formData: snapshot?.formData ?? [],
                 price: snapshot?.price,
+                parameterSnapshot: snapshot?.parameterSnapshot ?? null,
                 // Named `service` to match the live shape the cards destructure.
                 service: service ?? { id: snapshot?.serviceId, name: snapshot?.serviceName, parameters: [] }
             };
@@ -577,4 +589,44 @@ export const buildSaveWorkflowsInput = (nodes: any[], edges: any[]): any[] => {
                 .map((edge: any) => ({ id: String(edge.id), source: edge.source, target: edge.target }))
         };
     });
+};
+
+/**
+ * The node resolver decorates file and sampleSheet values with a short-lived
+ * presigned `url` on every read. Saving the canvas would persist it (nothing
+ * downstream strips it), so the overlay hands back the stored shape.
+ */
+const withoutPresignedUrl = (value: any): any => {
+  if (Array.isArray(value)) return value.map(withoutPresignedUrl);
+  if (value && typeof value === 'object' && 'url' in value) {
+    const { url: _url, ...stored } = value;
+    return stored;
+  }
+  return value;
+};
+
+/**
+ * The customer's editor hydrates from a version snapshot, but a samples sheet
+ * the lab swapped from its job page writes no version. Without this the
+ * customer's next save would send the old sheet back and undo the lab's swap.
+ * Only sampleSheet values are taken from the live nodes; everything else stays
+ * as the version recorded it (the live graph can hold a hidden staff draft).
+ */
+export const overlayLiveSampleSheetsOnCanvas = (nodes: any[], liveWorkflows: any[]): any[] => {
+  const liveById = new Map<string, any>();
+  (liveWorkflows ?? []).forEach((w: any) => (w?.nodes ?? []).forEach((n: any) => { if (n?.id) liveById.set(n.id, n); }));
+  if (!liveById.size) return nodes;
+  return nodes.map((node: any) => {
+    const live = liveById.get(node?.id);
+    const sheetIds = new Set((Array.isArray(live?.service?.parameters) ? live.service.parameters : []).filter((p: any) => isSampleSheetParam(p)).map((p: any) => p.id));
+    if (!sheetIds.size) return node;
+    const liveValues = new Map((Array.isArray(live.formData) ? live.formData : []).filter((e: any) => sheetIds.has(e?.id)).map((e: any) => [e.id, e.value]));
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        formData: (node?.data?.formData ?? []).map((entry: any) => (liveValues.has(entry?.id) ? { ...entry, value: withoutPresignedUrl(liveValues.get(entry.id)) } : entry))
+      }
+    };
+  });
 };

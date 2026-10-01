@@ -303,3 +303,65 @@ export function confirmedUsageSuffix(balance: { confirmedHours?: number | null; 
   if (hours <= 0) return '';
   return ` · ${formatHours(hours)} hrs confirmed · ${formatMoney(balance?.equipmentCharges)}`;
 }
+
+/** What the Payments card says in place of figures until the lab issues an invoice. */
+export const NO_INVOICE_ISSUED = 'No invoice';
+
+export interface PaymentsCardDeposit {
+  label?: string | null;
+  amount?: number | null;
+  dueDate?: string | Date | null;
+  outstanding?: number | null;
+}
+
+export interface InvoiceFigureSource {
+  kind?: string | null;
+  subtotal?: number | null;
+  totalCost?: number | null;
+  balanceDue?: number | null;
+  deposit?: PaymentsCardDeposit | null;
+  status?: string | null;
+  voidedAt?: unknown;
+  supersededAt?: unknown;
+  createdAt?: unknown;
+  invoiceDate?: unknown;
+}
+
+export interface PaymentsCardFigures<T extends InvoiceFigureSource> {
+  /** The invoice that stands, or null when none has been issued. */
+  invoice: T | null;
+  charges: number | null;
+  /** Live: every non-voided payment, whether or not an invoice restates it yet. */
+  payments: number;
+  balance: number | null;
+  deposit: PaymentsCardDeposit | null;
+}
+
+const cents = (n: number): number => Math.round(n * 100) / 100;
+
+/**
+ * What an invoice charged. A legacy (pre-versioning) document that carries no
+ * `balanceDue` states its figure as `totalCost`; everything else as `subtotal`.
+ */
+export function invoiceCharges(invoice: InvoiceFigureSource): number {
+  if (isLegacyInvoice(invoice) && invoice.balanceDue == null) return cents(Number(invoice.totalCost) || 0);
+  return cents(Number(invoice.subtotal ?? invoice.totalCost) || 0);
+}
+
+/**
+ * The Payments card's figures: the current issued invoice's charges and deposit,
+ * against live payments. Deliberately NOT jobBalance — that is live (SOW lines +
+ * confirmed bookings + custom charges) and would show a countersigned SOW's
+ * amount as owed before anything was invoiced. A booking confirmed after issue
+ * moves nothing here until the next invoice version.
+ */
+export function paymentsCardFigures<T extends InvoiceFigureSource>(
+  invoices: readonly T[] | null | undefined,
+  payments: ReadonlyArray<{ amount?: number | null; voidedAt?: unknown }> | null | undefined
+): PaymentsCardFigures<T> {
+  const paid = cents((payments ?? []).filter((p) => p && !p.voidedAt).reduce((sum, p) => sum + (Number(p.amount) || 0), 0));
+  const invoice = currentInvoice<T>(invoices);
+  if (!invoice) return { invoice: null, charges: null, payments: paid, balance: null, deposit: null };
+  const charges = invoiceCharges(invoice);
+  return { invoice, charges, payments: paid, balance: cents(charges - paid), deposit: invoice.deposit ?? null };
+}

@@ -5,8 +5,15 @@ export function idFromName(name: string): string {
     .replace(/\s+/g, '_');
 }
 
-export function makeUniqueIds<T extends { id?: string; name?: string }>(items: T[]): T[] {
-  const used = new Set<string>();
+/**
+ * De-duplicates each item's id, deriving a blank one from `name`. `reserved`
+ * seeds the used-id set up front (e.g. ids that must not be reassigned to a
+ * later item) without those ids' own entries passing through this function —
+ * callers that don't need that keep the default empty set, so behaviour is
+ * unchanged from before `reserved` existed.
+ */
+export function makeUniqueIds<T extends { id?: string; name?: string }>(items: T[], reserved: Iterable<string> = []): T[] {
+  const used = new Set<string>(reserved);
   return items.map((item) => {
     const base = item.id?.trim() || idFromName(item.name ?? '');
     if (!base) return item;

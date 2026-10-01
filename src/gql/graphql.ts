@@ -729,8 +729,12 @@ export type CreateJobInput = {
   clientDisplayName?: InputMaybe<Scalars['String']['input']>;
   /** Email of the actual client when a staff member submits on their behalf. */
   clientEmail?: InputMaybe<Scalars['String']['input']>;
+  /** Short free-text description, at most 500 characters. */
+  description?: InputMaybe<Scalars['String']['input']>;
   /** The institute the user is from */
   institute: Scalars['String']['input'];
+  /** Additional people with the same access as the primary client. */
+  memberEmails?: InputMaybe<Array<Scalars['String']['input']>>;
   /** Human readable name of the workflow */
   name: Scalars['String']['input'];
   /** Additional information the user provided */
@@ -1240,6 +1244,7 @@ export type InvoiceServiceSelectionInput = {
 };
 
 /** Jobs encapsulate many workflows that were submitted together */
+// Hand-edited 2026-09-29 (job-collaborators-and-description): staging lacks the schema. Regenerate with npm run codegen against a local backend once merged.
 export type Job = {
   __typename?: 'Job';
   /** When staff last accepted this job as specified */
@@ -1268,6 +1273,8 @@ export type Job = {
   customerActionRequired?: Maybe<CustomerActionRequired>;
   /** Customer pricing category for this job. Set from Keycloak at submission; staff may update it (and the owner account / other jobs) via changeJobCustomerCategory. */
   customerCategory?: Maybe<CustomerCategory>;
+  /** Short free-text description of the job. */
+  description?: Maybe<Scalars['String']['output']>;
   /** When the client last requested edit access on this job. Cleared by the next staff review decision. */
   editAccessRequestedAt?: Maybe<Scalars['DateTime']['output']>;
   /** The email address of the user - from access token */
@@ -1285,20 +1292,26 @@ export type Job = {
   jobId?: Maybe<Scalars['String']['output']>;
   /** Newest content versionNumber on the job, including unpublished staff drafts. Used by the editor conflict check; not a customer graph source. */
   latestContentVersionNumber?: Maybe<Scalars['Int']['output']>;
+  /** Additional people (emails) with the same access as the primary client. Never contains the primary. */
+  memberEmails: Array<Scalars['String']['output']>;
   /** Human readable name of the workflow */
   name: Scalars['String']['output'];
   /** Additional information the user provided */
   notes?: Maybe<Scalars['String']['output']>;
+  /** The primary client: clientEmail when staff submitted on their behalf, otherwise the submitter email. */
+  primaryClientEmail: Scalars['String']['output'];
   /** SOW associated with this job */
   sow?: Maybe<Sow>;
   /** Where in the Job life cycle this Job is */
   state: JobState;
   /** Subject id of the user - from access token */
-  sub: Scalars['String']['output'];
+  sub?: Maybe<Scalars['String']['output']>;
   /** The date the job was submitted */
   submitted: Scalars['DateTime']['output'];
+  /** The staff member who submitted this job on behalf of its client. Null when the client submitted it. */
+  submittedBy?: Maybe<JobSubmitter>;
   /** Username of the person who submitted the job - from access token */
-  username: Scalars['String']['output'];
+  username?: Maybe<Scalars['String']['output']>;
   /** Saved versions of this job's workflow graph, oldest first. Staff see every row; customers see published rows plus their own. */
   versions: Array<JobVersion>;
   /** The workflows that were submitted together */
@@ -1402,6 +1415,14 @@ export enum JobState {
   WaitingForSow = 'WAITING_FOR_SOW'
 }
 
+/** The staff member who submitted a job on behalf of its client. */
+export type JobSubmitter = {
+  __typename?: 'JobSubmitter';
+  email?: Maybe<Scalars['String']['output']>;
+  name?: Maybe<Scalars['String']['output']>;
+  sub: Scalars['String']['output'];
+};
+
 /** Immutable snapshot of a job's workflow graph */
 export type JobVersion = {
   __typename?: 'JobVersion';
@@ -1463,6 +1484,7 @@ export type JobVersionNode = {
   /** The React Flow client-side node id, carried verbatim from submission through every edit. Diffing is keyed entirely on this — if it were ever regenerated, every node would read as deleted-and-re-added. */
   id: Scalars['ID']['output'];
   label: Scalars['String']['output'];
+  parameterSnapshot?: Maybe<Array<ParameterSnapshotEntry>>;
   /** Canvas position; absent on legacy jobs submitted before positions were read back */
   position?: Maybe<JobVersionPosition>;
   /** Node price as computed when this version was saved */
@@ -1568,6 +1590,8 @@ export type Mutation = {
   addBugAttachments: BugReport;
   /** Record uploaded attachments for a job so they appear in tracking views. */
   addJobAttachments: Job;
+  /** Add another person (by email) with the same access as the primary client. */
+  addJobMember: Job;
   /** Staff-only. Add a new workflow (service(s) + parameters) to an existing job. */
   addWorkflowToJob: Job;
   /** Staff-only. Archive a job: hides it from the default jobs dashboard and the live lab boards while retaining everything. Permitted even when the job is IN_PROGRESS — the caller is expected to have confirmed — and the state at archive time is recorded. */
@@ -1661,6 +1685,8 @@ export type Mutation = {
   markNotificationRead?: Maybe<Notification>;
   /** Job-owner-only. Decline the workflow the lab asked you to approve, with a required reason posted to the comment thread. Returns the job to the lab; it is not terminal. */
   rejectJobReview: Job;
+  /** Remove a member from the job. The primary client cannot be removed. */
+  removeJobMember: Job;
   /** Renumbers a section. The block left at the top becomes its default. */
   reorderSowTextPresets: Array<SowTextPreset>;
   /** Job-owner-only. Ask the lab for access to edit this job's workflow. Grants nothing on its own — staff open the editor with reviewJob(REQUEST_EDITS). Allowed until the SOW is signed. */
@@ -1681,6 +1707,8 @@ export type Mutation = {
   saveSowVersion: SowVersion;
   /** Staff-only. Issues the current draft to the customer for signing. */
   sendSowToCustomer: SowVersion;
+  /** Set or clear the job description (trimmed, at most 500 characters). Any job state; creates no job version. Open to members and jobs:view-all. */
+  setJobDescription: Job;
   /** Administrator: set a user’s access tier by rewriting their Keycloak access-group membership. Pricing groups are never touched. Takes effect at the user’s next sign-in. */
   setUserKeycloakAccessTier: KeycloakUserCustomerManagement;
   /** Staff: set a user’s Keycloak pricing customer group to match the given category, or clear all such groups when category is omitted. */
@@ -1742,6 +1770,12 @@ export type MutationAddBugAttachmentsArgs = {
 
 export type MutationAddJobAttachmentsArgs = {
   attachments: Array<JobAttachmentInput>;
+  jobId: Scalars['ID']['input'];
+};
+
+
+export type MutationAddJobMemberArgs = {
+  email: Scalars['String']['input'];
   jobId: Scalars['ID']['input'];
 };
 
@@ -2029,6 +2063,12 @@ export type MutationRejectJobReviewArgs = {
 };
 
 
+export type MutationRemoveJobMemberArgs = {
+  email: Scalars['String']['input'];
+  jobId: Scalars['ID']['input'];
+};
+
+
 export type MutationReorderSowTextPresetsArgs = {
   order: ReorderSowTextPresetsInput;
 };
@@ -2080,6 +2120,12 @@ export type MutationSaveSowVersionArgs = {
 
 export type MutationSendSowToCustomerArgs = {
   sowId: Scalars['ID']['input'];
+};
+
+
+export type MutationSetJobDescriptionArgs = {
+  description?: InputMaybe<Scalars['String']['input']>;
+  jobId: Scalars['ID']['input'];
 };
 
 
@@ -2302,6 +2348,15 @@ export type OwnJobsResult = {
   items: Array<Job>;
   /** Total count (for pagination UI) */
   totalCount: Scalars['Int']['output'];
+};
+
+/** A parameter value as named and displayed when the node was last saved, so it stays readable after the catalogue changes. */
+export type ParameterSnapshotEntry = {
+  __typename?: 'ParameterSnapshotEntry';
+  displayValue: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  type?: Maybe<Scalars['String']['output']>;
 };
 
 /** Customer-category pricing (internal/external) with optional legacy fallback. */
@@ -4022,6 +4077,7 @@ export type WorkflowNode = {
   job?: Maybe<WorkflowNodeJob>;
   /** Human readable name of the service */
   label: Scalars['String']['output'];
+  parameterSnapshot?: Maybe<Array<ParameterSnapshotEntry>>;
   /** Snapshot of service price at submission time */
   price?: Maybe<Scalars['Float']['output']>;
   /** React Flow representation of the node (including its canvas position) for re-generating the graph. Nullable: nodes created before this was persisted, or through paths that never set it, have none — and a non-nullable field would make merely selecting it fail the whole job query. */

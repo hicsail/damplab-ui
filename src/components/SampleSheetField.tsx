@@ -13,9 +13,8 @@ interface Props {
   serviceId?: string;
   readOnly?: boolean;
   /**
-   * Whether a file can be picked here. True on the canvas, where files are
-   * uploaded at submission; false in the job editor, which has no upload step —
-   * there the sheet is replaced from the job page instead.
+   * Whether a file can be picked here. True on the canvas and in the job editor
+   * whenever it is not read-only; the editor uploads the file when it saves.
    */
   uploadable?: boolean;
   onChange: (next: unknown) => void;
@@ -109,7 +108,6 @@ export default function SampleSheetField({ param, value, serviceId, readOnly, up
         <FormHelperText sx={{ mt: 0.5 }}>No spreadsheet attached yet.</FormHelperText>
       )}
 
-      {!uploadable && !readOnly && <FormHelperText>Upload or replace the spreadsheet from the job page.</FormHelperText>}
       {error && <FormHelperText error>{error}</FormHelperText>}
     </div>
   );

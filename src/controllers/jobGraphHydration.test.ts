@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, mergeSavedFormData, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts } from './jobGraphHydration';
+import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, mergeSavedFormData, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts, versionWorkflowsAsCards, overlayLiveSampleSheetsOnCanvas } from './jobGraphHydration';
 import { getWorkflowsFromGraph } from './GraphHelpers';
-import { EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_PARAM_IDS, EQUIPMENT_START_PARAM_ID } from '../utils/servicePricing';
+import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_END_PARAM_ID, EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, EQUIPMENT_PARAM_IDS, EQUIPMENT_START_PARAM_ID } from '../utils/servicePricing';
 
 const service = (id: string, parameters: any[] = []) => ({
   id,
@@ -593,6 +593,26 @@ describe('mergeSavedFormData — equipment parameters', () => {
     { id: 'buf', name: 'Buffer', type: 'string', required: false }
   ];
 
+  it('carries a stored booker list through unchanged, after the four, without offering it anew', () => {
+    const saved = [
+      { id: EQUIPMENT_START_PARAM_ID, value: '2026-01-01' },
+      { id: EQUIPMENT_END_PARAM_ID, value: '2026-01-29' },
+      { id: EQUIPMENT_HOURS_PER_WEEK_PARAM_ID, value: 10 },
+      { id: EQUIPMENT_BOOKERS_PARAM_ID, value: ['a@b.com'] }
+    ];
+    const merged = mergeSavedFormData(parameters, saved, 'n1', { equipmentUse: true });
+    const retired = merged.filter((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID);
+    expect(retired).toHaveLength(1);
+    expect(retired[0].value).toEqual(['a@b.com']);
+    expect(merged[merged.length - 1].id).toBe(EQUIPMENT_BOOKERS_PARAM_ID);
+  });
+
+  it('adds no booker entry to a node that never stored one', () => {
+    const saved = [{ id: EQUIPMENT_START_PARAM_ID, value: '2026-01-01' }];
+    const merged = mergeSavedFormData(parameters, saved, 'n1', { equipmentUse: true });
+    expect(merged.some((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID)).toBe(false);
+  });
+
   it('keeps a saved booking window when the service is still equipment use', () => {
     const saved = [
       { id: EQUIPMENT_START_PARAM_ID, value: '2026-01-01' },
@@ -624,5 +644,37 @@ describe('mergeSavedFormData — equipment parameters', () => {
     // Behaviour 4: toggling the flag never touches nodes that already exist.
     const merged = mergeSavedFormData(parameters, [{ id: 'vol', value: 5 }], 'n1', { equipmentUse: true });
     expect(merged.some((p) => EQUIPMENT_PARAM_IDS.includes(p.id))).toBe(false);
+  });
+});
+
+describe('versionWorkflowsAsCards — parameter snapshot', () => {
+  it('carries the version node snapshot onto the card node', () => {
+    const snapshot = [{ id: 'gone', name: 'Old parameter', type: 'text', displayValue: 'x' }];
+    const cards = versionWorkflowsAsCards([{ workflowId: 'w1', name: 'W', nodes: [{ id: 'a', serviceId: 'svc', serviceName: 'Svc', formData: [], parameterSnapshot: snapshot }] }], []);
+    expect(cards[0].nodes[0].parameterSnapshot).toEqual(snapshot);
+  });
+});
+
+describe('overlayLiveSampleSheetsOnCanvas (customer editor)', () => {
+  it("puts the lab's current sheet on the canvas the customer edits, and nothing else", () => {
+    const canvas = [{ id: 'a', data: { formData: [{ id: 'sheet', value: 'old' }, { id: 'vol', value: 1 }] } }];
+    const live = [{ nodes: [{ id: 'a', service: { parameters: [{ id: 'sheet', type: 'sampleSheet' }, { id: 'vol', type: 'number' }] }, formData: [{ id: 'sheet', value: 'swapped' }, { id: 'vol', value: 99 }] }] }];
+    const out = overlayLiveSampleSheetsOnCanvas(canvas, live);
+    expect(out[0].data.formData).toEqual([{ id: 'sheet', value: 'swapped' }, { id: 'vol', value: 1 }]);
+    expect(canvas[0].data.formData[0].value).toBe('old');
+  });
+
+  it('strips the presigned url the node resolver adds, so a save does not persist it', () => {
+    const canvas = [{ id: 'a', data: { formData: [{ id: 'sheet', value: 'old' }] } }];
+    const value = { key: 'workflow-parameters/u/x.xlsx', filename: 'x.xlsx', sampleCount: 3, url: 'https://s3.example/x?X-Amz-Signature=abc' };
+    const live = [{ nodes: [{ id: 'a', service: { parameters: [{ id: 'sheet', type: 'sampleSheet' }] }, formData: [{ id: 'sheet', value }] }] }];
+    const out = overlayLiveSampleSheetsOnCanvas(canvas, live);
+    expect(out[0].data.formData[0].value).toEqual({ key: 'workflow-parameters/u/x.xlsx', filename: 'x.xlsx', sampleCount: 3 });
+    expect(value.url).toBeDefined();
+  });
+
+  it('leaves nodes without a live counterpart alone', () => {
+    const canvas = [{ id: 'new', data: { formData: [{ id: 'sheet', value: 'x' }] } }];
+    expect(overlayLiveSampleSheetsOnCanvas(canvas, [])).toEqual(canvas);
   });
 });

@@ -5,7 +5,7 @@ import CheckCircleOutlineIcon                                  from '@mui/icons-
 
 import { MUTATE_NODE_STATUS, MUTATE_WORKFLOW_STATE }                           from "../gql/mutations";
 import { ColorlibStepIconRoot, atLeastOneServiceActive, allServicesCompleted } from "../controllers/StepperHelpers"
-import { ImagesServicesDict } from '../assets/icons';
+import { getServiceIcon }   from '../assets/icons';
 
 
 export default function DominosStepper({ id, nodes, workflowState, refetchQueued, refetchInProgress, refetchComplete }: any) {
@@ -109,17 +109,17 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
         const imageCached: any = useMemo(() => 
             {return(<img className={className}
             // src={nodes[Number(props.icon)-1].icon}
-            src={ImagesServicesDict[nodes[Number(props.icon)-1].name]}
+            src={getServiceIcon(nodes[Number(props.icon)-1].name)}
             height="50" 
             alt=" "
             referrerPolicy="no-referrer" />)}, 
             // [nodes[Number(props.icon)-1].icon]);
-            [ImagesServicesDict[nodes[Number(props.icon)-1].name]]);
+            [getServiceIcon(nodes[Number(props.icon)-1].name)]);
         completed 
             ? image = <CheckCircleOutlineIcon fontSize="large" sx={{color: "white"}}/>
             : image = <img className={className}
                         //    src={nodes[Number(props.icon)-1].icon}
-                           src={ImagesServicesDict[nodes[Number(props.icon)-1].name]}
+                           src={getServiceIcon(nodes[Number(props.icon)-1].name)}
                            height="50" alt="Service icon" />
         return (
             <ColorlibStepIconRoot ownerState={{ completed, active }} className={className}>

@@ -9,22 +9,29 @@ import {
   DialogContent,
   DialogTitle,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { GET_UPLOAD_LOG, GET_UPLOAD_LOGS } from '../gql/queries';
+import { entityTypeLabel, filterUploadLogs, UploadLogTypeFilter, uploadLogFilterFromSearch } from '../utils/uploadLogs';
 
 export default function InventoryUploadHistory() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data, loading } = useQuery(GET_UPLOAD_LOGS, { fetchPolicy: 'cache-and-network' });
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<UploadLogTypeFilter>(() => uploadLogFilterFromSearch(location.search));
 
   const logs: any[] = data?.uploadLogs ?? [];
+  const shown = filterUploadLogs(logs, typeFilter);
 
   const columns: GridColDef[] = [
+    { field: 'entityType', headerName: 'Type', width: 110, valueGetter: (_v, row) => entityTypeLabel(row.entityType) },
     {
       field: 'uploadDate',
       headerName: 'Date',
@@ -71,7 +78,18 @@ export default function InventoryUploadHistory() {
       >
         Back to catalog
       </Button>
-      <Typography variant='h2'>Inventory Upload History</Typography>
+      <Typography variant='h2'>Upload History</Typography>
+
+      <ToggleButtonGroup
+        exclusive
+        size='small'
+        value={typeFilter}
+        onChange={(_e, value) => value && setTypeFilter(value)}
+      >
+        <ToggleButton value='ALL'>All</ToggleButton>
+        <ToggleButton value='INVENTORY'>Inventory</ToggleButton>
+        <ToggleButton value='OPERATION'>Operations</ToggleButton>
+      </ToggleButtonGroup>
 
       {loading && logs.length === 0 && (
         <Typography color='text.secondary'>Loading...</Typography>
@@ -79,7 +97,7 @@ export default function InventoryUploadHistory() {
 
       <Box sx={{ height: 500 }}>
         <DataGrid
-          rows={logs}
+          rows={shown}
           columns={columns}
           density='compact'
           disableRowSelectionOnClick
@@ -102,7 +120,7 @@ function UploadLogDetail({ logId, onClose }: { logId: string; onClose: () => voi
   const snapshots: any[] = log?.fieldSnapshots ?? [];
 
   const columns: GridColDef[] = [
-    { field: 'itemId', headerName: 'Item ID', width: 220 },
+    { field: 'itemId', headerName: 'Record ID', width: 220 },
     {
       field: 'action',
       headerName: 'Action',
