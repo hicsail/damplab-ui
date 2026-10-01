@@ -216,8 +216,9 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
                     const meta = stepMeta.get(step.id);
                     if (!meta) return null;
                     const equip: any[] = meta.equipment ?? [];
+                    const tags: any[] = Array.isArray(meta.paramTags) ? meta.paramTags.filter((t: any) => t?.label) : [];
                     const hasEquip = equip.length > 0;
-                    if (!hasEquip && !meta.requiresNoEquipment && !(meta.issues?.length)) return null;
+                    if (!hasEquip && !meta.requiresNoEquipment && !(meta.issues?.length) && tags.length === 0) return null;
                     return (
                       <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
                         {meta.requiresNoEquipment && !hasEquip && (
@@ -249,6 +250,9 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
                         })}
                         {(meta.issues ?? []).map((iss: string, i: number) => (
                           <Chip key={`iss-${i}`} size="small" color="warning" variant="outlined" icon={<WarningAmberIcon />} label={iss} />
+                        ))}
+                        {tags.map((tag: any, i: number) => (
+                          <Chip key={`tag-${i}`} size="small" variant="outlined" color="info" label={`${tag.label}: ${tag.value ?? ''}`} />
                         ))}
                       </Stack>
                     );

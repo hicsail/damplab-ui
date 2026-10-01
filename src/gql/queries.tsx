@@ -1935,6 +1935,7 @@ export const RESOLVE_PROTOCOL = gql`
         status
         requiresNoEquipment
         issues
+        paramTags
         equipment {
           id
           name
