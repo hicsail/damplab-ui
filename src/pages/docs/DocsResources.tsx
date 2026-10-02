@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Button, Link, Paper, Typography } from "@mui/material";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import SchemaOutlinedIcon from "@mui/icons-material/SchemaOutlined";
 import ScienceOutlinedIcon from "@mui/icons-material/ScienceOutlined";
 import { DocsPageHeader, DocsSection } from "../../components/docs/DocsParts";
 
@@ -125,6 +126,15 @@ const GRAPHQL_POINTS = [
 
 const SCHEMA_SCALE = "more than 100 kinds of records and around 200 queries and actions";
 
+/**
+ * The GraphiQL playground the backend serves at its GraphQL endpoint (`graphiql:
+ * true` in damplab-backend's graphql-options.ts). Built from VITE_BACKEND so each
+ * environment links to its own API. Hidden when VITE_BACKEND is a relative path
+ * (the local dev proxy), where /graphql on this host is not the playground.
+ */
+const BACKEND_URL: string = import.meta.env.VITE_BACKEND ?? "";
+const PLAYGROUND_URL: string | undefined = /^https?:\/\//.test(BACKEND_URL) ? BACKEND_URL : undefined;
+
 const EXAMPLE_QUERY = `query {
   services {
     name
@@ -195,6 +205,35 @@ function GraphqlSection() {
         </ExternalLink>{" "}
         in damplab-ui.
       </Typography>
+
+      {PLAYGROUND_URL && (
+        <Paper
+          variant="outlined"
+          sx={{ p: { xs: 2, md: 2.5 }, mt: 3, borderRadius: 2, display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", justifyContent: "space-between" }}
+        >
+          <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start", maxWidth: 620 }}>
+            <SchemaOutlinedIcon sx={{ color: "#456b6e", mt: 0.25 }} aria-hidden />
+            <Box>
+              <Typography sx={{ fontWeight: 700 }}>Explore the schema yourself</Typography>
+              <Typography sx={{ fontSize: 13.5, color: "text.secondary" }}>
+                The GraphQL playground lists every type and field in the schema: open the Docs panel in its top-left
+                corner to browse. Anyone can browse it. Running a request needs a signed-in Canvas account, so visitors
+                who try one will see an "unauthenticated" message.
+              </Typography>
+            </Box>
+          </Box>
+          <Button
+            href={PLAYGROUND_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="contained"
+            endIcon={<OpenInNewIcon fontSize="small" />}
+            sx={{ textTransform: "none" }}
+          >
+            Open the GraphQL playground
+          </Button>
+        </Paper>
+      )}
     </>
   );
 }
