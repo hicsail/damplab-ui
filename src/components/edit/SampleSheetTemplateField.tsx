@@ -2,12 +2,18 @@ import { useState } from 'react';
 import { Alert, Button, Link as MuiLink, Stack, Typography } from '@mui/material';
 import { useApolloClient, useMutation } from '@apollo/client';
 import { SAMPLE_SHEET_TEMPLATE_UPLOAD_URL } from '../../gql/mutations';
-import { GET_SAMPLE_SHEET_TEMPLATE_URL } from '../../gql/queries';
+import { GET_PARAMETER_SET_SAMPLE_SHEET_TEMPLATE_URL, GET_SAMPLE_SHEET_TEMPLATE_URL } from '../../gql/queries';
 import { formatSaveError } from '../../utils/gqlError';
 import { SAMPLE_SHEET_ACCEPT } from '../../utils/sampleSheet';
 
+/**
+ * Where the parameter is saved, which is where its stored template is read
+ * back from. A Parameter Set that has not been saved yet has no id.
+ */
+export type SampleSheetTemplateOwner = { serviceId: string } | { parameterSetId: string | undefined };
+
 interface Props {
-  serviceId: string;
+  owner: SampleSheetTemplateOwner;
   parameter: any;
   canWrite: boolean;
   /** Patches the parameter being edited; saved with the rest on Save. */
@@ -19,7 +25,7 @@ interface Props {
  * as soon as it is chosen, but the reference is only patched onto the
  * parameter, so nothing is live until the parameters are saved.
  */
-export default function SampleSheetTemplateField({ serviceId, parameter, canWrite, onChange }: Props) {
+export default function SampleSheetTemplateField({ owner, parameter, canWrite, onChange }: Props) {
   const client = useApolloClient();
   const [templateUploadUrl] = useMutation(SAMPLE_SHEET_TEMPLATE_UPLOAD_URL);
   const [error, setError] = useState<string | null>(null);
@@ -50,14 +56,26 @@ export default function SampleSheetTemplateField({ serviceId, parameter, canWrit
 
   const download = async () => {
     setError(null);
+    const notSaved = 'That template is not available yet. Save the parameters first.';
     try {
-      const { data } = await client.query({
-        query: GET_SAMPLE_SHEET_TEMPLATE_URL,
-        variables: { serviceId, parameterId: parameter?.id },
-        fetchPolicy: 'network-only'
-      });
-      if (data?.sampleSheetTemplateUrl) window.open(data.sampleSheetTemplateUrl, '_blank', 'noopener');
-      else setError('That template is not available yet. Save the parameters first.');
+      let url: string | null | undefined;
+      if ('serviceId' in owner) {
+        const { data } = await client.query({
+          query: GET_SAMPLE_SHEET_TEMPLATE_URL,
+          variables: { serviceId: owner.serviceId, parameterId: parameter?.id },
+          fetchPolicy: 'network-only'
+        });
+        url = data?.sampleSheetTemplateUrl;
+      } else if (owner.parameterSetId) {
+        const { data } = await client.query({
+          query: GET_PARAMETER_SET_SAMPLE_SHEET_TEMPLATE_URL,
+          variables: { parameterSetId: owner.parameterSetId, parameterId: parameter?.id },
+          fetchPolicy: 'network-only'
+        });
+        url = data?.parameterSetSampleSheetTemplateUrl;
+      }
+      if (url) window.open(url, '_blank', 'noopener');
+      else setError(notSaved);
     } catch (err) {
       setError(formatSaveError(err, 'this template'));
     }

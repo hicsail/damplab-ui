@@ -13,7 +13,7 @@ import {
 import { Template } from './types';
 
 interface FileUploadSectionProps {
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   isProcessing: boolean;
   savedTemplates: Template[];
   templatesLoading?: boolean;

@@ -154,7 +154,7 @@ export default function BookInventory() {
 
   const overlapsExisting = useMemo(() => {
     if (!start || !end || !timed) return false;
-    return busy.some((slot) => new Date(start) < new Date(slot.end) && new Date(slot.start) < new Date(end));
+    return busy.some((slot) => new Date(start) < new Date(slot.end as string | Date) && new Date(slot.start as string | Date) < new Date(end));
   }, [start, end, busy, timed]);
 
   const reload = async (): Promise<void> => {

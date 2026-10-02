@@ -9,14 +9,6 @@ export interface EditableParameter {
   [key: string]: any;
 }
 
-// Mirrors ParameterValidation.tsx's own (unexported) shape. validateParameter's
-// declared return type is the single-item interface, not an array, though it
-// returns an array at runtime (pre-existing mismatch — see typecheck baseline).
-interface ParameterValidationError {
-  field: string;
-  errorMsg: string;
-}
-
 export const createDragKey = (): string =>
   typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
@@ -64,7 +56,7 @@ export function prepareParametersForSave(
   });
 
   const validationErrors = unique.flatMap((parameter, index) =>
-    (validateParameter(parameter as any) as unknown as ParameterValidationError[]).map(
+    validateParameter(parameter as any).map(
       (error) => `Parameter ${index + 1}: ${error.field} - ${error.errorMsg}`
     )
   );

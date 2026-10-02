@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GridRowModes, GridRowModesModel } from '@mui/x-data-grid';
+import { GridActionsColDef, GridRowModes, GridRowModesModel } from '@mui/x-data-grid';
 import { getActionsColumn } from './ActionColumn';
 import { canFor } from '../../hooks/usePermissions';
 
@@ -12,7 +12,7 @@ const actionsFor = (canWrite: boolean, rowModesModel: GridRowModesModel = {}) =>
     handleEdit: () => {},
     handleDelete: () => {}
   });
-  return column.getActions!({ id: 'row-1' } as any);
+  return (column as GridActionsColDef).getActions({ id: 'row-1' } as any);
 };
 
 describe('getActionsColumn — the shared Actions column', () => {

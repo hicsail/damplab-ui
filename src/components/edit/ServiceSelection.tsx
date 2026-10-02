@@ -17,7 +17,7 @@ export const ServiceSelection: React.FC<ServiceSelectionProps> = (props) => {
   );
 
   const gridRef = useGridApiContext();
-  const ref = useRef();
+  const ref = useRef<unknown>(null);
 
   useLayoutEffect(() => {
     if (props.hasFocus && ref && ref.current) {

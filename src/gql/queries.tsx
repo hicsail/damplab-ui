@@ -502,7 +502,7 @@ export const JOBS_FOR_VIEWER = gql`
         archivedAt
         archivedBy
         archivedFromState
-        invoiceCount
+        invoiceStatus
         sow {
           id
           sowNumber
@@ -2422,5 +2422,11 @@ export const MY_NOTIFICATION_PREFERENCES = gql`
 export const GET_SAMPLE_SHEET_TEMPLATE_URL = gql`
   query SampleSheetTemplateUrl($serviceId: ID!, $parameterId: String!) {
     sampleSheetTemplateUrl(serviceId: $serviceId, parameterId: $parameterId)
+  }
+`;
+
+export const GET_PARAMETER_SET_SAMPLE_SHEET_TEMPLATE_URL = gql`
+  query ParameterSetSampleSheetTemplateUrl($parameterSetId: ID!, $parameterId: String!) {
+    parameterSetSampleSheetTemplateUrl(parameterSetId: $parameterSetId, parameterId: $parameterId)
   }
 `;

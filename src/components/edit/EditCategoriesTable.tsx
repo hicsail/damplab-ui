@@ -178,7 +178,7 @@ export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ search
           toolbar: GridToolBar as GridSlots['toolbar']
         }}
         slotProps={{
-          toolbar: { canWrite, setRowModesModel, setRows },
+          toolbar: { canWrite, setRowModesModel, setRows: (update) => setRows((old) => [...update(old)]) },
         }}
       />
       <Snackbar

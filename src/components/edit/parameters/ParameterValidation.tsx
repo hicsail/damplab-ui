@@ -1,11 +1,11 @@
 import { GridRowModel } from "@mui/x-data-grid";
 
-interface ParameterValidationError {
+export interface ParameterValidationError {
   field: string;
   errorMsg: string;
 }
 
-export function validateParameter(row: GridRowModel): ParameterValidationError {
+export function validateParameter(row: GridRowModel): ParameterValidationError[] {
   let errors: ParameterValidationError[] = [];
 
   // Name is required

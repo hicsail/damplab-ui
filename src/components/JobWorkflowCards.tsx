@@ -8,6 +8,7 @@ import HelpOutlineIcon  from '@mui/icons-material/HelpOutline';
 import { diffWordsWithSpace } from 'diff';
 import { resolveParameterName } from '../utils/servicePricing';
 import { snapshotFallback } from '../utils/parameterSnapshot';
+import { isRetiredEquipmentParam } from '../utils/equipmentParams';
 import SowDiffText from './sow/SowDiffText';
 import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
 import { isSampleSheetParam, parseSampleSheetValue, sampleCountLabel } from '../utils/sampleSheetValue';
@@ -305,7 +306,7 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                             </Box>
                                         </Box>
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
-                                            {normalizeFormEntries(node?.formData).map((entry: any) => {
+                                            {normalizeFormEntries(node?.formData).filter((entry) => !isRetiredEquipmentParam(entry)).map((entry: any) => {
                                                 const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
                                                 const fallback = snapshotFallback(node, entry.id, paramDef);
                                                 const label = fallback?.name || resolveParameterName(entry, paramDef) || 'Parameter';

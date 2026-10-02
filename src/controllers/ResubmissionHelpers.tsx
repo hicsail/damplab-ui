@@ -49,7 +49,7 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
     // const formData: NodeParameter[] = generateFormDataFromParamsAlt(service.service.parameters, nodeId);
     // const formData: NodeParameter[] = service.formData;
     
-    const formData = [];
+    const formData: NodeParameter[] = [];
     const paramsData = service.service.parameters;
     const formValues = service.formData;
     // Match saved values to parameters by id (not index): the catalog's parameter
@@ -81,7 +81,7 @@ export const addNodeToCanvasWithEdgeAlt = (services: any[], sourceId: string, se
             value: matched != null ? matched : (allowMultipleValues ? [''] : null),
             required: parameter.required,
             allowMultipleValues: allowMultipleValues || undefined,
-        });
+        } as NodeParameter);
     };
 
     // console.log(formData[0].value);
@@ -169,7 +169,7 @@ export const generateFormDataFromParamsAlt = (paramsData: any, nodeId: string): 
             value           : allowMultipleValues ? [''] : null,
             required        : parameter.required,
             allowMultipleValues: allowMultipleValues || undefined,
-        });
+        } as NodeParameter);
     }
 
     return formData;

@@ -220,7 +220,7 @@ export default function Checkout() {
     }
 
     const options = Array.isArray(parameterDef.options) ? parameterDef.options : [];
-    const optionNameById = new Map(
+    const optionNameById = new Map<string, string>(
       options
         .filter((opt: any) => opt && typeof opt.id === 'string')
         .map((opt: any) => [String(opt.id), String(opt.name ?? 'Option')] as const)

@@ -133,7 +133,7 @@ export default function DominosStepper({ id, nodes, workflowState, refetchQueued
             nonLinear
             alternativeLabel 
             // activeStep usually scalar; here array; get warning; doesn't seem to cause probs
-            activeStep = {active}
+            activeStep = {active as unknown as number}
             style={{ overflowX: "auto", padding: "25px", textAlign: 'center', 
                      fontSize: "11px",  lineHeight: "1.2" }}
             connector={null}

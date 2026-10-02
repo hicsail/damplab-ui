@@ -1,5 +1,6 @@
 import { sowStatusLabel, statusColor } from '../components/sow/sowTypes';
 import { ChipStatusColor, jobStatusColor, jobStatusLabel } from './technicianProcessStatus';
+import { invoiceStatusChipColor, invoiceStatusLabel } from './equipmentBilling';
 
 /**
  * The per-section status chips a row in the jobs list carries.
@@ -27,11 +28,13 @@ export interface JobSectionChip {
 export interface JobSectionSource {
   state?: string | null;
   sow?: { status?: string | null } | null;
-  invoiceCount?: number | null;
+  /** Where the job's current invoice stands; null or absent before one is issued. */
+  invoiceStatus?: string | null;
 }
 
 export function jobListSectionChips(job: JobSectionSource): JobSectionChip[] {
-  const invoices = job.invoiceCount ?? 0;
+  // Only the invoice that stands is reported, so anything else reads as none.
+  const invoice = job.invoiceStatus === 'PAID' || job.invoiceStatus === 'ISSUED' ? job.invoiceStatus : null;
 
   return [
     {
@@ -48,10 +51,10 @@ export function jobListSectionChips(job: JobSectionSource): JobSectionChip[] {
     },
     {
       key: 'invoices',
-      label: invoices > 0 ? `Invoices · ${invoices}` : 'Invoices · None',
-      // Matches the job page, where the Invoices pane is `info` once anything has
-      // been billed and neutral before that.
-      color: invoices > 0 ? 'info' : 'default'
+      label: `Invoice · ${invoice ? invoiceStatusLabel(invoice) : 'None'}`,
+      // The Invoice card's own chip colours: `info` while issued, `success`
+      // once paid, neutral before anything has been billed.
+      color: invoice ? invoiceStatusChipColor(invoice) : 'default'
     }
   ];
 }

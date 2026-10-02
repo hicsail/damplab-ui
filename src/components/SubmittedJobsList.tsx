@@ -40,7 +40,7 @@ export interface JobListItem {
    * backend without the field fails the whole query, so the caller has to be
    * running one that has it.
    */
-  invoiceCount?: number | null;
+  invoiceStatus?: string | null;
   username?: string;
   institute?: string;
   email?: string;
