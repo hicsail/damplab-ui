@@ -66,7 +66,7 @@ export const DOCS_PAGES: readonly DocsPageDef[] = [
     title: "Code & Protocols",
     navLabel: "Code & Protocols",
     summary: "Where to find the Canvas source code on GitHub and the laboratory protocols published on protocols.io.",
-    ready: false,
+    ready: true,
   },
 ];
 
