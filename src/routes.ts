@@ -27,7 +27,8 @@ export default [
     route("/docs", "./pages/docs/DocsIndex.tsx"),
     route("/docs/about", "./pages/docs/DocsAbout.tsx"),
     route("/docs/tech-stack", "./pages/docs/DocsTechStack.tsx"),
-    route("/docs/graphql", "./pages/docs/DocsGraphql.tsx"),
+    // GraphQL is now a section of Code & Protocols; this keeps old links working.
+    route("/docs/graphql", "./pages/docs/DocsGraphqlRedirect.tsx"),
     route("/docs/biosecurity", "./pages/docs/DocsBiosecurity.tsx"),
     route("/docs/resources", "./pages/docs/DocsResources.tsx"),
   ]),
