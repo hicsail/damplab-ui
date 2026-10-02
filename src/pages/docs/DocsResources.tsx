@@ -21,6 +21,12 @@ import { DocsPageHeader, DocsSection } from "../../components/docs/DocsParts";
  *    source of truth.
  *  - How Canvas uses protocols: damplab-backend src/protocols and src/protocol-map,
  *    and this repo's TechnicianBench, ProtocolMap and AdminEditService pages.
+ *  - GraphQL (folded in from the old /docs/graphql page, which now redirects
+ *    here): the backend builds its schema code-first (`autoSchemaFile: true` in
+ *    app.module.ts), so there is no schema file to link; this repo's generated
+ *    copy is src/gql/graphql.ts (`npm run codegen`). The rounded counts in
+ *    SCHEMA_SCALE come from counting @ObjectType / @InputType / @Query /
+ *    @Mutation decorators in damplab-backend (Oct 2026: ~125 / ~100 / ~90 / ~120).
  */
 
 const WORKSPACE_URL = "https://www.protocols.io/workspaces/damp-lab3";
@@ -93,6 +99,103 @@ function RepositoryCards() {
         );
       })}
     </Box>
+  );
+}
+
+// ─── GraphQL ────────────────────────────────────────────────────────────────
+
+const GRAPHQL_POINTS = [
+  {
+    title: "One schema for everything",
+    body: "The schema names every kind of record Canvas handles (jobs, workflows, lab operations, statements of work, invoices, inventory, bookings, comments and more), the details each one carries, and how they connect to one another.",
+  },
+  {
+    title: "Ask for exactly what you need",
+    body: "Every question the engine can answer (a query) and every action it can take (a mutation) is part of the schema. A request names the details it wants, and gets back exactly those.",
+  },
+  {
+    title: "Checked on every request",
+    body: "Before anything is read or saved, the engine checks the request against the schema and against what the person's role allows.",
+  },
+  {
+    title: "Kept in step",
+    body: "The schema is written alongside the engine's code, and the website generates its matching types from it, so both sides always agree on the shape of the data. Partner tools with an API key read through the same schema.",
+  },
+];
+
+const SCHEMA_SCALE = "more than 100 kinds of records and around 200 queries and actions";
+
+const EXAMPLE_QUERY = `query {
+  services {
+    name
+  }
+}`;
+
+const EXAMPLE_ANSWER = `{
+  "services": [
+    { "name": "Gibson Assembly" },
+    { "name": "Modular Cloning" },
+    …
+  ]
+}`;
+
+function CodeBlock({ label, code }: { label: string; code: string }) {
+  return (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "text.secondary", mb: 0.75 }}>{label}</Typography>
+      <Box
+        component="pre"
+        sx={{
+          m: 0,
+          p: 2,
+          borderRadius: 2,
+          bgcolor: "#1f2a2b",
+          color: "#e8f1f2",
+          fontSize: 13.5,
+          lineHeight: 1.5,
+          overflowX: "auto",
+        }}
+      >
+        <code>{code}</code>
+      </Box>
+    </Box>
+  );
+}
+
+function GraphqlSection() {
+  return (
+    <>
+      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" }, mb: 3 }}>
+        {GRAPHQL_POINTS.map((p) => (
+          <Paper key={p.title} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+            <Typography sx={{ fontWeight: 700, mb: 0.5 }}>{p.title}</Typography>
+            <Typography sx={{ fontSize: 14 }}>{p.body}</Typography>
+          </Paper>
+        ))}
+      </Box>
+
+      <Typography variant="h6" component="h3" sx={{ fontWeight: 700, mb: 0.5 }}>
+        What a request looks like
+      </Typography>
+      <Typography sx={{ color: "text.secondary", mb: 2, maxWidth: 760 }}>
+        To show the catalog, the website asks for the name of every lab operation, and the engine answers with just
+        that list.
+      </Typography>
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, mb: 3 }}>
+        <CodeBlock label="The question" code={EXAMPLE_QUERY} />
+        <CodeBlock label="The answer" code={EXAMPLE_ANSWER} />
+      </Box>
+
+      <Typography sx={{ maxWidth: 760, color: "text.secondary" }}>
+        Today the schema covers {SCHEMA_SCALE}. It is defined in the code of the{" "}
+        <ExternalLink href="https://github.com/hicsail/damplab-backend">damplab-backend</ExternalLink> repository, and
+        the website's generated copy of its types is{" "}
+        <ExternalLink href="https://github.com/hicsail/damplab-ui/blob/main/src/gql/graphql.ts">
+          src/gql/graphql.ts
+        </ExternalLink>{" "}
+        in damplab-ui.
+      </Typography>
+    </>
   );
 }
 
@@ -177,7 +280,7 @@ export default function DocsResources() {
     <>
       <DocsPageHeader
         slug="resources"
-        lead="The Canvas software is open source on GitHub, and the DAMP Lab publishes the step-by-step laboratory protocols behind its work on protocols.io. This page lists both and explains how they connect."
+        lead="The Canvas software is open source on GitHub and is built around a GraphQL schema that describes all of its data. The DAMP Lab publishes the step-by-step laboratory protocols behind its work on protocols.io. This page covers all three and how they connect."
       />
 
       <DocsSection
@@ -198,6 +301,14 @@ export default function DocsResources() {
           <ExternalLink href="https://github.com/DAMPLAB">github.com/DAMPLAB</ExternalLink>, also holds earlier lab
           automation projects, such as Aquarium lab workflows and Opentrons OT-2 scripts.
         </Typography>
+      </DocsSection>
+
+      <DocsSection
+        id="graphql"
+        title="GraphQL: how Canvas describes its data"
+        intro="GraphQL is the language the Canvas website and the Canvas engine use to talk to each other. At its center is our collection of schema and types: one shared definition of how we handle everything in our systems, from what a job is to what an invoice contains."
+      >
+        <GraphqlSection />
       </DocsSection>
 
       <DocsSection
