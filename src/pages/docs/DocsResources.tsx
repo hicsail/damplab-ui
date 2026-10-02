@@ -11,6 +11,10 @@ import { DocsPageHeader, DocsSection } from "../../components/docs/DocsParts";
  * Sources, so the next edit can be checked against them:
  *  - GitHub: `gh repo list hicsail` / `gh repo list DAMPLAB`. Only public repos are
  *    listed. The DAMP-Lab-North/South-Monitor repos are private; keep them off.
+ *    Licenses (check with `gh api repos/<owner>/<repo> --jq .license`, not the
+ *    repo list, which leaves the field empty): both hicsail repos are MIT, with a
+ *    LICENSE file since their initial commits. DAMPLAB/opentrons_protocols has no
+ *    license, so its card names none.
  *  - protocols.io: the public DAMP Lab workspace. PUBLISHED_PROTOCOLS is a snapshot
  *    of it (October 2026, 14 protocols, matching the "Protocols Status Tracking"
  *    sheet). Add new ones as the lab publishes them; the workspace link is the
@@ -37,14 +41,14 @@ const REPOSITORIES = [
     owner: "hicsail",
     title: "The Canvas website",
     body: "Everything you see in your browser: the workflow canvas, job pages, the tools lab staff use, and these documentation pages.",
-    tech: "TypeScript · React",
+    tech: "TypeScript · React · MIT License",
   },
   {
     name: "damplab-backend",
     owner: "hicsail",
     title: "The Canvas engine",
     body: "The behind-the-scenes service that checks permissions, prices work, moves jobs through their stages and stores the data. It is also what talks to protocols.io and the biosecurity screening services.",
-    tech: "TypeScript · NestJS · GraphQL",
+    tech: "TypeScript · NestJS · GraphQL · MIT License",
   },
   {
     name: "opentrons_protocols",
@@ -173,13 +177,20 @@ export default function DocsResources() {
     <>
       <DocsPageHeader
         slug="resources"
-        lead="The Canvas software is public on GitHub, and the DAMP Lab publishes the step-by-step laboratory protocols behind its work on protocols.io. This page lists both and explains how they connect."
+        lead="The Canvas software is open source on GitHub, and the DAMP Lab publishes the step-by-step laboratory protocols behind its work on protocols.io. This page lists both and explains how they connect."
       />
 
       <DocsSection
         id="github"
         title="GitHub: the source code"
-        intro="GitHub is a website where software code is stored and shared, with every change recorded. The Canvas code is public, so anyone can read it and see how it has changed over time."
+        intro={
+          <>
+            GitHub is a website where software code is stored and shared, with every change recorded. The Canvas code is
+            open source under the{" "}
+            <ExternalLink href="https://github.com/hicsail/damplab-ui/blob/main/LICENSE">MIT License</ExternalLink>: anyone
+            may read, use, change and share it, as long as the original copyright notice comes with it.
+          </>
+        }
       >
         <RepositoryCards />
         <Typography sx={{ mt: 2.5, maxWidth: 760, color: "text.secondary" }}>
