@@ -4,7 +4,7 @@ import { Alert, Box, Button, Chip, CircularProgress, FormControl, InputLabel, Me
 import { addDays, startOfMonth } from 'date-fns';
 import { GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BOOKING } from '../../gql/queries';
 import { CANCEL_BOOKING, CREATE_JOB_EQUIPMENT_BOOKING, UPDATE_JOB_EQUIPMENT_BOOKING } from '../../gql/mutations';
-import { blockedMessage, defaultSlotFor, formatBookingWindow, LOCKED_MESSAGES, operationNotBookableMessage } from '../../utils/jobEquipmentBooking';
+import { blockedMessage, bookingStatusLabel, defaultSlotFor, formatBookingWindow, LOCKED_MESSAGES, operationNotBookableMessage } from '../../utils/jobEquipmentBooking';
 import { formatGqlError, formatSaveError } from '../../utils/gqlError';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import JobEquipmentBookingDialog from './JobEquipmentBookingDialog';
@@ -16,6 +16,10 @@ interface Props {
   editBookingId?: string;
   /** Called once the deep link has been acted on, so the caller can drop it from the URL. */
   onEditConsumed?: () => void;
+  /** Show this booking picked out on its month and equipment (the staff job page's link). */
+  highlightBookingId?: string;
+  /** The job's name, for the booking dialog's Job line. */
+  jobLabel?: string;
 }
 
 /**
@@ -26,7 +30,7 @@ interface Props {
  * Every gate has a server-side twin — `jobEquipmentBooking` returns HIDDEN and no
  * data to a caller who is not on the job, and the mutations re-check.
  */
-export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEditConsumed }: Props): React.JSX.Element | null {
+export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEditConsumed, highlightBookingId, jobLabel }: Props): React.JSX.Element | null {
   const { can } = usePermissions();
   const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [selectedItem, setSelectedItem] = useState<Record<string, string>>({});
@@ -35,6 +39,7 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
   const [editing, setEditing] = useState<any | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const { data, loading, error, refetch } = useQuery(GET_JOB_EQUIPMENT_BOOKING, {
     variables: { jobId },
@@ -78,6 +83,17 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
     onEditConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editBookingId, view]);
+
+  // Deep link from the staff job page: go to the booking's month and equipment and
+  // keep it highlighted. Unlike the edit link it is not consumed — the highlight is
+  // the point of the page — and it opens nothing.
+  const highlightTarget = highlightBookingId ? (view?.bookings ?? []).find((b: any) => String(b._id) === String(highlightBookingId)) : undefined;
+  useEffect(() => {
+    if (!highlightTarget || highlightTarget.status === 'CANCELLED') return;
+    if (highlightTarget.startTime) setMonth(startOfMonth(new Date(highlightTarget.startTime)));
+    setSelectedItem((s) => ({ ...s, [highlightTarget.nodeId]: String(highlightTarget.inventoryItem) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightTarget?._id]);
 
   const [createBooking, { loading: creating }] = useMutation(CREATE_JOB_EQUIPMENT_BOOKING);
   const [updateBooking, { loading: updating }] = useMutation(UPDATE_JOB_EQUIPMENT_BOOKING);
@@ -130,6 +146,14 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
         });
       }
       closeDialog();
+      // A client's booking, or a client's change to one, waits on the lab (server: TENTATIVE).
+      if (!can(PERMISSIONS.JobsViewAll)) {
+        setNotice(
+          editing
+            ? 'Change requested. The new time is held for you until the lab approves it; you will be notified.'
+            : 'Booking requested. The time is held for you until the lab approves it; you will be notified.'
+        );
+      }
       await reload();
     } catch (error) {
       setDialogError(formatSaveError(error, 'this booking'));
@@ -156,17 +180,22 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
   };
 
   const dialogOperation = editing ? operations.find((op) => op.nodeId === editing.nodeId) : bookingFor;
-  const dialogItemName = (): string => {
-    const items: any[] = dialogOperation?.items ?? [];
-    const id = editing ? String(editing.inventoryItem) : (selectedItem[dialogOperation?.nodeId] ?? items.find((i) => i.schedulable)?.id);
-    return items.find((i) => i.id === id)?.name ?? 'equipment';
-  };
 
   return (
     <>
       {actionError && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setActionError(null)}>
           {actionError}
+        </Alert>
+      )}
+      {notice && (
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setNotice(null)}>
+          {notice}
+        </Alert>
+      )}
+      {highlightBookingId && view && (!highlightTarget || highlightTarget.status === 'CANCELLED') && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {highlightTarget ? 'That booking was cancelled, so it is no longer on the calendar.' : 'That booking is not on this job.'}
         </Alert>
       )}
 
@@ -237,6 +266,10 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
               busy={busyFor(itemId, mine)}
               window={op.window}
               canAct={mayBook}
+              // Staff do not book on a client's job, but may cancel its bookings (server: assertMayCancel admits jobs:view-all).
+              canCancelBooking={can(PERMISSIONS.JobsViewAll) ? () => true : undefined}
+              detailOf={(b) => (b.status === 'TENTATIVE' ? bookingStatusLabel(b) : undefined)}
+              highlightId={highlightBookingId}
               onEdit={(b) => {
                 setDialogError(null);
                 setBookingFor(null);
@@ -252,7 +285,9 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
 
       <JobEquipmentBookingDialog
         open={!!bookingFor || !!editing}
-        title={editing ? `Edit booking — ${dialogItemName()}` : `Book ${dialogItemName()} — ${dialogOperation?.label ?? ''}`}
+        requiresApproval={!can(PERMISSIONS.JobsViewAll)}
+        operationLabel={dialogOperation?.label}
+        jobLabel={jobLabel}
         window={dialogOperation?.window ?? {}}
         items={dialogOperation?.items ?? []}
         fixedItemId={editing ? String(editing.inventoryItem) : undefined}

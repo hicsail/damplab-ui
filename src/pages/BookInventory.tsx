@@ -29,7 +29,7 @@ import { GET_ACTIVE_INVENTORY_ITEMS, GET_INVENTORY_AVAILABILITY, GET_MY_BOOKINGS
 import { CANCEL_BOOKING, CREATE_BOOKING } from '../gql/mutations';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
-import { defaultSlotFor } from '../utils/jobEquipmentBooking';
+import { bookingStatusColor, bookingStatusLabel, defaultSlotFor } from '../utils/jobEquipmentBooking';
 import { formatSaveError } from '../utils/gqlError';
 import JobEquipmentBookingCalendar from '../components/booking/JobEquipmentBookingCalendar';
 import JobEquipmentBookingDialog from '../components/booking/JobEquipmentBookingDialog';
@@ -86,6 +86,8 @@ export default function BookInventory() {
   // once; the calendar clears it so a reload does not reopen it.
   const editBookingId = searchParams.get('edit') ?? undefined;
   const clearEdit = (): void => setSearchParams(jobId ? { job: jobId } : {}, { replace: true });
+  // `&highlight=<bookingId>` (from the staff job page) picks that booking out on the calendar.
+  const highlightBookingId = searchParams.get('highlight') ?? undefined;
 
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-and-network' });
   const { data: myData, loading: myLoading, refetch } = useQuery(GET_MY_BOOKINGS, { fetchPolicy: 'cache-and-network' });
@@ -96,6 +98,12 @@ export default function BookInventory() {
   const bookable = useMemo(() => (invData?.activeInventoryItems ?? []).filter((i: any) => i.bookable), [invData]);
   const bookableJobs = useMemo(() => (jobsData?.ownJobs?.items ?? []).filter((j: any) => j.sow?.status === BOOKABLE_SOW_STATUS), [jobsData]);
   const jobInList = !jobId || bookableJobs.some((j: any) => j.id === jobId);
+  /**
+   * A walk-up booking (no job behind it) is lab staff's alone; a client books
+   * through a job, where the booking waits on the lab's approval. Server twin:
+   * `createBooking` refuses anyone without `jobs:view-all`.
+   */
+  const canWalkUp = can(PERMISSIONS.JobsViewAll);
 
   const [itemId, setItemId] = useState('');
   const [start, setStart] = useState<Date | null>(null);
@@ -256,8 +264,18 @@ export default function BookInventory() {
             <Stack spacing={2}>
               <FormControl fullWidth>
                 <InputLabel id="book-job-label">Book against a job</InputLabel>
-                <Select labelId="book-job-label" label="Book against a job" value={jobInList ? jobId : ''} onChange={(e) => setJobId(e.target.value)}>
-                  <MenuItem value="">Not tied to a job (walk-up booking)</MenuItem>
+                {/* A job reached from its own page but not in the caller's list (staff
+                    opening a client's booking) keeps its own entry, so the selector
+                    never claims "walk-up" while the calendar below shows the job. */}
+                <Select labelId="book-job-label" label="Book against a job" value={jobId} onChange={(e) => setJobId(e.target.value)}>
+                  {!jobInList && <MenuItem value={jobId}>The job you opened this page from</MenuItem>}
+                  {canWalkUp ? (
+                    <MenuItem value="">Not tied to a job (walk-up booking)</MenuItem>
+                  ) : (
+                    <MenuItem value="" disabled>
+                      Choose a job
+                    </MenuItem>
+                  )}
                   {bookableJobs.map((j: any) => (
                     <MenuItem key={j.id} value={j.id}>
                       {j.name}
@@ -272,6 +290,12 @@ export default function BookInventory() {
                   None of your jobs has a countersigned Statement of Work yet. Time booked against a job is billed to that job at the operation's rate.
                 </Typography>
               )}
+              {!canWalkUp && !jobId && (
+                <Alert severity="info">
+                  Equipment is booked through a job. Choose one of your jobs above, or open the job and use Book Time on its Equipment Booking card. The lab
+                  approves each booking; its time is held for you until then.
+                </Alert>
+              )}
             </Stack>
           </CardContent>
         </Card>
@@ -282,12 +306,18 @@ export default function BookInventory() {
               <Typography variant="h6" sx={{ mb: 1.5 }}>
                 {selectedJob?.name ? `Equipment Booking — ${selectedJob.name}` : 'Equipment Booking'}
               </Typography>
-              <JobEquipmentBookingCalendar jobId={jobId} editBookingId={editBookingId} onEditConsumed={clearEdit} />
+              <JobEquipmentBookingCalendar
+                jobId={jobId}
+                editBookingId={editBookingId}
+                onEditConsumed={clearEdit}
+                highlightBookingId={highlightBookingId}
+                jobLabel={selectedJob ? `${selectedJob.name}${selectedJob.sow?.sowNumber ? ` — SOW ${selectedJob.sow.sowNumber}` : ''}` : undefined}
+              />
             </CardContent>
           </Card>
         )}
 
-        {!jobId && (
+        {!jobId && canWalkUp && (
           <Card variant="outlined" sx={{ mb: 3 }}>
             <CardContent>
               <Stack spacing={2}>
@@ -360,10 +390,9 @@ export default function BookInventory() {
           </Card>
         )}
 
-        {item && !jobId && (
+        {item && !jobId && canWalkUp && (
           <JobEquipmentBookingDialog
             open={!!proposed}
-            title={`Book ${item.name}`}
             window={{}}
             items={[{ id: String(item.id), name: item.name, schedulable: true }]}
             fixedItemId={String(item.id)}
@@ -414,7 +443,7 @@ export default function BookInventory() {
                             </Typography>
                           )}
                         </Box>
-                        <Chip size="small" label={b.status} color={b.status === 'CANCELLED' ? 'default' : b.status === 'COMPLETED' ? 'success' : 'warning'} />
+                        <Chip size="small" label={bookingStatusLabel(b)} color={bookingStatusColor(b)} variant={b.status === 'TENTATIVE' ? 'outlined' : 'filled'} />
                         {b.billingStatus === 'BILLED' && <Chip size="small" label="Billed" color="info" variant="outlined" />}
                         {b.jobId && <Chip size="small" label="Job booking" variant="outlined" />}
                         <Box sx={{ flex: 1 }} />

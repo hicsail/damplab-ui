@@ -134,6 +134,7 @@ export const GET_JOB_BY_ID = gql`
       name
       username
       clientDisplayName
+      clientName
       institute
       email
       sub
@@ -299,6 +300,7 @@ export const GET_OWN_JOB_BY_ID = gql`
       name
       username
       clientDisplayName
+      clientName
       institute
       email
       sub
@@ -1667,6 +1669,10 @@ const BOOKING_FIELDS = `
   cost
   billingStatus
   notes
+  history {
+    action
+    reason
+  }
 `;
 
 export const GET_MY_BOOKINGS = gql`
@@ -1758,6 +1764,9 @@ export const GET_JOB_EQUIPMENT_BOOKING = gql`
         createdBySub
         createdByName
         notes
+        usageConfirmedAt
+        usageConfirmedBy
+        actualQuantity
         history {
           at
           action
@@ -1767,6 +1776,8 @@ export const GET_JOB_EQUIPMENT_BOOKING = gql`
           previousStartTime
           previousEndTime
           previousNotes
+          actualHours
+          actualQuantity
         }
       }
     }

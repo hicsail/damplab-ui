@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeJobSubmitter } from './jobSubmitter';
+import { submissionLine, summarizeJobSubmitter } from './jobSubmitter';
 
 /**
  * Who a job's header should name.
@@ -86,13 +86,37 @@ describe('summarizeJobSubmitter — client-owned staff submissions (B30)', () =>
 
   it('never names the staff member as the user, even with no client display name', () => {
     const summary = summarizeJobSubmitter({ email: 'new@bu.edu', clientEmail: 'new@bu.edu', primaryClientEmail: 'new@bu.edu', submittedBy: { sub: 'admin-1', email: 'tech@damplab.org', name: 'Tess' } });
-    expect(summary.user).toBe('new@bu.edu');
+    expect(summary.user).toBe('new@bu.edu (account pending)');
     expect(summary.user).not.toContain('tech@damplab.org');
+  });
+
+  it('names the client from their account once it exists, and says pending until then', () => {
+    const job = { email: 'new@bu.edu', clientEmail: 'new@bu.edu', primaryClientEmail: 'new@bu.edu', submittedBy: { sub: 'admin-1', email: 'tech@damplab.org', name: 'Tess' } };
+    expect(summarizeJobSubmitter({ ...job, clientName: null }).user).toBe('new@bu.edu (account pending)');
+    expect(summarizeJobSubmitter({ ...job, clientName: 'Nia Wells' }).user).toBe('Nia Wells (new@bu.edu)');
   });
 
   it('still reads a legacy, unmigrated staff submission (no submittedBy; username/email are the technician\'s)', () => {
     const summary = summarizeJobSubmitter({ username: 'Tess Technician', email: 'tech@damplab.org', clientDisplayName: 'Cara Rivera', clientEmail: 'cara@bu.edu' });
     expect(summary.user).toBe('Cara Rivera (cara@bu.edu)');
     expect(summary.onBehalfOf).toBe('Submitted on their behalf by Tess Technician (tech@damplab.org)');
+  });
+});
+
+describe('submissionLine', () => {
+  it('says a staff-submitted job was submitted for its client, not by them', () => {
+    const summary = summarizeJobSubmitter({
+      email: 'cara@bu.edu',
+      clientEmail: 'cara@bu.edu',
+      clientName: 'Cara Rivera',
+      institute: 'Boston University',
+      submittedBy: { sub: 'admin-1', email: 'tech@damplab.org', name: 'Tess Technician' }
+    });
+    expect(submissionLine(summary, '2026-10-02 09:30')).toBe('Submitted for Cara Rivera (cara@bu.edu), Boston University on 2026-10-02 09:30');
+  });
+
+  it('keeps the old wording when the customer submitted it themselves', () => {
+    const summary = summarizeJobSubmitter({ username: 'crivera', clientDisplayName: 'Cara Rivera', email: 'cara@bu.edu', institute: 'Boston University' });
+    expect(submissionLine(summary, '2026-10-02 09:30')).toBe('Cara Rivera (cara@bu.edu), Boston University submitted this job on 2026-10-02 09:30');
   });
 });

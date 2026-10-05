@@ -17,6 +17,8 @@ import { AppContext } from '../../contexts/App';
 import { getActionsColumn } from './ActionColumn';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
+import ConfirmDeleteDialog, { PendingDelete } from './ConfirmDeleteDialog';
+
 import { Alert, Snackbar, Stack } from '@mui/material';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatSaveError } from '../../utils/gqlError';
@@ -60,6 +62,8 @@ export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ search
       return false;
     });
   }, [rows, searchString]);
+
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete<GridRowId> | null>(null);
 
   const handleDeletion = async (id: GridRowId) => {
     // Previously had no try/catch, so a refusal was an unhandled rejection.
@@ -146,7 +150,7 @@ export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ search
       renderEditCell: (params) => <ServiceSelection allServices={services} selectedServices={params.row.services} {...params} />
     },
     getActionsColumn({
-      handleDelete: (id) => handleDeletion(id),
+      handleDelete: (id) => setPendingDelete({ id, name: rows.find((row: any) => row.id === id)?.label }),
       handleEdit: (id) => setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } }),
       handleCancel: (id) => setRowModesModel({
         ...rowModesModel,
@@ -179,6 +183,17 @@ export const EditCategoriesTable: React.FC<EditCategoriesTableProps> = ({ search
         }}
         slotProps={{
           toolbar: { canWrite, setRowModesModel, setRows: (update) => setRows((old) => [...update(old)]) },
+        }}
+      />
+      <ConfirmDeleteDialog
+        target={pendingDelete}
+        noun='category'
+        detail='This removes the category from the catalog. The operations in it are not deleted.'
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const target = pendingDelete;
+          setPendingDelete(null);
+          if (target) void handleDeletion(target.id);
         }}
       />
       <Snackbar

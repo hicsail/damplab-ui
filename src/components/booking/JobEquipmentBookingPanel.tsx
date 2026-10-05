@@ -6,12 +6,28 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CloseIcon from '@mui/icons-material/Close';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EditIcon from '@mui/icons-material/Edit';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
+import ThumbUpAltIcon from '@mui/icons-material/ThumbUpAlt';
+import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 import HistoryIcon from '@mui/icons-material/History';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { format } from 'date-fns';
 import { GET_JOB_BALANCE, GET_JOB_EQUIPMENT_BOOKING, GET_JOB_PAYMENTS } from '../../gql/queries';
-import { CANCEL_BOOKING, CONFIRM_BOOKING_USAGE, SET_JOB_BOOKING_BLOCK } from '../../gql/mutations';
-import { blockedMessage, bookedHours, LOCKED_MESSAGES } from '../../utils/jobEquipmentBooking';
+import { APPROVE_BOOKING, CANCEL_BOOKING, CONFIRM_BOOKING_USAGE, DECLINE_BOOKING, SET_JOB_BOOKING_BLOCK } from '../../gql/mutations';
+import {
+  awaitingApproval,
+  blockedMessage,
+  bookedHours,
+  bookingHistoryLines,
+  bookingStatusColor,
+  bookingStatusLabel,
+  confirmedUsageLabel,
+  declinedReason,
+  isBookingOver,
+  lastApproval,
+  LOCKED_MESSAGES
+} from '../../utils/jobEquipmentBooking';
 import { confirmedUsageSuffix } from '../../utils/equipmentBilling';
 import { formatGqlError, formatSaveError } from '../../utils/gqlError';
 import { chipStatusBackground } from '../../utils/technicianProcessStatus';
@@ -29,14 +45,14 @@ interface Props {
 
 const railBtnSx = { textTransform: 'none' as const, width: '100%', justifyContent: 'flex-start', whiteSpace: 'nowrap' as const };
 
-const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success' | 'info' | 'error'> = {
-  RESERVED: 'warning',
-  IN_USE: 'warning',
-  COMPLETED: 'success',
-  CANCELLED: 'default'
+const ACTION_LABEL: Record<string, string> = {
+  CREATED: 'Booked',
+  UPDATED: 'Changed',
+  APPROVED: 'Approved',
+  DECLINED: 'Declined',
+  USAGE_CONFIRMED: 'Usage confirmed',
+  CANCELLED: 'Cancelled'
 };
-
-const ACTION_LABEL: Record<string, string> = { CREATED: 'Booked', UPDATED: 'Changed', CANCELLED: 'Cancelled' };
 
 const slot = (start?: string | null, end?: string | null): string =>
   `${start ? format(new Date(start), 'MMM d, h:mm a') : ''} – ${end ? format(new Date(end), 'MMM d, h:mm a') : ''}`;
@@ -60,6 +76,11 @@ function BookingHistory({ entries }: { entries: any[] }): React.JSX.Element {
           {h.reason && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               Reason: {h.reason}
+            </Typography>
+          )}
+          {h.action === 'USAGE_CONFIRMED' && (h.actualHours != null || h.actualQuantity != null) && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              Recorded {h.actualHours != null ? `${h.actualHours} hrs` : `${h.actualQuantity} units`}
             </Typography>
           )}
         </Box>
@@ -89,6 +110,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [pausing, setPausing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState<Record<string, boolean>>({});
+  const [declining, setDeclining] = useState<any | null>(null);
 
   const { data, loading, error, refetch } = useQuery(GET_JOB_EQUIPMENT_BOOKING, {
     variables: { jobId },
@@ -108,6 +130,8 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   const [cancelBooking] = useMutation(CANCEL_BOOKING);
   const [confirmUsage, { loading: confirming }] = useMutation(CONFIRM_BOOKING_USAGE);
   const [setBlock] = useMutation(SET_JOB_BOOKING_BLOCK);
+  const [approveBooking] = useMutation(APPROVE_BOOKING);
+  const [declineBooking] = useMutation(DECLINE_BOOKING);
 
   const view = data?.jobEquipmentBooking;
   const access = view?.access;
@@ -155,15 +179,31 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   const staffNeedsConfirmation = staffView && live.length > 0 && !staffAllConfirmed;
   const upcoming = live.find((b) => new Date(b.endTime).getTime() > Date.now());
   const operationLabel = (b: any): string => operations.find((op) => op.nodeId === b.nodeId)?.label ?? '';
-  const mayCancel = (b: any): boolean => !staffView && b.status !== 'CANCELLED' && b.billingStatus !== 'BILLED';
+  // Anyone on the job, and staff, until the booking has ended or been billed
+  // (server twin: BookingService.cancel refuses an ended booking for everyone).
+  const mayCancel = (b: any): boolean => b.status !== 'CANCELLED' && b.billingStatus !== 'BILLED' && !isBookingOver(b);
   // Editing needs the calendar (the busy slots, the window), so the pencil opens
   // the booking page on this job with the dialog already up for that booking.
-  const mayEdit = (b: any): boolean => open && mayCancel(b);
+  // Staff cannot move a job's booking (the server's verdict gives them no bookable operation).
+  const mayEdit = (b: any): boolean => !staffView && open && mayCancel(b);
   // Confirming usage is what makes a booking chargeable — a billing act, so it is
   // the staff page's and `billing:view`'s. Any time, past or future, until billed;
   // an already-confirmed booking can be corrected until then.
   const canConfirm = staffView && can(PERMISSIONS.BillingView);
-  const mayConfirm = (b: any): boolean => canConfirm && b.status !== 'CANCELLED' && b.billingStatus !== 'BILLED';
+  // A tentative booking must be approved before its usage can be recorded (server twin: confirmUsage).
+  const mayConfirm = (b: any): boolean => canConfirm && b.status !== 'CANCELLED' && b.status !== 'TENTATIVE' && b.billingStatus !== 'BILLED';
+  // Answering a client's request is an Administrator's (server twin: approveBooking / declineBooking, inventory:write).
+  const mayAnswer = (b: any): boolean => staffView && can(PERMISSIONS.InventoryWrite) && b.status === 'TENTATIVE';
+  const pending = awaitingApproval(live);
+
+  const doApprove = async (id: string): Promise<void> => {
+    try {
+      await approveBooking({ variables: { id } });
+      await refetch();
+    } catch (error) {
+      setActionError(formatSaveError(error, 'this approval'));
+    }
+  };
 
   const submitConfirm = async (values: { actualHours?: number; actualQuantity?: number }): Promise<void> => {
     if (!confirmTarget) return;
@@ -179,6 +219,8 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
     }
   };
   const editOnBookingPage = (b: any): void => void navigate(`/book-inventory?job=${encodeURIComponent(jobId)}&edit=${encodeURIComponent(b._id)}`);
+  // Staff see a booking in context — its month, its equipment, the other holds around it — highlighted.
+  const showOnBookingPage = (b: any): void => void navigate(`/book-inventory?job=${encodeURIComponent(jobId)}&highlight=${encodeURIComponent(b._id)}`);
 
   const doCancel = async (id: string): Promise<void> => {
     if (!window.confirm('Cancel this booking?')) return;
@@ -191,9 +233,13 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
   };
 
   const usage = confirmedUsageSuffix(balanceData?.jobBalance);
-  const status = `${live.length === 0 ? 'No bookings in place' : `${live.length} booking${live.length === 1 ? '' : 's'} · ${hours} hrs`}${usage}`;
+  const status = `${live.length === 0 ? 'No bookings in place' : `${live.length} booking${live.length === 1 ? '' : 's'} · ${hours} hrs`}${pending.length ? ` · ${pending.length} awaiting approval` : ''}${usage}`;
   const description = locked
     ? locked
+    : pending.length
+      ? staffView
+        ? 'A booking is waiting on the lab: approve or decline it below. Its time is held until then.'
+        : 'Your booking request is held for you until the lab approves it; you will be notified either way.'
     : upcoming
       ? `Next: ${upcoming.notes || upcoming.inventoryName} · ${format(new Date(upcoming.startTime), 'MMM d, h:mm a')}`
       : live.length === 0
@@ -274,34 +320,37 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
             <Stack spacing={1}>
               {bookings.map((b) => {
                 const cancelled = b.status === 'CANCELLED';
-                const history: any[] = b.history ?? [];
+                const history: any[] = bookingHistoryLines(b);
+                const usage = b.usageConfirmed && !cancelled ? confirmedUsageLabel(b) : null;
+                const approval = staffView && !cancelled && b.status !== 'TENTATIVE' ? lastApproval(b) : null;
                 const showHistory = !!historyOpen[b._id];
                 return (
                   <Card key={b._id} variant="outlined" sx={{ opacity: cancelled ? 0.7 : 1 }}>
                     <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontWeight: 600, textDecoration: cancelled ? 'line-through' : 'none' }} noWrap title={b.notes || b.inventoryName}>
-                            {b.notes || b.inventoryName}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap>
-                            {b.inventoryName}
-                            {operationLabel(b) ? ` · ${operationLabel(b)}` : ''}
-                            {b.createdByName ? ` · booked by ${b.createdByName}` : ''}
-                          </Typography>
-                        </Box>
+                      {/* Row 1: what was booked. Row 2: its status, slot, cost and actions. */}
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 600, textDecoration: cancelled ? 'line-through' : 'none' }} noWrap title={b.notes || b.inventoryName}>
+                          {b.notes || b.inventoryName}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          {b.inventoryName}
+                          {operationLabel(b) ? ` · ${operationLabel(b)}` : ''}
+                          {b.createdByName ? ` · booked by ${b.createdByName}` : ''}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
                         <Chip
                           size="small"
-                          label={cancelled ? 'Cancelled' : b.usageConfirmed ? `Confirmed${b.actualHours != null ? ` · ${b.actualHours} hrs` : ''}` : b.status}
-                          color={cancelled ? 'default' : b.usageConfirmed ? 'success' : (STATUS_COLOR[b.status] ?? 'default')}
-                          variant={cancelled ? 'outlined' : 'filled'}
+                          label={usage ? usage.label : bookingStatusLabel(b)}
+                          color={usage?.discrepant ? 'warning' : bookingStatusColor(b)}
+                          variant={cancelled || b.status === 'TENTATIVE' ? 'outlined' : 'filled'}
                         />
                         {b.billingStatus === 'BILLED' && <Chip size="small" label="Billed" color="info" variant="outlined" />}
-                        <Box sx={{ flex: 1 }} />
                         <Typography variant="body2" color="text.secondary" sx={{ textDecoration: cancelled ? 'line-through' : 'none' }}>
                           {slot(b.startTime, b.endTime)}
                         </Typography>
                         {b.cost != null && !cancelled && <Typography variant="body2">${Number(b.cost).toFixed(2)}</Typography>}
+                        <Box sx={{ flex: 1 }} />
                         {history.length > 0 && (
                           <Tooltip title={showHistory ? 'Hide history' : `History (${history.length})`}>
                             <IconButton size="small" onClick={() => setHistoryOpen((s) => ({ ...s, [b._id]: !showHistory }))} aria-expanded={showHistory}>
@@ -310,17 +359,44 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
                             </IconButton>
                           </Tooltip>
                         )}
+                        {approval && (
+                          <Tooltip title={`Approved${approval.byName ? ` by ${approval.byName}` : ''}${approval.at ? ` on ${format(new Date(approval.at as string), 'MMM d, h:mm a')}` : ''}`}>
+                            <ThumbUpAltIcon fontSize="small" color="success" sx={{ mx: 0.5 }} aria-label="Approved" />
+                          </Tooltip>
+                        )}
+                        {mayAnswer(b) && (
+                          <>
+                            <Tooltip title="Approve this booking">
+                              <IconButton size="small" color="success" onClick={() => void doApprove(b._id)} aria-label="Approve booking">
+                                <ThumbUpAltOutlinedIcon fontSize="inherit" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Decline this booking">
+                              <IconButton size="small" color="error" onClick={() => setDeclining(b)} aria-label="Decline booking">
+                                <DoNotDisturbOnOutlinedIcon fontSize="inherit" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        )}
                         {mayConfirm(b) && (
                           <Tooltip title={b.usageConfirmed ? 'Adjust recorded usage' : 'Record actual usage for billing'}>
                             <IconButton
                               size="small"
-                              color={b.usageConfirmed ? 'default' : 'success'}
+                              // Orange, not green: an unconfirmed booking is waiting on staff, not done.
+                              color={b.usageConfirmed ? 'default' : 'warning'}
                               onClick={() => {
                                 setConfirmError(null);
                                 setConfirmTarget(b);
                               }}
                             >
                               <CheckCircleIcon fontSize="inherit" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {staffView && !cancelled && (
+                          <Tooltip title="Open on the booking page">
+                            <IconButton size="small" onClick={() => showOnBookingPage(b)} aria-label="Open on the booking page">
+                              <OpenInNewIcon fontSize="inherit" />
                             </IconButton>
                           </Tooltip>
                         )}
@@ -339,6 +415,11 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
                           </Tooltip>
                         )}
                       </Stack>
+                      {declinedReason(b) && (
+                        <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                          Declined: {declinedReason(b)}
+                        </Typography>
+                      )}
                       {history.length > 0 && (
                         <Collapse in={showHistory} unmountOnExit>
                           <BookingHistory entries={history} />
@@ -363,6 +444,26 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
           setConfirmError(null);
         }}
         onConfirm={submitConfirm}
+      />
+
+      <ReasonDialog
+        open={!!declining}
+        title="Decline this booking"
+        warning="The slot is freed and the booking cancelled. The client is notified with your reason."
+        fieldLabel="Reason (the client sees this)"
+        confirmLabel="Decline booking"
+        onCancel={() => setDeclining(null)}
+        onConfirm={async (reason) => {
+          const target = declining;
+          setDeclining(null);
+          if (!target) return;
+          try {
+            await declineBooking({ variables: { id: target._id, reason } });
+            await refetch();
+          } catch (error) {
+            setActionError(formatSaveError(error, 'this decline'));
+          }
+        }}
       />
 
       <ReasonDialog

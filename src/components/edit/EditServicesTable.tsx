@@ -17,6 +17,8 @@ import { ServiceList } from './ServiceList';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppContext } from '../../contexts/App';
 import { GridToolBar } from './GridToolBar';
+import ConfirmDeleteDialog, { PendingDelete } from './ConfirmDeleteDialog';
+
 import { useNavigate } from 'react-router';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatSaveError } from '../../utils/gqlError';
@@ -137,6 +139,8 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
     });
   }, [rows, searchString, showHidden]);
 
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete<GridRowId> | null>(null);
+
   const handleDeletion = async (id: GridRowId) => {
     // Previously had no try/catch at all, so a refusal surfaced as an unhandled
     // rejection and the row simply stayed put with no explanation.
@@ -221,7 +225,7 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
                 key="delete"
                 icon={<Delete />}
                 label="Delete"
-                onClick={() => handleDeletion(id)}
+                onClick={() => setPendingDelete({ id, name: String(rows.find((row: any) => row.id === id)?.name ?? '') })}
                 color="inherit"
               />
             ]
@@ -361,6 +365,17 @@ export const EditServicesTable: React.FC<EditServicesTableProps> = ({ searchStri
           }}
         />
       </Stack>
+      <ConfirmDeleteDialog
+        target={pendingDelete}
+        noun='operation'
+        detail='This removes the operation from the catalog, so it can no longer be added to jobs. Jobs that already use it keep it.'
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const target = pendingDelete;
+          setPendingDelete(null);
+          if (target) void handleDeletion(target.id);
+        }}
+      />
       <FieldPickerDialog
         open={pickerOpen}
         title="Download operations"

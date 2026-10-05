@@ -184,3 +184,130 @@ export function bookedHours(bookings: Array<{ kind?: string | null; status?: str
   }
   return Math.round((ms / 3_600_000) * 100) / 100;
 }
+
+type BookingStatusLike = { status?: string | null; usageConfirmed?: boolean | null; history?: Array<{ action?: string | null; reason?: string | null }> | null };
+
+/** A decline is stored as a cancellation; the history's last entry says which it was. */
+export function declinedReason(b: BookingStatusLike | null | undefined): string | null {
+  const last = b?.history?.length ? b.history[b.history.length - 1] : null;
+  return b?.status === 'CANCELLED' && last?.action === 'DECLINED' ? last.reason?.trim() || '' : null;
+}
+
+/**
+ * The word a booking's status chip shows. TENTATIVE is a client's request the lab
+ * has not answered yet: it holds the slot but is not a confirmed booking.
+ */
+export function bookingStatusLabel(b: BookingStatusLike): string {
+  if (b.status === 'CANCELLED') return declinedReason(b) !== null ? 'Declined' : 'Cancelled';
+  if (b.usageConfirmed) return 'Confirmed';
+  switch (b.status) {
+    case 'TENTATIVE':
+      return 'Awaiting approval';
+    case 'RESERVED':
+      return 'Reserved';
+    case 'IN_USE':
+      return 'In use';
+    case 'COMPLETED':
+      return 'Completed';
+    default:
+      return String(b.status ?? '');
+  }
+}
+
+export function bookingStatusColor(b: BookingStatusLike): 'default' | 'warning' | 'success' | 'info' | 'error' {
+  if (b.status === 'CANCELLED') return declinedReason(b) !== null ? 'error' : 'default';
+  if (b.usageConfirmed || b.status === 'COMPLETED') return 'success';
+  if (b.status === 'TENTATIVE') return 'info';
+  return 'warning';
+}
+
+/** Live bookings still waiting on the lab. */
+export const awaitingApproval = <T extends { status?: string | null }>(bookings: T[]): T[] => bookings.filter((b) => b.status === 'TENTATIVE');
+
+/**
+ * Why recording usage now is premature, or null when the booked time is over.
+ * Staff confirm the hours actually used, so a booking still ahead of them (or
+ * still running) normally has nothing to confirm yet. A warning, not a block:
+ * the lab may know the outcome early.
+ */
+export function usageTimingWarning(
+  b: { kind?: string | null; startTime?: string | Date | null; endTime?: string | Date | null; usedOn?: string | Date | null } | null | undefined,
+  now: Date = new Date()
+): string | null {
+  if (!b) return null;
+  const fmt = (d: Date): string => d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  if (b.kind === 'QUANTITY') {
+    const used = b.usedOn ? new Date(b.usedOn) : null;
+    return used && used.getTime() > now.getTime() ? `This is booked for ${fmt(used)}, which has not happened yet. Usage is normally confirmed afterwards.` : null;
+  }
+  const start = b.startTime ? new Date(b.startTime) : null;
+  const end = b.endTime ? new Date(b.endTime) : null;
+  if (start && start.getTime() > now.getTime()) {
+    return `This booking has not started yet (it starts ${fmt(start)}). Hours are normally confirmed only once the time has been used.`;
+  }
+  if (end && end.getTime() > now.getTime()) {
+    return `This booking is still running (it ends ${fmt(end)}). Hours are normally confirmed only once the time has been used.`;
+  }
+  return null;
+}
+
+/** A timed booking whose end has passed. Server twin: BookingService.cancel refuses these for everyone. */
+export function isBookingOver(b: { kind?: string | null; endTime?: string | Date | null } | null | undefined, now: Date = new Date()): boolean {
+  if (!b || (b.kind && b.kind !== 'TIMED') || !b.endTime) return false;
+  return new Date(b.endTime).getTime() <= now.getTime();
+}
+
+/** Hours a timed booking reserves, to two decimals. */
+export function bookedSlotHours(b: { startTime?: string | Date | null; endTime?: string | Date | null }): number | null {
+  if (!b.startTime || !b.endTime) return null;
+  const hours = (new Date(b.endTime).getTime() - new Date(b.startTime).getTime()) / 3_600_000;
+  return Number.isFinite(hours) ? Math.round(hours * 100) / 100 : null;
+}
+
+/**
+ * The chip on a booking whose usage staff have recorded: "Confirmed · 2 hrs", or,
+ * when that differs from the time booked, "Confirmed · 1.5 hrs / 2 hrs (discrepant)"
+ * — recorded first, booked second.
+ */
+export function confirmedUsageLabel(b: { actualHours?: number | null; startTime?: string | Date | null; endTime?: string | Date | null }): { label: string; discrepant: boolean } {
+  if (b.actualHours == null) return { label: 'Confirmed', discrepant: false };
+  const booked = bookedSlotHours(b);
+  const actual = Math.round(Number(b.actualHours) * 100) / 100;
+  if (booked != null && Math.abs(actual - booked) >= 0.01) return { label: `Confirmed · ${actual} hrs / ${booked} hrs (discrepant)`, discrepant: true };
+  return { label: `Confirmed · ${actual} hrs`, discrepant: false };
+}
+
+export interface BookingHistoryLine {
+  at?: string | Date | null;
+  action?: string | null;
+  bySub?: string | null;
+  byName?: string | null;
+  reason?: string | null;
+  actualHours?: number | null;
+  actualQuantity?: number | null;
+  [key: string]: unknown;
+}
+
+/**
+ * A booking's history as the job page shows it. Usage confirmed before the trail
+ * recorded it has only the booking's own `usageConfirmedAt/By`, so that becomes
+ * the line it would have written.
+ */
+export function bookingHistoryLines(b: {
+  history?: BookingHistoryLine[] | null;
+  usageConfirmed?: boolean | null;
+  usageConfirmedAt?: string | Date | null;
+  usageConfirmedBy?: string | null;
+  actualHours?: number | null;
+  actualQuantity?: number | null;
+}): BookingHistoryLine[] {
+  const lines = [...(b.history ?? [])];
+  if (b.usageConfirmed && !lines.some((h) => h.action === 'USAGE_CONFIRMED')) {
+    lines.push({ at: b.usageConfirmedAt ?? null, action: 'USAGE_CONFIRMED', byName: b.usageConfirmedBy ?? null, actualHours: b.actualHours ?? null, actualQuantity: b.actualQuantity ?? null });
+  }
+  return lines;
+}
+
+/** The latest approval, for the approved marker's tooltip; null when never approved. */
+export const lastApproval = (b: { history?: BookingHistoryLine[] | null }): BookingHistoryLine | null =>
+  [...(b.history ?? [])].reverse().find((h) => h.action === 'APPROVED') ?? null;

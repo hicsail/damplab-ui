@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField, Typography } from '@mui/material';
+import { usageTimingWarning } from '../../utils/jobEquipmentBooking';
 
 interface Props {
   open: boolean;
@@ -38,6 +39,7 @@ export default function ConfirmUsageDialog({ open, booking, busy, error, onCance
   const n = Number(value);
   const valid = Number.isFinite(n) && n >= 0;
   const rate = booking?.rateSnapshot;
+  const tooEarly = open ? usageTimingWarning(booking) : null;
 
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
@@ -45,6 +47,11 @@ export default function ConfirmUsageDialog({ open, booking, busy, error, onCance
         {booking?.usageConfirmed ? 'Adjust confirmed usage' : 'Confirm usage'} — {booking?.inventoryName}
       </DialogTitle>
       <DialogContent>
+        {tooEarly && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <strong>Too early to confirm.</strong> {tooEarly}
+          </Alert>
+        )}
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Confirm the actual {timed ? 'hours used' : 'quantity used'}. This is what gets billed.
         </Typography>
@@ -77,7 +84,7 @@ export default function ConfirmUsageDialog({ open, booking, busy, error, onCance
       <DialogActions>
         <Button onClick={onCancel}>Cancel</Button>
         <Button variant="contained" disabled={!valid || busy} onClick={() => onConfirm(timed ? { actualHours: n } : { actualQuantity: Math.round(n) })}>
-          {busy ? 'Saving…' : 'Confirm'}
+          {busy ? 'Saving…' : tooEarly ? 'Confirm anyway' : 'Confirm'}
         </Button>
       </DialogActions>
     </Dialog>

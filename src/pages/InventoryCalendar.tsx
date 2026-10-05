@@ -19,20 +19,16 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CloseIcon from '@mui/icons-material/Close';
+import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
+import DoNotDisturbOnOutlinedIcon from '@mui/icons-material/DoNotDisturbOnOutlined';
 import { addDays, format, isSameDay, startOfWeek } from 'date-fns';
 import { GET_ACTIVE_INVENTORY_ITEMS, GET_BOOKINGS } from '../gql/queries';
-import { CANCEL_BOOKING } from '../gql/mutations';
+import { APPROVE_BOOKING, CANCEL_BOOKING, DECLINE_BOOKING } from '../gql/mutations';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { formatSaveError } from '../utils/gqlError';
-import { spansForWeek } from '../utils/jobEquipmentBooking';
-
-const STATUS_COLOR: Record<string, 'default' | 'warning' | 'success'> = {
-  RESERVED: 'warning',
-  IN_USE: 'warning',
-  COMPLETED: 'success',
-  CANCELLED: 'default'
-};
+import { bookingStatusColor, bookingStatusLabel, isBookingOver, spansForWeek } from '../utils/jobEquipmentBooking';
+import ReasonDialog from '../components/ReasonDialog';
 
 /**
  * A timed booking spans its slot; a consumable is a point on the day it was used.
@@ -61,6 +57,8 @@ export default function InventoryCalendar() {
    *
    * - **Confirm usage** lives on the job page (a billing act, not a scheduling
    *   one), so this board carries no confirm control.
+   * - **Approve / Decline** a client's tentative booking: `inventory:write`
+   *   (Administrators), the same line as cancelling someone else's slot.
    * - **Cancel** mirrors `cancelBooking`'s server-side rule exactly: owner, OR a
    *   caller holding `inventory:write`. Gating it on `inventory:schedule` instead
    *   would show an equipment user a Cancel on everyone else's slots that the
@@ -81,7 +79,8 @@ export default function InventoryCalendar() {
    * page can answer, and the server refuses the rest.
    */
   const canCancel = (booking: any): boolean =>
-    canManageOthersBookings || (!!mySub && (booking?.ownerSub === mySub || (!!booking?.jobId && booking?.createdBySub === mySub)));
+    !isBookingOver(booking) &&
+    (canManageOthersBookings || (!!mySub && (booking?.ownerSub === mySub || (!!booking?.jobId && booking?.createdBySub === mySub))));
 
   const weekEnd = addDays(weekStart, 7);
   const { data: invData } = useQuery(GET_ACTIVE_INVENTORY_ITEMS, { fetchPolicy: 'cache-first' });
@@ -92,6 +91,18 @@ export default function InventoryCalendar() {
   });
 
   const [cancelBooking] = useMutation(CANCEL_BOOKING);
+  const [approveBooking] = useMutation(APPROVE_BOOKING);
+  const [declineBooking] = useMutation(DECLINE_BOOKING);
+  const [declining, setDeclining] = useState<any | null>(null);
+
+  const doApprove = async (id: string) => {
+    try {
+      await approveBooking({ variables: { id } });
+      await refetch();
+    } catch (error) {
+      setActionError(formatSaveError(error, 'this approval'));
+    }
+  };
 
   const bookings: any[] = useMemo(() => (data?.bookings ?? []).filter((b: any) => b.status !== 'CANCELLED'), [data]);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
@@ -158,18 +169,29 @@ export default function InventoryCalendar() {
                   // — the server writes it that way — so the note is the title and the
                   // job line needs no second source of truth.
                   const title = b.notes || b.inventoryName;
+                  const tentative = b.status === 'TENTATIVE';
                   const who = b.ownerName || b.ownerEmail || '';
                   return (
                   <Tooltip key={`${b._id}-${key}`} title={`${title} · ${b.inventoryName} · ${time}${who ? ` · ${who}` : ''}`}>
-                  <Box sx={{ minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 0.75, bgcolor: 'background.paper' }}>
+                  <Box sx={{ minWidth: 0, border: '1px solid', borderColor: tentative ? 'info.main' : 'divider', borderStyle: tentative ? 'dashed' : 'solid', borderRadius: 1, p: 0.75, bgcolor: 'background.paper' }}>
                     <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2, ...clamp }}>{title}</Typography>
                     {b.notes && <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{b.inventoryName}</Typography>}
                     <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{time}</Typography>
                     {!b.jobId && who && <Typography variant="caption" color="text.secondary" sx={{ ...clamp }}>{who}</Typography>}
                     <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
-                      <Chip size="small" label={b.usageConfirmed ? 'Confirmed' : b.status} color={b.usageConfirmed ? 'success' : STATUS_COLOR[b.status] ?? 'default'} sx={{ height: 18 }} />
+                      <Chip size="small" label={bookingStatusLabel(b)} color={bookingStatusColor(b)} variant={tentative ? 'outlined' : 'filled'} sx={{ height: 18 }} />
                       {b.cost != null && <Typography variant="caption">${Number(b.cost).toFixed(2)}</Typography>}
                       <Box sx={{ flex: 1 }} />
+                      {tentative && canManageOthersBookings && (
+                        <>
+                          <Tooltip title="Approve this booking">
+                            <IconButton size="small" color="success" onClick={() => void doApprove(b._id)} aria-label="Approve booking"><ThumbUpAltOutlinedIcon fontSize="inherit" /></IconButton>
+                          </Tooltip>
+                          <Tooltip title="Decline this booking">
+                            <IconButton size="small" color="error" onClick={() => setDeclining(b)} aria-label="Decline booking"><DoNotDisturbOnOutlinedIcon fontSize="inherit" /></IconButton>
+                          </Tooltip>
+                        </>
+                      )}
                       {canCancel(b) && b.billingStatus !== 'BILLED' && (
                         <Tooltip title="Cancel booking">
                           <IconButton size="small" color="error" onClick={() => doCancel(b._id)}><CloseIcon fontSize="inherit" /></IconButton>
@@ -186,6 +208,25 @@ export default function InventoryCalendar() {
         })}
       </Box>
 
+      <ReasonDialog
+        open={!!declining}
+        title="Decline this booking"
+        warning="The slot is freed and the booking cancelled. The client is notified with your reason."
+        fieldLabel="Reason (the client sees this)"
+        confirmLabel="Decline booking"
+        onCancel={() => setDeclining(null)}
+        onConfirm={async (reason) => {
+          const target = declining;
+          setDeclining(null);
+          if (!target) return;
+          try {
+            await declineBooking({ variables: { id: target._id, reason } });
+            await refetch();
+          } catch (error) {
+            setActionError(formatSaveError(error, 'this decline'));
+          }
+        }}
+      />
     </Box>
   );
 }

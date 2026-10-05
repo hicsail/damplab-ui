@@ -26,15 +26,9 @@ import { parseEmailList, splitClientEmails, JOB_DESCRIPTION_MAX_LENGTH } from '.
 
 const CANVAS_AUTOSAVE_KEY = 'canvas:autosave';
 
-function buildStaffNotes(clientName: string, clientEmail: string, notes: string): string {
-  const trimmedName = clientName.trim();
+function buildStaffNotes(clientEmail: string, notes: string): string {
   const trimmedEmail = clientEmail.trim();
-  const header =
-    trimmedEmail !== ''
-      ? `Client contact: ${trimmedName} <${trimmedEmail}>`
-      : trimmedName !== ''
-        ? `Client: ${trimmedName}`
-        : '';
+  const header = trimmedEmail !== '' ? `Client contact: ${trimmedEmail}` : '';
   const body = notes.trim();
   if (header && body) return `${header}\n\n${body}`;
   return header || body;
@@ -55,7 +49,6 @@ export default function StaffJobSubmit() {
 
   const [formData, setFormData] = useState({
     jobName: '',
-    clientName: '',
     clientEmails: '',
     description: '',
     institute: '',
@@ -63,7 +56,7 @@ export default function StaffJobSubmit() {
   });
   const [touched, setTouched] = useState({
     jobName: false,
-    clientName: false,
+    clientEmails: false,
     institute: false,
   });
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -113,7 +106,7 @@ export default function StaffJobSubmit() {
   const isFormValid = () =>
     formData.jobName.trim() !== '' &&
     formData.institute.trim() !== '' &&
-    formData.clientName.trim() !== '' &&
+    !!clientEmail &&
     clientEmailList.invalid.length === 0;
 
   const handleSubmit = async () => {
@@ -121,7 +114,7 @@ export default function StaffJobSubmit() {
 
     try {
       setJobLoading(true);
-      const notes = buildStaffNotes(formData.clientName, clientEmail ?? '', formData.notes);
+      const notes = buildStaffNotes(clientEmail ?? '', formData.notes);
 
       const created = await submitCanvasJob(apolloClient, {
         workflows,
@@ -130,7 +123,8 @@ export default function StaffJobSubmit() {
         jobName: formData.jobName.trim(),
         institute: formData.institute.trim(),
         notes,
-        clientDisplayName: formData.clientName.trim(),
+        // No name is typed: the server takes it from the client's account.
+        clientDisplayName: '',
         clientEmail,
         memberEmails,
         description: formData.description,
@@ -143,13 +137,12 @@ export default function StaffJobSubmit() {
       setAttachments([]);
       setFormData({
         jobName: '',
-        clientName: '',
         clientEmails: '',
         description: '',
         institute: '',
         notes: '',
       });
-      setTouched({ jobName: false, clientName: false, institute: false });
+      setTouched({ jobName: false, clientEmails: false, institute: false });
     } catch (err) {
       console.error('Staff job submission failed:', err);
       setSnackbarMessage('Failed to submit job. Please try again.');
@@ -213,8 +206,8 @@ export default function StaffJobSubmit() {
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         This uses the same job pipeline as the customer checkout. Pricing review is skipped. The job
         belongs to the first client email below, and you are recorded as having submitted it on the
-        client's behalf. The client name is the display name on SOWs and customer-facing documents, and
-        the email is what lets the client see the job in their own dashboard.
+        client's behalf. The email is what lets the client see the job in their own dashboard, and their
+        name is taken from the account with that email — until they have one, the job shows it as pending.
       </Typography>
 
       <Button variant="outlined" onClick={() => navigate('/canvas')} sx={{ mb: 3, textTransform: 'none' }}>
@@ -260,31 +253,19 @@ export default function StaffJobSubmit() {
           <TextField
             fullWidth
             required
-            label="Client name (display name on job)"
-            value={formData.clientName}
-            onChange={handleInputChange('clientName')}
-            onBlur={handleBlur('clientName')}
-            error={touched.clientName && formData.clientName.trim() === ''}
-            helperText={
-              touched.clientName && formData.clientName.trim() === ''
-                ? 'Required'
-                : 'Shown on statements of work and similar documents'
-            }
-          />
-        </Grid>
-        <Grid size={12}>
-          <TextField
-            fullWidth
-            label="Client emails (optional)"
+            label="Client emails"
             multiline
             minRows={2}
             value={formData.clientEmails}
             onChange={handleInputChange('clientEmails')}
-            error={clientEmailList.invalid.length > 0}
+            onBlur={handleBlur('clientEmails')}
+            error={clientEmailList.invalid.length > 0 || (touched.clientEmails && !clientEmail)}
             helperText={
               clientEmailList.invalid.length > 0
                 ? `Not a valid email: ${clientEmailList.invalid.join(', ')}`
-                : "Login emails, separated by commas or new lines. The first is the primary client; the rest get the same access. With none, no client will see this job or its SOW. The primary is also kept in the job notes as the contact on file."
+                : touched.clientEmails && !clientEmail
+                  ? 'Required: the job belongs to the first email'
+                  : "Login emails, separated by commas or new lines. The first is the primary client; the rest get the same access. The primary is also kept in the job notes as the contact on file."
             }
           />
         </Grid>

@@ -2,6 +2,7 @@ import { Alert, Stack, Typography } from '@mui/material';
 import { useContext, useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import { ToolBar, EditTypes } from '../components/edit/ToolBar';
+import { readStoredEditType, storeEditType } from '../components/edit/editTypeStorage';
 import { EditBundlesTable } from '../components/edit/EditBundlesTable';
 import { EditCategoriesTable } from '../components/edit/EditCategoriesTable';
 import { EditServicesTable } from '../components/edit/EditServicesTable';
@@ -18,8 +19,9 @@ export default function AdminEdit () {
   const location = useLocation();
   // A Delete/Cancel elsewhere in the editor navigates back here with
   // `state: { editType: 'Parameter Sets' }` so the list re-selects that tab.
+  // Otherwise the page opens on whichever view this browser was on last.
   const [editType, setEditType] = useState<EditTypes>(
-    () => (location.state as { editType?: EditTypes } | null)?.editType ?? 'Services'
+    () => (location.state as { editType?: EditTypes } | null)?.editType ?? readStoredEditType() ?? 'Services'
   );
   const [searchString, setSearchString] = useState<string>('');
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -27,6 +29,10 @@ export default function AdminEdit () {
   useEffect(() => {
     void refreshCatalog();
   }, [refreshCatalog]);
+
+  useEffect(() => {
+    storeEditType(editType);
+  }, [editType]);
 
   const tableSelector = (type: EditTypes) => {
     switch(type) {

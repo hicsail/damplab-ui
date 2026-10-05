@@ -17,6 +17,8 @@ export interface JobSubmitterFields {
   username?: string | null;
   email?: string | null;
   clientDisplayName?: string | null;
+  /** Server-resolved: the stored name, else the name on the account with the client's email; null while they have none. */
+  clientName?: string | null;
   clientEmail?: string | null;
   institute?: string | null;
   primaryClientEmail?: string | null;
@@ -28,11 +30,25 @@ export interface JobSubmitterSummary {
   user: string;
   /** Who entered it on their behalf, or null when they entered it themselves. */
   onBehalfOf: string | null;
+  /** True when staff submitted it: the header then reads "Submitted for", since the person named did not submit it. */
+  submittedFor: boolean;
   /** The client's organization — `institute` is theirs on both kinds of job. */
   organization: string;
 }
 
 const clean = (value: string | null | undefined): string => value?.trim() ?? '';
+
+/** Shown in place of a name while a client staff submitted for has not created their account. */
+export const ACCOUNT_PENDING = 'account pending';
+
+/**
+ * The header's first line. A staff-submitted job was submitted *for* the person
+ * named, not by them.
+ */
+export function submissionLine(summary: JobSubmitterSummary, when: string): string {
+  const who = `${summary.user}${summary.organization ? `, ${summary.organization}` : ''}`;
+  return summary.submittedFor ? `Submitted for ${who} on ${when}` : `${who} submitted this job on ${when}`;
+}
 
 /** "Name (email)", degrading to whichever half exists rather than printing "()" . */
 function nameWithEmail(name: string, email: string): string {
@@ -51,8 +67,12 @@ export function summarizeJobSubmitter(job: JobSubmitterFields): JobSubmitterSumm
   // client's; the staff member is only ever named from submittedBy.
   if (job.submittedBy) {
     const primary = clean(job.primaryClientEmail) || clean(job.clientEmail) || clean(job.email);
+    // Staff name the client by email alone, so the name is the account's — and
+    // until that account exists there is none to show.
+    const name = clean(job.clientName) || clean(job.clientDisplayName) || clean(job.username);
     return {
-      user: nameWithEmail(clean(job.clientDisplayName) || clean(job.username), primary),
+      user: name ? nameWithEmail(name, primary) : `${primary} (${ACCOUNT_PENDING})`,
+      submittedFor: true,
       onBehalfOf: `Submitted on their behalf by ${nameWithEmail(clean(job.submittedBy.name), clean(job.submittedBy.email))}`,
       organization
     };
@@ -61,6 +81,7 @@ export function summarizeJobSubmitter(job: JobSubmitterFields): JobSubmitterSumm
   if (clientEmail) {
     return {
       user: nameWithEmail(clientName, clientEmail),
+      submittedFor: true,
       onBehalfOf: `Submitted on their behalf by ${nameWithEmail(submitterName, submitterEmail)}`,
       organization
     };
@@ -68,6 +89,7 @@ export function summarizeJobSubmitter(job: JobSubmitterFields): JobSubmitterSumm
 
   return {
     user: nameWithEmail(clientName || submitterName, submitterEmail),
+    submittedFor: false,
     onBehalfOf: null,
     organization
   };

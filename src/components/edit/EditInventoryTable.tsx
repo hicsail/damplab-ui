@@ -8,6 +8,8 @@ import HistoryIcon from '@mui/icons-material/History';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { GridToolBar } from './GridToolBar';
+import ConfirmDeleteDialog, { PendingDelete } from './ConfirmDeleteDialog';
+
 import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS, GET_STATIONS } from '../../gql/queries';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatSaveError } from '../../utils/gqlError';
@@ -69,6 +71,8 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
       return haystack.includes(q);
     });
   }, [rows, searchString]);
+
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete<GridRowId> | null>(null);
 
   const handleDelete = async (id: GridRowId) => {
     try {
@@ -135,7 +139,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
       width: 100,
       getActions: ({ id }) => [
         <GridActionsCellItem key='edit' icon={<Edit />} label='Edit' onClick={() => navigate(`/edit/inventory/${id}`)} color='inherit' />,
-        <GridActionsCellItem key='delete' icon={<Delete />} label='Delete' onClick={() => handleDelete(id)} color='inherit' />
+        <GridActionsCellItem key='delete' icon={<Delete />} label='Delete' onClick={() => setPendingDelete({ id, name: rows.find((row: any) => row.id === id)?.name })} color='inherit' />
       ]
     },
     { field: 'uniqueId', headerName: 'ID', width: 110 },
@@ -297,6 +301,17 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
             onAdd: () => navigate('/edit/inventory/new'),
             showEditModeHint: false
           }
+        }}
+      />
+      <ConfirmDeleteDialog
+        target={pendingDelete}
+        noun='inventory item'
+        detail='This marks the item as deleted. It stays in this list, shown as Deleted, and can no longer be booked.'
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const target = pendingDelete;
+          setPendingDelete(null);
+          if (target) void handleDelete(target.id);
         }}
       />
       <Snackbar

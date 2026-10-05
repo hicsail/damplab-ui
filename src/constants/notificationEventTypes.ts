@@ -67,6 +67,24 @@ export const NOTIFICATION_EVENT_TYPES: readonly NotificationEventTypeDef[] = [
     supportsEmail: false,
   },
   {
+    eventType: "EQUIPMENT_BOOKING_REQUESTED",
+    label: "Equipment Booking Requested",
+    description: "A client booked or moved equipment time that is waiting on the lab's approval",
+    supportsEmail: true,
+  },
+  {
+    eventType: "EQUIPMENT_BOOKING_APPROVED",
+    label: "Equipment Booking Approved",
+    description: "The lab approved your equipment booking",
+    supportsEmail: true,
+  },
+  {
+    eventType: "EQUIPMENT_BOOKING_DECLINED",
+    label: "Equipment Booking Declined",
+    description: "The lab declined your equipment booking",
+    supportsEmail: true,
+  },
+  {
     eventType: "BUG_DEPLOYED_TO_STAGING",
     label: "Bug Fix Deployed to Staging",
     description: "A fix for a bug you reported has been deployed to staging",

@@ -859,6 +859,7 @@ export const CREATE_JOB_EQUIPMENT_BOOKING = gql`
   mutation CreateJobEquipmentBooking($input: CreateJobEquipmentBookingInput!) {
     createJobEquipmentBooking(input: $input) {
       _id
+      status
       startTime
       endTime
       cost
@@ -873,6 +874,26 @@ export const UPDATE_JOB_EQUIPMENT_BOOKING = gql`
       startTime
       endTime
       cost
+      status
+    }
+  }
+`;
+
+/** Administrators answer a client's tentative booking. */
+export const APPROVE_BOOKING = gql`
+  mutation ApproveBooking($id: ID!) {
+    approveBooking(id: $id) {
+      _id
+      status
+    }
+  }
+`;
+
+export const DECLINE_BOOKING = gql`
+  mutation DeclineBooking($id: ID!, $reason: String!) {
+    declineBooking(id: $id, reason: $reason) {
+      _id
+      status
     }
   }
 `;

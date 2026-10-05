@@ -13,8 +13,17 @@ export interface BookingDialogItem {
 
 interface Props {
   open: boolean;
-  title: string;
   window: BookingWindow;
+  /**
+   * A client's booking is a request the lab approves (server: TENTATIVE). The
+   * dialog says so — in its title, a note and its button — and staff, whose
+   * bookings are confirmed, see none of it.
+   */
+  requiresApproval?: boolean;
+  /** The equipment-use operation being booked, listed under the equipment. */
+  operationLabel?: string;
+  /** The job the booking is billed to, listed under the operation; absent for a walk-up. */
+  jobLabel?: string;
   items: BookingDialogItem[];
   /** Set when editing: the item is fixed and the picker is hidden. */
   fixedItemId?: string;
@@ -40,10 +49,18 @@ const HOUR_MS = 3_600_000;
  * server — the lab bills actual hours, so drift between the estimate and the
  * schedule is expected rather than an error.
  */
+/** "Book Equipment", or "Request to Book Equipment" when the lab must approve it. */
+export function bookingDialogTitle(opts: { editing?: boolean; requiresApproval?: boolean }): string {
+  const action = opts.editing ? 'Change Booking' : 'Book Equipment';
+  return opts.requiresApproval ? `Request to ${action}` : action;
+}
+
 export default function JobEquipmentBookingDialog({
   open,
-  title,
   window: estimatedWindow,
+  requiresApproval = false,
+  operationLabel,
+  jobLabel,
   items,
   fixedItemId,
   editing = false,
@@ -86,7 +103,7 @@ export default function JobEquipmentBookingDialog({
 
   return (
     <Dialog open={open} onClose={onCancel} maxWidth="xs" fullWidth>
-      <DialogTitle>{title}</DialogTitle>
+      <DialogTitle>{bookingDialogTitle({ editing, requiresApproval })}</DialogTitle>
       <DialogContent>
         <LocalizationProvider dateAdapter={AdapterDateFns}>
           <Stack spacing={2} sx={{ mt: 1 }}>
@@ -106,6 +123,23 @@ export default function JobEquipmentBookingDialog({
                   ))}
                 </Select>
               </FormControl>
+            )}
+            {operationLabel && (
+              <Typography variant="body2">
+                <b>Operation:</b> {operationLabel}
+              </Typography>
+            )}
+            {jobLabel && (
+              <Typography variant="body2">
+                <b>Job:</b> {jobLabel}
+              </Typography>
+            )}
+            {requiresApproval && (
+              <Alert severity="info">
+                {editing
+                  ? 'Changing a booking sends it back to the lab for approval. The new time is held for you until then, and you will be notified either way.'
+                  : 'This booking needs the lab’s approval. The time is held for you until then, and you will be notified when it is approved or declined.'}
+              </Alert>
             )}
             <DateTimePicker label="Start" value={start} onChange={pickStart} slotProps={{ textField: { size: 'small', fullWidth: true } }} />
             <DateTimePicker label="End" value={end} onChange={setEnd} slotProps={{ textField: { size: 'small', fullWidth: true } }} />
@@ -143,7 +177,7 @@ export default function JobEquipmentBookingDialog({
           disabled={invalid || busy}
           onClick={() => onConfirm({ inventoryItemId: itemId, startTime: start as Date, endTime: end as Date, notes: notes.trim(), reason: editing ? reason.trim() : undefined })}
         >
-          {busy ? 'Saving…' : 'Save booking'}
+          {busy ? 'Saving…' : requiresApproval ? 'Send request' : 'Save booking'}
         </Button>
       </DialogActions>
     </Dialog>

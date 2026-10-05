@@ -102,7 +102,7 @@ describe('building mutations (pins 28, 31)', () => {
   it('never sends an id on create (F2)', () => {
     const input = buildOperationCreateInput(rowOf([['id', 'name', 'parameterSets', 'hiddenFromClients'], ['', 'New op', 'Cleanup; Buffers', 'y']]), all, ctx.sets);
     expect(input).not.toHaveProperty('id');
-    // Every key AdminNewService (the create that works) sends that CreateService requires.
+    // Every key the operation form's create (AdminEditService with no id) sends that CreateService requires.
     expect(input).toMatchObject({ name: 'New op', icon: '', description: '', allowedConnections: [], parameters: [], paramGroups: [], deliverables: [], protocolIds: [], pricingMode: 'SERVICE', parameterSetIds: ['s2', 's1'], hiddenFromClients: true });
   });
 
