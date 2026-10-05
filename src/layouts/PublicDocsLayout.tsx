@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link as RouterLink, Outlet, useLocation } from "react-router";
 import { Box, Breadcrumbs, Link, List, ListItemButton, ListItemText, Typography } from "@mui/material";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
@@ -19,8 +20,18 @@ import { DOCS_INDEX_PATH, DOCS_PAGES } from "../pages/docs/docsPages";
  * turn "Amazon Web Services" into "Amazon Web Operations".
  */
 export default function PublicDocsLayout() {
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   const clean = pathname.replace(/\/+$/, "") || "/";
+
+  // Client-side navigation does not scroll to a #section the way a full page load
+  // does, so links such as /docs/resources#graphql would land at the top.
+  useEffect(() => {
+    if (!hash) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(decodeURIComponent(hash.slice(1)))?.scrollIntoView();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pathname, hash]);
   const current = DOCS_PAGES.find((p) => p.path === clean);
   const onIndex = clean === DOCS_INDEX_PATH;
 

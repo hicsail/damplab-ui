@@ -9,7 +9,7 @@
  * has not been written yet. The index shows it as "Coming soon".
  */
 
-export type DocsPageSlug = "about" | "tech-stack" | "graphql" | "biosecurity" | "resources";
+export type DocsPageSlug = "about" | "tech-stack" | "biosecurity" | "resources";
 
 export interface DocsPageDef {
   slug: DocsPageSlug;
@@ -45,14 +45,6 @@ export const DOCS_PAGES: readonly DocsPageDef[] = [
     ready: true,
   },
   {
-    slug: "graphql",
-    path: "/docs/graphql",
-    title: "GraphQL",
-    navLabel: "GraphQL",
-    summary: "How the Canvas website asks for and updates information, using a request language called GraphQL.",
-    ready: false,
-  },
-  {
     slug: "biosecurity",
     path: "/docs/biosecurity",
     title: "Biosecurity",
@@ -65,8 +57,9 @@ export const DOCS_PAGES: readonly DocsPageDef[] = [
     path: "/docs/resources",
     title: "Code & Protocols",
     navLabel: "Code & Protocols",
-    summary: "Where to find the Canvas source code on GitHub and the laboratory protocols published on protocols.io.",
-    ready: false,
+    summary:
+      "The Canvas source code on GitHub, the GraphQL schema that describes how Canvas handles its data, and the laboratory protocols published on protocols.io.",
+    ready: true,
   },
 ];
 

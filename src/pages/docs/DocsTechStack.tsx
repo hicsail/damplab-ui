@@ -156,7 +156,7 @@ interface BuildingBlock {
   tech: string;
 }
 
-const graphqlPath = docsPage("graphql").path;
+const graphqlPath = `${docsPage("resources").path}#graphql`;
 const biosecurityPath = docsPage("biosecurity").path;
 
 const BUILDING_BLOCKS: BuildingBlock[] = [
