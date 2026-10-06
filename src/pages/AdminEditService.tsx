@@ -29,7 +29,7 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { GET_ACTIVE_INVENTORY_ITEMS, GET_PARAMETER_SETS, UPDATE_SERVICE } from '../gql/queries';
+import { CREATE_SERVICE, GET_ACTIVE_INVENTORY_ITEMS, GET_PARAMETER_SETS, UPDATE_SERVICE } from '../gql/queries';
 import { AppContext } from '../contexts/App';
 import { DeliverablesEditor } from '../components/edit/DeliverablesEditor';
 import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
@@ -47,8 +47,15 @@ const MENU_PROPS = {
   }
 };
 
+/**
+ * The operation form, for an existing operation and for a new one. The route
+ * `/edit/services/new` has no `:serviceId`, and that is what makes it a create.
+ * One form on purpose: a separate "new" page once carried a subset of these
+ * fields, so several could only be set after the first save.
+ */
 export default function AdminEditService() {
   const { serviceId } = useParams<{ serviceId: string }>();
+  const isNew = serviceId === undefined;
   const navigate = useNavigate();
   const client = useApolloClient();
   const { services, refreshCatalog } = useContext(AppContext);
@@ -222,7 +229,7 @@ export default function AdminEditService() {
   };
 
   const handleSave = async () => {
-    if (!service) return;
+    if (!service && !isNew) return;
     setErrorMessage(null);
     setSuccessMessage(null);
 
@@ -248,7 +255,7 @@ export default function AdminEditService() {
       return;
     }
 
-    const row: any = service;
+    const row: any = service ?? {};
     const changes = {
       name: name.trim(),
       serviceCategoryNumber: serviceCategoryNumber.trim(),
@@ -285,6 +292,14 @@ export default function AdminEditService() {
 
     try {
       setIsSaving(true);
+      if (isNew) {
+        // Parameters are added on their own page, which needs the new id.
+        const { data } = await client.mutate({ mutation: CREATE_SERVICE, variables: { service: { ...changes, parameters: [] } } });
+        await refreshCatalog();
+        const createdId = data?.createService?.id;
+        navigate(createdId ? `/edit/services/${createdId}` : '/edit');
+        return;
+      }
       await client.mutate({
         mutation: UPDATE_SERVICE,
         variables: {
@@ -305,7 +320,7 @@ export default function AdminEditService() {
     }
   };
 
-  if (!service) {
+  if (!service && !isNew) {
     return (
       <Stack spacing={2} sx={{ maxWidth: 900 }}>
         <Button
@@ -333,10 +348,13 @@ export default function AdminEditService() {
       >
         Back to catalog
       </Button>
-      <Typography variant="h2">Edit service</Typography>
+      <Typography variant="h2">{isNew ? 'Add new service' : 'Edit service'}</Typography>
       <Typography variant="body1" color="text.secondary">
-        Update service details, pricing, connections, and deliverables on this page. Use{' '}
-        <strong>Configure parameters</strong> for the full parameter editor.
+        {isNew
+          ? 'Set the service details, pricing, connections, and deliverables on this page. Parameters are added after the first save, under '
+          : 'Update service details, pricing, connections, and deliverables on this page. Use '}
+        <strong>Configure parameters</strong>
+        {isNew ? '.' : ' for the full parameter editor.'}
       </Typography>
 
       {!!errorMessage && <Alert severity="error">{errorMessage}</Alert>}
@@ -674,9 +692,10 @@ export default function AdminEditService() {
       </FormControl>
 
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-        <Button variant="outlined" onClick={() => navigate(`/edit/services/${serviceId}/parameters`)}>
+        <Button variant="outlined" disabled={isNew} onClick={() => navigate(`/edit/services/${serviceId}/parameters`)}>
           Configure parameters
         </Button>
+        {isNew && <FormHelperText sx={{ alignSelf: 'center' }}>Save the service first; its parameters are edited on their own page.</FormHelperText>}
       </Stack>
 
       <Box>
@@ -696,7 +715,7 @@ export default function AdminEditService() {
         </Button>
         {canWrite && (
           <Button variant="contained" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Save changes'}
+            {isSaving ? 'Saving...' : isNew ? 'Save service' : 'Save changes'}
           </Button>
         )}
       </Stack>

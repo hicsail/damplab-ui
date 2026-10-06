@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import { useNavigate } from 'react-router';
 import { Alert, Stack } from '@mui/material';
-import { DataGrid, GridColDef, GridRowModesModel, GridSlotProps, GridSlots } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridRowModesModel, GridSlots } from '@mui/x-data-grid';
 import { GET_PARAMETER_SETS } from '../../gql/queries';
-import { GridToolBar, GridToolBarProps } from './GridToolBar';
+import { GridToolBar } from './GridToolBar';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatGqlError } from '../../utils/gqlError';
 import { usedByLabel } from './parameterSetForm';
@@ -51,12 +51,7 @@ export const EditParameterSetsTable: React.FC<EditParameterSetsTableProps> = ({ 
         disableRowSelectionOnClick
         onRowClick={(params) => navigate(`/edit/parameter-sets/${params.row.id}`)}
         sx={{ '& .MuiDataGrid-row': { cursor: 'pointer' } }}
-        // Same pre-existing GridToolBar / DataGrid slotProps typing mismatch as every
-        // other table here (EditBundlesTable, EditServicesTable, …) — see typecheck
-        // baseline. `unknown` first is TS's own suggestion, applied narrowly to just
-        // the `toolbar` slot (not the whole `slots`/`slotProps` object) so the
-        // `satisfies GridToolBarProps` below still catches an unwired call site.
-        slots={{ toolbar: GridToolBar as unknown as GridSlots['toolbar'] }}
+        slots={{ toolbar: GridToolBar as GridSlots['toolbar'] }}
         slotProps={{
           toolbar: {
             canWrite,
@@ -64,7 +59,7 @@ export const EditParameterSetsTable: React.FC<EditParameterSetsTableProps> = ({ 
             addButtonLabel: 'Add parameter set',
             onAdd: () => navigate('/edit/parameter-sets/new'),
             showEditModeHint: false
-          } satisfies GridToolBarProps as unknown as GridSlotProps['toolbar']
+          }
         }}
       />
     </Stack>

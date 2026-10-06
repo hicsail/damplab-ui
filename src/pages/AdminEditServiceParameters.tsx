@@ -186,7 +186,7 @@ export default function AdminEditServiceParameters() {
           tableDataText={tableDataText}
           setTableDataText={setTableDataText}
           canWrite={canWrite}
-          sampleSheetServiceId={String(service.id)}
+          sampleSheetOwner={{ serviceId: String(service.id) }}
           listHeader={
             reservedParameters.length > 0 ? (
               <>

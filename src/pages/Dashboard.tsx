@@ -30,6 +30,7 @@ import { GET_LAB_MONITOR_STAFF_LIST, JOB_CLIENTS, JOBS_FEED_STATUS, JOBS_FOR_VIE
 import { ARCHIVE_JOB, MARK_JOBS_FEED_VIEWED, UNARCHIVE_JOB } from '../gql/mutations';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { formatSaveError } from '../utils/gqlError';
+import { toJobListItem } from '../utils/jobListItem';
 
 /**
  * States where lab work is genuinely under way, so archiving is worth a warning.
@@ -131,29 +132,7 @@ export default function Dashboard() {
   const result = data?.jobsForViewer;
   const items: JobListItem[] = useMemo(() => {
     const raw = result?.items ?? [];
-    return raw.map((j: Record<string, unknown>) => ({
-      id: String(j.id ?? ''),
-      name: String(j.name ?? ''),
-      state: String(j.state ?? ''),
-      submitted: String(j.submitted ?? ''),
-      username: j.username != null ? String(j.username) : undefined,
-      institute: j.institute != null ? String(j.institute) : undefined,
-      email: j.email != null ? String(j.email) : undefined,
-      isArchived: Boolean(j.isArchived),
-      archivedAt: j.archivedAt != null ? String(j.archivedAt) : undefined,
-      archivedBy: j.archivedBy != null ? String(j.archivedBy) : undefined,
-      archivedFromState: j.archivedFromState != null ? String(j.archivedFromState) : undefined,
-      sow: j.sow
-        ? {
-            id: String((j.sow as Record<string, unknown>).id ?? ''),
-            sowNumber: String((j.sow as Record<string, unknown>).sowNumber ?? ''),
-            sowTitle: (j.sow as Record<string, unknown>).sowTitle != null
-              ? String((j.sow as Record<string, unknown>).sowTitle)
-              : undefined,
-            status: String((j.sow as Record<string, unknown>).status ?? ''),
-          }
-        : null,
-    }));
+    return raw.map(toJobListItem);
   }, [result?.items]);
   const totalCount = result?.totalCount ?? 0;
 

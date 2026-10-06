@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router';
 import { AppContext } from '../../contexts/App';
 import { ServiceList } from './ServiceList';
 import { GridToolBar } from './GridToolBar';
+import ConfirmDeleteDialog, { PendingDelete } from './ConfirmDeleteDialog';
+
 import { DELETE_BUNDLE } from '../../gql/queries';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatSaveError } from '../../utils/gqlError';
@@ -46,6 +48,8 @@ export const EditBundlesTable: React.FC<EditBundlesTableProps> = ({ searchString
     });
   }, [rows, searchString]);
 
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete<GridRowId> | null>(null);
+
   const handleDelete = async (id: GridRowId) => {
     try {
       await client.mutate({
@@ -80,7 +84,7 @@ export const EditBundlesTable: React.FC<EditBundlesTableProps> = ({ searchString
                 key='delete'
                 icon={<Delete />}
                 label='Delete'
-                onClick={() => handleDelete(id)}
+                onClick={() => setPendingDelete({ id, name: rows.find((row: any) => row.id === id)?.name })}
                 color='inherit'
               />
             ]
@@ -120,6 +124,17 @@ export const EditBundlesTable: React.FC<EditBundlesTableProps> = ({ searchString
             onAdd: () => navigate('/edit/bundles/new'),
             showEditModeHint: false
           }
+        }}
+      />
+      <ConfirmDeleteDialog
+        target={pendingDelete}
+        noun='bundle'
+        detail='This removes the bundle from the catalog. The operations in it are not deleted.'
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const target = pendingDelete;
+          setPendingDelete(null);
+          if (target) void handleDelete(target.id);
         }}
       />
       <Snackbar

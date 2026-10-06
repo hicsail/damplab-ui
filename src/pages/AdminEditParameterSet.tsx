@@ -3,6 +3,7 @@ import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from '@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import ParameterSetEditor from '../components/edit/ParameterSetEditor';
+import ConfirmDeleteDialog from '../components/edit/ConfirmDeleteDialog';
 import { usedByLabel } from '../components/edit/parameterSetForm';
 import { Can } from '../components/PermissionGate';
 import { DELETE_PARAMETER_SET, UPDATE_PARAMETER_SET } from '../gql/mutations';
@@ -20,6 +21,7 @@ export default function AdminEditParameterSet() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const set = data?.parameterSet;
 
   if (loading && !set) return <CircularProgress />;
@@ -43,7 +45,7 @@ export default function AdminEditParameterSet() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Delete "${set.name}"? This cannot be undone.`)) return;
+    setConfirmingDelete(false);
     try {
       await client.mutate({ mutation: DELETE_PARAMETER_SET, variables: { id } });
       navigate('/edit', { state: { editType: 'Parameter Sets' } });
@@ -76,11 +78,18 @@ export default function AdminEditParameterSet() {
         errorMessage={error}
         extraActions={
           <Can permission={PERMISSIONS.CatalogEditorWrite}>
-            <Button color='error' variant='outlined' onClick={handleDelete} disabled={saving}>
+            <Button color='error' variant='outlined' onClick={() => setConfirmingDelete(true)} disabled={saving}>
               Delete
             </Button>
           </Can>
         }
+      />
+      <ConfirmDeleteDialog
+        target={confirmingDelete ? { id: set.id, name: set.name } : null}
+        noun='parameter set'
+        detail='This cannot be undone. A set that operations still use is not deleted.'
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() => void handleDelete()}
       />
     </Stack>
   );

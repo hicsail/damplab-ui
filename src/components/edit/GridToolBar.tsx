@@ -24,6 +24,13 @@ export interface GridToolBarProps {
   showEditModeHint?: boolean;
 }
 
+// The DataGrid's own way to type a custom toolbar's props: without it every
+// `slots.toolbar` / `slotProps.toolbar` naming this component is a type error.
+declare module '@mui/x-data-grid' {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface ToolbarPropsOverrides extends GridToolBarProps {}
+}
+
 export const GridToolBar: React.FC<GridToolBarProps> = (props) => {
   const handleNewRecord = () => {
     if (props.onAdd) {

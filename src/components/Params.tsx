@@ -88,13 +88,18 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
 
   /** Marks one parameter as edited relative to the diff baseline. */
   const wrapChanged = (param: any, element: React.ReactNode): React.ReactNode => {
-    if (!element || !changedParamIds?.has(param?.id)) return element;
+    if (!element) return element;
+    // The wrapper is always there, styled or not: adding it on the first
+    // keystroke (when the parameter first counts as changed, and for a node
+    // with no changes yet, when its set first exists) would remount the input
+    // under it and drop focus mid-word.
+    const changed = changedParamIds?.has(param?.id) === true;
     return (
       <Box
         key={param.id}
-        sx={{ mt: 1, pl: 1, py: 0.5, borderLeft: '3px solid #ed6c02', backgroundColor: 'rgba(237, 108, 2, 0.08)', borderRadius: 0.5 }}
+        sx={changed ? { mt: 1, pl: 1, py: 0.5, borderLeft: '3px solid #ed6c02', backgroundColor: 'rgba(237, 108, 2, 0.08)', borderRadius: 0.5 } : undefined}
       >
-        <Typography variant="caption" sx={{ display: 'block', color: '#ed6c02', fontWeight: 700 }}>Edited</Typography>
+        {changed && <Typography variant="caption" sx={{ display: 'block', color: '#ed6c02', fontWeight: 700 }}>Edited</Typography>}
         {element}
       </Box>
     );

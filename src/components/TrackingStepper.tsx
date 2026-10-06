@@ -9,6 +9,7 @@ import PendingIcon from '@mui/icons-material/Pending';
 import { AppContext }         from '../contexts/App';
 import { getServiceIcon }   from '../assets/icons';
 import { resolveParameterName } from '../utils/servicePricing';
+import { isRetiredEquipmentParam } from '../utils/equipmentParams';
 
 
 // the purpose of this component is to showcase nodes in a workflow and their details
@@ -145,7 +146,7 @@ export default function TrackingStepper(workflow: any) {
                                 : (workflow.workflow[activeStep]?.data?.formData && typeof workflow.workflow[activeStep].data.formData === 'object'
                                     ? Object.values(workflow.workflow[activeStep].data.formData)
                                     : [])
-                            ).map((parameter: any, paramIdx: number) => {
+                            ).filter((parameter: any) => !isRetiredEquipmentParam(parameter)).map((parameter: any, paramIdx: number) => {
                                 const isMulti = parameter.allowMultipleValues || Array.isArray(parameter.value);
                                 const values = isMulti ? (parameter.value && parameter.value.length ? parameter.value : ['']) : [parameter.value ?? ''];
                                 return (

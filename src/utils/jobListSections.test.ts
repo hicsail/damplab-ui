@@ -14,7 +14,7 @@ describe('jobListSectionChips', () => {
   it('reports every section of a job nothing has happened to yet', () => {
     const chips = chipsByKey({ state: 'SUBMITTED' });
     expect(chips.sow.label).toBe('SOW · Not started');
-    expect(chips.invoices.label).toBe('Invoices · None');
+    expect(chips.invoices.label).toBe('Invoice · None');
     expect(chips.sow.color).toBe('default');
     expect(chips.invoices.color).toBe('default');
   });
@@ -41,13 +41,15 @@ describe('jobListSectionChips', () => {
     expect(draft.color).not.toBe(final.color);
   });
 
-  it('counts invoices', () => {
-    expect(chipsByKey({ invoiceCount: 3 }).invoices).toMatchObject({ label: 'Invoices · 3', color: 'info' });
+  it('shows where the invoice stands, in the Invoice card’s colours', () => {
+    expect(chipsByKey({ invoiceStatus: 'ISSUED' }).invoices).toMatchObject({ label: 'Invoice · Issued', color: 'info' });
+    expect(chipsByKey({ invoiceStatus: 'PAID' }).invoices).toMatchObject({ label: 'Invoice · Paid', color: 'success' });
   });
 
-  it('treats a missing invoiceCount as none rather than as unknown', () => {
+  it('treats a missing invoiceStatus as none rather than as unknown', () => {
     // Not a compatibility path — a backend without the field fails the query
     // outright. This is only so a caller that does not select it still renders.
-    expect(chipsByKey({ invoiceCount: null }).invoices.label).toBe('Invoices · None');
+    expect(chipsByKey({ invoiceStatus: null }).invoices).toMatchObject({ label: 'Invoice · None', color: 'default' });
+    expect(chipsByKey({}).invoices.label).toBe('Invoice · None');
   });
 });

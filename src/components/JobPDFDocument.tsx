@@ -3,6 +3,7 @@ import React from 'react';
 import { Document, Page, Canvas, StyleSheet, View, Text, Image } from '@react-pdf/renderer';
 import { Workflow } from '../gql/graphql';
 import { resolveParameterName } from '../utils/servicePricing';
+import { isRetiredEquipmentParam } from '../utils/equipmentParams';
 
 // Register font
 import { Font } from '@react-pdf/renderer';
@@ -90,7 +91,7 @@ const formatParameterDisplayValue = (parameterDef: any, value: unknown): string 
     return formatParameterValue(value);
   }
   const options = Array.isArray(parameterDef.options) ? parameterDef.options : [];
-  const optionNameById = new Map(
+  const optionNameById = new Map<string, string>(
     options
       .filter((opt: any) => opt && typeof opt.id === 'string')
       .map((opt: any) => [String(opt.id), String(opt.name ?? opt.id)] as const)
@@ -191,8 +192,8 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
         {workflow.nodes.map((service, ind) => (
           <View key={ind} style={styles.section}>
             <Text style={styles.service}>{service.label}</Text>
-            {(Array.isArray(service.formData) ? service.formData : []).map((parameter: any, i: number) => {
-              const parameterDef = (service.parameters || service.service?.parameters || []).find(
+            {(Array.isArray(service.formData) ? service.formData : []).filter((parameter: any) => !isRetiredEquipmentParam(parameter)).map((parameter: any, i: number) => {
+              const parameterDef = ((service as any).parameters || service.service?.parameters || []).find(
                 (p: any) => p?.id === parameter.id
               );
               const label = resolveParameterName(parameter, parameterDef) ?? parameter.id ?? 'Parameter';

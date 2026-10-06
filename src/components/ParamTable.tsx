@@ -72,7 +72,7 @@ const ParamTable: React.FC<ParamTableProps> = ({ title, rows, onChange, columns 
                       type={typeof row[col.field] === 'number' ? 'number' : 'text'}
                       value={row[col.field]}
                       onChange={(e) => handleInputChange(rowIndex, col.field, e.target.value)}
-                      multiline={typeof row[col.field] === 'string' && row[col.field].length > 20} // Enable multiline for longer text
+                      multiline={typeof row[col.field] === 'string' && String(row[col.field]).length > 20} // Enable multiline for longer text
                       fullWidth
                       InputProps={{
                         style: { minWidth: '120px' }, // Ensure a minimum width

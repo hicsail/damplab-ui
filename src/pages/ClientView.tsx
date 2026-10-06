@@ -34,6 +34,7 @@ import { buildReasonedJobInput, retryOperationId } from "../utils/jobReview";
 import { formatGqlError } from "../utils/gqlError";
 import {
   JobSubmitterSummary,
+  submissionLine,
   summarizeJobSubmitter,
 } from "../utils/jobSubmitter";
 import SowCustomerView from "../components/sow/SowCustomerView";
@@ -107,6 +108,7 @@ export default function Tracking() {
   const [jobTime, setJobTime] = useState("");
   const [submitter, setSubmitter] = useState<JobSubmitterSummary>({
     user: "",
+    submittedFor: false,
     onBehalfOf: null,
     organization: "",
   });
@@ -600,10 +602,7 @@ export default function Tracking() {
             )}
           </Box>
           <Typography sx={{ fontSize: 13 }}>
-            {submitter.user}
-            {submitter.organization && `, ${submitter.organization}`}
-            {" submitted this job on "}
-            {jobTime.slice(0, 16).replace("T", " ")}
+            {submissionLine(submitter, jobTime.slice(0, 16).replace("T", " "))}
           </Typography>
           {submitter.onBehalfOf && (
             <Typography sx={{ fontSize: 13, mt: 0.5 }}>

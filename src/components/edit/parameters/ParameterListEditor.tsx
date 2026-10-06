@@ -35,7 +35,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
 import { idFromName } from '../../../utils/idFromName';
-import SampleSheetTemplateField from '../SampleSheetTemplateField';
+import SampleSheetTemplateField, { SampleSheetTemplateOwner } from '../SampleSheetTemplateField';
 import { createDragKey, EditableParameter } from './parameterSave';
 
 const TYPE_OPTIONS = [
@@ -111,8 +111,8 @@ export interface ParameterListEditorProps {
   tableDataText: Record<number, string>;
   setTableDataText: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   canWrite: boolean;
-  /** Operation id for sample-sheet templates. Omitted ⇒ "Samples spreadsheet" is not offered (Parameter Sets). */
-  sampleSheetServiceId?: string;
+  /** The operation or Parameter Set these parameters are saved on; a samples-spreadsheet template is read back from it. */
+  sampleSheetOwner: SampleSheetTemplateOwner;
   /** True ⇒ the id is fixed: renaming no longer re-derives it, and it shows read-only. */
   isIdLocked?: (parameter: EditableParameter) => boolean;
   /** Above the "Parameters" heading in the list pane (e.g. reserved equipment params). */
@@ -129,7 +129,7 @@ export default function ParameterListEditor({
   tableDataText,
   setTableDataText,
   canWrite,
-  sampleSheetServiceId,
+  sampleSheetOwner,
   isIdLocked,
   listHeader,
   listFooter,
@@ -295,7 +295,7 @@ export default function ParameterListEditor({
                   value={selectedParameter.type ?? 'string'}
                   onChange={(event) => updateParameter(selectedParameterIndex, { type: event.target.value })}
                 >
-                  {TYPE_OPTIONS.filter((o) => o.value !== 'sampleSheet' || sampleSheetServiceId !== undefined).map((option) => (
+                  {TYPE_OPTIONS.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
                       {option.label}
                     </MenuItem>
@@ -624,10 +624,10 @@ export default function ParameterListEditor({
                 </Grid>
               )}
 
-              {selectedParameter.type === 'sampleSheet' && sampleSheetServiceId !== undefined && (
+              {selectedParameter.type === 'sampleSheet' && (
                 <Grid size={12}>
                   <SampleSheetTemplateField
-                    serviceId={sampleSheetServiceId}
+                    owner={sampleSheetOwner}
                     parameter={selectedParameter}
                     canWrite={canWrite}
                     onChange={(patch) => updateParameter(selectedParameterIndex, patch)}

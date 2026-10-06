@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -6,7 +6,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { addDays, addMonths, differenceInCalendarDays, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from 'date-fns';
-import { BookingWindow, DaySpan, isOutsideWindow, spansForDays } from '../../utils/jobEquipmentBooking';
+import { BookingWindow, DaySpan, isBookingOver, isOutsideWindow, spansForDays } from '../../utils/jobEquipmentBooking';
 
 /** A hold on the item that is not one of the caller's own bookings here. */
 export interface BusySlot {
@@ -26,6 +26,8 @@ interface Props {
   window?: BookingWindow;
   /** Show Edit / Cancel on the caller's own bookings. */
   canAct?: boolean;
+  /** Show Cancel (only) on a booking the caller may cancel without booking rights — staff on a client's job. */
+  canCancelBooking?: (booking: any) => boolean;
   onEdit?: (booking: any) => void;
   onCancel?: (bookingId: string) => void;
   /** Clicking a day card proposes a slot on that day. Absent → cards are inert. */
@@ -34,6 +36,8 @@ interface Props {
   titleOf?: (booking: any) => string;
   /** Optional third line of a booking card, e.g. a status or a quantity. */
   detailOf?: (booking: any) => string | undefined;
+  /** A booking to pick out (outlined in orange) and scroll into view, e.g. from the job page's link. */
+  highlightId?: string;
   /** The range a booking occupies. Default: startTime–endTime; a consumable's usedOn needs a point range. */
   rangeOf?: (booking: any) => { start?: string | Date | null; end?: string | Date | null };
 }
@@ -72,13 +76,22 @@ export default function BookingMonthGrid({
   busy = [],
   window: estimatedWindow,
   canAct,
+  canCancelBooking,
   onEdit,
   onCancel,
   onDayClick,
   titleOf,
   detailOf,
+  highlightId,
   rangeOf = defaultRange
 }: Props): React.JSX.Element {
+  // Scroll to the highlighted booking once per highlight; a multi-day booking's first day wins.
+  const scrolledTo = useRef<string | null>(null);
+  const highlightRef = (el: HTMLDivElement | null): void => {
+    if (!el || !highlightId || scrolledTo.current === highlightId) return;
+    scrolledTo.current = highlightId;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   const { first, dayCount } = useMemo(() => monthGrid(month), [month]);
   const days = useMemo(() => Array.from({ length: dayCount }, (_, i) => addDays(first, i)), [first, dayCount]);
   const mine = useMemo(() => spansForDays(bookings, first, dayCount, rangeOf), [bookings, first, dayCount, rangeOf]);
@@ -159,9 +172,24 @@ export default function BookingMonthGrid({
                   const outside = estimatedWindow ? isOutsideWindow(estimatedWindow, new Date(b.startTime), new Date(b.endTime)) : false;
                   const title = titleOf ? titleOf(b) : b.notes || b.inventoryName || 'Booking';
                   const detail = detailOf?.(b);
+                  const highlighted = !!highlightId && String(b._id) === String(highlightId);
                   return (
                     <Tooltip key={`${b._id}-${key}`} title={`${title} · ${b.inventoryName ?? ''} · ${timeLabel(span)}${detail ? ` · ${detail}` : ''}`}>
-                      <Box onClick={(e) => e.stopPropagation()} sx={{ minWidth: 0, border: '1px solid', borderColor: 'primary.main', borderRadius: 1, p: 0.5, bgcolor: 'background.paper', cursor: 'default' }}>
+                      <Box
+                        ref={highlighted ? highlightRef : undefined}
+                        data-highlighted={highlighted || undefined}
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{
+                          minWidth: 0,
+                          border: highlighted ? '2px solid' : '1px solid',
+                          borderColor: highlighted ? 'warning.main' : 'primary.main',
+                          boxShadow: highlighted ? 3 : 'none',
+                          borderRadius: 1,
+                          p: 0.5,
+                          bgcolor: 'background.paper',
+                          cursor: 'default'
+                        }}
+                      >
                         <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2, ...clamp }}>
                           {title}
                         </Typography>
@@ -177,9 +205,9 @@ export default function BookingMonthGrid({
                           {b.cost != null && <Typography variant="caption">${Number(b.cost).toFixed(2)}</Typography>}
                           {outside && <WarningAmberIcon color="warning" sx={{ fontSize: 14 }} />}
                           <Box sx={{ flex: 1 }} />
-                          {canAct && b.billingStatus !== 'BILLED' && (
+                          {(canAct || canCancelBooking?.(b)) && b.billingStatus !== 'BILLED' && !isBookingOver(b) && (
                             <>
-                              {onEdit && (
+                              {canAct && onEdit && (
                                 <IconButton size="small" aria-label="Edit booking" onClick={() => onEdit(b)} sx={{ p: 0.25 }}>
                                   <EditIcon sx={{ fontSize: 14 }} />
                                 </IconButton>

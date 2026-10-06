@@ -23,4 +23,12 @@ describe('JobWorkflowCards — parameter snapshot fallback (B22)', () => {
     expect(out).toContain('Volume: 10');
     expect(out).toContain('Number of runs: 2');
   });
+
+  it('leaves out the retired booker list an old job still stores (F1)', () => {
+    const withBookers = [{ ...workflows[0], nodes: [{ ...workflows[0].nodes[0], formData: [{ id: 'vol', value: 10 }, { id: '__equipBookers', value: ['old@x.org'] }] }] }];
+    const out = text(<JobWorkflowCards workflows={withBookers} />);
+    expect(out).toContain('Volume: 10');
+    expect(out).not.toContain('old@x.org');
+    expect(out).not.toContain('Authorized booker emails');
+  });
 });

@@ -7,7 +7,7 @@ import { ReadOnlyFieldset } from '../ReadOnlyFieldset';
 import { lockedDragKeys, parameterSetPayload } from './parameterSetForm';
 
 export interface ParameterSetEditorProps {
-  initial?: { name: string; description?: string | null; parameters: any[] };
+  initial?: { id?: string; name: string; description?: string | null; parameters: any[] };
   /** True on the edit page: parameters loaded from the server keep their id (pin 2). */
   lockSavedIds: boolean;
   canWrite: boolean;
@@ -66,6 +66,7 @@ export default function ParameterSetEditor({
             tableDataText={tableDataText}
             setTableDataText={setTableDataText}
             canWrite={canWrite}
+            sampleSheetOwner={{ parameterSetId: initial?.id }}
             isIdLocked={isIdLocked}
           />
         </Stack>

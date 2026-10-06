@@ -13,6 +13,7 @@ import { CanvasContext } from '../contexts/Canvas'
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { trunc } from '../utils';
 import { calculateServiceCost } from '../utils/servicePricing';
+import type { CustomerCategory } from '../utils/customerCategory';
 import { EQUIPMENT_SIDEBAR_CAPTION, hasEquipmentParams, orderEquipmentFirst } from '../utils/equipmentParams';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { useShowHiddenOperations } from '../hooks/useShowHiddenOperations';
@@ -263,7 +264,7 @@ export default function ContextTestComponent(props: SidebarProps) {
             },
             activeNode.data?.formData,
             activeNode.data?.price,
-            customerCategory
+            customerCategory as CustomerCategory | undefined
         )
         : 0;
     const showPending = activeNode ? !hasPricingConfigured(activeNode) : false;

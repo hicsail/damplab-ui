@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blockedMessage, bookingsForWeek, bookedHours, defaultSlotFor, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES, operationNotBookableMessage, spansForDays, spansForWeek } from './jobEquipmentBooking';
+import { awaitingApproval, bookingHistoryLines, bookingStatusColor, bookingStatusLabel, confirmedUsageLabel, declinedReason, isBookingOver, lastApproval, usageTimingWarning } from './jobEquipmentBooking';
 
 describe('formatBookingWindow', () => {
   it('prints a closed window as a range', () => {
@@ -148,5 +149,75 @@ describe('operationNotBookableMessage', () => {
     const text = operationNotBookableMessage(2);
     expect(text).toBe('Only people on this job can book this operation.');
     expect(text).not.toMatch(/listed|booker/i);
+  });
+});
+
+describe('booking status wording', () => {
+  it('calls a client’s unanswered request "Awaiting approval"', () => {
+    expect(bookingStatusLabel({ status: 'TENTATIVE' })).toBe('Awaiting approval');
+    expect(bookingStatusColor({ status: 'TENTATIVE' })).toBe('info');
+    expect(awaitingApproval([{ status: 'TENTATIVE' }, { status: 'RESERVED' }, { status: 'CANCELLED' }])).toEqual([{ status: 'TENTATIVE' }]);
+  });
+
+  it('tells a decline from a cancellation by the last history entry, and keeps its reason', () => {
+    const declined = { status: 'CANCELLED', history: [{ action: 'CREATED' }, { action: 'DECLINED', reason: 'Instrument down' }] };
+    expect(bookingStatusLabel(declined)).toBe('Declined');
+    expect(declinedReason(declined)).toBe('Instrument down');
+    expect(bookingStatusLabel({ status: 'CANCELLED', history: [{ action: 'CANCELLED' }] })).toBe('Cancelled');
+    expect(declinedReason({ status: 'CANCELLED', history: [{ action: 'CANCELLED' }] })).toBeNull();
+  });
+
+  it('keeps the existing words for the rest', () => {
+    expect(bookingStatusLabel({ status: 'RESERVED' })).toBe('Reserved');
+    expect(bookingStatusLabel({ status: 'RESERVED', usageConfirmed: true })).toBe('Confirmed');
+  });
+});
+
+describe('usageTimingWarning', () => {
+  const now = new Date(2026, 9, 5, 12, 0);
+  const at = (h: number, d = 5): Date => new Date(2026, 9, d, h, 0);
+
+  it('warns before a booking starts, and while it is running', () => {
+    expect(usageTimingWarning({ kind: 'TIMED', startTime: at(14), endTime: at(16) }, now)).toMatch(/has not started yet \(it starts Oct 5, 2:00 PM\)/);
+    expect(usageTimingWarning({ kind: 'TIMED', startTime: at(10), endTime: at(14) }, now)).toMatch(/still running \(it ends Oct 5, 2:00 PM\)/);
+  });
+
+  it('says nothing once the time is over', () => {
+    expect(usageTimingWarning({ kind: 'TIMED', startTime: at(8), endTime: at(10) }, now)).toBeNull();
+    expect(usageTimingWarning(null, now)).toBeNull();
+  });
+
+  it('warns about a consumable dated in the future', () => {
+    expect(usageTimingWarning({ kind: 'QUANTITY', usedOn: at(9, 7) }, now)).toMatch(/not happened yet/);
+    expect(usageTimingWarning({ kind: 'QUANTITY', usedOn: at(9, 3) }, now)).toBeNull();
+  });
+});
+
+describe('confirmed usage, history and ended bookings', () => {
+  const slot = { startTime: '2026-01-06T10:00:00Z', endTime: '2026-01-06T12:00:00Z' };
+
+  it('flags hours that differ from the booking, recorded first and booked second', () => {
+    expect(confirmedUsageLabel({ ...slot, actualHours: 2 })).toEqual({ label: 'Confirmed · 2 hrs', discrepant: false });
+    expect(confirmedUsageLabel({ ...slot, actualHours: 1.5 })).toEqual({ label: 'Confirmed · 1.5 hrs / 2 hrs (discrepant)', discrepant: true });
+    expect(confirmedUsageLabel({ ...slot, actualHours: null })).toEqual({ label: 'Confirmed', discrepant: false });
+  });
+
+  it('shows a confirmation from before the trail recorded it, and never twice', () => {
+    const legacy = bookingHistoryLines({ history: [{ action: 'CREATED' }], usageConfirmed: true, usageConfirmedAt: '2026-01-07T09:00:00Z', usageConfirmedBy: 'Admin', actualHours: 2 });
+    expect(legacy.map((h) => h.action)).toEqual(['CREATED', 'USAGE_CONFIRMED']);
+    expect(legacy[1]).toMatchObject({ byName: 'Admin', actualHours: 2 });
+    const recorded = bookingHistoryLines({ history: [{ action: 'USAGE_CONFIRMED', actualHours: 2 }], usageConfirmed: true });
+    expect(recorded).toHaveLength(1);
+  });
+
+  it('finds the latest approval', () => {
+    expect(lastApproval({ history: [{ action: 'APPROVED', byName: 'A' }, { action: 'UPDATED' }, { action: 'APPROVED', byName: 'B' }] })?.byName).toBe('B');
+    expect(lastApproval({ history: [] })).toBeNull();
+  });
+
+  it('knows a timed booking has ended once its end passes', () => {
+    expect(isBookingOver({ kind: 'TIMED', endTime: '2026-01-06T12:00:00Z' }, new Date('2026-01-06T12:00:00Z'))).toBe(true);
+    expect(isBookingOver({ kind: 'TIMED', endTime: '2026-01-06T12:00:00Z' }, new Date('2026-01-06T11:59:00Z'))).toBe(false);
+    expect(isBookingOver({ kind: 'QUANTITY', endTime: '2026-01-06T12:00:00Z' }, new Date('2027-01-01'))).toBe(false);
   });
 });

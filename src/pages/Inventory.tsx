@@ -124,7 +124,7 @@ export default function Inventory() {
     const bookings: any[] = bookingsData?.bookings ?? [];
     for (const b of bookings) {
       if (b.kind !== 'TIMED' || !b.startTime || !b.endTime) continue;
-      if (b.status !== 'RESERVED' && b.status !== 'IN_USE') continue;
+      if (b.status !== 'TENTATIVE' && b.status !== 'RESERVED' && b.status !== 'IN_USE') continue;
       if (new Date(b.startTime).getTime() > nowMs || new Date(b.endTime).getTime() <= nowMs) continue;
       const itemId = String(b.inventoryItem);
       if (!m.has(itemId)) m.set(itemId, { startTime: b.startTime, endTime: b.endTime, ownerName: b.ownerName, notes: b.notes, jobId: b.jobId });
@@ -132,13 +132,13 @@ export default function Inventory() {
     return m;
   }, [bookingsData]);
 
-  // Map inventoryId → next upcoming booking (soonest per item that starts after now, RESERVED only).
+  // Map inventoryId → next upcoming booking (soonest per item that starts after now; a tentative one holds the slot too).
   const nextBookingMap = useMemo(() => {
     const m = new Map<string, NextBookingInfo>();
     const nowMs = Date.now();
     const bookings: any[] = bookingsData?.bookings ?? [];
     const sorted = [...bookings]
-      .filter((b: any) => b.status === 'RESERVED' && b.startTime && new Date(b.startTime).getTime() > nowMs)
+      .filter((b: any) => (b.status === 'RESERVED' || b.status === 'TENTATIVE') && b.startTime && new Date(b.startTime).getTime() > nowMs)
       .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     for (const b of sorted) {
       const itemId = String(b.inventoryItem);

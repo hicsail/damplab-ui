@@ -122,7 +122,8 @@ async function getAccessToken() : Promise<string | undefined> {
   try {
     await keycloak.updateToken(30);
   } catch (error) {
-    console.error(`Failed to refresh token: ${error.name}: ${error.message}`);
+    const e = error as { name?: string; message?: string } | null;
+    console.error(`Failed to refresh token: ${e?.name}: ${e?.message}`);
   }
   return keycloak.token;
 }

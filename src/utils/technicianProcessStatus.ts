@@ -80,7 +80,7 @@ function isJobVisibleToCustomer(version: JobVersionPick): boolean {
   return version.visibleToCustomer !== false;
 }
 
-function newest(versions: JobVersionPick[]): JobVersionPick | null {
+function newest<T extends { versionNumber: number }>(versions: T[]): T | null {
   if (!versions.length) return null;
   return versions.reduce((best, v) => (v.versionNumber > best.versionNumber ? v : best));
 }

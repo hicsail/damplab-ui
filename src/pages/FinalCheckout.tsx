@@ -123,7 +123,7 @@ export default function FinalCheckout() {
   };
 
   // Handler to mark a field as touched https://formik.org/docs/tutorial
-  const handleBlur = (field) => {
+  const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
   };
 
@@ -463,7 +463,7 @@ const handleSubmitJob = async () => {
           onClose={handleSnackbarClose}
           variant="filled"
           severity={snackbarState.severity}
-          color={
+          color={(
             snackbarState.severity === 'success'
               ? 'primary'
               : snackbarState.severity === 'error'
@@ -471,7 +471,7 @@ const handleSubmitJob = async () => {
               : snackbarState.severity === 'info'
               ? 'info'
               : undefined
-          }
+          ) as AlertColor | undefined}
           sx={{
             width: '100%',
             minWidth: '300px',

@@ -4,6 +4,7 @@ import { Box, CircularProgress, Drawer, IconButton, Stack, Typography } from '@m
 import CloseIcon from '@mui/icons-material/Close';
 import { addDays, startOfMonth } from 'date-fns';
 import { GET_BOOKINGS } from '../gql/queries';
+import { bookingStatusLabel } from '../utils/jobEquipmentBooking';
 import BookingMonthGrid, { monthGrid } from './booking/BookingMonthGrid';
 
 interface InventoryItemCalendarDrawerProps {
@@ -29,7 +30,7 @@ const bookingRange = (b: any): { start?: string | Date | null; end?: string | Da
 const titleOf = (b: any): string => (b.jobId ? b.notes || 'Job booking' : b.ownerName || b.ownerEmail || 'Booking');
 
 const detailOf = (b: any): string | undefined => {
-  const status = b.usageConfirmed ? 'Confirmed' : b.status;
+  const status = bookingStatusLabel(b);
   return b.kind === 'TIMED' ? status : `${b.quantity} units · ${status}`;
 };
 
