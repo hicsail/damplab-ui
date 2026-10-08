@@ -5,6 +5,7 @@ import { Workflow } from '../gql/graphql';
 import { resolveParameterName } from '../utils/servicePricing';
 import { isRetiredEquipmentParam } from '../utils/equipmentParams';
 import { isOtherTextEntryId, otherLabel, otherTextFrom } from '../utils/otherOption';
+import { withoutHiddenAnswers } from '../utils/parameterConditions';
 
 // Register font
 import { Font } from '@react-pdf/renderer';
@@ -193,7 +194,7 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
         {workflow.nodes.map((service, ind) => (
           <View key={ind} style={styles.section}>
             <Text style={styles.service}>{service.label}</Text>
-            {(Array.isArray(service.formData) ? service.formData : []).filter((parameter: any) => !isRetiredEquipmentParam(parameter) && !isOtherTextEntryId(parameter?.id)).map((parameter: any, i: number) => {
+            {withoutHiddenAnswers((service as any).parameters || service.service?.parameters || [], Array.isArray(service.formData) ? service.formData : []).filter((parameter: any) => !isRetiredEquipmentParam(parameter) && !isOtherTextEntryId(parameter?.id)).map((parameter: any, i: number) => {
               const parameterDef = ((service as any).parameters || service.service?.parameters || []).find(
                 (p: any) => p?.id === parameter.id
               );

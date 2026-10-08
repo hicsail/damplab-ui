@@ -10,6 +10,7 @@ import { resolveParameterName } from '../utils/servicePricing';
 import { snapshotFallback } from '../utils/parameterSnapshot';
 import { isRetiredEquipmentParam } from '../utils/equipmentParams';
 import { isOtherTextEntryId, otherLabel, otherTextEntryId, otherTextFrom } from '../utils/otherOption';
+import { hiddenParameterIds, withoutHiddenAnswers } from '../utils/parameterConditions';
 import SowDiffText from './sow/SowDiffText';
 import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
 import { isSampleSheetParam, parseSampleSheetValue, sampleCountLabel } from '../utils/sampleSheetValue';
@@ -116,7 +117,8 @@ export const getParameterFiles = (workflows: any[]): Array<{ label: string; file
             );
             if (!fileParamMap.size) return;
 
-            (node?.formData ?? []).forEach((entry: any) => {
+            // A file answered for a parameter that is now hidden is not listed.
+            withoutHiddenAnswers(serviceParams, Array.isArray(node?.formData) ? node.formData : []).forEach((entry: any) => {
                 if (!fileParamMap.has(entry?.id)) return;
                 const paramLabel = fileParamMap.get(entry.id);
                 const rawValues = Array.isArray(entry.value) ? entry.value : [entry.value];
@@ -172,7 +174,9 @@ export const getSampleSheets = (workflows: any[]): SampleSheetSlot[] => {
         (workflow?.nodes ?? []).forEach((node: any) => {
             const serviceParams = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
             const entries = normalizeFormEntries(node?.formData);
-            serviceParams.filter((p: any) => isSampleSheetParam(p)).forEach((param: any) => {
+            // A hidden samples-spreadsheet parameter is not asked for, so it is not a slot.
+            const hidden = hiddenParameterIds(serviceParams, entries);
+            serviceParams.filter((p: any) => isSampleSheetParam(p) && !hidden.has(p.id)).forEach((param: any) => {
                 const slot = sampleSheetSlot(node, param, entries.find((entry) => entry.id === param.id)?.value);
                 if (slot) slots.push(slot);
             });
@@ -307,7 +311,7 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                             </Box>
                                         </Box>
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
-                                            {normalizeFormEntries(node?.formData).filter((entry) => !isRetiredEquipmentParam(entry) && !isOtherTextEntryId(entry.id)).map((entry: any) => {
+                                            {withoutHiddenAnswers(paramDefs, normalizeFormEntries(node?.formData)).filter((entry) => !isRetiredEquipmentParam(entry) && !isOtherTextEntryId(entry.id)).map((entry: any) => {
                                                 const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
                                                 const fallback = snapshotFallback(node, entry.id, paramDef);
                                                 const label = fallback?.name || resolveParameterName(entry, paramDef) || 'Parameter';

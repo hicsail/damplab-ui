@@ -11,6 +11,7 @@ import { addNodesAndEdgesFromBundle, isValidConnection } from '../controllers/Gr
 import { hydrateJobGraph, hydrateVersionGraph, lockedClientIdsFromJob, buildSaveWorkflowsInput, deriveGhostNodes, deriveGhostEdges, unionGhostSources, applyJobEditorNodeChanges, restoreGhostEdges, mergeComparisonGhosts, overlayLiveSampleSheetsOnCanvas } from '../controllers/jobGraphHydration';
 import { uploadPendingParamFiles } from '../utils/uploadPendingParamFiles';
 import { diffJobGraphs, latestVersion, selectedDiffPair, GraphDiff, EMPTY_DIFF, SnapshotWorkflow, JobVersionLike, jobVersionDisplayLabel } from '../utils/jobGraphDiff';
+import { snapshotWithoutHiddenAnswers } from '../utils/parameterConditions';
 import { canRevertVersions, customerMayEdit, editingBlockedMessage, staffEditBlockedReason } from '../utils/jobEditing';
 import { missedContentVersion, missedUnfilteredContent, pickersAfterSave, seedLoadedVersionNumber } from '../utils/jobEditorSave';
 import JobVersionHistory from '../components/JobVersionHistory';
@@ -222,10 +223,14 @@ export default function JobEditor() {
         [nodes, edges]
     );
 
-    const diff: GraphDiff = useMemo(
-        () => (baselineWorkflows ? diffJobGraphs(baselineWorkflows, canvasSnapshot) : EMPTY_DIFF),
-        [baselineWorkflows, canvasSnapshot]
-    );
+    const diff: GraphDiff = useMemo(() => {
+        if (!baselineWorkflows) return EMPTY_DIFF;
+        // A hidden parameter is left out of both sides, judged by the live catalog
+        // definitions against each side's own answers — so an answer that only
+        // became hidden (or was emptied because it is hidden) is not an edit.
+        const liveParameters = (node: { serviceId?: string }): unknown => (services ?? []).find((s: any) => String(s.id) === String(node.serviceId))?.parameters;
+        return diffJobGraphs(snapshotWithoutHiddenAnswers(baselineWorkflows, liveParameters), snapshotWithoutHiddenAnswers(canvasSnapshot, liveParameters));
+    }, [baselineWorkflows, canvasSnapshot, services]);
 
     /**
      * Rebuild the canvas: staff latest stays live; everyone else, and any
