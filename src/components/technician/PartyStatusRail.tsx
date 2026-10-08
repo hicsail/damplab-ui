@@ -2,9 +2,9 @@ import React from 'react';
 import { Avatar, Badge, Box, Typography } from '@mui/material';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PersonIcon from '@mui/icons-material/Person';
 import type { PartyBadge } from '../../utils/technicianProcessStatus';
 import { STATUS_PANE_MIN_HEIGHT } from '../CollapsibleStatusCard';
-import CustomerAvatar from '../../assets/avatars/customer-default.jpg';
 
 /**
  * Customer vs DAMP Lab icons with a paper (holds it) or check (committed) badge
@@ -98,12 +98,9 @@ export default function PartyStatusRail({ customerBadge, staffBadge, customerVer
         version={customerVersion}
         badge={customerBadge}
         avatar={
-          <Avatar
-            src={CustomerAvatar}
-            alt=""
-            sx={{ width: ICON_SIZE, height: ICON_SIZE, bgcolor: 'grey.300', flexShrink: 0 }}
-            aria-label="Customer"
-          />
+          <Avatar sx={{ width: ICON_SIZE, height: ICON_SIZE, bgcolor: 'grey.300', flexShrink: 0 }} aria-label="Customer">
+            <PersonIcon sx={{ fontSize: 38 }} />
+          </Avatar>
         }
       />
       <PartySlot

@@ -342,7 +342,7 @@ export default function JobEquipmentBookingPanel({ jobId, staffView = false }: P
                         <Chip
                           size="small"
                           label={usage ? usage.label : bookingStatusLabel(b)}
-                          color={usage?.discrepant ? 'warning' : bookingStatusColor(b)}
+                          color={bookingStatusColor(b)}
                           variant={cancelled || b.status === 'TENTATIVE' ? 'outlined' : 'filled'}
                         />
                         {b.billingStatus === 'BILLED' && <Chip size="small" label="Billed" color="info" variant="outlined" />}
