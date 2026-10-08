@@ -35,7 +35,7 @@ import SampleSheetField from "./SampleSheetField";
 import { isSampleSheetParam } from "../utils/sampleSheet";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
 import { answerProblems, isCheckboxList, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
-import { isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, selectsOther } from "../utils/otherOption";
+import { errorLabel, isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, selectsOther } from "../utils/otherOption";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -312,7 +312,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
             </Typography>
             <Box component="ul" sx={{ my: 0.5, pl: 2 }}>
               {Object.keys(paramErrors).slice(0, 6).map((key: any) => {
-                let name = activeNode.data.formData.find((obj: any) => obj.id === key)?.name;
+                const name = errorLabel(key, activeNode.data.formData);
                 return (
                   <li key={key}>
                     <Typography variant="caption">

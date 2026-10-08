@@ -48,3 +48,17 @@ export function otherTextFrom(formData: unknown, parameterId: string): string {
   else if (formData && typeof formData === 'object') value = (formData as Record<string, unknown>)[id];
   return typeof value === 'string' ? value : '';
 }
+
+/**
+ * The name to show beside a field error. The missing-"Other"-text error is keyed
+ * by the companion entry's id, which has no form-data entry until the sync effect
+ * has inserted it; fall back to the parent parameter's name rather than show
+ * `undefined`. (UI only: the backend has no use for it.)
+ */
+export function errorLabel(key: string, formData: ReadonlyArray<{ id?: unknown; name?: unknown }> | null | undefined): string {
+  const nameOf = (id: string): string | undefined => {
+    const name = (formData ?? []).find((entry) => entry?.id === id)?.name;
+    return typeof name === 'string' && name !== '' ? name : undefined;
+  };
+  return nameOf(key) ?? (isOtherTextEntryId(key) ? nameOf(otherTextParentId(key)) : undefined) ?? key;
+}

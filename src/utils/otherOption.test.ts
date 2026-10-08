@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  isOtherOptionName, isOtherTextEntryId, OTHER_TEXT_LABEL, OTHER_TEXT_SUFFIX, otherLabel, otherOptionIdOf, otherTextEntryId, otherTextFrom, otherTextParentId, selectsOther
+  errorLabel, isOtherOptionName, isOtherTextEntryId, OTHER_TEXT_LABEL, OTHER_TEXT_SUFFIX, otherLabel, otherOptionIdOf, otherTextEntryId, otherTextFrom, otherTextParentId, selectsOther
 } from './otherOption';
 
 const sampleType = { id: 'sample_type', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: ' other ' }] };
@@ -40,5 +40,23 @@ describe('the "Other" convention — mirror of the backend', () => {
     expect(otherTextFrom(formData, 'volume')).toBe('');
     expect(otherTextFrom(undefined, 'sample_type')).toBe('');
     expect(otherTextFrom({ sample_type__otherText: 'Yeast' }, 'sample_type')).toBe('Yeast');
+  });
+});
+
+describe('errorLabel (F12)', () => {
+  const formData = [{ id: 'kind', name: 'Kind' }, { id: 'kind__otherText', name: 'Kind (Other)' }, { id: 'vol', name: 'Volume' }];
+
+  it('uses the entry’s own name', () => {
+    expect(errorLabel('vol', formData)).toBe('Volume');
+    expect(errorLabel('kind__otherText', formData)).toBe('Kind (Other)');
+  });
+
+  it('falls back to the parent parameter’s name when the “Other” text entry is not in the form data yet', () => {
+    expect(errorLabel('kind__otherText', [{ id: 'kind', name: 'Kind' }])).toBe('Kind');
+  });
+
+  it('never returns undefined', () => {
+    expect(errorLabel('mystery', formData)).toBe('mystery');
+    expect(errorLabel('mystery__otherText', formData)).toBe('mystery__otherText');
   });
 });
