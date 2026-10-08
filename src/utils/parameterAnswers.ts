@@ -1,5 +1,6 @@
 import { checkValue, effectiveValidation, parseValidation } from './parameterValidation';
 import { isOtherTextEntryId, otherTextEntryId, otherTextFrom, selectsOther } from './otherOption';
+import { withoutHiddenAnswers } from './parameterConditions';
 
 /**
  * What is wrong with a node's answers beyond "required": a number that breaks
@@ -76,4 +77,53 @@ export function toggleChecked(values: unknown, optionId: string, checked: boolea
 /** A multi-value dropdown shown as tick-boxes. `display` lives on the definition, not on the form entry. */
 export function isCheckboxList(entry: any, definition: any): boolean {
   return entry?.type === 'dropdown' && definition?.display === 'checkboxes';
+}
+
+/** Whether every required entry of a form-data list has a value. */
+function requiredAnswersFilled(formData: ReadonlyArray<any>): boolean {
+  for (const entry of formData ?? []) {
+    if (!entry) continue;
+    if (entry.paramType === 'result') {
+      if (entry.value === false && entry.required === true && (entry.resultParamValue === null || entry.resultParamValue === '')) return false;
+    } else if (entry.required === true) {
+      const isMulti = entry.allowMultipleValues === true || Array.isArray(entry.value);
+      if (isMulti) {
+        if (!(Array.isArray(entry.value) && entry.value.some((v: any) => v != null && String(v).trim() !== ''))) return false;
+      } else if (entry.value === '' || entry.value === undefined || entry.value === null) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * The canvas node's completeness badge: no required value is missing and no
+ * answer breaks a rule — among the parameters that are shown. A hidden
+ * parameter (its "show only if" is false) never counts against the node.
+ */
+export function nodeAnswersComplete(formData: ReadonlyArray<any> | null | undefined, parameters: ReadonlyArray<any> | null | undefined): boolean {
+  const shown = withoutHiddenAnswers(parameters, formData ?? []);
+  return requiredAnswersFilled(shown) && Object.keys(answerProblems(shown, parameters)).length === 0;
+}
+
+/**
+ * The form's "Required" messages, keyed by entry id. `values` is the form's
+ * current values by entry id; `formData` the entries to check — pass only the
+ * shown ones (withoutHiddenAnswers), so a hidden parameter is never required.
+ */
+export function requiredProblems(formData: ReadonlyArray<any>, values: Record<string, any>): Record<string, string> {
+  const problems: Record<string, string> = {};
+  for (const entry of formData ?? []) {
+    if (!entry || entry.paramType === 'result' || isOtherTextEntryId(entry.id) || !entry.required) continue;
+    const value = values[entry.id];
+    const isFile = entry.type === 'file' || entry.type === 'sampleSheet';
+    if (entry.allowMultipleValues === true || Array.isArray(entry.value)) {
+      const hasValue = entry.type === 'file' ? Array.isArray(value) && value.length > 0 : Array.isArray(value) && value.some((v: any) => v != null && String(v).trim() !== '');
+      if (!hasValue) problems[entry.id] = 'Required (at least one value)';
+    } else if (isFile ? !value : value === '' || value === undefined || value === null) {
+      problems[entry.id] = 'Required';
+    }
+  }
+  return problems;
 }

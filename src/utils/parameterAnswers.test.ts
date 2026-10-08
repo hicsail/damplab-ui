@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { answerProblems, isCheckboxList, syncOtherTextEntries, toggleChecked } from './parameterAnswers';
+import { answerProblems, isCheckboxList, syncOtherTextEntries, toggleChecked, nodeAnswersComplete, requiredProblems } from './parameterAnswers';
+import { withoutHiddenAnswers } from './parameterConditions';
 
 const options = [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }];
 const parameters = [
@@ -75,5 +76,56 @@ describe('checkbox list helpers (rule 30)', () => {
     expect(isCheckboxList(entry('sample_type', ''), parameters[2])).toBe(false);
     expect(isCheckboxList(entry('tags', []), undefined)).toBe(false);
     expect(isCheckboxList({ ...entry('tags', []), type: 'string' }, parameters[3])).toBe(false);
+  });
+});
+
+describe('hidden parameters raise nothing (show-only-if rule 16)', () => {
+  const options = [{ id: 'bact', name: 'Bacteria' }, { id: 'yeast', name: 'Yeast' }, { id: 'oth', name: 'Other' }];
+  const isBacteria = { parameterId: 'kind', op: 'eq', optionIds: ['bact'] };
+  const parameters = [
+    { id: 'kind', name: 'Kind', type: 'dropdown', options },
+    { id: 'cycles', name: 'Cycles', type: 'number', validation: '>0', showIf: isBacteria },
+    { id: 'lysis', name: 'Lysis', type: 'dropdown', options, showIf: isBacteria },
+    { id: 'kit', name: 'Kit', type: 'string', showIf: isBacteria },
+    { id: 'files', name: 'Maps', type: 'file', allowMultipleValues: true, showIf: isBacteria }
+  ];
+  const form = (kind: string): any[] => [
+    { id: 'kind', type: 'dropdown', options, value: kind, required: true },
+    { id: 'cycles', type: 'number', value: 0, required: true },
+    { id: 'lysis', type: 'dropdown', options, value: 'oth', required: true },
+    { id: 'kit', type: 'string', value: '', required: true },
+    { id: 'files', type: 'file', value: [], required: true, allowMultipleValues: true }
+  ];
+  const valuesOf = (formData: any[]): Record<string, any> => Object.fromEntries(formData.map((e) => [e.id, e.value]));
+
+  it('requiredProblems: one message per empty required entry it is given', () => {
+    const shown = form('bact');
+    expect(requiredProblems(shown, valuesOf(shown))).toEqual({ kit: 'Required', files: 'Required (at least one value)' });
+    expect(requiredProblems(shown, { ...valuesOf(shown), kit: 'K', files: [{}] })).toEqual({});
+    expect(requiredProblems([{ id: 'sheet', type: 'sampleSheet', value: null, required: true }, { id: 'opt', type: 'string', value: '', required: false }], { sheet: null, opt: '' })).toEqual({ sheet: 'Required' });
+  });
+
+  it('the form: a hidden parameter is neither required, nor range-checked, nor asked for "Other" text', () => {
+    const shown = withoutHiddenAnswers(parameters, form('yeast'));
+    expect(shown.map((e: any) => e.id)).toEqual(['kind']);
+    expect(requiredProblems(shown, valuesOf(form('yeast')))).toEqual({});
+    expect(answerProblems(shown, parameters)).toEqual({});
+    // The same answers with the condition true raise all three kinds.
+    const visible = withoutHiddenAnswers(parameters, form('bact'));
+    expect(Object.keys(requiredProblems(visible, valuesOf(form('bact'))))).toEqual(['kit', 'files']);
+    expect(answerProblems(visible, parameters)).toEqual({ cycles: 'Must be greater than 0', lysis__otherText: 'Please specify “Other”' });
+  });
+
+  it('the node badge: hidden parameters do not count against completeness', () => {
+    expect(nodeAnswersComplete(form('yeast'), parameters)).toBe(true);
+    expect(nodeAnswersComplete(form('bact'), parameters)).toBe(false);
+    expect(nodeAnswersComplete([{ id: 'kind', type: 'dropdown', options, value: '', required: true }], parameters)).toBe(false);
+    expect(nodeAnswersComplete(null, parameters)).toBe(true);
+  });
+
+  it('the node badge: a required result parameter still needs its alternative, and a broken rule still flags', () => {
+    expect(nodeAnswersComplete([{ id: 'r', paramType: 'result', value: false, required: true, resultParamValue: '' }], [])).toBe(false);
+    expect(nodeAnswersComplete([{ id: 'r', paramType: 'result', value: true, required: true, resultParamValue: '' }], [])).toBe(true);
+    expect(nodeAnswersComplete([{ id: 'n', type: 'number', value: -1 }], [{ id: 'n', type: 'number', validation: '>0' }])).toBe(false);
   });
 });

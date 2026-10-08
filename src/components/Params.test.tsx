@@ -49,3 +49,67 @@ describe('Params — "Other" (rule 27)', () => {
     expect(text(html([entry('tags', ['oth'])]))).toContain('Please specify');
   });
 });
+
+describe('Params — "show only if" (show-only-if rule 14)', () => {
+  const kinds = [{ id: 'bact', name: 'Bacteria' }, { id: 'yeast', name: 'Yeast' }];
+  const isBacteria = { parameterId: 'kind', op: 'eq', optionIds: ['bact'] };
+  // A set parameter cannot name an operation's own parameter, so the Extraction set is controlled by the Sample set.
+  const organismIsBacteria = { parameterId: 'organism', parameterSetId: 'set0', op: 'eq', optionIds: ['bact'] };
+  const conditional = [
+    { id: 'kind', name: 'Kind', type: 'dropdown', options: kinds },
+    { id: 'lysis', name: 'Lysis method', type: 'dropdown', options, showIf: isBacteria },
+    { id: 'organism', name: 'Organism', type: 'dropdown', options: kinds, fromParameterSetId: 'set0', fromParameterSetName: 'Sample' },
+    { id: 'buffer', name: 'Buffer', type: 'string', fromParameterSetId: 'set1', fromParameterSetName: 'Extraction', showIf: organismIsBacteria },
+    { id: 'elution', name: 'Elution', type: 'string', fromParameterSetId: 'set1', fromParameterSetName: 'Extraction', showIf: organismIsBacteria },
+    { id: 'notes', name: 'Free notes', type: 'string', fromParameterSetId: 'set2', fromParameterSetName: 'Paperwork' }
+  ];
+  const entryOf = (id: string, value: unknown): any => {
+    const def: any = conditional.find((p) => p.id === id);
+    return { id, nodeId: 'n1', name: def.name, type: def.type, options: def.options ?? null, paramType: 'input', value, required: true };
+  };
+  const otherText = { id: 'lysis__otherText', nodeId: 'n1', name: 'Lysis method (Other)', type: 'string', paramType: 'input', value: 'Beads', required: false };
+  const render = (kind: string): string =>
+    text(
+      renderToStaticMarkup(
+        <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+          <Params
+            activeNode={{
+              id: 'n1',
+              data: {
+                id: 'n1',
+                serviceId: 's1',
+                parameters: conditional,
+                formData: [entryOf('kind', kind), entryOf('lysis', 'oth'), otherText, entryOf('organism', kind), entryOf('buffer', 'TE'), entryOf('elution', ''), entryOf('notes', '')]
+              }
+            }}
+          />
+        </CanvasContext.Provider>
+      )
+    );
+
+  it('renders a conditional parameter, its "Other" text and its set heading while the condition holds', () => {
+    const shown = render('bact');
+    expect(shown).toContain('Lysis method');
+    expect(shown).toContain('Please specify');
+    expect(shown).toContain('Extraction');
+    expect(shown).toContain('Buffer');
+    expect(shown).toContain('Elution');
+  });
+
+  it('does not render a hidden parameter, nor its "Other" text', () => {
+    const hidden = render('yeast');
+    expect(hidden).toContain('Kind');
+    expect(hidden).not.toContain('Lysis method');
+    expect(hidden).not.toContain('Please specify');
+    expect(hidden).not.toContain('Buffer');
+    expect(hidden).not.toContain('Elution');
+  });
+
+  it('does not render a set heading with no visible parameter under it, and keeps the others', () => {
+    const hidden = render('yeast');
+    expect(hidden).not.toContain('Extraction');
+    expect(hidden).toContain('Sample');
+    expect(hidden).toContain('Paperwork');
+    expect(hidden).toContain('Free notes');
+  });
+});
