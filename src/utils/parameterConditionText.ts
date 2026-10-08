@@ -48,6 +48,8 @@ type Token =
 const SYMBOLS = ['&&', '||', '==', '!=', '>=', '<=', '>', '<', '(', ')', ',', '.'] as const;
 const OPERATORS: Record<string, ConditionOp> = { '==': 'eq', '!=': 'ne', '>': 'gt', '>=': 'ge', '<': 'lt', '<=': 'le' };
 const NUMBER = /^-?(?:\d+\.?\d*|\.\d+)/;
+/** NUMBER, anchored at both ends: a whole value that is a single number token. */
+const NUMBER_WHOLE = new RegExp(`${NUMBER.source}$`);
 const WORD = /^[A-Za-z_][A-Za-z0-9_]*/;
 
 /** Curly quotes are read as straight quotes (rule 2). */
@@ -459,8 +461,9 @@ function comparisonText(comparison: Comparison, scope: ConditionScope, missing: 
   const fits = !found.parameter || comparisonFits(comparison, found.parameter);
   if (!fits) missing.push(`“${labelOf(found.parameter)}”, whose answer format has changed since`);
   // A Number controller's values are numbers (possibly stored as numeric strings): written bare, as they are typed.
-  const bare = (value: unknown): boolean => found.parameter?.type === 'number' && String(value).trim() !== '' && Number.isFinite(Number(String(value).trim()));
-  const literal = (value: unknown): string => (typeof value === 'string' && !bare(value) ? quote(value) : String(value));
+  // Only what the tokenizer reads back as one number goes bare (so not 1e3, +5 or 0x10), and in its trimmed form.
+  const bare = (value: string): boolean => found.parameter?.type === 'number' && NUMBER_WHOLE.test(value.trim());
+  const literal = (value: unknown): string => (typeof value !== 'string' ? String(value) : bare(value) ? value.trim() : quote(value));
   const optionText = (id: string): string => {
     const option = optionsOf(found.parameter).find((o) => String(o?.id ?? '') === id);
     if (!option && found.parameter && fits) missing.push(`an option “${labelOf(found.parameter)}” no longer has (id ${id})`);

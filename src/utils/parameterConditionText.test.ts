@@ -264,6 +264,27 @@ describe('conditionText (rule 25)', () => {
     }
   });
 
+  it('a Number controller\'s literals print so they read back, whatever their form (print → parse → resolve)', () => {
+    // What reads back: a value the tokenizer takes as one number is a number again; anything else stays the text it was.
+    const plain = /^-?(?:\d+\.?\d*|\.\d+)$/;
+    const readBack = (v: unknown): unknown => (typeof v === 'string' && plain.test(v.trim()) ? Number(v.trim()) : v);
+    for (const value of [5, '5', ' 5 ', '5.0', -5, 0.5, '1e3', '+5', '0x10']) {
+      for (const op of ['eq', 'ne'] as const) {
+        const text = conditionText({ parameterId: 'cycles', op, value } as any, onOperation);
+        expect(resolved(text, onOperation).value, text).toBe(readBack(value));
+      }
+      for (const op of ['gt', 'ge', 'lt', 'le'] as const) {
+        const text = conditionText({ parameterId: 'cycles', op, value } as any, onOperation);
+        expect(resolved(text, onOperation).value, text).toBe(Number(String(value).trim()));
+      }
+      const listed = conditionText({ parameterId: 'cycles', op: 'in', values: [value, 7] } as any, onOperation);
+      expect(resolved(listed, onOperation).values, listed).toEqual([String(readBack(value)), '7']);
+    }
+    expect(conditionText({ parameterId: 'cycles', op: 'eq', value: ' 5 ' } as any, onOperation)).toBe('"Cycles"==5');
+    expect(conditionText({ parameterId: 'cycles', op: 'eq', value: '1e3' } as any, onOperation)).toBe('"Cycles"=="1e3"');
+    expect(conditionText({ parameterId: 'cycles', op: 'in', values: ['+5', '0x10'] } as any, onOperation)).toBe('"Cycles" in ("+5","0x10")');
+  });
+
   it('a rename changes the text, not the condition', () => {
     const condition = resolved('"Sample Type"=="Bacteria"');
     const renamed = [{ ...SAMPLE, name: 'Organism', options: [{ id: 'bact', name: 'E. coli' }] }, KIT];

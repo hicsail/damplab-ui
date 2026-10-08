@@ -5,12 +5,13 @@ import Params from './Params';
 import { CanvasContext } from '../contexts/Canvas';
 
 // There is no DOM here, so effects never run on their own. Params' effects are collected so a test can run them,
-// and formik's setValues is observed (the real useFormik still supplies the values). Everything else is untouched.
-const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, setValues: vi.fn() }));
+// (with the dependency list each was given) and formik's setValues is observed (the real useFormik still supplies the values). Everything else is untouched.
+const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn() }));
 vi.mock('react', async (importOriginal) => {
   const actual: any = await importOriginal();
-  const useEffect = (effect: () => void): void => {
+  const useEffect = (effect: () => void, deps?: unknown[]): void => {
     spy.effects.push(effect);
+    spy.deps.push(deps);
   };
   return { ...actual, default: { ...actual, useEffect }, useEffect };
 });
@@ -141,6 +142,7 @@ describe('Params — rule 15 through the form (show-only-if)', () => {
   /** Render the form for a node holding `formData`, then run the effects that render registered (what a browser does after paint). */
   const mount = (formData: any[]): void => {
     spy.effects.length = 0;
+    spy.deps.length = 0;
     renderToStaticMarkup(
       <CanvasContext.Provider value={{ setNodes } as any}>
         <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData } }} />
@@ -172,6 +174,13 @@ describe('Params — rule 15 through the form (show-only-if)', () => {
     expect(spy.setValues).not.toHaveBeenCalled();
     expect(setNodes).toHaveBeenCalledTimes(1);
     expect(savedFormData().find((e) => e.id === 'lysis').value).toBe('');
+  });
+
+  it('runs the reset again whenever the form values change: the effect is keyed on them', () => {
+    mount([row('kind', 'yeast'), row('lysis', 'beads')]);
+    const keyed = spy.deps.filter((deps) => deps?.some((dep) => (dep as any)?.kind === 'yeast' && (dep as any)?.lysis === 'beads'));
+    expect(keyed).toHaveLength(1);
+    expect(keyed[0]).toHaveLength(1);
   });
 
   it('leaves a shown parameter alone', () => {
