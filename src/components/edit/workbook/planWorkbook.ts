@@ -1,7 +1,7 @@
 import { BundlesWork, planBundles } from './bundlesSheet';
 import { findIdClashes } from './parameterIdClashes';
 import { newOperationRowKeys, OperationsWork, planOperations } from './operationsWorkbookSheet';
-import { newSetRowKeys, ParameterListWork, planParameterList } from './parameterListSheet';
+import { newSetRowKeys, OperationSets, ParameterListWork, planParameterList } from './parameterListSheet';
 import { planSowSections, SowSectionsWork } from './sowSectionsSheet';
 import { CatalogSnapshot, isApplicable, PlanRow, RawWorkbook, SHEET_KEYS, SheetPlan } from './types';
 
@@ -31,11 +31,27 @@ export function planWorkbook(raw: RawWorkbook, catalog: CatalogSnapshot, options
   const newOperationRows = newOperationRowKeys(raw.sheets.operations, catalog);
   const plan: WorkbookPlan = { ignoredSheets: raw.ignoredSheets };
   if (raw.sheets.operations) plan.operations = planOperations(raw.sheets.operations, catalog, { newSetRows, allowPricing: options.allowPricing, hideMissing: options.hideMissing });
-  if (raw.sheets.parameterList) plan.parameterList = planParameterList(raw.sheets.parameterList, catalog, { newOperationRows });
+  if (raw.sheets.parameterList) plan.parameterList = planParameterList(raw.sheets.parameterList, catalog, { newOperationRows, operationSets: operationSetsAfter(plan.operations, catalog) });
   if (raw.sheets.bundles) plan.bundles = planBundles(raw.sheets.bundles, catalog, { newOperationRows });
   if (raw.sheets.sowSections) plan.sowSections = planSowSections(raw.sheets.sowSections, catalog);
   refuseIdClashes(plan, catalog);
   return plan;
+}
+
+/**
+ * The sets each operation would end with if every Operations row were applied,
+ * by set id (`new:<name>` for a set this upload creates). The Parameter List
+ * sheet warns from it when a condition names a set some operation lacks.
+ */
+function operationSetsAfter(operations: SheetPlan<OperationsWork> | undefined, catalog: CatalogSnapshot): OperationSets[] {
+  const rows = Object.values(operations?.work.rows ?? {});
+  const keyOf = (name: string): string => catalog.sets.find((set) => set.name.trim() === name)?.id ?? `new:${name}`;
+  const existing = catalog.operations.map((operation) => {
+    const row = rows.find((work) => work.existingId === operation.id);
+    return { name: operation.name.trim(), setKeys: row?.setNames ? row.setNames.map(keyOf) : operation.parameterSetIds };
+  });
+  const created = rows.filter((work) => work.existingId === undefined).map((work) => ({ name: work.name, setKeys: (work.setNames ?? []).map(keyOf) }));
+  return [...existing, ...created];
 }
 
 /** Rule 20, across sheets: a set parameter this upload creates must not take an id its using operations already have. */

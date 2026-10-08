@@ -1,9 +1,9 @@
 import { formatGqlError } from '../../../utils/gqlError';
 import { findIdClashes } from './parameterIdClashes';
 import { categoryWrites } from './operationsWorkbookSheet';
-import { buildOwnerParameters } from './parameterListSheet';
+import { OwnerWork, resolveOwnerParameters } from './parameterListSheet';
 import { allRows, sheetPlans, WorkbookPlan } from './planWorkbook';
-import { CatalogSnapshot, isApplicable, LOG_ENTITY_TYPE, SHEET_TITLES, SheetKey } from './types';
+import { CatalogSet, CatalogSnapshot, isApplicable, LOG_ENTITY_TYPE, SHEET_TITLES, SheetKey } from './types';
 
 /** The existing, gated mutations an upload calls — nothing else. Each create resolves to the new record's id. */
 export interface WorkbookMutator {
@@ -98,6 +98,26 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
     return false;
   };
 
+  /**
+   * The rows of one write whose needs are met — by rows already applied or by
+   * other rows of the same write (a condition may name a parameter created
+   * beside it). The rest are marked failed, and dropping one can strand another.
+   */
+  const readyTogether = (keys: string[]): string[] => {
+    let live = keys;
+    for (;;) {
+      const unmetOf = (key: string): string | undefined =>
+        rowsByKey.get(key)!.needs.find((need) => !need.anyOf.some((provider) => done.has(provider) || live.includes(provider)))?.what;
+      const blocked = live.filter((key) => unmetOf(key) !== undefined);
+      if (blocked.length === 0) return live;
+      for (const key of blocked) {
+        const what = unmetOf(key)!;
+        settle([key], `${what.charAt(0).toUpperCase()}${what.slice(1)} was not created.`);
+      }
+      live = live.filter((key) => !blocked.includes(key));
+    }
+  };
+
   for (const [key, text] of Object.entries(clashes)) settle([key], text);
 
   const owners = plan.parameterList?.work.owners ?? [];
@@ -106,12 +126,28 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   const operationSetIds = new Map(catalog.operations.map((operation) => [operation.id, operation.parameterSetIds] as const));
   const setIdByName = new Map(catalog.sets.map((set) => [set.name.trim(), set.id] as const));
 
-  // 1. Parameter sets, each with its whole parameter list.
-  for (const owner of owners) {
-    if (owner.kind !== 'set') continue;
-    const keys = owner.entries.map((entry) => entry.rowKey).filter(usable);
+  // The sets as written so far, with real ids — what a condition's "Set"."Parameter" is resolved against.
+  const resultSets: CatalogSet[] = catalog.sets.map((set) => ({ ...set }));
+
+  // 1. Parameter sets, each with its whole parameter list. A set whose rows need a row of another set
+  //    still to be written goes after it. A ring of such sets cannot be ordered: those go in sheet order,
+  //    and the rows left without what they need say so.
+  const pendingSets: OwnerWork[] = owners.filter((owner) => owner.kind === 'set');
+  while (pendingSets.length > 0) {
+    const ownerOfRow = (key: string): OwnerWork | undefined => pendingSets.find((other) => other.entries.some((entry) => entry.rowKey === key));
+    const waits = (candidate: OwnerWork): boolean =>
+      candidate.entries.some(
+        (entry) => usable(entry.rowKey) && rowsByKey.get(entry.rowKey)!.needs.some((need) => need.anyOf.some((provider) => usable(provider) && ![undefined, candidate].includes(ownerOfRow(provider))))
+      );
+    const [owner] = pendingSets.splice(Math.max(0, pendingSets.findIndex((candidate) => !waits(candidate))), 1);
+    const ready = readyTogether(owner.entries.map((entry) => entry.rowKey).filter(usable));
+    if (ready.length === 0) continue;
+    // Conditions are resolved here, against what was actually written: the ids the plan showed can differ once rows are unticked.
+    const built = resolveOwnerParameters(owner, new Set(ready), owner.reservedIds, resultSets);
+    for (const [key, text] of Object.entries(built.failed)) settle([key], `conditionalDisplayLogic: ${text}`);
+    const keys = ready.filter((key) => !(key in built.failed));
     if (keys.length === 0) continue;
-    const parameters = buildOwnerParameters(owner, new Set(keys));
+    const parameters = built.parameters;
     try {
       let id = owner.existingId;
       if (id) await mutator.updateParameterSet(id, { parameters });
@@ -120,6 +156,9 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
         setIdByName.set(owner.name, id);
       }
       setParameterIds.set(id, parameters.map((p) => String(p?.id ?? '')));
+      const at = resultSets.findIndex((set) => set.id === id);
+      if (at >= 0) resultSets[at] = { ...resultSets[at], parameters };
+      else resultSets.push({ id, name: owner.name, parameters });
       snapshots.parameterList.push({ itemId: id, action: owner.existingId ? 'UPDATE' : 'CREATE', before: owner.existingId ? { parameters: owner.stored } : undefined, after: { parameters } });
       settle(keys);
     } catch (error) {
@@ -162,15 +201,19 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   // 3. Operations' own parameters — after step 2, so an operation this upload created exists.
   for (const owner of owners) {
     if (owner.kind !== 'operation') continue;
-    const keys = owner.entries.map((entry) => entry.rowKey).filter(usable).filter(ready);
-    if (keys.length === 0) continue;
+    const readyKeys = readyTogether(owner.entries.map((entry) => entry.rowKey).filter(usable));
+    if (readyKeys.length === 0) continue;
     const id = owner.existingId ?? (owner.operationRowKey !== undefined ? operationIdByRowKey.get(owner.operationRowKey) : undefined);
     if (!id) {
-      settle(keys, `Operation “${owner.name}” was not created.`);
+      settle(readyKeys, `Operation “${owner.name}” was not created.`);
       continue;
     }
     const reserved = (operationSetIds.get(id) ?? []).flatMap((setId) => setParameterIds.get(setId) ?? []);
-    const parameters = buildOwnerParameters(owner, new Set(keys), reserved);
+    const built = resolveOwnerParameters(owner, new Set(readyKeys), reserved, resultSets);
+    for (const [key, text] of Object.entries(built.failed)) settle([key], `conditionalDisplayLogic: ${text}`);
+    const keys = readyKeys.filter((key) => !(key in built.failed));
+    if (keys.length === 0) continue;
+    const parameters = built.parameters;
     try {
       await mutator.updateService(id, { parameters });
       snapshots.parameterList.push({ itemId: id, action: 'UPDATE', before: { parameters: owner.stored }, after: { parameters } });
