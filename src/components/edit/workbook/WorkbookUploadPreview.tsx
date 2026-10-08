@@ -4,10 +4,10 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useContext, useMemo, useState } from 'react';
 import { UserContext } from '../../../contexts/UserContext';
 import { formatGqlError } from '../../../utils/gqlError';
-import { ApplySummary, applyWorkbook } from './applyWorkbook';
-import { countsFor, planWorkbook, sheetPlans, tickedKeys, unmetNeeds } from './planWorkbook';
+import { ApplySummary, applyWorkbook, stoppedSummary } from './applyWorkbook';
+import { countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, tickedKeys, unmetNeeds, untickedCounts } from './planWorkbook';
 import { CatalogSnapshot, isApplicable, PlanRow, RawWorkbook, SHEET_TITLES, SheetKey } from './types';
-import { apolloWorkbookMutator } from './workbookCatalog';
+import { apolloWorkbookMutator, loadCatalogSnapshot } from './workbookCatalog';
 
 export interface WorkbookUploadPreviewProps {
   raw: RawWorkbook;
@@ -26,9 +26,12 @@ const ACTION_COLOR: Record<PlanRow['action'], 'success' | 'info' | 'warning' | '
  * counts, per-row errors and warnings, and a tick-box per row. Only ticked rows
  * are applied. Ignored sheets and columns are named, never silently dropped.
  */
-export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, onClose, onComplete }: WorkbookUploadPreviewProps) {
+export function WorkbookUploadPreview({ raw, catalog: openedWith, fileName, allowPricing, onClose, onComplete }: WorkbookUploadPreviewProps) {
   const client = useApolloClient();
   const { userProps } = useContext(UserContext);
+  // The catalog the plan is made against. Import re-loads it; see handleImport.
+  const [catalog, setCatalog] = useState<CatalogSnapshot>(openedWith);
+  const [notice, setNotice] = useState<{ severity: 'warning' | 'error'; text: string } | null>(null);
   const [hideMissing, setHideMissing] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [importing, setImporting] = useState(false);
@@ -45,10 +48,30 @@ export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, on
 
   const handleImport = async () => {
     setImporting(true);
+    setNotice(null);
     const uploaderName = userProps?.idTokenParsed?.name || userProps?.idTokenParsed?.preferred_username || 'unknown';
     let summary: ApplySummary;
     try {
-      summary = await applyWorkbook(plan, ticked, catalog, apolloWorkbookMutator(client), {
+      // The import writes whole lists (a set's parameters, an operation's, a category's members), so it is built from
+      // the catalog as it is now, never as it was when the file was chosen. If that changes what the preview said would
+      // happen, nothing is applied: the person sees the new plan first.
+      let fresh: CatalogSnapshot;
+      try {
+        fresh = await loadCatalogSnapshot(client);
+      } catch (error) {
+        setNotice({ severity: 'error', text: `Could not re-check the catalog, so nothing was imported: ${formatGqlError(error)}` });
+        setImporting(false);
+        return;
+      }
+      const replanned = planWorkbook(raw, fresh, { allowPricing, hideMissing });
+      if (!plansMatch(plan, replanned)) {
+        setCatalog(fresh);
+        setOverrides({});
+        setNotice({ severity: 'warning', text: 'The catalog changed while this preview was open, so nothing was imported. The preview now shows what would happen against the current catalog. Check it, then import again.' });
+        setImporting(false);
+        return;
+      }
+      summary = await applyWorkbook(replanned, ticked, fresh, apolloWorkbookMutator(client), {
         fileName,
         uploaderName,
         uploaderSub: userProps?.subject,
@@ -56,9 +79,9 @@ export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, on
       });
     } catch (error) {
       // applyWorkbook reports row and log failures in its summary; this is anything it did not catch.
-      // Hand the parent an error summary so it closes the dialog, shows the message and refreshes the
+      // Hand the parent a stopped summary so it closes the dialog, shows the message and refreshes the
       // catalog (some rows may already have been written).
-      summary = { sheets: {}, rowErrors: {}, errors: [`The import stopped unexpectedly: ${formatGqlError(error)} Some rows may already have been applied.`] };
+      summary = stoppedSummary(error);
     } finally {
       setImporting(false);
     }
@@ -103,6 +126,9 @@ export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, on
   ];
 
   const counts = current ? countsFor(current.rows, ticked, blocked) : { create: 0, update: 0, hide: 0, skip: 0 };
+  const unticked = current ? untickedCounts(current.rows, ticked) : { create: 0, update: 0, hide: 0 };
+  // The rows that matter first; unchanged ones last. A person approving a bulk write must meet every error and every create.
+  const orderedRows = useMemo(() => (current ? previewOrder(current.rows, blocked) : []), [current, blocked]);
 
   return (
     <Dialog open onClose={importing ? undefined : onClose} maxWidth='xl' fullWidth>
@@ -112,6 +138,7 @@ export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, on
           <Typography variant='body2' color='text.secondary'>
             {fileName}. Nothing is changed until you import, and nothing is ever deleted: records and parameters the workbook does not mention are left as they are.
           </Typography>
+          {notice && <Alert severity={notice.severity}>{notice.text}</Alert>}
           {(plan.ignoredSheets.length > 0 || ignoredColumns.length > 0) && (
             <Alert severity='info'>
               {plan.ignoredSheets.length > 0 && <div>Ignored sheets: {plan.ignoredSheets.join(', ')}</div>}
@@ -123,7 +150,9 @@ export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, on
           <Tabs value={current?.sheet ?? false} onChange={(_event, value: SheetKey) => setTab(value)}>
             {sheets.map((sheet) => {
               const c = countsFor(sheet.rows, ticked, blocked);
-              return <Tab key={sheet.sheet} value={sheet.sheet} label={`${SHEET_TITLES[sheet.sheet]} (${c.create + c.update + c.hide})`} />;
+              const u = untickedCounts(sheet.rows, ticked);
+              const notTicked = u.create + u.update + u.hide;
+              return <Tab key={sheet.sheet} value={sheet.sheet} label={`${SHEET_TITLES[sheet.sheet]} (${c.create + c.update + c.hide}${notTicked > 0 ? `, ${notTicked} not ticked` : ''})`} />;
             })}
           </Tabs>
           {current && (
@@ -133,6 +162,9 @@ export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, on
                 <Chip label={`${counts.create} to create`} color='success' variant='outlined' />
                 <Chip label={`${counts.update} to update`} color='info' variant='outlined' />
                 {counts.hide > 0 && <Chip label={`${counts.hide} to hide`} color='warning' variant='outlined' />}
+                {unticked.create > 0 && <Chip label={`${unticked.create} create${unticked.create === 1 ? '' : 's'} not ticked`} color='warning' />}
+                {unticked.update > 0 && <Chip label={`${unticked.update} update${unticked.update === 1 ? '' : 's'} not ticked`} color='warning' />}
+                {unticked.hide > 0 && <Chip label={`${unticked.hide} hide${unticked.hide === 1 ? '' : 's'} not ticked`} color='warning' />}
                 <Chip label={`${counts.skip} to skip`} variant='outlined' />
                 {current.sheet === 'operations' && (
                   <FormControlLabel
@@ -143,7 +175,7 @@ export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, on
               </Box>
               {importing && <LinearProgress variant='determinate' value={progress} />}
               <Box sx={{ height: 440 }}>
-                <DataGrid rows={current.rows} columns={columns} getRowId={(row) => row.key} density='compact' getRowHeight={() => 'auto'} disableRowSelectionOnClick />
+                <DataGrid rows={orderedRows} columns={columns} getRowId={(row) => row.key} density='compact' getRowHeight={() => 'auto'} disableRowSelectionOnClick />
               </Box>
             </>
           )}

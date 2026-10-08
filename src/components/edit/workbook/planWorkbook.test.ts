@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { allRows, countsFor, planWorkbook, sheetPlans, tickedKeys, unmetNeeds } from './planWorkbook';
+import { allRows, countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, tickedKeys, unmetNeeds, untickedCounts } from './planWorkbook';
 import { catalogOf, rawSheet } from './testSupport';
-import { RawWorkbook } from './types';
+import { PlanRow, RawWorkbook } from './types';
 
 const catalog = catalogOf({
   operations: [{ id: 'op1', name: 'PCR', parameterSetIds: [], ownParameters: [] } as any],
@@ -74,5 +74,85 @@ describe('ticks, dependencies and counts (rule 8)', () => {
     expect(countsFor(plan.operations!.rows, ticked, blocked)).toEqual({ create: 0, update: 0, hide: 0, skip: 2 });
     expect(countsFor(plan.sowSections!.rows, ticked, blocked)).toEqual({ create: 1, update: 0, hide: 0, skip: 0 });
     expect(countsFor(plan.operations!.rows, tickedKeys(plan, {}), {})).toEqual({ create: 1, update: 0, hide: 0, skip: 1 });
+  });
+});
+
+describe('plansMatch (I1: the plan re-made at Import against the plan that was previewed)', () => {
+  it('is true for the same file against an unchanged catalog', () => {
+    expect(plansMatch(planWorkbook(chained, catalog, options), planWorkbook(chained, catalog, options))).toBe(true);
+  });
+
+  it('is true when the catalog changed somewhere no row looks', () => {
+    const grown = catalogOf({ ...catalog, sets: [...catalog.sets, { id: 's2', name: 'Elsewhere', parameters: [] }] });
+    expect(plansMatch(planWorkbook(chained, catalog, options), planWorkbook(chained, grown, options))).toBe(true);
+  });
+
+  it('is false when a row’s action changes: a record the file would create now exists', () => {
+    const made = catalogOf({ ...catalog, operations: [...catalog.operations, { id: 'op2', name: 'Ligation', parameterSetIds: [], ownParameters: [] } as any] });
+    expect(plansMatch(planWorkbook(chained, catalog, options), planWorkbook(chained, made, options))).toBe(false);
+  });
+
+  it('is false when the changed fields differ', () => {
+    const file = { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['id', 'name', 'description'], [['op1', 'PCR', 'Amplify']]) } };
+    const before = catalogOf({ ...catalog, operations: [{ id: 'op1', name: 'PCR', description: 'Old', parameterSetIds: [], ownParameters: [] } as any] });
+    const after = catalogOf({ ...catalog, operations: [{ id: 'op1', name: 'PCR', description: 'Amplify', parameterSetIds: [], ownParameters: [] } as any] });
+    expect(plansMatch(planWorkbook(file, before, options), planWorkbook(file, after, options))).toBe(false);
+  });
+
+  it('is false when an error or a warning appears or goes', () => {
+    const file = { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['id', 'name'], [['op1', 'PCR']]) } };
+    const gone = catalogOf({ ...catalog, operations: [] });
+    expect(plansMatch(planWorkbook(file, catalog, options), planWorkbook(file, gone, options))).toBe(false);
+    const near = catalogOf({ ...catalog, operations: [{ id: 'op7', name: 'pcr ', parameterSetIds: [], ownParameters: [] } as any] });
+    const byName = { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['name'], [['PCR']]) } };
+    expect(plansMatch(planWorkbook(byName, catalog, options), planWorkbook(byName, near, options))).toBe(false);
+  });
+
+  it('is false when a hide row appears', () => {
+    const file = { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['name'], [['PCR']]) } };
+    const more = catalogOf({ ...catalog, operations: [...catalog.operations, { id: 'op5', name: 'New one', parameterSetIds: [], ownParameters: [] } as any] });
+    const hide = { allowPricing: true, hideMissing: true };
+    expect(plansMatch(planWorkbook(file, catalog, hide), planWorkbook(file, more, hide))).toBe(false);
+  });
+});
+
+describe('previewOrder (I3: the rows that matter come first)', () => {
+  const row = (key: string, over: Partial<PlanRow>): PlanRow => ({
+    key, sheet: 'operations', rowNumber: Number(key.split(':')[1]) || null, label: key, action: 'unchanged', matchedByName: false, changed: [], errors: [], warnings: [], selectedByDefault: false, needs: [], ...over
+  });
+  const rows = [
+    row('operations:2', {}),
+    row('operations:3', { action: 'create' }),
+    row('operations:4', {}),
+    row('operations:5', { action: 'skip', errors: ['boom'] }),
+    row('operations:6', { action: 'update' }),
+    row('operations:7', { action: 'create', warnings: ['near-duplicate'] }),
+    row('operations:8', { action: 'unchanged', warnings: ['order is ignored'] }),
+    row('operations:9', { action: 'skip', errors: ['again'] }),
+    row('hide:x', { action: 'hide' })
+  ];
+
+  it('puts errors, then warnings, then writes, then unchanged; sheet order within each band', () => {
+    expect(previewOrder(rows, {}).map((r) => r.key)).toEqual(['operations:5', 'operations:9', 'operations:7', 'operations:3', 'operations:6', 'hide:x', 'operations:2', 'operations:4', 'operations:8']);
+  });
+
+  it('treats a row that is blocked by an unmet need as an error row', () => {
+    expect(previewOrder(rows, { 'operations:6': 'Parameter set “Salts” was not created.' }).map((r) => r.key).slice(0, 3)).toEqual(['operations:5', 'operations:6', 'operations:9']);
+  });
+
+  it('keeps every row and leaves the input alone', () => {
+    const copy = [...rows];
+    expect(previewOrder(rows, {})).toHaveLength(rows.length);
+    expect(rows).toEqual(copy);
+  });
+});
+
+describe('untickedCounts (I3: an unticked create or update is never uncounted)', () => {
+  it('counts applicable rows that are not ticked, by action', () => {
+    const plan = planWorkbook(chained, catalog, options);
+    const ticked = tickedKeys(plan, { 'parameterList:2': false, 'sowSections:2': false });
+    expect(untickedCounts(plan.parameterList!.rows, ticked)).toEqual({ create: 1, update: 0, hide: 0 });
+    expect(untickedCounts(plan.sowSections!.rows, ticked)).toEqual({ create: 1, update: 0, hide: 0 });
+    expect(untickedCounts(plan.operations!.rows, ticked)).toEqual({ create: 0, update: 0, hide: 0 });
   });
 });

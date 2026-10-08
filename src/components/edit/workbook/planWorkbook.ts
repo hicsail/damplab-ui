@@ -104,3 +104,40 @@ export function countsFor(rows: ReadonlyArray<PlanRow>, ticked: ReadonlySet<stri
   }
   return counts;
 }
+
+/**
+ * Whether a plan made at Import (from a freshly loaded catalog) says the same
+ * thing as the plan that was previewed: the same rows, each with the same
+ * action, changed fields, errors and warnings. Only then is the import applied;
+ * anything else means the catalog moved while the preview was open and the
+ * person has not seen what would now happen.
+ */
+export function plansMatch(previewed: WorkbookPlan, fresh: WorkbookPlan): boolean {
+  const signature = (plan: WorkbookPlan): string =>
+    JSON.stringify(allRows(plan).map((row) => [row.key, row.action, row.changed, row.errors, row.warnings]));
+  return signature(previewed) === signature(fresh);
+}
+
+/**
+ * The preview grid's order: rows with errors (or blocked by something unmet),
+ * then rows with warnings, then creates / updates / hides, then unchanged rows.
+ * Sheet order within each band, so the "Row" column still reads as the sheet's.
+ */
+export function previewOrder(rows: ReadonlyArray<PlanRow>, blocked: Readonly<Record<string, string>>): PlanRow[] {
+  const band = (row: PlanRow): number => {
+    if (row.errors.length > 0 || row.key in blocked) return 0;
+    if (row.action === 'unchanged') return 3;
+    return row.warnings.length > 0 ? 1 : 2;
+  };
+  return rows.map((row, index) => ({ row, index })).sort((a, b) => band(a.row) - band(b.row) || a.index - b.index).map(({ row }) => row);
+}
+
+/** Creates, updates and hides that could be applied but are not ticked — counted so a skipped write is never invisible. */
+export function untickedCounts(rows: ReadonlyArray<PlanRow>, ticked: ReadonlySet<string>): { create: number; update: number; hide: number } {
+  const counts = { create: 0, update: 0, hide: 0 };
+  for (const row of rows) {
+    if (!isApplicable(row) || ticked.has(row.key)) continue;
+    if (row.action === 'create' || row.action === 'update' || row.action === 'hide') counts[row.action] += 1;
+  }
+  return counts;
+}
