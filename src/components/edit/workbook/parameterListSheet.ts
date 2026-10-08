@@ -1,6 +1,6 @@
 import { makeUniqueIds } from '../../../utils/idFromName';
 import { effectiveValidation, parseValidation } from '../../../utils/parameterValidation';
-import { nearKey, parseYesNo, sameList, splitList, yesNo } from './cells';
+import { nearKey, normalizeEol, parseYesNo, sameList, splitList, yesNo } from './cells';
 import { matchRows } from './matching';
 import { CatalogSnapshot, Need, PlanRow, RawRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
@@ -45,7 +45,7 @@ export function parseTypeCell(raw: string): { type: string; checkboxes: boolean 
 }
 
 const optionsOf = (parameter: any): any[] => (Array.isArray(parameter?.options) ? parameter.options : []);
-const optionName = (option: any): string => String(option?.name ?? '').trim();
+const optionName = (option: any): string => normalizeEol(option?.name).trim();
 
 /** What the download writes for a parameter — and what an uploaded row is compared against. */
 export function parameterCells(parameter: any, owner: { set?: string; operation?: string }): Record<string, string> {
@@ -54,14 +54,14 @@ export function parameterCells(parameter: any, owner: { set?: string; operation?
     parameterId: String(parameter?.id ?? ''),
     parameterSet: owner.set ?? '',
     operation: owner.operation ?? '',
-    parameter: String(parameter?.name ?? '').trim(),
-    description: String(parameter?.description ?? '').trim(),
+    parameter: normalizeEol(parameter?.name).trim(),
+    description: normalizeEol(parameter?.description).trim(),
     required: yesNo(parameter?.required),
     type: typeLabelOf(parameter),
     options: optionsOf(parameter).map(optionName).join('; '),
     validation: parameter?.type === 'number' ? effectiveValidation(parameter) : '',
     allowMultiple: yesNo(parameter?.allowMultipleValues),
-    defaultValue: defaultValue === undefined || defaultValue === null ? '' : String(defaultValue)
+    defaultValue: normalizeEol(defaultValue)
   };
 }
 

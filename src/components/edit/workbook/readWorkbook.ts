@@ -21,6 +21,8 @@ export function canonicalColumn(sheet: SheetKey, header: unknown): string | null
 function readSheet(sheet: SheetKey, title: string, worksheet: XLSX.WorkSheet): RawSheet {
   const aoa = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as unknown[][];
   const [header = [], ...body] = aoa;
+  // sheet_to_json starts at the used range, so leading blank sheet rows are not in `aoa`: the header is sheet row firstRow + 1.
+  const firstRow = worksheet['!ref'] ? XLSX.utils.decode_range(worksheet['!ref']).s.r : 0;
   const columnAt = new Map<number, string>();
   const ignoredColumns: string[] = [];
   header.forEach((raw, index) => {
@@ -37,7 +39,7 @@ function readSheet(sheet: SheetKey, title: string, worksheet: XLSX.WorkSheet): R
     for (const [i, column] of columnAt) cells[column] = cellText((raw as unknown[])?.[i]);
     // A row with nothing in any recognised column is not a row (a stray note, a formatted-but-empty line).
     if (Object.values(cells).every((v) => v === '')) return;
-    rows.push({ rowNumber: index + 2, cells });
+    rows.push({ rowNumber: firstRow + index + 2, cells });
   });
   return { title, columns: [...columnAt.values()], ignoredColumns, rows };
 }

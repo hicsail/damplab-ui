@@ -164,3 +164,11 @@ describe('Operations — "Hide operations not in this sheet from clients" (rule 
     expect(result.rows.map((r) => r.key)).toEqual(['operations:2', 'hide:op1']);
   });
 });
+
+describe('Operations — M6: stored CRLF reads as the same as the LF the reader gives', () => {
+  it('is unchanged when only the line ends differ', () => {
+    const crlf = catalogOf({ operations: [{ ...pcr, description: 'Line one\r\nLine two', parameterSetIds: [] }] });
+    const result = planOperations(rawSheet('operations', ['id', 'name', 'description'], [['op1', 'PCR', 'Line one\nLine two']]), crlf, ctx);
+    expect(result.rows[0].action).toBe('unchanged');
+  });
+});

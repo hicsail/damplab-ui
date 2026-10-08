@@ -1,5 +1,5 @@
 import { OperationLike, PRICING_COLUMNS, PricingColumn, tierPrice } from '../operationsSheet';
-import { nearKey, parseMoney, parseYesNo, sameList, yesNo } from './cells';
+import { nearKey, normalizeEol, parseMoney, parseYesNo, sameList, yesNo } from './cells';
 import { matchRows } from './matching';
 import { CatalogCategory, CatalogOperation, CatalogSnapshot, Need, PlanRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
@@ -33,9 +33,9 @@ function operationCells(operation: CatalogOperation, catalog: CatalogSnapshot): 
   const cells: Record<string, string | number> = {
     id: operation.id,
     serviceCategory: categoryLabelOf(operation.id, catalog.categories),
-    name: operation.name.trim(),
-    description: (operation.description ?? '').trim(),
-    unit: (operation.unit ?? '').trim(),
+    name: normalizeEol(operation.name).trim(),
+    description: normalizeEol(operation.description).trim(),
+    unit: normalizeEol(operation.unit).trim(),
     hiddenFromClients: yesNo(operation.hiddenFromClients),
     pricingMode: operation.pricingMode === 'PARAMETER' ? 'PARAMETER' : 'SERVICE'
   };

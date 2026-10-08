@@ -1,3 +1,4 @@
+import { normalizeEol } from './cells';
 import { matchRows } from './matching';
 import { CatalogSnapshot, PlanRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
@@ -11,7 +12,7 @@ import { CatalogSnapshot, PlanRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, S
 const fullName = (sectionKey: string, name: string): string => `${sectionKey} › ${name}`;
 
 export function sowSectionsExportRows(catalog: CatalogSnapshot): Array<Array<string | number>> {
-  return [[...SHEET_COLUMNS.sowSections], ...catalog.sowPresets.map((preset) => [preset.id, preset.sectionKey, preset.name.trim(), (preset.text ?? '').trim(), preset.order])];
+  return [[...SHEET_COLUMNS.sowSections], ...catalog.sowPresets.map((preset) => [preset.id, preset.sectionKey, normalizeEol(preset.name).trim(), normalizeEol(preset.text).trim(), preset.order])];
 }
 
 export interface SowRowWork {
@@ -53,7 +54,7 @@ export function planSowSections(sheet: RawSheet, catalog: CatalogSnapshot): Shee
         const changes: { name?: string; text?: string } = {};
         const before: Record<string, unknown> = {};
         if (has('sectionKey') && cell('sectionKey') !== existing.sectionKey) errors.push(`sectionKey cannot be changed by an upload (it is “${existing.sectionKey}”).`);
-        if (has('name') && cell('name') !== existing.name.trim()) {
+        if (has('name') && cell('name') !== normalizeEol(existing.name).trim()) {
           if (cell('name') === '') errors.push('Name cannot be blank.');
           else {
             changes.name = cell('name');
@@ -61,7 +62,7 @@ export function planSowSections(sheet: RawSheet, catalog: CatalogSnapshot): Shee
             changed.push('name');
           }
         }
-        if (has('text') && cell('text') !== (existing.text ?? '').trim()) {
+        if (has('text') && cell('text') !== normalizeEol(existing.text).trim()) {
           changes.text = cell('text');
           before.text = existing.text ?? '';
           changed.push('text');

@@ -61,3 +61,11 @@ describe('SOW Sections — upload (rules 2, 3, 5, 33)', () => {
     expect(plan(['sectionKey', 'name'], [['terms', '']]).rows[0].errors).toEqual(['A new SOW text block needs a name.']);
   });
 });
+
+describe('SOW Sections — M6: stored CRLF reads as the same as the LF the reader gives', () => {
+  it('is unchanged when only the line ends differ', () => {
+    const crlf = catalogOf({ sowSectionKeys: ['terms'], sowPresets: [{ id: 'p1', sectionKey: 'terms', name: 'Default', text: 'Net 30.\r\n- No refunds', order: 1000 }] });
+    const result = planSowSections(rawSheet('sowSections', ['id', 'sectionKey', 'name', 'text'], [['p1', 'terms', 'Default', 'Net 30.\n- No refunds']]), crlf);
+    expect(result.rows[0].action).toBe('unchanged');
+  });
+});

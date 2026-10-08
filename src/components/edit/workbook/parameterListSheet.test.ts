@@ -211,3 +211,11 @@ describe('Parameter List — type, options, validation (rules 18, 19, 22)', () =
     expect(plan(['parameterSet', 'parameter', 'required'], [['Buffers', 'Volume', 'maybe']]).rows[0].errors).toEqual(['required: “maybe” must be Y or N.']);
   });
 });
+
+describe('Parameter List — M6: stored CRLF reads as the same as the LF the reader gives', () => {
+  it('is unchanged when only the line ends differ', () => {
+    const crlf = catalogOf({ sets: [{ id: 'set1', name: 'Buffers', parameters: [{ id: 'v', name: 'Volume', type: 'string', description: 'a\r\nb' }] }] });
+    const result = plan(['parameterId', 'parameterSet', 'parameter', 'description'], [['v', 'Buffers', 'Volume', 'a\nb']], none, crlf);
+    expect(result.rows[0].action).toBe('unchanged');
+  });
+});

@@ -22,6 +22,18 @@ describe('canonicalColumn', () => {
   });
 });
 
+describe('readWorkbook row numbers (F14)', () => {
+  it('numbers rows by sheet row when blank rows sit above the header', () => {
+    const raw = readWorkbook(book({ Operations: [[], [], ['id', 'name'], ['op1', 'PCR'], ['', ''], ['op2', 'Gel']] }));
+    expect(raw.sheets.operations!.rows.map((row) => [row.rowNumber, row.cells.name])).toEqual([[4, 'PCR'], [6, 'Gel']]);
+  });
+
+  it('still numbers rows from 2 when the header is the first row', () => {
+    const raw = readWorkbook(book({ Operations: [['id', 'name'], ['op1', 'PCR']] }));
+    expect(raw.sheets.operations!.rows[0].rowNumber).toBe(2);
+  });
+});
+
 describe('readWorkbook (rule 8: recognised sheets, ignored sheets and columns)', () => {
   it('recognises the four sheets by name, case-insensitively, and names every other sheet as ignored', () => {
     const raw = readWorkbook(book({

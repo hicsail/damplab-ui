@@ -1,8 +1,10 @@
+/** CRLF as LF — how the reader sees a cell; the stored side of every comparison goes through it too. */
+export const normalizeEol = (v: unknown): string => (v === null || v === undefined ? '' : String(v).replace(/\r\n/g, '\n'));
+
 /** Any SheetJS cell value as trimmed text. A date cell reads as its ISO day. */
 export function cellText(v: unknown): string {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
-  if (v === null || v === undefined) return '';
-  return String(v).replace(/\r\n/g, '\n').trim();
+  return normalizeEol(v).trim();
 }
 
 /** Two names with the same key differ only by case or spacing: a near-duplicate. */
@@ -21,11 +23,13 @@ export function parseYesNo(raw: string): boolean | 'invalid' {
 
 export const yesNo = (v: unknown): 'Y' | 'N' => (v === true ? 'Y' : 'N');
 
-/** '' → null (clear); a negative or non-number → 'invalid'. Accepts "$1,200.50". */
+/** '' → null (clear); a negative or non-number → 'invalid'. Accepts "$1,200.50"; after stripping `$`, `,` and spaces only a plain decimal is a price. */
 export function parseMoney(raw: string): number | null | 'invalid' {
   if (raw === '') return null;
-  const n = Number(raw.replace(/[$,\s]/g, ''));
-  return Number.isFinite(n) && n >= 0 ? n : 'invalid';
+  const stripped = raw.replace(/[$,\s]/g, '');
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(stripped)) return 'invalid';
+  const n = Number(stripped);
+  return Number.isFinite(n) ? n : 'invalid';
 }
 
 /** A semicolon-separated cell as trimmed, non-blank names. */

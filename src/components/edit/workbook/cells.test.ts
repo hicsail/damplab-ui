@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellText, nearKey, parseMoney, parseYesNo, sameList, splitList, yesNo } from './cells';
+import { cellText, nearKey, normalizeEol, parseMoney, parseYesNo, sameList, splitList, yesNo } from './cells';
 
 describe('cells', () => {
   it('reads any cell as trimmed text', () => {
@@ -30,6 +30,19 @@ describe('cells', () => {
     expect(parseMoney('')).toBeNull();
     expect(parseMoney('-1')).toBe('invalid');
     expect(parseMoney('free')).toBe('invalid');
+  });
+
+  it('F13: a price cell must be a plain decimal once $ , and spaces are stripped', () => {
+    for (const bad of ['$', ',', '$,', ' $ ', '0x10', '1e3', '1.2.3', '.', '--1']) expect(parseMoney(bad)).toBe('invalid');
+    expect(parseMoney('0')).toBe(0);
+    expect(parseMoney('$ 1,200')).toBe(1200);
+    expect(parseMoney('.5')).toBe(0.5);
+    expect(parseMoney('12.')).toBe(12);
+  });
+
+  it('M6: normalises CRLF line ends the way the reader does', () => {
+    expect(normalizeEol('a\r\nb\r\nc')).toBe('a\nb\nc');
+    expect(normalizeEol(undefined)).toBe('');
   });
 
   it('splits a semicolon list, trimming and dropping blanks', () => {
