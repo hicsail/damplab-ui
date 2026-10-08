@@ -1,4 +1,5 @@
 import { GridRowModel } from "@mui/x-data-grid";
+import { validationError } from './parameterTypeChoice';
 
 export interface ParameterValidationError {
   field: string;
@@ -34,6 +35,15 @@ export function validateParameter(row: GridRowModel): ParameterValidationError[]
     } else if (numericPrice < 0) {
       errors.push({ field: "Fallback price", errorMsg: "Fallback price cannot be negative." });
     }
+  }
+
+  const validationProblem = validationError(row);
+  if (validationProblem) {
+    errors.push({ field: "Validation", errorMsg: validationProblem });
+  }
+
+  if (row.display === "checkboxes" && !(row.type === "dropdown" && row.allowMultipleValues === true)) {
+    errors.push({ field: "Answer format", errorMsg: "Checkboxes needs “Allow multiple selections” to be Yes." });
   }
 
   return errors;

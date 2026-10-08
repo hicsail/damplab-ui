@@ -63,3 +63,25 @@ describe('withDragKeys', () => {
     expect(new Set(out.map((p) => p._dragKey)).size).toBe(2);
   });
 });
+
+describe('prepareParametersForSave — validation and display', () => {
+  it('drops a blank validation, and any validation on a parameter that is not a Number', () => {
+    const { parameters, errors } = prepareParametersForSave(
+      [
+        { _dragKey: 'a', id: 'cycles', name: 'Cycles', type: 'number', validation: '  ' },
+        { _dragKey: 'b', id: 'notes', name: 'Notes', type: 'string', validation: '>0', display: 'checkboxes' },
+        { _dragKey: 'c', id: 'vol', name: 'Volume', type: 'number', validation: ' >0 ' }
+      ],
+      {}
+    );
+    expect(errors).toEqual([]);
+    expect(parameters[0]).toEqual({ id: 'cycles', name: 'Cycles', type: 'number' });
+    expect(parameters[1]).toEqual({ id: 'notes', name: 'Notes', type: 'string' });
+    expect(parameters[2]).toEqual({ id: 'vol', name: 'Volume', type: 'number', validation: '>0' });
+  });
+
+  it('refuses to save an unparseable validation (rule 23)', () => {
+    const { errors } = prepareParametersForSave([{ _dragKey: 'a', id: 'cycles', name: 'Cycles', type: 'number', validation: '>0 || <5' }], {});
+    expect(errors).toEqual(['Parameter 1: Validation - “||” is not supported — join rules with &&.']);
+  });
+});

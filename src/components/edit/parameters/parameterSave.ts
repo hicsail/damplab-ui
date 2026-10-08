@@ -29,6 +29,13 @@ export function prepareParametersForSave(
     const { _dragKey, ...rest } = parameter;
     const next: Record<string, any> = { ...rest };
     if (!next.id || String(next.id).trim() === '') next.id = idFromName(next.name ?? '');
+    // Stored trimmed; a blank one is not stored. Only a Number carries a
+    // validation and only a dropdown a display — the server refuses anything else.
+    if (typeof next.validation === 'string') next.validation = next.validation.trim();
+    if (next.type !== 'number' || !next.validation) delete next.validation;
+    if (next.type !== 'dropdown' || next.display === undefined || next.display === null) delete next.display;
+    if (next.rangeValueMin === undefined) delete next.rangeValueMin;
+    if (next.rangeValueMax === undefined) delete next.rangeValueMax;
     if (next.type === 'table') {
       const raw = tableDataText[index];
       if (raw && raw.trim()) {

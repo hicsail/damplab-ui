@@ -37,6 +37,7 @@ import { useState } from 'react';
 import { idFromName } from '../../../utils/idFromName';
 import SampleSheetTemplateField, { SampleSheetTemplateOwner } from '../SampleSheetTemplateField';
 import { createDragKey, EditableParameter } from './parameterSave';
+import { applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
 
 const TYPE_OPTIONS = [
   { value: 'string', label: 'Text' },
@@ -45,6 +46,7 @@ const TYPE_OPTIONS = [
   { value: 'sampleSheet', label: 'Samples spreadsheet' },
   { value: 'boolean', label: 'Yes/No' },
   { value: 'dropdown', label: 'Pick from list' },
+  { value: CHECKBOXES_CHOICE, label: 'Checkboxes' },
   { value: 'table', label: 'Table' }
 ];
 
@@ -292,8 +294,8 @@ export default function ParameterListEditor({
                   select
                   label='Answer format'
                   fullWidth
-                  value={selectedParameter.type ?? 'string'}
-                  onChange={(event) => updateParameter(selectedParameterIndex, { type: event.target.value })}
+                  value={typeChoiceOf(selectedParameter)}
+                  onChange={(event) => updateParameter(selectedParameterIndex, applyTypeChoice(event.target.value))}
                 >
                   {TYPE_OPTIONS.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
@@ -323,6 +325,8 @@ export default function ParameterListEditor({
                   select
                   label='Allow multiple selections?'
                   fullWidth
+                  disabled={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE}
+                  helperText={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE ? 'Checkboxes always allow several.' : undefined}
                   value={selectedParameter.allowMultipleValues ? 'yes' : 'no'}
                   onChange={(event) =>
                     updateParameter(selectedParameterIndex, {
@@ -464,30 +468,15 @@ export default function ParameterListEditor({
                       <MenuItem value='no'>No</MenuItem>
                     </TextField>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <TextField
-                      label='Minimum allowed value'
-                      type='number'
+                      label='Validation'
                       fullWidth
-                      value={selectedParameter.rangeValueMin ?? ''}
-                      onChange={(event) =>
-                        updateParameter(selectedParameterIndex, {
-                          rangeValueMin: event.target.value === '' ? undefined : Number(event.target.value)
-                        })
-                      }
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
-                    <TextField
-                      label='Maximum allowed value'
-                      type='number'
-                      fullWidth
-                      value={selectedParameter.rangeValueMax ?? ''}
-                      onChange={(event) =>
-                        updateParameter(selectedParameterIndex, {
-                          rangeValueMax: event.target.value === '' ? undefined : Number(event.target.value)
-                        })
-                      }
+                      placeholder='>0 && <100 && integer'
+                      value={validationText(selectedParameter)}
+                      error={Boolean(validationError(selectedParameter))}
+                      helperText={validationError(selectedParameter) ?? 'Rules joined by &&: >n, >=n, <n, <=n, integer. Leave blank for none.'}
+                      onChange={(event) => updateParameter(selectedParameterIndex, applyValidationText(event.target.value))}
                     />
                   </Grid>
                 </>
