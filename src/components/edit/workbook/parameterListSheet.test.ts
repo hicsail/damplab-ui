@@ -21,9 +21,9 @@ describe('Parameter List — download rows (rules 15, 18, 24)', () => {
   it('writes each set parameter once under its set, then each operation’s own parameters', () => {
     expect(parameterListExportRows(catalog)).toEqual([
       COLUMNS,
-      ['volume', 'Buffers', '', 'Volume', 'In µL', 'Y', 'Number', '', '>=1 && <=50', 'N', ''],
-      ['sample_type', 'Buffers', '', 'Sample Type', '', 'N', 'Checkboxes', 'Bacteria; Other', '', 'Y', ''],
-      ['cycles', '', 'PCR', 'Cycles', '', 'N', 'Number', '', '>0 && integer', 'N', '30']
+      ['volume', 'Buffers', '', 'Volume', 'In µL', 'Y', 'Number', '', '>=1 && <=50', '', 'N', ''],
+      ['sample_type', 'Buffers', '', 'Sample Type', '', 'N', 'Checkboxes', 'Bacteria; Other', '', '', 'Y', ''],
+      ['cycles', '', 'PCR', 'Cycles', '', 'N', 'Number', '', '>0 && integer', '', 'N', '30']
     ]);
   });
 
@@ -240,5 +240,129 @@ describe('Parameter List — F15', () => {
     const twins = catalogOf({ sets: [{ id: 'a', name: 'Buffers', parameters: [] }, { id: 'b', name: 'Buffers ', parameters: [] }] });
     const result = plan(['parameterSet', 'parameter'], [['Buffers', 'Volume']], none, twins);
     expect(result.rows[0]).toMatchObject({ action: 'skip', errors: ['2 parameter sets are named “Buffers” — its parameters cannot say which.'] });
+  });
+});
+
+describe('Parameter List — conditionalDisplayLogic (show-only-if rules 24–28)', () => {
+  const sampleType = { id: 'sample_type', name: 'Sample Type', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }, { id: 'yeast', name: 'Yeast' }] };
+  const isBacteria = { parameterId: 'sample_type', op: 'eq', optionIds: ['bact'] };
+  const extraction = {
+    id: 'setX',
+    name: 'Nucleic Acid Extraction',
+    parameters: [sampleType, { id: 'lysis', name: 'Lysis', type: 'string', showIf: isBacteria, price: 3 }, { id: 'elution', name: 'Elution volume', type: 'number' }]
+  };
+  const pcrOp: any = {
+    id: 'op1',
+    name: 'PCR',
+    parameterSetIds: ['setX'],
+    ownParameters: [
+      { id: 'hot', name: 'Hot start', type: 'boolean' },
+      { id: 'polymerase', name: 'Polymerase', type: 'string', showIf: { all: [{ parameterId: 'sample_type', parameterSetId: 'setX', op: 'eq', optionIds: ['bact'] }, { parameterId: 'hot', op: 'eq', value: true }] } }
+    ]
+  };
+  const cat = catalogOf({ sets: [extraction], operations: [pcrOp] });
+  const planIn = (columns: string[], rows: string[][]) => plan(columns, rows, none, cat);
+  const logicOf = (rows: string[][], header: string[]): string[] => rows.map((row) => row[header.indexOf('conditionalDisplayLogic')]);
+
+  it('is a column of the sheet, exported after validation (rule 24)', () => {
+    expect(COLUMNS.indexOf('conditionalDisplayLogic')).toBe(COLUMNS.indexOf('validation') + 1);
+  });
+
+  it('download writes each condition from the stored ids with current names: unqualified in the same list, "Set"."Parameter" otherwise (rule 25)', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    expect(logicOf(rows, header)).toEqual(['', '"Sample Type"=="Bacteria"', '', '', '"Nucleic Acid Extraction"."Sample Type"=="Bacteria" && "Hot start"==true']);
+  });
+
+  it('download writes a reference that no longer resolves as "<missing>"', () => {
+    const orphan = catalogOf({ sets: [{ id: 's', name: 'S', parameters: [{ id: 'a', name: 'A', type: 'string', showIf: { parameterId: 'gone', parameterSetId: 'deleted', op: 'eq', value: 'x' } }] }] });
+    const [header, ...rows] = parameterListExportRows(orphan);
+    expect(logicOf(rows, header)).toEqual(['"<missing>"=="x"']);
+    // …and that same sheet uploads as unchanged.
+    expect(plan(header, rows, none, orphan).rows.map((r) => r.action)).toEqual(['unchanged']);
+  });
+
+  it('download → upload with no edits is all unchanged, with and without ids (rule 26)', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    expect(planIn(header, rows).rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged', 'unchanged', 'unchanged']);
+    expect(planIn(header.slice(1), rows.map((r) => r.slice(1))).rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged', 'unchanged', 'unchanged']);
+  });
+
+  it('a cell that differs only in spacing outside quotes or in quote style is unchanged (rule 26)', () => {
+    const result = planIn(['parameterSet', 'parameter', 'conditionalDisplayLogic'], [['Nucleic Acid Extraction', 'Lysis', ' “Sample Type”  ==  ‘Bacteria’ ']]);
+    expect(result.rows[0]).toMatchObject({ action: 'unchanged', changed: [], errors: [] });
+    expect(result.work.owners[0].entries).toEqual([]);
+  });
+
+  it('a cell that is written differently but means the stored condition is unchanged too', () => {
+    const result = planIn(['parameterSet', 'parameter', 'conditionalDisplayLogic'], [['Nucleic Acid Extraction', 'Lysis', '("Nucleic Acid Extraction"."Sample Type" == "bacteria")']]);
+    expect(result.rows[0]).toMatchObject({ action: 'unchanged', changed: [], errors: [], selectedByDefault: false });
+    expect(result.work.owners[0].entries).toEqual([]);
+  });
+
+  it('a changed cell is stored as ids, and every field without a column is left alone (rule 27)', () => {
+    const result = planIn(['parameterSet', 'parameter', 'conditionalDisplayLogic'], [['Nucleic Acid Extraction', 'Lysis', '"Sample Type"!="Bacteria" || "Elution volume">=50']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['conditionalDisplayLogic'], errors: [] });
+    const next = buildOwnerParameters(result.work.owners[0], new Set([result.rows[0].key]));
+    expect(next[1]).toEqual({
+      id: 'lysis', name: 'Lysis', type: 'string', price: 3,
+      showIf: { any: [{ parameterId: 'sample_type', op: 'ne', optionIds: ['bact'] }, { parameterId: 'elution', op: 'ge', value: 50 }] }
+    });
+  });
+
+  it('an operation’s own parameter can name a set parameter, qualified', () => {
+    const result = planIn(['operation', 'parameter', 'conditionalDisplayLogic'], [['PCR', 'Hot start', '"Nucleic Acid Extraction"."Sample Type" in ("Bacteria","Yeast")']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', errors: [] });
+    expect(buildOwnerParameters(result.work.owners[0], new Set([result.rows[0].key]))[0].showIf).toEqual({ parameterId: 'sample_type', parameterSetId: 'setX', op: 'in', optionIds: ['bact', 'yeast'] });
+  });
+
+  it('a new parameter can carry a condition', () => {
+    const result = planIn(['parameterSet', 'parameter', 'type', 'conditionalDisplayLogic'], [['Nucleic Acid Extraction', 'Bead size', 'Number', '"Sample Type"=="Yeast"']]);
+    expect(result.rows[0]).toMatchObject({ action: 'create', errors: [] });
+    const next = buildOwnerParameters(result.work.owners[0], new Set([result.rows[0].key]));
+    expect(next[3]).toMatchObject({ id: 'bead_size', showIf: { parameterId: 'sample_type', op: 'eq', optionIds: ['yeast'] } });
+  });
+
+  it.each([
+    ['prose, not a condition', 'Enzyme used depends on template', 'conditionalDisplayLogic: Expected a quoted parameter name but found “Enzyme”.'],
+    ['an unknown set', '"Buffers"."Volume">5', 'conditionalDisplayLogic: No parameter set is named “Buffers”.'],
+    ['an unknown parameter', '"Organism"=="Bacteria"', 'conditionalDisplayLogic: No parameter is named “Organism” here.'],
+    ['a value that is not an option', '"Sample Type"=="Fungi"', 'conditionalDisplayLogic: “Fungi” is not an option of “Sample Type”.'],
+    ['itself', '"Lysis"=="x"', 'conditionalDisplayLogic: A parameter cannot depend on itself.']
+  ])('a rule-6 error is a row error and the row is skipped: %s', (_name, cell, message) => {
+    const result = planIn(['parameterSet', 'parameter', 'description', 'conditionalDisplayLogic'], [['Nucleic Acid Extraction', 'Lysis', 'Changed too', cell]]);
+    expect(result.rows[0]).toMatchObject({ action: 'skip', errors: [message], changed: [], selectedByDefault: false });
+    expect(result.work.owners[0].entries).toEqual([]);
+  });
+
+  it('a set parameter cannot name an operation’s own parameter (rule 5)', () => {
+    const result = planIn(['parameterSet', 'parameter', 'conditionalDisplayLogic'], [['Nucleic Acid Extraction', 'Elution volume', '"Hot start"==true']]);
+    expect(result.rows[0].errors).toEqual(['conditionalDisplayLogic: No parameter is named “Hot start” here.']);
+  });
+
+  it('a loop with a stored condition is refused', () => {
+    // Lysis already depends on Sample Type.
+    const result = planIn(['parameterSet', 'parameter', 'conditionalDisplayLogic'], [['Nucleic Acid Extraction', 'Sample Type', '"Lysis"=="x"']]);
+    expect(result.rows[0].errors).toEqual(['conditionalDisplayLogic: This condition would form a loop: the parameter it depends on depends, in turn, on this one.']);
+  });
+
+  it('a blank cell on a parameter that has a condition removes it, with a warning (rule 28)', () => {
+    const result = planIn(['parameterSet', 'parameter', 'conditionalDisplayLogic'], [['Nucleic Acid Extraction', 'Lysis', ''], ['Nucleic Acid Extraction', 'Elution volume', '']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['conditionalDisplayLogic'], warnings: ['The conditionalDisplayLogic cell is blank: the condition will be removed.'] });
+    expect(result.rows[1]).toMatchObject({ action: 'unchanged', warnings: [] });
+    const next = buildOwnerParameters(result.work.owners[0], new Set([result.rows[0].key]));
+    expect(next[1]).toEqual({ id: 'lysis', name: 'Lysis', type: 'string', price: 3 });
+  });
+
+  it('a sheet without the column changes no condition (rule 28)', () => {
+    const result = planIn(['parameterSet', 'parameter', 'description'], [['Nucleic Acid Extraction', 'Lysis', 'How the cells are opened']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['description'], warnings: [] });
+    expect(buildOwnerParameters(result.work.owners[0], new Set([result.rows[0].key]))[1].showIf).toEqual(isBacteria);
+  });
+
+  it('a row that changes another column keeps a condition it did not touch, even one that no longer resolves', () => {
+    const orphan = catalogOf({ sets: [{ id: 's', name: 'S', parameters: [{ id: 'a', name: 'A', type: 'string', showIf: { parameterId: 'gone', op: 'eq', value: 'x' } }] }] });
+    const result = plan(['parameterSet', 'parameter', 'description', 'conditionalDisplayLogic'], [['S', 'A', 'New text', '"<missing>"=="x"']], none, orphan);
+    expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['description'], errors: [] });
+    expect(buildOwnerParameters(result.work.owners[0], new Set([result.rows[0].key]))[0].showIf).toEqual({ parameterId: 'gone', op: 'eq', value: 'x' });
   });
 });

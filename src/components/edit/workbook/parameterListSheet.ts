@@ -1,5 +1,6 @@
 import { makeUniqueIds } from '../../../utils/idFromName';
 import { effectiveValidation, parseValidation } from '../../../utils/parameterValidation';
+import { ConditionAst, ConditionScope, conditionText, parseCondition, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
 import { nearKey, normalizeEol, parseYesNo, sameList, splitList, yesNo } from './cells';
 import { matchRows } from './matching';
 import { CatalogSnapshot, Need, PlanRow, RawRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
@@ -47,8 +48,16 @@ export function parseTypeCell(raw: string): { type: string; checkboxes: boolean 
 const optionsOf = (parameter: any): any[] => (Array.isArray(parameter?.options) ? parameter.options : []);
 const optionName = (option: any): string => normalizeEol(option?.name).trim();
 
-/** What the download writes for a parameter — and what an uploaded row is compared against. */
-export function parameterCells(parameter: any, owner: { set?: string; operation?: string }): Record<string, string> {
+/** Where a parameter of this owner looks its condition's names up: its own list, its set's id (none for an operation), and every set. */
+export function ownerScope(catalog: CatalogSnapshot, owner: { kind: 'set' | 'operation'; id?: string }, list: ReadonlyArray<any>): ConditionScope {
+  return { list, setId: owner.kind === 'set' ? owner.id : undefined, sets: catalog.sets };
+}
+
+/**
+ * What the download writes for a parameter — and what an uploaded row is compared against.
+ * `scope` is where the parameter lives: its condition is written from the stored ids with the names found there.
+ */
+export function parameterCells(parameter: any, owner: { set?: string; operation?: string }, scope: ConditionScope): Record<string, string> {
   const defaultValue = parameter?.defaultValue;
   return {
     parameterId: String(parameter?.id ?? ''),
@@ -60,6 +69,7 @@ export function parameterCells(parameter: any, owner: { set?: string; operation?
     type: typeLabelOf(parameter),
     options: optionsOf(parameter).map(optionName).join('; '),
     validation: parameter?.type === 'number' ? effectiveValidation(parameter) : '',
+    conditionalDisplayLogic: conditionText(parameter?.showIf, scope),
     allowMultiple: yesNo(parameter?.allowMultipleValues),
     defaultValue: normalizeEol(defaultValue)
   };
@@ -69,12 +79,14 @@ export function parameterCells(parameter: any, owner: { set?: string; operation?
 export function parameterListExportRows(catalog: CatalogSnapshot): string[][] {
   const columns = [...SHEET_COLUMNS.parameterList];
   const rows: string[][] = [columns];
-  const push = (parameter: any, owner: { set?: string; operation?: string }): void => {
-    const cells = parameterCells(parameter, owner);
+  const push = (parameter: any, owner: { set?: string; operation?: string }, scope: ConditionScope): void => {
+    const cells = parameterCells(parameter, owner, scope);
     rows.push(columns.map((column) => cells[column]));
   };
-  for (const set of catalog.sets) for (const parameter of set.parameters) push(parameter, { set: set.name.trim() });
-  for (const operation of catalog.operations) for (const parameter of operation.ownParameters) push(parameter, { operation: operation.name.trim() });
+  for (const set of catalog.sets) for (const parameter of set.parameters) push(parameter, { set: set.name.trim() }, ownerScope(catalog, { kind: 'set', id: set.id }, set.parameters));
+  for (const operation of catalog.operations) {
+    for (const parameter of operation.ownParameters) push(parameter, { operation: operation.name.trim() }, ownerScope(catalog, { kind: 'operation' }, operation.ownParameters));
+  }
   return rows;
 }
 
@@ -95,6 +107,8 @@ function sameCell(column: string, cell: string, current: string): boolean {
     }
     case 'validation':
       return compact(cell) === compact(current);
+    case 'conditionalDisplayLogic':
+      return sameConditionText(cell, current);
     case 'options':
       return sameList(splitList(cell), splitList(current));
     default:
@@ -126,7 +140,12 @@ function resolveOptions(cell: string, stored: any[]): { options: any[]; errors: 
 }
 
 /** The parameter after the given columns are applied to `base`. Columns not named are left exactly as stored. */
-function applyCells(base: Record<string, any>, cells: Record<string, string>, columns: ReadonlySet<string>, isNew: boolean): { next: Record<string, any>; errors: string[]; warnings: string[] } {
+function applyCells(
+  base: Record<string, any>,
+  cells: Record<string, string>,
+  columns: ReadonlySet<string>,
+  isNew: boolean
+): { next: Record<string, any>; errors: string[]; warnings: string[]; condition?: ConditionAst } {
   const next: Record<string, any> = { ...base };
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -212,7 +231,23 @@ function applyCells(base: Record<string, any>, cells: Record<string, string>, co
       else errors.push(`defaultValue: “${text}” is not a number.`);
     } else next.defaultValue = text;
   }
-  return { next, errors, warnings };
+
+  // The condition is only parsed here. Its names are resolved to ids once every row is planned (resolveConditions).
+  let condition: ConditionAst | undefined;
+  if (has('conditionalDisplayLogic')) {
+    const text = cell('conditionalDisplayLogic');
+    if (text === '') {
+      if (next.showIf !== undefined) {
+        delete next.showIf;
+        warnings.push('The conditionalDisplayLogic cell is blank: the condition will be removed.');
+      }
+    } else {
+      const parsed = parseCondition(text);
+      if ('error' in parsed) errors.push(`conditionalDisplayLogic: ${parsed.error}`);
+      else condition = parsed.tree;
+    }
+  }
+  return { next, errors, warnings, condition };
 }
 
 /** A new parameter before its cells are applied. Price 0; the id is minted when the owner's list is built. */
@@ -234,6 +269,8 @@ export interface ParameterEntry {
   existingParamId?: string;
   /** The whole parameter after this row is applied. A create's id is '' until minted. */
   next: Record<string, any>;
+  /** The row's conditionalDisplayLogic cell, parsed — present when the cell changed and is not blank. `next.showIf` is what it resolved to. */
+  condition?: ConditionAst;
 }
 
 export interface OwnerWork {
@@ -348,7 +385,7 @@ export function planParameterList(sheet: RawSheet, catalog: CatalogSnapshot, ctx
       if (errors.length === 0) {
         const stored = match.existingId !== undefined ? owner.stored.find((p) => String(p?.id ?? '') === match.existingId) : undefined;
         if (stored) {
-          const current = parameterCells(stored, {});
+          const current = parameterCells(stored, {}, ownerScope(catalog, { kind: owner.kind, id: owner.existingId }, owner.stored));
           changed = dataColumns.filter((column) => !sameCell(column, raw.cells[column] ?? '', current[column]));
         } else {
           changed = dataColumns.filter((column) => (raw.cells[column] ?? '') !== '');
@@ -361,8 +398,8 @@ export function planParameterList(sheet: RawSheet, catalog: CatalogSnapshot, ctx
           warnings.push(...applied.warnings);
           if (applied.errors.length === 0) {
             // A cell can differ and still change nothing (an ignored options cell, allowMultiple on a checkbox list).
-            if (stored && JSON.stringify(applied.next) === JSON.stringify(stored)) action = 'unchanged';
-            else owner.entries.push({ rowKey: key, existingParamId: match.existingId, next: applied.next });
+            if (stored && applied.condition === undefined && JSON.stringify(applied.next) === JSON.stringify(stored)) action = 'unchanged';
+            else owner.entries.push({ rowKey: key, existingParamId: match.existingId, next: applied.next, condition: applied.condition });
           }
         }
       }
@@ -377,8 +414,54 @@ export function planParameterList(sheet: RawSheet, catalog: CatalogSnapshot, ctx
     owners.push(owner);
   }
 
+  resolveConditions(owners, catalog, new Map([...planned.values()].map((row) => [row.key, row] as const)));
+
   const rows = [...planned.values()].sort((a, b) => (a.rowNumber ?? 0) - (b.rowNumber ?? 0));
   return { sheet: 'parameterList', rowCount: sheet.rows.length, rows, ignoredColumns: sheet.ignoredColumns, work: { owners } };
+}
+
+/** A row that turned out not to be applicable after it was planned: an error, and nothing to tick. */
+function refuseRow(row: PlanRow, error: string): void {
+  row.errors.push(error);
+  row.action = 'skip';
+  row.changed = [];
+  row.selectedByDefault = false;
+  row.needs = [];
+  row.matchedByName = false;
+}
+
+/**
+ * Turns every changed conditionalDisplayLogic cell into the stored tree
+ * (`next.showIf`), resolving its names against the catalog. A cell that does
+ * not resolve is a row error and the row is skipped, like a bad validation
+ * rule. A cell that resolves to exactly what is stored leaves the row unchanged.
+ */
+function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsByKey: ReadonlyMap<string, PlanRow>): void {
+  for (const owner of owners) {
+    for (const entry of [...owner.entries]) {
+      if (entry.condition === undefined) continue;
+      const row = rowsByKey.get(entry.rowKey)!;
+      const drop = (): void => {
+        owner.entries.splice(owner.entries.indexOf(entry), 1);
+      };
+      const stored = entry.existingParamId !== undefined ? owner.stored.find((p) => String(p?.id ?? '') === entry.existingParamId) : undefined;
+      const list = stored ? owner.stored.map((p) => (p === stored ? entry.next : p)) : [...owner.stored, entry.next];
+      const resolved = resolveCondition(entry.condition, { ...ownerScope(catalog, { kind: owner.kind, id: owner.existingId }, list), carrierIndex: list.indexOf(entry.next) });
+      if ('error' in resolved) {
+        refuseRow(row, `conditionalDisplayLogic: ${resolved.error}`);
+        drop();
+        continue;
+      }
+      entry.next = { ...entry.next, showIf: resolved.condition };
+      if (stored && JSON.stringify(entry.next) === JSON.stringify(stored)) {
+        row.action = 'unchanged';
+        row.changed = [];
+        row.selectedByDefault = false;
+        row.needs = [];
+        drop();
+      }
+    }
+  }
 }
 
 /**

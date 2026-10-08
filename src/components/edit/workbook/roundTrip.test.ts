@@ -15,14 +15,17 @@ const catalog = catalogOf({
         { id: 'sample_type', name: 'Sample Type', type: 'dropdown', allowMultipleValues: true, display: 'checkboxes', options }
       ]
     },
-    { id: 's2', name: 'Cleanup', parameters: [{ id: 'method', name: 'Method', type: 'dropdown', options, defaultValue: 'bact' }] }
+    { id: 's2', name: 'Cleanup', parameters: [{ id: 'method', name: 'Method', type: 'dropdown', options, defaultValue: 'bact', showIf: { parameterId: 'sample_type', parameterSetId: 's1', op: 'in', optionIds: ['bact', 'oth'] } }] }
   ],
   operations: [
     {
       id: 'op1', name: 'PCR', description: 'Amplify', unit: 'rxn', pricingMode: 'SERVICE', hiddenFromClients: false,
       pricing: { internal: 5, external: 9, externalAcademic: 7, externalMarket: 9, externalNoSalary: 6, legacy: 10 },
       parameterSetIds: ['s1', 's2'],
-      ownParameters: [{ id: 'cycles', name: 'Cycles', type: 'number', validation: '>0 && integer', defaultValue: 30 }, { id: 'hot', name: 'Hot start', type: 'boolean', required: true }]
+      ownParameters: [
+        { id: 'cycles', name: 'Cycles', type: 'number', validation: '>0 && integer', defaultValue: 30, showIf: { any: [{ parameterId: 'hot', op: 'eq', value: false }, { parameterId: 'volume', parameterSetId: 's1', op: 'gt', value: 2.5 }] } },
+        { id: 'hot', name: 'Hot start', type: 'boolean', required: true }
+      ]
     } as any,
     { id: 'op2', name: 'Gibson Assembly', pricingMode: 'PARAMETER', hiddenFromClients: true, parameterSetIds: [], ownParameters: [] } as any
   ],
@@ -69,6 +72,19 @@ describe('download → upload, unchanged (rule 2)', () => {
   it('is unchanged without the pricing columns too (a reader without internal-fields:read)', async () => {
     const { plan } = await upload(buildWorkbookData(catalog, { includePricing: false }));
     expect(allRows(plan).every((r) => r.action === 'unchanged')).toBe(true);
+  });
+});
+
+describe('download → upload: conditionalDisplayLogic (show-only-if rules 24–26)', () => {
+  it('writes the conditions as text into the real file, and reads them back as unchanged', async () => {
+    const data = buildWorkbookData(catalog, { includePricing: true });
+    const sheet = data.sheets[1];
+    const column = sheet.rows[0].indexOf('conditionalDisplayLogic');
+    expect(column).toBe(sheet.rows[0].indexOf('validation') + 1);
+    expect(sheet.rows.slice(1).map((row) => row[column])).toEqual(['', '', '"Buffers"."Sample Type" in ("Bacteria","Other")', '"Hot start"==false || "Buffers"."Volume">2.5', '']);
+    const { plan } = await upload(data);
+    expect(plan.parameterList!.ignoredColumns).toEqual([]);
+    expect(plan.parameterList!.rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged', 'unchanged', 'unchanged']);
   });
 });
 

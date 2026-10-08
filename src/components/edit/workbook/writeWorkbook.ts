@@ -34,7 +34,7 @@ export const SPARE_ROWS = 200;
 
 /** Column order on the Lists sheet. */
 const LIST_ORDER: readonly ListName[] = ['categories', 'sets', 'yesNo', 'types', 'operations'];
-const WIDE_COLUMNS = new Set(['name', 'description', 'text', 'options', 'parameter', 'BundleName', 'Operation', 'serviceCategory', 'validation']);
+const WIDE_COLUMNS = new Set(['name', 'description', 'text', 'options', 'parameter', 'BundleName', 'Operation', 'serviceCategory', 'validation', 'conditionalDisplayLogic']);
 
 const unique = (values: string[]): string[] => [...new Set(values.map((value) => value.trim()).filter((value) => value !== ''))];
 
