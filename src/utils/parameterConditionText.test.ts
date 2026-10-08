@@ -273,12 +273,12 @@ describe('conditionText (rule 25)', () => {
   it('writes a reference that no longer resolves as "<missing>", and says what is missing (rules 25, 32)', () => {
     const gone = { list: [KIT], setId: 'set1', sets: [CLEANUP] };
     expect(conditionText({ parameterId: 'sample', op: 'eq', optionIds: ['bact'] }, gone)).toBe('"<missing>"=="<missing>"');
-    expect(missingReferences({ parameterId: 'sample', op: 'eq', optionIds: ['bact'] }, gone)).toEqual(['a parameter that no longer exists']);
+    expect(missingReferences({ parameterId: 'sample', op: 'eq', optionIds: ['bact'] }, gone)).toEqual(['a parameter that no longer exists (id sample)']);
     expect(conditionText({ parameterId: 'sample', parameterSetId: 'set9', op: 'includes', value: 'x' }, gone)).toBe('"<missing>".includes("x")');
-    expect(missingReferences({ parameterId: 'sample', parameterSetId: 'set9', op: 'includes', value: 'x' }, gone)).toEqual(['a parameter set that no longer exists']);
-    expect(missingReferences({ parameterId: 'gone', parameterSetId: 'set2', op: 'eq', value: 'x' }, gone)).toEqual(['a parameter that is no longer in “Cleanup”']);
+    expect(missingReferences({ parameterId: 'sample', parameterSetId: 'set9', op: 'includes', value: 'x' }, gone)).toEqual(['a parameter set that no longer exists (id set9)']);
+    expect(missingReferences({ parameterId: 'gone', parameterSetId: 'set2', op: 'eq', value: 'x' }, gone)).toEqual(['a parameter that is no longer in “Cleanup” (id gone)']);
     expect(conditionText({ parameterId: 'sample', op: 'in', optionIds: ['bact', 'dropped'] }, inSet)).toBe('"Sample Type" in ("Bacteria","<missing>")');
-    expect(missingReferences({ parameterId: 'sample', op: 'in', optionIds: ['bact', 'dropped'] }, inSet)).toEqual(['an option “Sample Type” no longer has']);
+    expect(missingReferences({ parameterId: 'sample', op: 'in', optionIds: ['bact', 'dropped'] }, inSet)).toEqual(['an option “Sample Type” no longer has (id dropped)']);
     expect(missingReferences({ parameterId: 'sample', op: 'eq', optionIds: ['bact'] }, inSet)).toEqual([]);
     expect(missingReferences(undefined, inSet)).toEqual([]);
   });
@@ -325,5 +325,85 @@ describe('resolveCondition on a syntax tree', () => {
   it('is what conditionFromText does after parsing', () => {
     const parsed = parseCondition('"Volume">5');
     expect('tree' in parsed && resolveCondition(parsed.tree, inSet)).toEqual({ condition: { parameterId: 'volume', op: 'gt', value: 5 } });
+  });
+});
+
+describe('quotes inside names (review I2)', () => {
+  const ODD = ['5” plate', 'Buyer’s note', '“Quoted” kit', '‘Single’ kit', 'Say "hi"'];
+  const oddScope = (name: string): ConditionScope => ({ list: [{ id: 'odd', name, type: 'string' }, KIT], carrierIndex: 1, setId: 'set1', sets: [] });
+
+  it('a string opened by a straight quote closes only on a straight quote', () => {
+    expect(tree('"5” plate"=="x"')).toEqual({ ref: { name: '5” plate' }, op: 'eq', value: 'x' });
+    expect(tree('"Buyer’s note"=="x"')).toEqual({ ref: { name: 'Buyer’s note' }, op: 'eq', value: 'x' });
+    expect(tree("'It’s'==\"x\"")).toEqual({ ref: { name: 'It’s' }, op: 'eq', value: 'x' });
+  });
+
+  it('curly quotes still open and close a string', () => {
+    expect(tree('“Sample Type”==‘Bacteria’')).toEqual({ ref: { name: 'Sample Type' }, op: 'eq', value: 'Bacteria' });
+    expect(tree('”Sample Type”=="x"')).toEqual({ ref: { name: 'Sample Type' }, op: 'eq', value: 'x' });
+  });
+
+  it.each(ODD)('print → parse → resolve is stable for a name containing quotes: %s', (name) => {
+    const scope = oddScope(name);
+    const condition: any = { parameterId: 'odd', op: 'eq', value: `${name} too` };
+    const text = conditionText(condition, scope);
+    expect(resolved(text, scope)).toEqual(condition);
+    expect(sameConditionText(text, text)).toBe(true);
+    expect(sameConditionText(text, ` ${text}  `)).toBe(true);
+  });
+
+  it('a hand-typed straight quote finds a name written with a curly one, in parameters, sets and options', () => {
+    const scope: ConditionScope = {
+      list: [{ id: 'buyer', name: 'Buyer’s note', type: 'dropdown', options: [{ id: 'o1', name: 'Don’t ship' }] }, KIT],
+      carrierIndex: 1,
+      setId: 'set1',
+      sets: [{ id: 'setq', name: 'Lab’s set', parameters: [{ id: 'p', name: 'Plate’s size', type: 'string' }] }]
+    };
+    expect(resolved('"Buyer\'s note"=="Don\'t ship"', scope)).toEqual({ parameterId: 'buyer', op: 'eq', optionIds: ['o1'] });
+    expect(resolved('"Lab\'s set"."Plate\'s size"=="x"', scope)).toEqual({ parameterId: 'p', parameterSetId: 'setq', op: 'eq', value: 'x' });
+  });
+
+  it('when straightening makes two names collide, an exact match wins; otherwise it is ambiguous', () => {
+    const list = [{ id: 'a', name: 'Buyer’s note', type: 'string' }, { id: 'b', name: "Buyer's note", type: 'string' }, KIT];
+    const scope: ConditionScope = { list, carrierIndex: 2, setId: 'set1', sets: [] };
+    expect(resolved('"Buyer’s note"=="x"', scope).parameterId).toBe('a');
+    expect(resolved('"Buyer\'s note"=="x"', scope).parameterId).toBe('b');
+    expect(problem('"BUYER‘S note"=="x"', scope)).toBe('2 parameters are named “BUYER‘S note” here.');
+  });
+});
+
+describe('resolveCondition — review M2, M3, M4, F10', () => {
+  it('M2: a legacy enum controller is resolved as a choice, like the evaluator reads it', () => {
+    const scope: ConditionScope = { list: [{ ...SAMPLE, type: 'enum' }, KIT], carrierIndex: 1, setId: 'set1', sets: [] };
+    expect(resolved('"Sample Type"=="Bacteria"', scope)).toEqual({ parameterId: 'sample', op: 'eq', optionIds: ['bact'] });
+    expect(problem('"Sample Type"=="Fungi"', scope)).toBe('“Fungi” is not an option of “Sample Type”.');
+  });
+
+  it('M3: a non-numeric literal against a Number parameter is refused for ==, != and in', () => {
+    expect(problem('"Volume"=="abc"')).toBe('“==” needs a number, not “abc”.');
+    expect(problem('"Volume"!="abc"')).toBe('“!=” needs a number, not “abc”.');
+    expect(problem('"Volume" in ("1","abc")')).toBe('“in” needs numbers, not “abc”.');
+    expect(problem('"Volume"==""')).toBe('“==” needs a number, not “”.');
+    // A number written as a quoted string is accepted, as it is for the ordering operators.
+    expect(resolved('"Volume"=="5"')).toEqual({ parameterId: 'volume', op: 'eq', value: '5' });
+    expect(resolved('"Volume">"5"')).toEqual({ parameterId: 'volume', op: 'gt', value: 5 });
+    expect(resolved('"Volume" in (1,"2")')).toEqual({ parameterId: 'volume', op: 'in', values: ['1', '2'] });
+    // Text parameters are unaffected.
+    expect(resolved('"Notes"=="abc"')).toEqual({ parameterId: 'note', op: 'eq', value: 'abc' });
+  });
+
+  it('M4: a Number in-list is printed unquoted and reads back the same', () => {
+    const condition = resolved('"Volume" in (1,2)');
+    expect(conditionText(condition, inSet)).toBe('"Volume" in (1,2)');
+    expect(resolved(conditionText(condition, inSet))).toEqual(condition);
+    expect(conditionText({ parameterId: 'note', op: 'in', values: ['1', '2'] }, inSet)).toBe('"Notes" in ("1","2")');
+  });
+
+  it('F10: two options with the same name on one parameter are an ambiguity error (rule 6)', () => {
+    const twin = { id: 'twin', name: 'Twin', type: 'dropdown', options: [{ id: 'o1', name: 'Same' }, { id: 'o2', name: ' same ' }, { id: 'o3', name: 'Other' }] };
+    const scope: ConditionScope = { list: [twin, KIT], carrierIndex: 1, setId: 'set1', sets: [] };
+    expect(problem('"Twin"=="Same"', scope)).toBe('2 options of “Twin” are named “Same”.');
+    expect(problem('"Twin" in ("Other","Same")', scope)).toBe('2 options of “Twin” are named “Same”.');
+    expect(resolved('"Twin"=="Other"', scope)).toEqual({ parameterId: 'twin', op: 'eq', optionIds: ['o3'] });
   });
 });

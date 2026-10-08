@@ -53,8 +53,15 @@ const WORD = /^[A-Za-z_][A-Za-z0-9_]*/;
 /** Curly quotes are read as straight quotes (rule 2). */
 const straighten = (text: string): string => text.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
 
-function tokenize(input: string): { tokens: Token[] } | { error: string } {
-  const text = straighten(input);
+/**
+ * What may close a string, by the character that opened it. Only the delimiters
+ * are straightened, never what is inside: a string opened by a straight quote
+ * closes on a straight quote alone, so a curly quote in a name is ordinary text.
+ * One opened by a curly quote closes on either form.
+ */
+const CLOSERS: Record<string, string> = { '"': '"', "'": "'", '“': '"“”', '”': '"“”', '‘': "'‘’", '’': "'‘’" };
+
+function tokenize(text: string): { tokens: Token[] } | { error: string } {
   const tokens: Token[] = [];
   let i = 0;
   while (i < text.length) {
@@ -63,7 +70,7 @@ function tokenize(input: string): { tokens: Token[] } | { error: string } {
       i += 1;
       continue;
     }
-    if (ch === '"' || ch === "'") {
+    if (ch in CLOSERS) {
       let value = '';
       let j = i + 1;
       for (;;) {
@@ -73,7 +80,7 @@ function tokenize(input: string): { tokens: Token[] } | { error: string } {
           j += 2;
           continue;
         }
-        if (text[j] === ch) break;
+        if (CLOSERS[ch].includes(text[j])) break;
         value += text[j];
         j += 1;
       }
@@ -254,9 +261,18 @@ export interface ConditionScope {
 }
 
 const key = (s: unknown): string => String(s ?? '').trim().toLowerCase();
+/** `key` with quotes straightened, so a hand-typed "Buyer's note" finds `Buyer’s note`. */
+const looseKey = (s: unknown): string => straighten(key(s));
+/** The items named `wanted` (rule 4): an exact match wins; failing one, a match with quotes straightened on both sides. */
+function named<T>(items: readonly T[], nameOf: (item: T) => unknown, wanted: unknown): T[] {
+  const exact = items.filter((item) => key(nameOf(item)) === key(wanted));
+  return exact.length > 0 ? exact : items.filter((item) => looseKey(nameOf(item)) === looseKey(wanted));
+}
 const listOf = (set: ScopeSet): any[] => (Array.isArray(set.parameters) ? set.parameters : []);
 const optionsOf = (parameter: any): any[] => (Array.isArray(parameter?.options) ? parameter.options : []);
 const labelOf = (parameter: any): string => String(parameter?.name ?? parameter?.id ?? '').trim();
+/** The evaluator's `isChoice`: a legacy `enum` is a choice too. */
+const isChoiceType = (type: string): boolean => type === 'dropdown' || type === 'enum';
 const TYPE_NAMES: Record<string, string> = { table: 'Table', file: 'File upload', sampleSheet: 'Samples spreadsheet' };
 
 // ------------------------------------------------------------------ resolver (rules 5–7)
@@ -283,19 +299,23 @@ function resolveComparison(ast: ComparisonAst, scope: ConditionScope): Compariso
   let parameterSetId: string | undefined;
   let where = 'here';
   if (ast.ref.set !== undefined) {
-    const named = scope.sets.filter((set) => key(set.name) === key(ast.ref.set));
-    if (named.length === 0) throw new ResolveProblem(`No parameter set is named “${ast.ref.set}”.`);
-    if (named.length > 1) throw new ResolveProblem(`${named.length} parameter sets are named “${ast.ref.set}”.`);
-    where = `in “${named[0].name.trim()}”`;
+    const found = named(scope.sets, (set) => set.name, ast.ref.set);
+    if (found.length === 0) throw new ResolveProblem(`No parameter set is named “${ast.ref.set}”.`);
+    if (found.length > 1) throw new ResolveProblem(`${found.length} parameter sets are named “${ast.ref.set}”.`);
+    where = `in “${found[0].name.trim()}”`;
     // Naming the carrier's own set is the same as not naming it.
-    if (scope.setId === undefined || named[0].id !== scope.setId) {
-      list = listOf(named[0]);
-      parameterSetId = named[0].id;
+    if (scope.setId === undefined || found[0].id !== scope.setId) {
+      list = listOf(found[0]);
+      parameterSetId = found[0].id;
     }
   }
 
   // 2. Which parameter.
-  const matches = list.map((parameter, index) => ({ parameter, index })).filter(({ parameter }) => key(parameter?.name) === key(ast.ref.name));
+  const matches = named(
+    list.map((parameter, index) => ({ parameter, index })),
+    ({ parameter }) => parameter?.name,
+    ast.ref.name
+  );
   if (matches.length === 0) throw new ResolveProblem(`No parameter is named “${ast.ref.name}” ${where}.`);
   if (matches.length > 1) throw new ResolveProblem(`${matches.length} parameters are named “${ast.ref.name}” ${where}.`);
   const { parameter, index } = matches[0];
@@ -331,10 +351,17 @@ function resolveComparison(ast: ComparisonAst, scope: ConditionScope): Compariso
     return comparisonOf(id, parameterSetId, op, { value: String(ast.value) });
   }
 
-  if (type === 'dropdown') {
+  if (type === 'number') {
+    // ==, != and in: a quoted number is accepted, as it is for the ordering operators; anything else could never be true.
+    const bad = literals.find((value) => String(value).trim() === '' || !Number.isFinite(typeof value === 'number' ? value : Number(String(value).trim())));
+    if (bad !== undefined) throw new ResolveProblem(`“${op === 'in' ? 'in' : OPERATOR_TEXT[op]}” needs ${op === 'in' ? 'numbers' : 'a number'}, not “${String(bad)}”.`);
+  }
+
+  if (isChoiceType(type)) {
     const optionIds = literals.map((value) => {
-      const found = optionsOf(parameter).filter((option) => key(option?.name) === key(value));
+      const found = named(optionsOf(parameter), (option) => option?.name, value);
       if (found.length === 0) throw new ResolveProblem(`“${String(value)}” is not an option of “${name}”.`);
+      if (found.length > 1) throw new ResolveProblem(`${found.length} options of “${name}” are named “${String(value)}”.`);
       const optionId = String(found[0]?.id ?? '');
       if (optionId === '') throw new ResolveProblem(`Option “${String(value)}” of “${name}” has no id yet — save it first.`);
       return optionId;
@@ -415,12 +442,12 @@ function lookup(comparison: Comparison, scope: ConditionScope): { parameter?: an
   const sameList = comparison.parameterSetId === undefined || comparison.parameterSetId === scope.setId;
   if (sameList) {
     const parameter = scope.list.find((p) => String(p?.id ?? '') === comparison.parameterId);
-    return parameter ? { parameter, text: quote(labelOf(parameter)) } : { text: quote(MISSING), missing: 'a parameter that no longer exists' };
+    return parameter ? { parameter, text: quote(labelOf(parameter)) } : { text: quote(MISSING), missing: `a parameter that no longer exists (id ${comparison.parameterId})` };
   }
   const set = scope.sets.find((s) => s.id === comparison.parameterSetId);
-  if (!set) return { text: quote(MISSING), missing: 'a parameter set that no longer exists' };
+  if (!set) return { text: quote(MISSING), missing: `a parameter set that no longer exists (id ${comparison.parameterSetId})` };
   const parameter = listOf(set).find((p) => String(p?.id ?? '') === comparison.parameterId);
-  if (!parameter) return { text: quote(MISSING), missing: `a parameter that is no longer in “${set.name.trim()}”` };
+  if (!parameter) return { text: quote(MISSING), missing: `a parameter that is no longer in “${set.name.trim()}” (id ${comparison.parameterId})` };
   return { parameter, text: `${quote(set.name.trim())}.${quote(labelOf(parameter))}` };
 }
 
@@ -431,10 +458,12 @@ function comparisonText(comparison: Comparison, scope: ConditionScope, missing: 
   // One phrase says it; the options it no longer has are not listed on top.
   const fits = !found.parameter || comparisonFits(comparison, found.parameter);
   if (!fits) missing.push(`“${labelOf(found.parameter)}”, whose answer format has changed since`);
-  const literal = (value: unknown): string => (typeof value === 'string' ? quote(value) : String(value));
+  // A Number controller's values are numbers (possibly stored as numeric strings): written bare, as they are typed.
+  const bare = (value: unknown): boolean => found.parameter?.type === 'number' && String(value).trim() !== '' && Number.isFinite(Number(String(value).trim()));
+  const literal = (value: unknown): string => (typeof value === 'string' && !bare(value) ? quote(value) : String(value));
   const optionText = (id: string): string => {
     const option = optionsOf(found.parameter).find((o) => String(o?.id ?? '') === id);
-    if (!option && found.parameter && fits) missing.push(`an option “${labelOf(found.parameter)}” no longer has`);
+    if (!option && found.parameter && fits) missing.push(`an option “${labelOf(found.parameter)}” no longer has (id ${id})`);
     return quote(option ? String(option.name ?? '').trim() : MISSING);
   };
   const values = comparison.optionIds !== undefined ? comparison.optionIds.map(optionText) : comparison.values !== undefined ? comparison.values.map(literal) : [literal(comparison.value)];

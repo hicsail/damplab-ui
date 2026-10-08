@@ -36,12 +36,31 @@ export function showIfText(parameters: ReadonlyArray<Row>, index: number, contex
   return conditionText(parameter.showIf as any, showIfScope(parameters, index, context));
 }
 
-/** Why the typed condition cannot be saved, or null. Only text that was typed is judged. */
+/**
+ * Why the typed condition cannot be saved, or null. Only text that was typed is judged.
+ *
+ * Judged the way prepareParametersForSave judges it: every edited sibling's
+ * stored condition is dropped and its typed text resolved in order (an earlier
+ * one is in scope for a later one), so the field and Save agree on a loop.
+ * Siblings after `index` cannot change the answer for `index`.
+ */
 export function showIfError(parameters: ReadonlyArray<Row>, index: number, context: ConditionContext): string | null {
-  const text = parameters[index]?._showIfText;
-  if (typeof text !== 'string') return null;
-  const result = conditionFromText(text, showIfScope(parameters, index, context));
-  return 'error' in result ? result.error : null;
+  if (typeof parameters[index]?._showIfText !== 'string') return null;
+  const list: Row[] = parameters.map((parameter) => {
+    if (typeof parameter._showIfText !== 'string') return parameter;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { showIf, ...rest } = parameter;
+    return rest;
+  });
+  for (let at = 0; at <= index; at += 1) {
+    const text = parameters[at]._showIfText;
+    if (typeof text !== 'string') continue;
+    const result = conditionFromText(text, showIfScope(list, at, context));
+    if ('error' in result) {
+      if (at === index) return result.error;
+    } else if (result.condition !== undefined) list[at] = { ...list[at], showIf: result.condition };
+  }
+  return null;
 }
 
 /** A stored condition that no longer resolves: what is missing. It does not block Save. */

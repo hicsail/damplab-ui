@@ -198,6 +198,9 @@ const VECTORS: Array<{ name: string; parameters: any[]; formData: unknown; visib
   { name: 'unresolved: eq on a yes/no with no value', parameters: [HOT, target({ parameterId: 'hot', op: 'eq' })], formData: [{ id: 'hot', value: true }], visible: ['hot', 't'] },
   { name: 'unresolved: includes on text with no value', parameters: [NOTE, target({ parameterId: 'note', op: 'includes' })], formData: [{ id: 'note', value: 'x' }], visible: ['note', 't'] },
   { name: 'unresolved: in on text with no values', parameters: [NOTE, target({ parameterId: 'note', op: 'in' })], formData: [{ id: 'note', value: 'x' }], visible: ['note', 't'] },
+  { name: 'text ne blank: unanswered is false', parameters: [NOTE, target({ parameterId: 'note', op: 'ne', value: '' })], formData: [{ id: 'note', value: '  ' }], visible: ['note'] },
+  { name: 'text ne blank: answered is true', parameters: [NOTE, target({ parameterId: 'note', op: 'ne', value: '' })], formData: [{ id: 'note', value: 'hello' }], visible: ['note', 't'] },
+  { name: 'text eq blank: answered is false', parameters: [NOTE, target({ parameterId: 'note', op: 'eq', value: '' })], formData: [{ id: 'note', value: 'hello' }], visible: ['note'] },
   {
     name: 'reserved entries are never hidden',
     parameters: [SAMPLE, { id: '__runCount', name: 'Number of runs', type: 'number', showIf: sampleIs('bact') }],

@@ -199,7 +199,9 @@ function compare(comparison: Comparison, controller: Param, value: unknown): boo
     const wanted = (comparison.values ?? []).map(text);
     return texts.some((t) => wanted.includes(t));
   }
-  if (blank(comparison.value) || typeof comparison.value === 'boolean') return false;
+  if (typeof comparison.value === 'boolean') return false;
+  // Answered, and the target is blank: nothing equals it, so "is filled in" (!= "") holds; == and .includes stay false (rule 10).
+  if (blank(comparison.value)) return op === 'ne';
   const target = text(comparison.value);
   if (op === 'eq') return texts.some((t) => t === target);
   if (op === 'ne') return !texts.some((t) => t === target);

@@ -1,8 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import Params from './Params';
 import { CanvasContext } from '../contexts/Canvas';
+
+// There is no DOM here, so effects never run on their own. Params' effects are collected so a test can run them,
+// and formik's setValues is observed (the real useFormik still supplies the values). Everything else is untouched.
+const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, setValues: vi.fn() }));
+vi.mock('react', async (importOriginal) => {
+  const actual: any = await importOriginal();
+  const useEffect = (effect: () => void): void => {
+    spy.effects.push(effect);
+  };
+  return { ...actual, default: { ...actual, useEffect }, useEffect };
+});
+vi.mock('formik', async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, useFormik: (config: any) => ({ ...actual.useFormik(config), setValues: spy.setValues }) };
+});
 
 const options = [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }];
 const parameters = [
@@ -111,5 +126,57 @@ describe('Params — "show only if" (show-only-if rule 14)', () => {
     expect(hidden).toContain('Sample');
     expect(hidden).toContain('Paperwork');
     expect(hidden).toContain('Free notes');
+  });
+});
+
+describe('Params — rule 15 through the form (show-only-if)', () => {
+  const kinds = [{ id: 'bact', name: 'Bacteria' }, { id: 'yeast', name: 'Yeast' }];
+  const defs = [
+    { id: 'kind', name: 'Kind', type: 'dropdown', options: kinds },
+    { id: 'lysis', name: 'Lysis method', type: 'string', showIf: { parameterId: 'kind', op: 'eq', optionIds: ['bact'] } }
+  ];
+  const row = (id: string, value: unknown): any => ({ id, nodeId: 'n1', name: id, type: defs.find((d) => d.id === id)!.type, options: id === 'kind' ? kinds : null, paramType: 'input', value, required: false });
+  const setNodes = vi.fn();
+
+  /** Render the form for a node holding `formData`, then run the effects that render registered (what a browser does after paint). */
+  const mount = (formData: any[]): void => {
+    spy.effects.length = 0;
+    renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes } as any}>
+        <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData } }} />
+      </CanvasContext.Provider>
+    );
+    spy.effects.forEach((effect) => effect());
+  };
+  const savedFormData = (): any[] => {
+    const updater = setNodes.mock.calls.at(-1)![0];
+    return updater([{ id: 'n1', data: { formData: [] } }])[0].data.formData;
+  };
+
+  beforeEach(() => {
+    spy.setValues.mockClear();
+    setNodes.mockClear();
+  });
+
+  it('empties the answer of a parameter an answer change has just hidden, and then settles (no loop)', () => {
+    // The answer was changed from Bacteria to Yeast; "Lysis method" still holds its text.
+    mount([row('kind', 'yeast'), row('lysis', 'beads')]);
+    expect(spy.setValues).toHaveBeenCalledTimes(1);
+    expect(spy.setValues).toHaveBeenCalledWith({ kind: 'yeast', lysis: '' });
+    // Nothing is written back while a reset is pending: the form re-renders with the emptied values first.
+    expect(setNodes).not.toHaveBeenCalled();
+
+    // The form re-renders with those values: nothing is left to reset, so the effect saves and stops.
+    spy.setValues.mockClear();
+    mount([row('kind', 'yeast'), row('lysis', '')]);
+    expect(spy.setValues).not.toHaveBeenCalled();
+    expect(setNodes).toHaveBeenCalledTimes(1);
+    expect(savedFormData().find((e) => e.id === 'lysis').value).toBe('');
+  });
+
+  it('leaves a shown parameter alone', () => {
+    mount([row('kind', 'bact'), row('lysis', 'beads')]);
+    expect(spy.setValues).not.toHaveBeenCalled();
+    expect(savedFormData().find((e) => e.id === 'lysis').value).toBe('beads');
   });
 });

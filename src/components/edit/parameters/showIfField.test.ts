@@ -28,7 +28,7 @@ describe('the "Show only if" field (rules 30–32)', () => {
 
   it('warns — without an error — when a stored condition no longer resolves, naming what is missing', () => {
     const orphan = [{ id: 'kit', name: 'Kit', type: 'string', showIf: { parameterId: 'sample', parameterSetId: 'deleted-set', op: 'eq', optionIds: ['bact'] } }];
-    expect(showIfWarning(orphan, 0, onOperation)).toBe('This condition refers to a parameter set that no longer exists. Until it is corrected the parameter is always shown.');
+    expect(showIfWarning(orphan, 0, onOperation)).toBe('This condition refers to a parameter set that no longer exists (id deleted-set). Until it is corrected the parameter is always shown.');
     expect(showIfError(orphan, 0, onOperation)).toBeNull();
     expect(showIfWarning([{ id: 'kit', name: 'Kit', showIf: stored }], 0, onOperation)).toBeNull();
     // The parameter it names is still there, but is no longer a dropdown: the stored option means nothing.
@@ -60,5 +60,34 @@ describe('read-only views of a parameter (rule 33)', () => {
     expect(withShowIfSummary(undefined, 'Show only if: "A"==1')).toBe('Show only if: "A"==1');
     expect(withShowIfSummary('number', null)).toBe('number');
     expect(withShowIfSummary(undefined, null)).toBeUndefined();
+  });
+});
+
+describe('the field and Save agree (review M1)', () => {
+  const a = { id: 'a', name: 'A', type: 'string' };
+  const b = { id: 'b', name: 'B', type: 'string' };
+
+  it('does not report a loop that Save would accept: the sibling’s stored condition is being cleared', () => {
+    const list = [{ ...a, showIf: { parameterId: 'b', op: 'eq', value: 'x' }, _showIfText: '' }, { ...b, _showIfText: '"A"=="x"' }];
+    expect(showIfError(list, 1, { sets: [] })).toBeNull();
+  });
+
+  it('reports a loop among the typed texts, on the parameter Save would refuse', () => {
+    const list = [{ ...a, _showIfText: '"B"=="x"' }, { ...b, _showIfText: '"A"=="x"' }];
+    expect(showIfError(list, 0, { sets: [] })).toBeNull();
+    expect(showIfError(list, 1, { sets: [] })).toBe('This condition would form a loop: the parameter it depends on depends, in turn, on this one.');
+  });
+
+  it('a sibling’s untouched stored condition still counts', () => {
+    const list = [{ ...a, showIf: { parameterId: 'b', op: 'eq', value: 'x' } }, { ...b, _showIfText: '"A"=="x"' }];
+    expect(showIfError(list, 1, { sets: [] })).toMatch(/loop/);
+  });
+});
+
+describe('a warning names the id of what is gone (review F11)', () => {
+  it('says which parameter is missing once it is deleted, while the field text stays "<missing>"', () => {
+    const list = [{ id: 'kit', name: 'Kit', type: 'string', showIf: { parameterId: 'deleted-param', op: 'eq', value: 'x' } }];
+    expect(showIfWarning(list, 0, { sets: [] })).toBe('This condition refers to a parameter that no longer exists (id deleted-param). Until it is corrected the parameter is always shown.');
+    expect(showIfText(list, 0, { sets: [] })).toBe('"<missing>"=="x"');
   });
 });
