@@ -3,6 +3,7 @@ import { Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogConten
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useContext, useMemo, useState } from 'react';
 import { UserContext } from '../../../contexts/UserContext';
+import { formatGqlError } from '../../../utils/gqlError';
 import { ApplySummary, applyWorkbook } from './applyWorkbook';
 import { countsFor, planWorkbook, sheetPlans, tickedKeys, unmetNeeds } from './planWorkbook';
 import { CatalogSnapshot, isApplicable, PlanRow, RawWorkbook, SHEET_TITLES, SheetKey } from './types';
@@ -45,13 +46,22 @@ export function WorkbookUploadPreview({ raw, catalog, fileName, allowPricing, on
   const handleImport = async () => {
     setImporting(true);
     const uploaderName = userProps?.idTokenParsed?.name || userProps?.idTokenParsed?.preferred_username || 'unknown';
-    const summary = await applyWorkbook(plan, ticked, catalog, apolloWorkbookMutator(client), {
-      fileName,
-      uploaderName,
-      uploaderSub: userProps?.subject,
-      onProgress: (done, total) => setProgress(total === 0 ? 100 : Math.round((done / total) * 100))
-    });
-    setImporting(false);
+    let summary: ApplySummary;
+    try {
+      summary = await applyWorkbook(plan, ticked, catalog, apolloWorkbookMutator(client), {
+        fileName,
+        uploaderName,
+        uploaderSub: userProps?.subject,
+        onProgress: (done, total) => setProgress(total === 0 ? 100 : Math.round((done / total) * 100))
+      });
+    } catch (error) {
+      // applyWorkbook reports row and log failures in its summary; this is anything it did not catch.
+      // Hand the parent an error summary so it closes the dialog, shows the message and refreshes the
+      // catalog (some rows may already have been written).
+      summary = { sheets: {}, rowErrors: {}, errors: [`The import stopped unexpectedly: ${formatGqlError(error)} Some rows may already have been applied.`] };
+    } finally {
+      setImporting(false);
+    }
     onComplete(summary);
   };
 
