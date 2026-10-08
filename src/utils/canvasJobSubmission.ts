@@ -8,6 +8,7 @@ import {
 } from '../gql/mutations';
 import { transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
 import { isSampleSheetParam } from './sampleSheet';
+import { withoutHiddenAnswers } from './parameterConditions';
 
 export type PendingParamFile = {
   __kind: 'pending-file';
@@ -92,8 +93,11 @@ export async function submitCanvasJob(
         ...node,
         data: {
           ...node.data,
+          // Answers to hidden parameters are left out — before files are collected,
+          // so a file picked for a parameter that is now hidden is never uploaded.
+          // The server discards them too; this only keeps the request honest.
           formData: Array.isArray(node.data?.formData)
-            ? node.data.formData.map((entry: any) => ({ ...entry }))
+            ? withoutHiddenAnswers(node.data?.parameters, node.data.formData).map((entry: any) => ({ ...entry }))
             : [],
         },
       }));

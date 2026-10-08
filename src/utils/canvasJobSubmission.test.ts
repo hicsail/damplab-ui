@@ -126,3 +126,48 @@ describe('submitCanvasJob — members and description', () => {
     expect(jobInputs[0]).not.toHaveProperty('description');
   });
 });
+
+describe('submitCanvasJob — answers to hidden parameters (show-only-if rule 17)', () => {
+  const kindIsPlasmid = { parameterId: 'kind', op: 'eq', optionIds: ['plasmid'] };
+  const parameters = [
+    { id: 'kind', name: 'Kind', type: 'dropdown', options: [{ id: 'plasmid', name: 'Plasmid' }, { id: 'oth', name: 'Other' }] },
+    { id: 'vector', name: 'Vector map', type: 'file', showIf: kindIsPlasmid },
+    { id: 'notes', name: 'Notes', type: 'string' }
+  ];
+  const conditionalNode = (kind: string) => ({
+    id: 'n1',
+    data: {
+      id: 'n1',
+      label: 'Gibson Assembly',
+      serviceId: 'svc',
+      parameters,
+      formData: [
+        { id: 'kind', type: 'dropdown', value: kind },
+        { id: 'kind__otherText', type: 'string', value: kind === 'oth' ? 'Linear' : '' },
+        { id: 'vector', type: 'file', value: pending('pUC19.gb') },
+        { id: 'notes', type: 'string', value: 'n' }
+      ],
+    },
+  });
+  const submitNode = (client: any, kind: string) =>
+    submitCanvasJob(client, {
+      workflows: [[conditionalNode(kind)]], edges: [], nodes: [], jobName: 'Demo', institute: 'BU', notes: '', clientDisplayName: 'Demo', attachments: [],
+      getAccessToken: async () => 'token',
+    });
+
+  it('leaves the hidden answer out of createJob and never asks to upload its file', async () => {
+    const presign = vi.fn(async () => ({ data: { createWorkflowParameterUploadUrls: [] } }));
+    const { client, jobInputs } = makeClient(presign);
+    await submitNode(client, 'oth');
+    expect(jobInputs[0].workflows[0].nodes[0].formData.map((e: any) => e.id)).toEqual(['kind', 'kind__otherText', 'notes']);
+    expect(presign).not.toHaveBeenCalled();
+  });
+
+  it('sends the answer, and uploads its file, while the parameter is shown', async () => {
+    const presign = vi.fn(async () => ({ data: { createWorkflowParameterUploadUrls: [] } }));
+    const { client, jobInputs } = makeClient(presign);
+    await submitNode(client, 'plasmid');
+    expect(jobInputs[0].workflows[0].nodes[0].formData.map((e: any) => e.id)).toEqual(['kind', 'kind__otherText', 'vector', 'notes']);
+    expect(presign).toHaveBeenCalledTimes(1);
+  });
+});
