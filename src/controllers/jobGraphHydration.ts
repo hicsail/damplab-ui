@@ -62,8 +62,12 @@ export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId
     const includeEquipment = EQUIPMENT_PARAM_IDS.some((id) => savedById.has(id));
     const fresh = generateFormDataFromParams(parameters ?? [], nodeId, { includeRunCount, includeEquipment });
 
+    // Positional only for a list saved before parameters carried ids, where there is nothing else to go on. Once any
+    // entry has an id, a parameter with no entry was never saved: giving it the value at its position would hand it a
+    // neighbour's answer (or an "Other" text).
+    const savedWithoutIds = savedById.size === 0;
     const merged = fresh.map((param, index) => {
-        const matched = savedById.has(param.id) ? savedById.get(param.id) : savedList[index]?.value;
+        const matched = savedById.has(param.id) ? savedById.get(param.id) : savedWithoutIds ? savedList[index]?.value : undefined;
         if (matched === undefined || matched === null) return param;
         return { ...param, value: matched };
     });
