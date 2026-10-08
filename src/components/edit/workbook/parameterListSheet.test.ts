@@ -219,3 +219,26 @@ describe('Parameter List — M6: stored CRLF reads as the same as the LF the rea
     expect(result.rows[0].action).toBe('unchanged');
   });
 });
+
+describe('Parameter List — F15', () => {
+  const emptyDropdown = catalogOf({ sets: [{ id: 'set1', name: 'Buffers', parameters: [{ id: 'kind', name: 'Kind', type: 'dropdown', description: 'old', options: [] }] }] });
+
+  it('(a) an unrelated edit to a stored zero-option dropdown is not refused', () => {
+    const result = plan(['parameterSet', 'parameter', 'description'], [['Buffers', 'Kind', 'new']], none, emptyDropdown);
+    expect(result.rows[0]).toMatchObject({ action: 'update', errors: [] });
+  });
+
+  it('(a) but touching its type or options still needs an option, and so does a create', () => {
+    expect(plan(['parameterSet', 'parameter', 'options'], [['Buffers', 'Kind', '']], none, emptyDropdown).rows[0].action).toBe('unchanged');
+    expect(plan(['parameterSet', 'parameter', 'type', 'options'], [['Buffers', 'Kind', 'Checkboxes', '']], none, emptyDropdown).rows[0].errors)
+      .toEqual(['A Dropdown or Checkboxes parameter needs at least one option.']);
+    expect(plan(['parameterSet', 'parameter', 'type'], [['Buffers', 'Fresh', 'Dropdown']], none, emptyDropdown).rows[0].errors)
+      .toEqual(['A Dropdown or Checkboxes parameter needs at least one option.']);
+  });
+
+  it('(b) two stored sets with one name are an explicit error, as operations get', () => {
+    const twins = catalogOf({ sets: [{ id: 'a', name: 'Buffers', parameters: [] }, { id: 'b', name: 'Buffers ', parameters: [] }] });
+    const result = plan(['parameterSet', 'parameter'], [['Buffers', 'Volume']], none, twins);
+    expect(result.rows[0]).toMatchObject({ action: 'skip', errors: ['2 parameter sets are named “Buffers” — its parameters cannot say which.'] });
+  });
+});

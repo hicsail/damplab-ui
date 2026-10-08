@@ -67,7 +67,7 @@ export function planSowSections(sheet: RawSheet, catalog: CatalogSnapshot): Shee
           before.text = existing.text ?? '';
           changed.push('text');
         }
-        if (has('order') && cell('order') !== String(existing.order)) warnings.push('order is set by dragging in the SOW section editor; the cell is ignored.');
+        if (has('order') && cell('order') !== '' && Number(cell('order')) !== existing.order) warnings.push('order is set by dragging in the SOW section editor; the cell is ignored.');
         if (changed.length === 0) action = 'unchanged';
         else if (errors.length === 0) work.rows[key] = { existingId: existing.id, changes, before };
       }

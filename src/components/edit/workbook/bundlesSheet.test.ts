@@ -82,3 +82,21 @@ describe('Bundles — steps (rule 32)', () => {
     expect(plan(['BundleName'], [['cloning']]).rows[0]).toMatchObject({ action: 'create', warnings: ['Looks like “Cloning” — a near-duplicate'], selectedByDefault: false });
   });
 });
+
+describe('Bundles — F17a: the icon is the first non-blank icon in the bundle’s rows', () => {
+  it('keeps the stored icon when a reordered sheet puts a blank-icon row first', () => {
+    const result = plan(['id', 'BundleName', 'Order', 'Operation', 'icon'], [
+      ['b1', 'Cloning', '2', 'Gel', ''],
+      ['b1', 'Cloning', '1', 'PCR', 'dna.png'],
+      ['b1', 'Cloning', '3', 'PCR', '']
+    ]);
+    // Same steps in the same Order, same icon: nothing to write.
+    expect(result.rows[0]).toMatchObject({ action: 'unchanged', changed: [] });
+    expect(result.work.bundles['bundles:2']).toBeUndefined();
+  });
+
+  it('a create takes the first non-blank icon', () => {
+    const result = plan(['BundleName', 'Order', 'Operation', 'icon'], [['Fresh', '1', 'PCR', ''], ['Fresh', '2', 'Gel', 'x.png']]);
+    expect(result.work.bundles['bundles:2'].changes.icon).toBe('x.png');
+  });
+});

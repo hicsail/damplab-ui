@@ -96,7 +96,8 @@ export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { ne
       }
 
       if (hasIcon) {
-        const icon = first.cells.icon ?? '';
+        // The first non-blank icon in the bundle's rows, so reordering rows cannot clear a stored icon.
+        const icon = group.rows.map((raw) => raw.cells.icon ?? '').find((value) => value !== '') ?? '';
         if (!existing) changes.icon = icon;
         else if ((existing.icon ?? '') !== icon) {
           changes.icon = icon;

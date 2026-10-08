@@ -69,3 +69,16 @@ describe('SOW Sections — M6: stored CRLF reads as the same as the LF the reade
     expect(result.rows[0].action).toBe('unchanged');
   });
 });
+
+describe('SOW Sections — F17b: the order warning only fires on a different number', () => {
+  const warnings = (order: string) => plan(['id', 'sectionKey', 'name', 'order'], [['p1', 'terms', 'Default', order]]).rows[0].warnings;
+  it('is quiet for a blank cell and for a numerically equal one', () => {
+    expect(warnings('')).toEqual([]);
+    expect(warnings('1000.0')).toEqual([]);
+    expect(warnings('1000')).toEqual([]);
+  });
+  it('still warns for a different number or a non-number', () => {
+    expect(warnings('500')).toHaveLength(1);
+    expect(warnings('soon')).toHaveLength(1);
+  });
+});

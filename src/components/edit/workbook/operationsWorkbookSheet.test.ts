@@ -172,3 +172,33 @@ describe('Operations — M6: stored CRLF reads as the same as the LF the reader 
     expect(result.rows[0].action).toBe('unchanged');
   });
 });
+
+describe('Operations — F16: the category warning belongs to a row that writes a blank category', () => {
+  it('an untouched download of an uncategorised operation is quiet', () => {
+    const [header, ...body] = operationsExportRows(catalog, true).map((r) => r.map(String));
+    const result = plan(header, body);
+    const gibsonRow = result.rows.find((row) => row.label === 'Gibson Assembly')!;
+    expect(gibsonRow).toMatchObject({ action: 'unchanged', warnings: [] });
+    expect(result.rows.flatMap((row) => row.warnings)).toEqual([]);
+  });
+
+  it('an uncategorised operation updated for another field is quiet too', () => {
+    const result = plan(['id', 'name', 'serviceCategory', 'description'], [['op2', 'Gibson Assembly', '', 'New text']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', warnings: [] });
+  });
+
+  it('a new operation with a blank category still warns', () => {
+    const result = plan(['name', 'serviceCategory'], [['Brand new', '']]);
+    expect(result.rows[0]).toMatchObject({ action: 'create', warnings: ['will not appear in any canvas dropdown'] });
+  });
+});
+
+describe('Operations — M1: hide rows leave out an operation the sheet names ambiguously', () => {
+  it('a row whose name matches two operations errors, and neither is offered for hiding', () => {
+    const twinA: any = { id: 'tw1', name: 'Twin', parameterSetIds: [], ownParameters: [] };
+    const twinB: any = { id: 'tw2', name: 'Twin', parameterSetIds: [], ownParameters: [] };
+    const twins = catalogOf({ operations: [twinA, twinB, old] });
+    const result = planOperations(rawSheet('operations', ['name'], [['Twin']]), twins, { ...ctx, hideMissing: true });
+    expect(result.rows.map((r) => [r.key, r.action])).toEqual([['operations:2', 'skip'], ['hide:op3', 'hide']]);
+  });
+});

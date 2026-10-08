@@ -230,8 +230,9 @@ export function planOperations(
       let category: string | undefined;
       if (hasCategoryColumn) {
         const label = cell('serviceCategory');
-        if (label === '') warnings.push('will not appear in any canvas dropdown');
         const moved = !current || !sameCell('serviceCategory', label, current.serviceCategory);
+        // Only a row that writes a blank category warns: an untouched download of an uncategorised operation is quiet.
+        if (label === '' && moved) warnings.push('will not appear in any canvas dropdown');
         if (moved) {
           if (existing) {
             changed.push('serviceCategory');
@@ -280,7 +281,12 @@ export function planOperations(
 
   if (ctx.hideMissing) {
     // "No sheet row matched" — a matched row with an error still mentions its operation.
+    // A name that matches any operation mentions all of them, even when it is ambiguous and the row errors.
     const mentioned = new Set(matches.map((match) => match.existingId).filter((id): id is string => id !== undefined));
+    sheet.rows.forEach((raw) => {
+      if ((raw.cells.id ?? '') !== '' || (raw.cells.name ?? '') === '') return;
+      for (const operation of catalog.operations) if (operation.name.trim() === raw.cells.name) mentioned.add(operation.id);
+    });
     for (const operation of catalog.operations) {
       if (mentioned.has(operation.id) || operation.hiddenFromClients === true) continue;
       const key = `hide:${operation.id}`;

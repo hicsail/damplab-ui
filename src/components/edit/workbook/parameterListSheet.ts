@@ -126,7 +126,7 @@ function resolveOptions(cell: string, stored: any[]): { options: any[]; errors: 
 }
 
 /** The parameter after the given columns are applied to `base`. Columns not named are left exactly as stored. */
-function applyCells(base: Record<string, any>, cells: Record<string, string>, columns: ReadonlySet<string>): { next: Record<string, any>; errors: string[]; warnings: string[] } {
+function applyCells(base: Record<string, any>, cells: Record<string, string>, columns: ReadonlySet<string>, isNew: boolean): { next: Record<string, any>; errors: string[]; warnings: string[] } {
   const next: Record<string, any> = { ...base };
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -179,7 +179,8 @@ function applyCells(base: Record<string, any>, cells: Record<string, string>, co
       warnings.push(...resolved.warnings);
     }
   }
-  if (next.type === 'dropdown' && optionsOf(next).length === 0) errors.push('A Dropdown or Checkboxes parameter needs at least one option.');
+  // Only a create, or a row that touches type or options, is held to this: an unrelated edit to a stored zero-option dropdown goes through.
+  if (next.type === 'dropdown' && optionsOf(next).length === 0 && (isNew || has('type') || has('options'))) errors.push('A Dropdown or Checkboxes parameter needs at least one option.');
 
   const validationCell = has('validation') ? cell('validation') : '';
   if (has('validation') && validationCell !== '') {
@@ -298,8 +299,11 @@ export function planParameterList(sheet: RawSheet, catalog: CatalogSnapshot, ctx
     let tickedByDefault = true;
 
     if (group.kind === 'set') {
-      const set = catalog.sets.find((s) => s.name.trim() === group.name);
-      if (set) {
+      const sameName = catalog.sets.filter((s) => s.name.trim() === group.name);
+      const set = sameName[0];
+      if (sameName.length > 1) {
+        ownerErrors.push(`${sameName.length} parameter sets are named “${group.name}” — its parameters cannot say which.`);
+      } else if (set) {
         owner.existingId = set.id;
         owner.stored = set.parameters;
       } else {
@@ -352,7 +356,7 @@ export function planParameterList(sheet: RawSheet, catalog: CatalogSnapshot, ctx
         if (stored && changed.length === 0) {
           action = 'unchanged';
         } else {
-          const applied = applyCells(stored ?? newParameter(), raw.cells, new Set(changed));
+          const applied = applyCells(stored ?? newParameter(), raw.cells, new Set(changed), stored === undefined);
           errors.push(...applied.errors);
           warnings.push(...applied.warnings);
           if (applied.errors.length === 0) {
