@@ -9,6 +9,7 @@ import { EditServicesTable } from '../components/edit/EditServicesTable';
 import { EditInventoryTable } from '../components/edit/EditInventoryTable';
 import { EditSowSectionsTable } from '../components/edit/EditSowSectionsTable';
 import { EditParameterSetsTable } from '../components/edit/EditParameterSetsTable';
+import { WorkbookButtons, WorkbookMessage } from '../components/edit/workbook/WorkbookButtons';
 import { DownloadCatalogButton } from '../components/edit/DownloadCatalogButton';
 import { Can } from '../components/PermissionGate';
 import { PERMISSIONS } from '../hooks/usePermissions';
@@ -25,6 +26,7 @@ export default function AdminEdit () {
   );
   const [searchString, setSearchString] = useState<string>('');
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [workbookMessage, setWorkbookMessage] = useState<WorkbookMessage | null>(null);
 
   useEffect(() => {
     void refreshCatalog();
@@ -49,11 +51,16 @@ export default function AdminEdit () {
     <Stack spacing={3}>
       <Stack direction='row' alignItems='center' justifyContent='space-between' flexWrap='wrap' gap={2}>
         <Typography variant='h2'>Catalog Editor</Typography>
-        <Can permission={PERMISSIONS.CatalogEditorWrite}>
-          <DownloadCatalogButton onError={setDownloadError} />
-        </Can>
+        <Stack direction='row' alignItems='center' flexWrap='wrap' gap={1}>
+          {/* The workbook is one file for the Services, Parameter Sets, Categories, Bundles and SOWs views. */}
+          <WorkbookButtons editType={editType} onMessage={setWorkbookMessage} />
+          <Can permission={PERMISSIONS.CatalogEditorWrite}>
+            <DownloadCatalogButton onError={setDownloadError} />
+          </Can>
+        </Stack>
       </Stack>
       {downloadError && <Alert severity='error' onClose={() => setDownloadError(null)}>{downloadError}</Alert>}
+      {workbookMessage && <Alert severity={workbookMessage.severity} onClose={() => setWorkbookMessage(null)}>{workbookMessage.text}</Alert>}
       <ToolBar
         editType={editType}
         setEditType={setEditType}
