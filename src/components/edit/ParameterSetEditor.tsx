@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Alert, Button, Stack, TextField } from '@mui/material';
 import { useNavigate } from 'react-router';
+import { useQuery } from '@apollo/client';
+import { GET_PARAMETER_SETS } from '../../gql/queries';
+import { setRefsFrom } from '../../utils/serviceParameters';
 import ParameterListEditor from './parameters/ParameterListEditor';
 import { EditableParameter, withDragKeys } from './parameters/parameterSave';
 import { ReadOnlyFieldset } from '../ReadOnlyFieldset';
@@ -38,11 +41,14 @@ export default function ParameterSetEditor({
   // Computed once from what was loaded: a parameter added in this session is not locked yet.
   const locked = useMemo(() => (lockSavedIds ? lockedDragKeys(parameters) : new Set<string>()), []); // eslint-disable-line react-hooks/exhaustive-deps
   const isIdLocked = (p: EditableParameter) => locked.has(p._dragKey);
+  // Every set, so a "Show only if" can name a parameter of another set ("Set"."Parameter").
+  const { data: setsData } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
+  const conditionContext = useMemo(() => ({ setId: initial?.id, sets: setRefsFrom(setsData, { withParameters: true }) }), [initial?.id, setsData]);
 
   const handleSave = () => {
     // Same predicate passed to ParameterListEditor below, so a new parameter
     // colliding with a saved id is the one renamed — never the saved one (C4).
-    const { payload, errors } = parameterSetPayload({ name, description, parameters, tableDataText, isIdLocked });
+    const { payload, errors } = parameterSetPayload({ name, description, parameters, tableDataText, isIdLocked, conditionContext });
     if (!payload) {
       setLocalError(errors.join(' '));
       return;
@@ -68,6 +74,7 @@ export default function ParameterSetEditor({
             canWrite={canWrite}
             sampleSheetOwner={{ parameterSetId: initial?.id }}
             isIdLocked={isIdLocked}
+            conditionContext={conditionContext}
           />
         </Stack>
       </ReadOnlyFieldset>

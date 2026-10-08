@@ -67,6 +67,8 @@ export default function AdminEditServiceParameters() {
   const { data: setsData, error: setsError } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
   const allSets = useMemo(() => setRefsFrom(setsData, { withParameters: true }), [setsData]);
   const attachedSetIds = service?.parameterSetIds;
+  // An operation's own parameter may name a set parameter in its "Show only if" ("Set"."Parameter").
+  const conditionContext = useMemo(() => ({ sets: allSets }), [allSets]);
   const setRows = useMemo(
     () => setParameterRows(attachedSetIds, allSets, parameters),
     [attachedSetIds, allSets, parameters]
@@ -122,7 +124,7 @@ export default function AdminEditServiceParameters() {
       setErrorMessage(null);
       setSuccessMessage(null);
 
-      const { parameters: prepared, errors } = prepareParametersForSave(parameters, tableDataText);
+      const { parameters: prepared, errors } = prepareParametersForSave(parameters, tableDataText, undefined, conditionContext);
       if (errors.length) {
         setErrorMessage(errors.join(' '));
         return;
@@ -187,6 +189,7 @@ export default function AdminEditServiceParameters() {
           setTableDataText={setTableDataText}
           canWrite={canWrite}
           sampleSheetOwner={{ serviceId: String(service.id) }}
+          conditionContext={conditionContext}
           listHeader={
             reservedParameters.length > 0 ? (
               <>
