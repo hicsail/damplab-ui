@@ -40,6 +40,7 @@ import { UserContext, UserContextProps } from "../contexts/UserContext";
 import { getWorkflowsFromGraph } from "../controllers/GraphHelpers";
 import { calculateServiceCost } from "../utils/servicePricing";
 import { isOtherTextEntryId, otherLabel, otherTextEntryId, otherTextFrom } from '../utils/otherOption';
+import { withoutHiddenAnswers } from '../utils/parameterConditions';
 
 
 import { PausePresentationRounded } from "@mui/icons-material";
@@ -266,7 +267,8 @@ export default function Checkout() {
 
   const getParameterLineItems = (node: WorkflowNode) => {
     const parameters = node.data.parameters || [];
-    const formData = node.data.formData || [];
+    // A hidden parameter has no line item: its answer is not read at all.
+    const formData = withoutHiddenAnswers(parameters, node.data.formData || []);
     const formDataMap = new Map(formData.map((entry) => [entry.id, entry.value]));
 
     const normalizePrice = (value: unknown): number | undefined => {
@@ -566,7 +568,7 @@ export default function Checkout() {
                                       Estimated cost: {formatPriceLabel(getNodeCost(node))}
                                     </Typography>
                                   )}
-                                  {node.data?.formData?.filter((param) => !isOtherTextEntryId(param.id)).map((param) => {
+                                  {withoutHiddenAnswers(node.data.parameters, node.data?.formData ?? []).filter((param) => !isOtherTextEntryId(param.id)).map((param) => {
                                     const paramDef = (node.data.parameters || []).find((p: any) => p?.id === param.id);
                                     return (
                                     <Typography

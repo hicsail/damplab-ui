@@ -32,6 +32,7 @@ import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import ProtocolViewer from '../components/ProtocolViewer';
 import { CommentsSection } from '../components/CommentsSection';
 import { isOtherTextEntryId, otherLabel, otherTextFrom } from '../utils/otherOption';
+import { withoutHiddenAnswers } from '../utils/parameterConditions';
 
 type StateName = 'QUEUED' | 'IN_PROGRESS' | 'COMPLETE';
 const STATE_NAMES: StateName[] = ['QUEUED', 'IN_PROGRESS', 'COMPLETE'];
@@ -152,6 +153,16 @@ export function optionLabelLookup(parameters: any, formData?: unknown): Record<s
     }
   }
   return out;
+}
+
+/**
+ * The answers the bench lists for an operation: every stored entry except the
+ * "Other" text (shown with its answer) and the answers of parameters that are
+ * hidden for these answers.
+ */
+export function benchParameterEntries(parameters: any, formData: unknown): Array<{ id: string; value: any }> {
+  const entries: Array<{ id: string; value: any }> = Array.isArray(formData) ? formData : [];
+  return withoutHiddenAnswers(parameters, entries).filter((entry: any) => !isOtherTextEntryId(entry?.id));
 }
 
 /** Format a single formData value (string | string[] | file object) for display. */
@@ -311,7 +322,7 @@ export default function TechnicianBench() {
           const effectiveSteps = stepOverrides[op._id] ?? serverSteps;
           const names = paramNameLookup(service.parameters);
           const optionLabels = optionLabelLookup(service.parameters, op.formData);
-          const entries: Array<{ id: string; value: any }> = (Array.isArray(op.formData) ? op.formData : []).filter((entry: any) => !isOtherTextEntryId(entry?.id));
+          const entries = benchParameterEntries(service.parameters, op.formData);
 
           return (
             <Accordion key={op._id} defaultExpanded={st === 'IN_PROGRESS'} disableGutters>

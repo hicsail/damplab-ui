@@ -15,7 +15,7 @@ const chained: RawWorkbook = {
   ignoredSheets: ['(Syntax)'],
   sheets: {
     parameterList: rawSheet('parameterList', ['parameterSet', 'operation', 'parameter', 'type'], [['Salts', '', 'NaCl', 'Number'], ['', 'Ligation', 'Insert', 'Text']]),
-    operations: rawSheet('operations', ['name', 'parameterSet1'], [['Ligation', 'Salts'], ['PCR', '']]),
+    operations: rawSheet('operations', ['id', 'name', 'parameterSet1'], [['', 'Ligation', 'Salts'], ['op1', 'PCR', '']]),
     bundles: rawSheet('bundles', ['BundleName', 'Order', 'Operation'], [['Cloning', '1', 'Ligation']]),
     sowSections: rawSheet('sowSections', ['sectionKey', 'name', 'text'], [['terms', 'Default', 'Net 30.']])
   }
@@ -87,7 +87,7 @@ describe('plansMatch (I1: the plan re-made at Import against the plan that was p
     expect(plansMatch(planWorkbook(chained, catalog, options), planWorkbook(chained, grown, options))).toBe(true);
   });
 
-  it('is false when a row’s action changes: a record the file would create now exists', () => {
+  it('is false when a record of the name the file would create now exists: the row would now make a second one, and says so', () => {
     const made = catalogOf({ ...catalog, operations: [...catalog.operations, { id: 'op2', name: 'Ligation', parameterSetIds: [], ownParameters: [] } as any] });
     expect(plansMatch(planWorkbook(chained, catalog, options), planWorkbook(chained, made, options))).toBe(false);
   });
@@ -118,7 +118,7 @@ describe('plansMatch (I1: the plan re-made at Import against the plan that was p
 
 describe('previewOrder (I3: the rows that matter come first)', () => {
   const row = (key: string, over: Partial<PlanRow>): PlanRow => ({
-    key, sheet: 'operations', rowNumber: Number(key.split(':')[1]) || null, label: key, action: 'unchanged', matchedByName: false, changed: [], errors: [], warnings: [], selectedByDefault: false, needs: [], ...over
+    key, sheet: 'operations', rowNumber: Number(key.split(':')[1]) || null, label: key, action: 'unchanged', changed: [], errors: [], warnings: [], selectedByDefault: false, needs: [], ...over
   });
   const rows = [
     row('operations:2', {}),

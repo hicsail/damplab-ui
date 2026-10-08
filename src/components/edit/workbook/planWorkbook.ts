@@ -1,7 +1,7 @@
 import { BundlesWork, planBundles } from './bundlesSheet';
 import { findIdClashes } from './parameterIdClashes';
-import { newOperationRowKeys, OperationsWork, planOperations } from './operationsWorkbookSheet';
-import { newSetRowKeys, ParameterListWork, planParameterList } from './parameterListSheet';
+import { operationRowsByName, OperationsWork, planOperations } from './operationsWorkbookSheet';
+import { newSetRowKeys, OperationSets, ParameterListWork, planParameterList } from './parameterListSheet';
 import { planSowSections, SowSectionsWork } from './sowSectionsSheet';
 import { CatalogSnapshot, isApplicable, PlanRow, RawWorkbook, SHEET_KEYS, SheetPlan } from './types';
 
@@ -23,19 +23,35 @@ export interface PlanOptions {
 /**
  * Classifies every row of every recognised sheet. Sheets reference each other
  * by name — an operation names a set this upload creates, a bundle names an
- * operation this upload creates — so each planner is told what the others
- * create, and records it as a `need` on the row.
+ * operation by the name its Operations row carries — so each planner is told
+ * what the others hold, and records what a row waits for as a `need` on it.
  */
 export function planWorkbook(raw: RawWorkbook, catalog: CatalogSnapshot, options: PlanOptions): WorkbookPlan {
   const newSetRows = newSetRowKeys(raw.sheets.parameterList, catalog);
-  const newOperationRows = newOperationRowKeys(raw.sheets.operations, catalog);
+  const operationRows = operationRowsByName(raw.sheets.operations);
   const plan: WorkbookPlan = { ignoredSheets: raw.ignoredSheets };
   if (raw.sheets.operations) plan.operations = planOperations(raw.sheets.operations, catalog, { newSetRows, allowPricing: options.allowPricing, hideMissing: options.hideMissing });
-  if (raw.sheets.parameterList) plan.parameterList = planParameterList(raw.sheets.parameterList, catalog, { newOperationRows });
-  if (raw.sheets.bundles) plan.bundles = planBundles(raw.sheets.bundles, catalog, { newOperationRows });
+  if (raw.sheets.parameterList) plan.parameterList = planParameterList(raw.sheets.parameterList, catalog, { operationRows, operationSets: operationSetsAfter(plan.operations, catalog) });
+  if (raw.sheets.bundles) plan.bundles = planBundles(raw.sheets.bundles, catalog, { operationRows });
   if (raw.sheets.sowSections) plan.sowSections = planSowSections(raw.sheets.sowSections, catalog);
   refuseIdClashes(plan, catalog);
   return plan;
+}
+
+/**
+ * The sets each operation would end with if every Operations row were applied,
+ * by set id (`new:<name>` for a set this upload creates). The Parameter List
+ * sheet warns from it when a condition names a set some operation lacks.
+ */
+function operationSetsAfter(operations: SheetPlan<OperationsWork> | undefined, catalog: CatalogSnapshot): OperationSets[] {
+  const rows = Object.values(operations?.work.rows ?? {});
+  const keyOf = (name: string): string => catalog.sets.find((set) => set.name.trim() === name)?.id ?? `new:${name}`;
+  const existing = catalog.operations.map((operation) => {
+    const row = rows.find((work) => work.existingId === operation.id);
+    return { name: operation.name.trim(), setKeys: row?.setNames ? row.setNames.map(keyOf) : operation.parameterSetIds };
+  });
+  const created = rows.filter((work) => work.existingId === undefined).map((work) => ({ name: work.name, setKeys: (work.setNames ?? []).map(keyOf) }));
+  return [...existing, ...created];
 }
 
 /** Rule 20, across sheets: a set parameter this upload creates must not take an id its using operations already have. */
@@ -49,7 +65,6 @@ function refuseIdClashes(plan: WorkbookPlan, catalog: CatalogSnapshot): void {
     row.changed = [];
     row.selectedByDefault = false;
     row.needs = [];
-    row.matchedByName = false;
   }
 }
 

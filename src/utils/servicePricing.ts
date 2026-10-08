@@ -62,6 +62,7 @@ export const resolveParameterName = (entry: any, paramDef?: any): string | undef
   (typeof entry?.id === 'string' ? EQUIPMENT_PARAM_NAMES[entry.id] : undefined);
 import type { CustomerCategory } from './customerCategory';
 import { isSampleSheetParam, sampleCountFromValue } from './sampleSheetValue';
+import { withoutHiddenAnswers } from './parameterConditions';
 export type { CustomerCategory };
 
 interface ServiceParameterOption {
@@ -536,8 +537,13 @@ export const calculateServiceCost = (
   const pricingMode = effectivePricingMode(service, rawFormData);
   let baseCost = 0;
 
+  // A hidden parameter is not priced: no parameter or option price, and a hidden
+  // multiplier multiplies nothing. Twin of the same filter in the backend's
+  // calculateServiceCostBreakdown, which is what the SOW bills from.
+  const shownFormData = withoutHiddenAnswers(service?.parameters, rawFormData);
+
   if (pricingMode === 'PARAMETER') {
-    baseCost = calculateParameterCostWithCategory(service?.parameters, rawFormData, customerCategory);
+    baseCost = calculateParameterCostWithCategory(service?.parameters, shownFormData, customerCategory);
   } else {
     const servicePrice = resolveCategoryPrice(service, customerCategory);
     if (servicePrice !== undefined) {
@@ -548,7 +554,7 @@ export const calculateServiceCost = (
     }
   }
 
-  const multiplier = getMultiplier(service?.parameters, rawFormData, {
+  const multiplier = getMultiplier(service?.parameters, shownFormData, {
     // Only PARAMETER mode reads a parameter's own price, so only there can one
     // already have been billed into the base.
     skipSelfPriced: pricingMode === 'PARAMETER',

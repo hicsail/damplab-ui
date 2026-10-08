@@ -1,4 +1,5 @@
 import { EditableParameter, prepareParametersForSave } from './parameters/parameterSave';
+import type { ConditionContext } from './parameters/showIfField';
 
 /** Parameters loaded from a saved set keep their ids: recorded job answers are keyed by them. */
 export function lockedDragKeys(loaded: ReadonlyArray<EditableParameter>): Set<string> {
@@ -16,11 +17,13 @@ export function parameterSetPayload(input: {
    * the one renamed, never the saved one (controller ruling C4 / pin 2).
    */
   isIdLocked?: (p: EditableParameter) => boolean;
+  /** The set's id and every parameter set, for "Show only if" references. */
+  conditionContext?: ConditionContext;
 }): { payload?: { name: string; description: string | null; parameters: any[] }; errors: string[] } {
   const name = input.name.trim();
   if (!name) return { errors: ['Name is required.'] };
   if (name.includes(';')) return { errors: ['A set name cannot contain ";".'] };
-  const { parameters, errors } = prepareParametersForSave(input.parameters, input.tableDataText, input.isIdLocked);
+  const { parameters, errors } = prepareParametersForSave(input.parameters, input.tableDataText, input.isIdLocked, input.conditionContext);
   if (errors.length) return { errors };
   return { payload: { name, description: input.description.trim() || null, parameters }, errors: [] };
 }

@@ -34,8 +34,9 @@ import { isRetiredEquipmentParam, validateEquipmentValues } from "../utils/equip
 import SampleSheetField from "./SampleSheetField";
 import { isSampleSheetParam } from "../utils/sampleSheet";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
-import { answerProblems, isCheckboxList, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
-import { errorLabel, isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, selectsOther } from "../utils/otherOption";
+import { answerProblems, isCheckboxList, requiredProblems, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
+import { errorLabel, isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, otherTextParentId, selectsOther } from "../utils/otherOption";
+import { hiddenParameterIds, resetHiddenValues, withoutHiddenAnswers } from "../utils/parameterConditions";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -180,32 +181,11 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
 
   // validation function for formik to check for empty fields
   const validate = (values: any) => {
-    let errors: any = {};
-    activeNode.data.formData.forEach((obj: any) => {
-      if (obj.paramType === "result" || isOtherTextEntryId(obj.id)) return;
-      const key = obj.id;
-      if (isMultiValueParam(obj)) {
-        if (obj.required) {
-          const arr = values[key];
-          const hasValue = obj.type === "file"
-            ? Array.isArray(arr) && arr.length > 0
-            : Array.isArray(arr) && arr.some((v: any) => v != null && String(v).trim() !== "");
-          if (!hasValue) errors[key] = "Required (at least one value)";
-        }
-      } else {
-        if (obj.type === "file" || isSampleSheetParam(obj)) {
-          if (obj.required && !values[key]) errors[key] = "Required";
-          return;
-        }
-        if (
-          values[key] === "" ||
-          values[key] === undefined ||
-          values[key] === null
-        ) {
-          if (obj.required) errors[key] = "Required";
-        }
-      }
-    });
+    // Only the parameters that are shown are checked: a hidden one (its "show
+    // only if" is false for these values) raises no required, validation or
+    // "Other" message.
+    const shown = withoutHiddenAnswers(activeNode?.data?.parameters, buildUpdatedFormData(values));
+    let errors: any = requiredProblems(shown, values);
 
     // The reserved equipment parameters carry rules the generic required-field pass
     // cannot express: a date pair that must not invert, and an integer floor.
@@ -214,7 +194,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
 
     // A number that breaks its rule, and "Other" with no text. A "Required"
     // already recorded for the same field wins: it is the more basic problem.
-    for (const [key, message] of Object.entries(answerProblems(buildUpdatedFormData(values), activeNode?.data?.parameters))) {
+    for (const [key, message] of Object.entries(answerProblems(shown, activeNode?.data?.parameters))) {
       if (!errors[key]) errors[key] = message;
     }
 
@@ -245,6 +225,17 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
 
   // update values to active node form data and validate
   useEffect(() => {
+    // When an answer hides a parameter, its value goes back to empty and its
+    // "Other" text is dropped; shown again, it starts empty. resetHiddenValues
+    // is null once nothing is left to reset, so this cannot loop. A read-only
+    // form (a past version, a step already in flight) changes nothing.
+    if (!readOnly) {
+      const reset = resetHiddenValues(formik.values, activeNode.data.formData, activeNode?.data?.parameters);
+      if (reset) {
+        formik.setValues(reset);
+        return;
+      }
+    }
     const updatedFormData = buildUpdatedFormData(formik.values);
     setNodes((nds: any[]) =>
       nds.map((node: any) =>
@@ -296,7 +287,13 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     if (otherOptionIdOf(param) !== null && !selectsOther(param, nextValue)) formik.setFieldValue(otherTextEntryId(param.id), "");
   };
 
-  const setHeadings = parameterSetHeadings(activeNode?.data?.formData ?? [], activeNode?.data?.parameters);
+  // Re-evaluated on every render, so on every answer change in this step.
+  const hidden = hiddenParameterIds(activeNode?.data?.parameters, formik.values);
+  const shownFormData: any[] = (activeNode?.data?.formData ?? []).filter(
+    (param: any) => !hidden.has(param?.id) && !(isOtherTextEntryId(param?.id) && hidden.has(otherTextParentId(param.id)))
+  );
+  // Over the shown entries only: a set with no visible parameter gets no heading.
+  const setHeadings = parameterSetHeadings(shownFormData, activeNode?.data?.parameters);
 
   return (
     <div>
@@ -339,7 +336,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
           </AccordionSummary>
           <AccordionDetails>
         <div className="input-params" style={{ marginLeft: 8 }}>
-          {activeNode.data.formData.map((param: any, index: number) => isRetiredEquipmentParam(param) ? null : <React.Fragment key={param.id ?? index}>{setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}{wrapChanged(param, (() => {
+          {shownFormData.map((param: any, index: number) => isRetiredEquipmentParam(param) ? null : <React.Fragment key={param.id ?? index}>{setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}{wrapChanged(param, (() => {
             if (param.paramType !== "result") {
               // The "Other" text is drawn under its parameter, never as a field of its own.
               if (isOtherTextEntryId(param.id)) return null;
@@ -811,7 +808,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
               </Box>
             )
           }
-          {activeNode.data.formData.map((param: any) => {
+          {shownFormData.map((param: any) => {
             if (param.paramType === "result") {
               return (
                 <div key={param.id}>

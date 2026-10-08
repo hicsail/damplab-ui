@@ -3,23 +3,30 @@ import { nearKey } from './cells';
 export interface MatchResult {
   action: 'create' | 'update';
   existingId?: string;
-  matchedByName: boolean;
+  /** The matched record's position in `existing` — what tells two records without an id apart. */
+  existingIndex?: number;
   errors: string[];
   warnings: string[];
   selectedByDefault: boolean;
 }
 
+/** `a and b`, `a, b and c`: sheet row numbers in a sentence. */
+export const rowList = (numbers: ReadonlyArray<number>): string => `${numbers.slice(0, -1).join(', ')} and ${numbers[numbers.length - 1]}`;
+
 /**
- * Which record each row means (design rules 3–5), for one scope: all operations,
- * one owner's parameters, all bundles, all SOW text blocks.
+ * Which record each row means, for one scope: all operations, one owner's
+ * parameters, all bundles, all SOW text blocks. A row is matched by id only.
  *
  * - a non-blank id that matches is an update; one that matches nothing is an error;
- * - with a blank id, a record whose trimmed name equals the row's is an update
- *   "matched by name"; two such records is an error; none is a create;
+ * - a blank id is always a create, never an update of the record with that name —
+ *   except that a record which itself has no id has nothing else to be matched
+ *   on: the one such record of exactly the row's name is that row's, an update;
+ * - a create whose name equals an existing record's exactly (trimmed) would make a
+ *   second record of that name: a warning, unticked by default;
  * - a create whose name equals an existing record's, or another new row's, only
  *   after lower-casing and collapsing whitespace is a near-duplicate: a warning,
  *   unticked by default;
- * - two rows that resolve to the same record, or create the same name, are both errors.
+ * - two rows with the same id, or two that create the same name, are both errors.
  */
 export function matchRows(
   rows: ReadonlyArray<{ rowNumber: number; id: string; name: string }>,
@@ -27,12 +34,13 @@ export function matchRows(
   noun: string
 ): MatchResult[] {
   const results: MatchResult[] = rows.map((row) => {
-    const result: MatchResult = { action: 'create', matchedByName: false, errors: [], warnings: [], selectedByDefault: true };
+    const result: MatchResult = { action: 'create', errors: [], warnings: [], selectedByDefault: true };
     if (row.id !== '') {
-      const found = existing.find((e) => e.id === row.id);
-      if (found) {
+      const index = existing.findIndex((e) => e.id === row.id);
+      if (index >= 0) {
         result.action = 'update';
-        result.existingId = found.id;
+        result.existingId = row.id;
+        result.existingIndex = index;
       } else {
         result.errors.push(`No ${noun} has id “${row.id}”.`);
       }
@@ -42,19 +50,22 @@ export function matchRows(
       result.errors.push(`A new ${noun} needs a name.`);
       return result;
     }
-    const sameName = existing.filter((e) => e.name.trim() === row.name);
-    if (sameName.length === 1) {
+    const withoutId = existing.map((e, index) => ({ e, index })).filter(({ e }) => e.id === '' && e.name.trim() === row.name);
+    if (withoutId.length === 1) {
       result.action = 'update';
-      result.existingId = sameName[0].id;
-      result.matchedByName = true;
-    } else if (sameName.length > 1) {
-      result.errors.push(`${sameName.length} ${noun}s are named “${row.name}” — add the id to say which.`);
-    } else {
-      const near = existing.find((e) => nearKey(e.name) === nearKey(row.name));
-      if (near) {
-        result.warnings.push(`Looks like “${near.name.trim()}” — a near-duplicate`);
-        result.selectedByDefault = false;
-      }
+      result.existingId = '';
+      result.existingIndex = withoutId[0].index;
+      return result;
+    }
+    if (existing.some((e) => e.name.trim() === row.name)) {
+      result.warnings.push(`Same name as an existing ${noun} — this row creates a second one. Add the id to update it instead.`);
+      result.selectedByDefault = false;
+      return result;
+    }
+    const near = existing.find((e) => nearKey(e.name) === nearKey(row.name));
+    if (near) {
+      result.warnings.push(`Looks like “${near.name.trim()}” — a near-duplicate`);
+      result.selectedByDefault = false;
     }
     return result;
   });
@@ -75,14 +86,13 @@ export function matchRows(
   const groups = new Map<string, number[]>();
   rows.forEach((row, i) => {
     if (results[i].errors.length > 0) return;
-    const key = results[i].action === 'update' ? `update:${results[i].existingId}` : `create:${row.name}`;
+    const key = results[i].action === 'update' ? `update:${results[i].existingIndex}` : `create:${row.name}`;
     groups.set(key, [...(groups.get(key) ?? []), i]);
   });
   for (const [key, indexes] of groups) {
     if (indexes.length < 2) continue;
-    const numbers = indexes.map((i) => rows[i].rowNumber);
-    const list = `${numbers.slice(0, -1).join(', ')} and ${numbers[numbers.length - 1]}`;
-    const name = key.startsWith('update:') ? (existing.find((e) => `update:${e.id}` === key)?.name.trim() ?? '') : rows[indexes[0]].name;
+    const list = rowList(indexes.map((i) => rows[i].rowNumber));
+    const name = key.startsWith('update:') ? existing[results[indexes[0]].existingIndex!].name.trim() : rows[indexes[0]].name;
     const message = key.startsWith('update:') ? `Rows ${list} both resolve to “${name}”.` : `Rows ${list} both create “${name}”.`;
     for (const i of indexes) results[i].errors.push(message);
   }

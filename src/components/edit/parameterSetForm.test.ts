@@ -43,4 +43,11 @@ describe('parameter set form', () => {
     expect(payload!.parameters[1].id).toBe('buffer_volume'); // saved, untouched
     expect(payload!.parameters[0].id).toBe('buffer_volume_2'); // new, renamed
   });
+  it('forwards the condition context, so a set parameter can name a parameter of another set', () => {
+    const parameters = [{ _dragKey: 'a', id: 'kit', name: 'Kit', type: 'string', _showIfText: '"Cleanup"."Method"=="Column"' }];
+    const cleanup = { id: 'set2', name: 'Cleanup', parameters: [{ id: 'method', name: 'Method', type: 'dropdown', options: [{ id: 'col', name: 'Column' }] }] };
+    const withContext = parameterSetPayload({ name: 'Extraction', description: '', parameters, tableDataText: {}, conditionContext: { setId: 'set1', sets: [cleanup] } });
+    expect(withContext.payload?.parameters[0].showIf).toEqual({ parameterId: 'method', parameterSetId: 'set2', op: 'eq', optionIds: ['col'] });
+    expect(parameterSetPayload({ name: 'Extraction', description: '', parameters, tableDataText: {} }).errors).toEqual(['Parameter 1: Show only if - No parameter set is named “Cleanup”.']);
+  });
 });

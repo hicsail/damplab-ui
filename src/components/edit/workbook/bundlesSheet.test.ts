@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bundlesExportRows, planBundles } from './bundlesSheet';
+import { OperationRowRef } from './operationsWorkbookSheet';
 import { catalogOf, rawSheet } from './testSupport';
 
 const op = (id: string, name: string): any => ({ id, name, parameterSetIds: [], ownParameters: [] });
@@ -10,7 +11,8 @@ const catalog = catalogOf({
     { id: 'b2', label: 'Empty', icon: '', steps: [] }
   ]
 });
-const none = { newOperationRows: new Map<string, string>() };
+const none = { operationRows: new Map<string, OperationRowRef[]>() };
+const SAME_NAME = 'Same name as an existing bundle — this row creates a second one. Add the id to update it instead.';
 const plan = (columns: string[], rows: string[][], ctx = none) => planBundles(rawSheet('bundles', columns, rows), catalog, ctx);
 
 describe('Bundles — download rows (rule 32)', () => {
@@ -26,21 +28,21 @@ describe('Bundles — download rows (rule 32)', () => {
 });
 
 describe('Bundles — a downloaded sheet uploaded unchanged (rule 2)', () => {
-  it('is one "unchanged" row per bundle, with and without ids', () => {
+  it('is one "unchanged" row per bundle with its ids; without them each bundle would be created a second time', () => {
     const [header, ...rows] = bundlesExportRows(catalog);
     const asText = rows.map((r) => r.map(String));
     const withIds = plan(header.map(String), asText);
     expect(withIds.rows.map((r) => [r.label, r.action, r.rowNumber])).toEqual([['Cloning', 'unchanged', 2], ['Empty', 'unchanged', 5]]);
     expect(withIds.rowCount).toBe(4);
-    expect(plan(header.map(String).slice(1), asText.map((r) => r.slice(1))).rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged']);
+    expect(plan(header.map(String).slice(1), asText.map((r) => r.slice(1))).rows.map((r) => [r.action, r.warnings, r.selectedByDefault])).toEqual([['create', [SAME_NAME], false], ['create', [SAME_NAME], false]]);
   });
 });
 
 describe('Bundles — steps (rule 32)', () => {
   it('forms a bundle from rows with the same BundleName, sorted by Order, and lets an operation repeat', () => {
-    const result = plan(['BundleName', 'Order', 'Operation'], [['Cloning', '3', 'PCR'], ['Cloning', '1', 'Gel'], ['Cloning', '2', 'Gel']]);
+    const result = plan(['id', 'BundleName', 'Order', 'Operation'], [['b1', 'Cloning', '3', 'PCR'], ['', 'Cloning', '1', 'Gel'], ['', 'Cloning', '2', 'Gel']]);
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0]).toMatchObject({ key: 'bundles:2', action: 'update', matchedByName: true, changed: ['steps'], errors: [] });
+    expect(result.rows[0]).toMatchObject({ key: 'bundles:2', action: 'update', changed: ['steps'], errors: [] });
     expect(result.work.bundles['bundles:2']).toMatchObject({ existingId: 'b1', changes: { steps: [{ name: 'Gel', id: 'op2' }, { name: 'Gel', id: 'op2' }, { name: 'PCR', id: 'op1' }] }, before: { steps: ['PCR', 'Gel', 'PCR'] } });
   });
 
@@ -57,7 +59,7 @@ describe('Bundles — steps (rule 32)', () => {
   });
 
   it('without an Operation column the steps are left alone (rule 6)', () => {
-    const result = plan(['BundleName', 'icon'], [['Cloning', 'new.png']]);
+    const result = plan(['id', 'BundleName', 'icon'], [['b1', 'Cloning', 'new.png']]);
     expect(result.work.bundles['bundles:2'].changes).toEqual({ icon: 'new.png' });
   });
 
@@ -67,8 +69,8 @@ describe('Bundles — steps (rule 32)', () => {
   });
 
   it('waits on an operation this upload creates', () => {
-    const result = plan(['BundleName', 'Order', 'Operation'], [['Cloning', '1', 'Ligation']], { newOperationRows: new Map([['Ligation', 'operations:9']]) });
-    expect(result.rows[0]).toMatchObject({ action: 'update', errors: [], needs: [{ what: 'operation “Ligation”', anyOf: ['operations:9'] }] });
+    const result = plan(['BundleName', 'Order', 'Operation'], [['Cloning', '1', 'Ligation']], { operationRows: new Map([['Ligation', [{ rowKey: 'operations:9', rowNumber: 9, id: '' }]]]) });
+    expect(result.rows[0]).toMatchObject({ action: 'create', errors: [], needs: [{ what: 'operation “Ligation”', anyOf: ['operations:9'] }] });
     expect(result.work.bundles['bundles:2'].changes.steps).toEqual([{ name: 'Ligation', rowKey: 'operations:9' }]);
   });
 

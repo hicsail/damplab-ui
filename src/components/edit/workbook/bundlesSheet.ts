@@ -1,5 +1,6 @@
 import { sameList } from './cells';
 import { matchRows } from './matching';
+import { OperationRowRef, ReferenceWarning, resolveOperationName } from './operationsWorkbookSheet';
 import { CatalogSnapshot, Need, PlanRow, RawRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
 /**
@@ -21,7 +22,7 @@ export interface BundleStepRef {
   name: string;
   /** An existing operation's id. */
   id?: string;
-  /** The Operations row that creates the operation, when it does not exist yet. */
+  /** The Operations row that creates the operation, when that is the operation meant. */
   rowKey?: string;
 }
 
@@ -36,7 +37,7 @@ export interface BundlesWork {
   bundles: Record<string, BundleWork>;
 }
 
-export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { newOperationRows: ReadonlyMap<string, string> }): SheetPlan<BundlesWork> {
+export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { operationRows: ReadonlyMap<string, ReadonlyArray<OperationRowRef>> }): SheetPlan<BundlesWork> {
   const hasSteps = sheet.columns.includes('Operation');
   const hasOrder = sheet.columns.includes('Order');
   const hasIcon = sheet.columns.includes('icon');
@@ -48,7 +49,7 @@ export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { ne
     const name = raw.cells.BundleName ?? '';
     if (name === '') {
       rows.push({
-        key: rowKey('bundles', raw.rowNumber), sheet: 'bundles', rowNumber: raw.rowNumber, label: raw.cells.Operation ?? '', action: 'skip', matchedByName: false,
+        key: rowKey('bundles', raw.rowNumber), sheet: 'bundles', rowNumber: raw.rowNumber, label: raw.cells.Operation ?? '', action: 'skip',
         changed: [], errors: ['A bundle row needs a BundleName.'], warnings: [], selectedByDefault: false, needs: []
       });
       continue;
@@ -81,6 +82,8 @@ export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { ne
     const errors = [...groupErrors[index].errors, ...match.errors];
     const warnings = [...match.warnings];
     const needs: Need[] = [];
+    // Steps whose name a different stored operation holds today.
+    const moved: ReferenceWarning[] = [];
     const existing = match.existingId !== undefined ? catalog.bundles.find((bundle) => bundle.id === match.existingId) : undefined;
     let action: RowAction = match.action;
     const changed: string[] = [];
@@ -120,14 +123,15 @@ export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { ne
         const steps: BundleStepRef[] = [];
         for (const { raw } of ordered) {
           const name = raw.cells.Operation;
-          const found = catalog.operations.filter((operation) => operation.name.trim() === name);
-          if (found.length === 1) steps.push({ name, id: found[0].id });
-          else if (found.length > 1) errors.push(`Row ${raw.rowNumber}: ${found.length} operations are named “${name}”.`);
-          else if (ctx.newOperationRows.has(name)) {
-            const provider = ctx.newOperationRows.get(name)!;
-            steps.push({ name, rowKey: provider });
-            if (!needs.some((need) => need.anyOf[0] === provider)) needs.push({ what: `operation “${name}”`, anyOf: [provider] });
-          } else errors.push(`Row ${raw.rowNumber}: No operation named “${name}”.`);
+          const found = resolveOperationName(name, ctx.operationRows, catalog);
+          if ((found.kind === 'existing' || found.kind === 'row') && found.warning && !moved.some((warning) => warning.text === found.warning!.text)) moved.push(found.warning);
+          if (found.kind === 'existing') steps.push({ name, id: found.operation.id });
+          else if (found.kind === 'row') {
+            steps.push({ name, rowKey: found.rowKey });
+            if (!needs.some((need) => need.anyOf[0] === found.rowKey)) needs.push({ what: `operation “${name}”`, anyOf: [found.rowKey] });
+          } else if (found.kind === 'error') errors.push(`Row ${raw.rowNumber}: ${found.message}`);
+          else if (found.count > 1) errors.push(`Row ${raw.rowNumber}: ${found.count} operations are named “${name}”.`);
+          else errors.push(`Row ${raw.rowNumber}: No operation named “${name}”.`);
         }
         const same = existing !== undefined && steps.every((step) => step.id !== undefined) && sameList(steps.map((step) => step.id!), existing.steps.map((step) => step.id));
         if (!same) {
@@ -147,9 +151,12 @@ export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { ne
 
     if (errors.length > 0) action = 'skip';
     const writes = action === 'create' || action === 'update';
+    // Only a bundle whose steps this upload writes: one that ends up unchanged moves nothing.
+    const said = writes && changes.steps !== undefined ? moved : [];
+    warnings.push(...said.map((warning) => warning.text));
     rows.push({
-      key, sheet: 'bundles', rowNumber: first.rowNumber, label: group.name, action, matchedByName: match.matchedByName && action !== 'skip',
-      changed: writes ? changed : [], errors, warnings, selectedByDefault: writes && match.selectedByDefault, needs: writes ? needs : []
+      key, sheet: 'bundles', rowNumber: first.rowNumber, label: group.name, action,
+      changed: writes ? changed : [], errors, warnings, selectedByDefault: writes && match.selectedByDefault && !said.some((warning) => warning.untick), needs: writes ? needs : []
     });
   });
 

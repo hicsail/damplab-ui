@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
-import { allRows, planWorkbook, sheetPlans } from './planWorkbook';
+import { allRows, planWorkbook, sheetPlans, tickedKeys, unmetNeeds } from './planWorkbook';
 import { readWorkbook } from './readWorkbook';
 import { catalogOf } from './testSupport';
 import { buildWorkbookData, SPARE_ROWS, WorkbookData, writeWorkbook } from './writeWorkbook';
@@ -15,14 +15,17 @@ const catalog = catalogOf({
         { id: 'sample_type', name: 'Sample Type', type: 'dropdown', allowMultipleValues: true, display: 'checkboxes', options }
       ]
     },
-    { id: 's2', name: 'Cleanup', parameters: [{ id: 'method', name: 'Method', type: 'dropdown', options, defaultValue: 'bact' }] }
+    { id: 's2', name: 'Cleanup', parameters: [{ id: 'method', name: 'Method', type: 'dropdown', options, defaultValue: 'bact', showIf: { parameterId: 'sample_type', parameterSetId: 's1', op: 'in', optionIds: ['bact', 'oth'] } }] }
   ],
   operations: [
     {
       id: 'op1', name: 'PCR', description: 'Amplify', unit: 'rxn', pricingMode: 'SERVICE', hiddenFromClients: false,
       pricing: { internal: 5, external: 9, externalAcademic: 7, externalMarket: 9, externalNoSalary: 6, legacy: 10 },
       parameterSetIds: ['s1', 's2'],
-      ownParameters: [{ id: 'cycles', name: 'Cycles', type: 'number', validation: '>0 && integer', defaultValue: 30 }, { id: 'hot', name: 'Hot start', type: 'boolean', required: true }]
+      ownParameters: [
+        { id: 'cycles', name: 'Cycles', type: 'number', validation: '>0 && integer', defaultValue: 30, showIf: { any: [{ parameterId: 'hot', op: 'eq', value: false }, { parameterId: 'volume', parameterSetId: 's1', op: 'gt', value: 2.5 }] } },
+        { id: 'hot', name: 'Hot start', type: 'boolean', required: true }
+      ]
     } as any,
     { id: 'op2', name: 'Gibson Assembly', pricingMode: 'PARAMETER', hiddenFromClients: true, parameterSetIds: [], ownParameters: [] } as any
   ],
@@ -56,19 +59,55 @@ describe('download → upload, unchanged (rule 2)', () => {
     expect(sheetPlans(plan).flatMap((s) => s.ignoredColumns)).toEqual([]);
   });
 
-  it('is still all unchanged with every id column removed — a hand-authored workbook uploaded twice (Review Focus 1)', async () => {
+  it('with every id column removed nothing is matched by name: every row is a create, and each one that names a stored record is warned and unticked', async () => {
     const data = buildWorkbookData(catalog, { includePricing: true });
     const withoutIds: WorkbookData = { ...data, sheets: data.sheets.map((sheet) => ({ ...sheet, rows: sheet.rows.map((row) => row.slice(1)) })) };
     expect(withoutIds.sheets.map((s) => s.rows[0][0])).toEqual(['serviceCategory', 'parameterSet', 'BundleName', 'sectionKey']);
     const { plan } = await upload(withoutIds);
     const rows = allRows(plan);
-    expect(rows.filter((r) => r.action !== 'unchanged').map((r) => `${r.key}: ${r.action} ${r.changed.join(',')} ${r.errors.join(' ')}`)).toEqual([]);
-    expect(rows.filter((r) => r.matchedByName === false && r.action !== 'unchanged')).toEqual([]);
+    expect(rows.map((r) => `${r.key}: ${r.action} ${r.errors.join(' ')}`)).toEqual([
+      'operations:2: create ', 'operations:3: create ',
+      'parameterList:2: create ', 'parameterList:3: create ', 'parameterList:4: create ', 'parameterList:5: create ', 'parameterList:6: create ',
+      'bundles:2: create ', 'bundles:5: create ',
+      'sowSections:2: create ', 'sowSections:3: create '
+    ]);
+    const same = (noun: string): string => `Same name as an existing ${noun} — this row creates a second one. Add the id to update it instead.`;
+    const warned = (sheet: string, noun: string): boolean => rows.filter((r) => r.sheet === sheet).every((r) => r.warnings.includes(same(noun)) && !r.selectedByDefault);
+    expect(warned('operations', 'operation')).toBe(true);
+    expect(warned('bundles', 'bundle')).toBe(true);
+    expect(warned('sowSections', 'SOW text block')).toBe(true);
+    // The sets are still found by name, so their parameters would be second ones.
+    expect(rows.filter((r) => r.sheet === 'parameterList').slice(0, 3).every((r) => r.warnings.includes(same('parameter')) && !r.selectedByDefault)).toBe(true);
+    // "PCR" now means the operation the Operations row creates, which has no parameters yet: these wait for that row.
+    const newPcr = '“PCR” means the new operation in row 2, not the existing operation named “PCR”.';
+    expect(rows.filter((r) => r.sheet === 'parameterList').slice(3).map((r) => [r.warnings, r.selectedByDefault, r.needs[0]])).toEqual([
+      [[newPcr], true, { what: 'operation “PCR”', anyOf: ['operations:2'] }],
+      [[newPcr], true, { what: 'operation “PCR”', anyOf: ['operations:2'] }]
+    ]);
+    expect(plan.bundles!.work.bundles['bundles:2'].changes.steps).toEqual([
+      { name: 'PCR', rowKey: 'operations:2' }, { name: 'Gibson Assembly', rowKey: 'operations:3' }, { name: 'PCR', rowKey: 'operations:2' }
+    ]);
+    // Nothing that is ticked by default can be applied: no stored record is touched.
+    const ticked = tickedKeys(plan, {});
+    expect([...ticked].filter((key) => !(key in unmetNeeds(plan, ticked)))).toEqual([]);
   });
 
   it('is unchanged without the pricing columns too (a reader without internal-fields:read)', async () => {
     const { plan } = await upload(buildWorkbookData(catalog, { includePricing: false }));
     expect(allRows(plan).every((r) => r.action === 'unchanged')).toBe(true);
+  });
+});
+
+describe('download → upload: conditionalDisplayLogic (show-only-if rules 24–26)', () => {
+  it('writes the conditions as text into the real file, and reads them back as unchanged', async () => {
+    const data = buildWorkbookData(catalog, { includePricing: true });
+    const sheet = data.sheets[1];
+    const column = sheet.rows[0].indexOf('conditionalDisplayLogic');
+    expect(column).toBe(sheet.rows[0].indexOf('validation') + 1);
+    expect(sheet.rows.slice(1).map((row) => row[column])).toEqual(['', '', '"Buffers"."Sample Type" in ("Bacteria","Other")', '"Hot start"==false || "Buffers"."Volume">2.5', '']);
+    const { plan } = await upload(data);
+    expect(plan.parameterList!.ignoredColumns).toEqual([]);
+    expect(plan.parameterList!.rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged', 'unchanged', 'unchanged']);
   });
 });
 

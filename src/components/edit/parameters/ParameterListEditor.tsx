@@ -38,6 +38,7 @@ import { idFromName } from '../../../utils/idFromName';
 import SampleSheetTemplateField, { SampleSheetTemplateOwner } from '../SampleSheetTemplateField';
 import { createDragKey, EditableParameter } from './parameterSave';
 import { applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
+import { ConditionContext, NO_CONDITION_CONTEXT, SHOW_IF_EXAMPLE, SHOW_IF_HELP, showIfError, showIfText, showIfWarning } from './showIfField';
 
 const TYPE_OPTIONS = [
   { value: 'string', label: 'Text' },
@@ -123,6 +124,8 @@ export interface ParameterListEditorProps {
   listFooter?: React.ReactNode;
   /** A chip label for a row, e.g. "overrides Buffers". */
   rowChip?: (parameter: EditableParameter) => string | undefined;
+  /** What "Show only if" references are resolved against, beyond this list: the set being edited and every set. */
+  conditionContext?: ConditionContext;
 }
 
 export default function ParameterListEditor({
@@ -135,7 +138,8 @@ export default function ParameterListEditor({
   isIdLocked,
   listHeader,
   listFooter,
-  rowChip
+  rowChip,
+  conditionContext = NO_CONDITION_CONTEXT
 }: ParameterListEditorProps) {
   const [selectedParameterIndex, setSelectedParameterIndex] = useState(0);
 
@@ -201,6 +205,8 @@ export default function ParameterListEditor({
   };
 
   const selectedParameter = parameters[selectedParameterIndex];
+  const conditionError = showIfError(parameters, selectedParameterIndex, conditionContext);
+  const conditionWarning = showIfWarning(parameters, selectedParameterIndex, conditionContext);
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '280px 1fr' }, gap: 2 }}>
@@ -287,6 +293,18 @@ export default function ParameterListEditor({
                   fullWidth
                   value={selectedParameter.description ?? ''}
                   onChange={(event) => updateParameter(selectedParameterIndex, { description: event.target.value })}
+                />
+              </Grid>
+              <Grid size={12}>
+                <TextField
+                  label='Show only if'
+                  fullWidth
+                  placeholder={SHOW_IF_EXAMPLE}
+                  value={showIfText(parameters, selectedParameterIndex, conditionContext)}
+                  error={Boolean(conditionError)}
+                  helperText={conditionError ?? conditionWarning ?? SHOW_IF_HELP}
+                  FormHelperTextProps={conditionWarning && !conditionError ? { sx: { color: 'warning.main' } } : undefined}
+                  onChange={(event) => updateParameter(selectedParameterIndex, { _showIfText: event.target.value })}
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>

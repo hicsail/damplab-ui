@@ -98,9 +98,9 @@ describe('applyWorkbook — updates, ticks and hides', () => {
   const edits: RawWorkbook = {
     ignoredSheets: [],
     sheets: {
-      parameterList: rawSheet('parameterList', ['parameterSet', 'operation', 'parameter', 'description'], [['Buffers', '', 'Volume', 'In µL'], ['Buffers', '', 'pH', ''], ['', 'PCR', 'Cycles', 'How many']]),
+      parameterList: rawSheet('parameterList', ['parameterId', 'parameterSet', 'operation', 'parameter', 'description'], [['volume', 'Buffers', '', 'Volume', 'In µL'], ['', 'Buffers', '', 'pH', ''], ['cycles', '', 'PCR', 'Cycles', 'How many']]),
       operations: rawSheet('operations', ['id', 'name', 'serviceCategory', 'description'], [['op1', 'PCR', 'Cloning', 'Amplify']]),
-      bundles: rawSheet('bundles', ['BundleName', 'Order', 'Operation'], [['Cloning', '1', 'PCR'], ['Cloning', '2', 'PCR']]),
+      bundles: rawSheet('bundles', ['id', 'BundleName', 'Order', 'Operation'], [['b1', 'Cloning', '1', 'PCR'], ['b1', 'Cloning', '2', 'PCR']]),
       sowSections: rawSheet('sowSections', ['id', 'sectionKey', 'name', 'text'], [['p1', 'terms', 'Default', 'Net 45.']])
     }
   };
@@ -170,7 +170,7 @@ describe('applyWorkbook — failures (rules 8, 20)', () => {
 
   it('shows the server’s own refusal on every row of the owner it refused (rule 20)', async () => {
     const clash = 'Saving "Buffers" would give "PCR" the same parameter id from two sets. Rename the parameter or remove one of the sets from those operations first.';
-    const raw: RawWorkbook = { ignoredSheets: [], sheets: { parameterList: rawSheet('parameterList', ['parameterSet', 'parameter', 'description'], [['Buffers', 'Volume', 'x'], ['Buffers', 'pH', '']]) } };
+    const raw: RawWorkbook = { ignoredSheets: [], sheets: { parameterList: rawSheet('parameterList', ['parameterId', 'parameterSet', 'parameter', 'description'], [['volume', 'Buffers', 'Volume', 'x'], ['', 'Buffers', 'pH', '']]) } };
     const { summary } = await run(raw, {}, { updateParameterSet: clash });
     expect(summary.rowErrors).toEqual({ 'parameterList:2': clash, 'parameterList:3': clash });
     expect(summary.sheets.parameterList).toEqual({ created: 0, updated: 0, skipped: 0, failed: 2 });

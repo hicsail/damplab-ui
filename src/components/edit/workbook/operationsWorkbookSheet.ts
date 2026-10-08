@@ -1,6 +1,6 @@
 import { OperationLike, PRICING_COLUMNS, PricingColumn, tierPrice } from '../operationsSheet';
 import { nearKey, normalizeEol, parseMoney, parseYesNo, sameList, yesNo } from './cells';
-import { matchRows } from './matching';
+import { matchRows, rowList } from './matching';
 import { CatalogCategory, CatalogOperation, CatalogSnapshot, Need, PlanRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
 /**
@@ -135,17 +135,74 @@ export interface OperationsWork {
   hides: Record<string, { id: string; name: string }>;
 }
 
-/** Operations this sheet creates: a blank-id row whose name no operation has, by name. */
-export function newOperationRowKeys(sheet: RawSheet | undefined, catalog: CatalogSnapshot): Map<string, string> {
-  const out = new Map<string, string>();
-  if (!sheet) return out;
-  const existing = new Set(catalog.operations.map((operation) => operation.name.trim()));
-  for (const row of sheet.rows) {
+/** An Operations row as another sheet's reference sees it: where it is, and what its id cell says. */
+export interface OperationRowRef {
+  rowKey: string;
+  rowNumber: number;
+  /** '' for a row that creates its operation. */
+  id: string;
+}
+
+/** Every Operations row under its name cell as uploaded — with an id or without, an error or not. */
+export function operationRowsByName(sheet: RawSheet | undefined): Map<string, OperationRowRef[]> {
+  const out = new Map<string, OperationRowRef[]>();
+  for (const row of sheet?.rows ?? []) {
     const name = row.cells.name ?? '';
-    if ((row.cells.id ?? '') !== '' || name === '' || existing.has(name) || out.has(name)) continue;
-    out.set(name, rowKey('operations', row.rowNumber));
+    if (name === '') continue;
+    out.set(name, [...(out.get(name) ?? []), { rowKey: rowKey('operations', row.rowNumber), rowNumber: row.rowNumber, id: row.cells.id ?? '' }]);
   }
   return out;
+}
+
+/** Said on a row that names an operation by a name a different stored operation holds; `untick` when nothing else holds the row back. */
+export interface ReferenceWarning {
+  text: string;
+  untick: boolean;
+}
+
+export type OperationReference =
+  /** An operation that exists. */
+  | { kind: 'existing'; operation: CatalogOperation; warning?: ReferenceWarning }
+  /** The operation this Operations row creates. */
+  | { kind: 'row'; rowKey: string; rowNumber: number; warning?: ReferenceWarning }
+  /** The rows of this upload cannot say which operation is meant. */
+  | { kind: 'error'; message: string }
+  /** No row carries the name, and this many (none, or two or more) stored operations do. */
+  | { kind: 'catalog'; count: number };
+
+/**
+ * Which operation a name on another sheet means. The rows of this upload come
+ * first: exactly one Operations row with that name is that row's operation —
+ * the stored one when the row has an id (so a renamed operation is found by its
+ * new name), the one the row creates when it has none; two or more cannot say
+ * which. Only a name no row carries is looked up among the stored operations.
+ *
+ * When a row settles the name while a *different* stored operation is the one
+ * currently called that, the reference comes with a warning for the rows that
+ * use it: they would write to another operation than the name means today.
+ * They are unticked by default too, unless the row creates its operation and
+ * the stored namesake has no row here — then they already wait for that
+ * create, which is itself unticked.
+ */
+export function resolveOperationName(name: string, operationRows: ReadonlyMap<string, ReadonlyArray<OperationRowRef>>, catalog: CatalogSnapshot): OperationReference {
+  const rows = operationRows.get(name) ?? [];
+  if (rows.length > 1) return { kind: 'error', message: `Rows ${rowList(rows.map((row) => row.rowNumber))} are both named “${name}” — rename one so this row can say which.` };
+  if (rows.length === 1) {
+    const [row] = rows;
+    const namesakes = catalog.operations.filter((candidate) => candidate.name.trim() === name && candidate.id !== row.id);
+    const renamedAway = namesakes.some((namesake) => [...operationRows].some(([other, others]) => other !== name && others.some((candidate) => candidate.id === namesake.id)));
+    const warning: ReferenceWarning | undefined =
+      namesakes.length === 0
+        ? undefined
+        : row.id === '' && !renamedAway
+          ? { text: `“${name}” means the new operation in row ${row.rowNumber}, not the existing operation named “${name}”.`, untick: false }
+          : { text: `“${name}” now means the operation in row ${row.rowNumber}, not the operation currently named “${name}”.`, untick: true };
+    if (row.id === '') return { kind: 'row', rowKey: row.rowKey, rowNumber: row.rowNumber, warning };
+    const operation = catalog.operations.find((candidate) => candidate.id === row.id);
+    return operation ? { kind: 'existing', operation, warning } : { kind: 'error', message: `Row ${row.rowNumber} is named “${name}”, but no operation has its id.` };
+  }
+  const stored = catalog.operations.filter((operation) => operation.name.trim() === name);
+  return stored.length === 1 ? { kind: 'existing', operation: stored[0] } : { kind: 'catalog', count: stored.length };
 }
 
 export function planOperations(
@@ -274,14 +331,15 @@ export function planOperations(
     const writes = action === 'create' || action === 'update';
     rows.push({
       key, sheet: 'operations', rowNumber: raw.rowNumber, label: cell('name') || existing?.name.trim() || cell('id'), action,
-      matchedByName: match.matchedByName && action !== 'skip', changed: writes ? changed : [], errors, warnings,
+      changed: writes ? changed : [], errors, warnings,
       selectedByDefault: writes && match.selectedByDefault, needs: writes ? needs : []
     });
   });
 
   if (ctx.hideMissing) {
     // "No sheet row matched" — a matched row with an error still mentions its operation.
-    // A name that matches any operation mentions all of them, even when it is ambiguous and the row errors.
+    // A row without an id creates an operation of its own, but its name still mentions every stored operation
+    // of that name: a hand-authored sheet (no ids) must never offer to hide the operations it lists.
     const mentioned = new Set(matches.map((match) => match.existingId).filter((id): id is string => id !== undefined));
     sheet.rows.forEach((raw) => {
       if ((raw.cells.id ?? '') !== '' || (raw.cells.name ?? '') === '') return;
@@ -291,7 +349,7 @@ export function planOperations(
       if (mentioned.has(operation.id) || operation.hiddenFromClients === true) continue;
       const key = `hide:${operation.id}`;
       work.hides[key] = { id: operation.id, name: operation.name.trim() };
-      rows.push({ key, sheet: 'operations', rowNumber: null, label: operation.name.trim(), action: 'hide', matchedByName: false, changed: ['hiddenFromClients'], errors: [], warnings: [], selectedByDefault: true, needs: [] });
+      rows.push({ key, sheet: 'operations', rowNumber: null, label: operation.name.trim(), action: 'hide', changed: ['hiddenFromClients'], errors: [], warnings: [], selectedByDefault: true, needs: [] });
     }
   }
 

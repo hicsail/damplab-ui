@@ -3,8 +3,9 @@ import { matchRows } from './matching';
 import { CatalogSnapshot, PlanRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
 /**
- * The `SOW Sections` sheet: one row per SOW text block. A block's name is only
- * unique inside its section, so rows are matched on sectionKey + name.
+ * The `SOW Sections` sheet: one row per SOW text block, matched by id. A
+ * block's name is only unique inside its section, so the name a new row is
+ * compared by (same name, near-duplicate) is sectionKey + name.
  *
  * `order` is written by the download and ignored by the upload: the create and
  * update mutations cannot set it, and it is changed by dragging in the editor.
@@ -77,7 +78,7 @@ export function planSowSections(sheet: RawSheet, catalog: CatalogSnapshot): Shee
     const writes = action === 'create' || action === 'update';
     rows.push({
       key, sheet: 'sowSections', rowNumber: raw.rowNumber, label: fullName(cell('sectionKey') || existing?.sectionKey || '', cell('name') || existing?.name.trim() || ''), action,
-      matchedByName: match.matchedByName && action !== 'skip', changed: writes ? changed : [], errors, warnings, selectedByDefault: writes && match.selectedByDefault, needs: []
+      changed: writes ? changed : [], errors, warnings, selectedByDefault: writes && match.selectedByDefault, needs: []
     });
   });
 

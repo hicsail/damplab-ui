@@ -16,7 +16,9 @@ describe('canonicalColumn', () => {
     expect(canonicalColumn('operations', 'serviceCategoryNumber')).toBeNull();
     expect(canonicalColumn('operations', 'Notes')).toBeNull();
     expect(canonicalColumn('bundles', 'bundle name')).toBe('BundleName');
-    expect(canonicalColumn('parameterList', 'conditionalDisplayLogic')).toBeNull();
+    expect(canonicalColumn('parameterList', 'conditionalDisplayLogic')).toBe('conditionalDisplayLogic');
+    expect(canonicalColumn('parameterList', 'Conditional Display Logic')).toBe('conditionalDisplayLogic');
+    expect(canonicalColumn('parameterList', 'technicianVisibility')).toBeNull();
     expect(canonicalColumn('parameterList', 'parameterSet1')).toBeNull();
     expect(canonicalColumn('operations', '')).toBeNull();
   });
@@ -63,11 +65,12 @@ describe('readWorkbook (rule 8: recognised sheets, ignored sheets and columns)',
       ]
     }));
     const sheet = raw.sheets.parameterList!;
-    expect(sheet.columns).toEqual(['parameterSet', 'parameter', 'required']);
-    expect(sheet.ignoredColumns).toEqual(['Notes', 'conditionalDisplayLogic', 'technicianVisibility']);
+    // conditionalDisplayLogic is a column of the sheet now; technicianVisibility and Notes still are not.
+    expect(sheet.columns).toEqual(['parameterSet', 'parameter', 'required', 'conditionalDisplayLogic']);
+    expect(sheet.ignoredColumns).toEqual(['Notes', 'technicianVisibility']);
     expect(sheet.rows).toEqual([
-      { rowNumber: 2, cells: { parameterSet: 'Buffers', parameter: 'Volume', required: 'true' } },
-      { rowNumber: 4, cells: { parameterSet: 'Buffers', parameter: 'pH', required: 'N' } }
+      { rowNumber: 2, cells: { parameterSet: 'Buffers', parameter: 'Volume', required: 'true', conditionalDisplayLogic: 'y' } },
+      { rowNumber: 4, cells: { parameterSet: 'Buffers', parameter: 'pH', required: 'N', conditionalDisplayLogic: '' } }
     ]);
   });
 
