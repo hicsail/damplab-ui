@@ -22,6 +22,7 @@
     "date-fns": "^4.1.0",
     "deep-chat-react": "^2.4.2",
     "diff": "^7.0.0",
+    "exceljs": "^4.4.0",
     "formik": "^2.4.6",
     "graphql": "^16.10.0",
     "isbot": "^5",
