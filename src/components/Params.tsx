@@ -434,12 +434,22 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                 );
               }
               if (param.type === "table") {
+                const { columns, rows } = param.tableData ?? {};
+                if (!Array.isArray(columns) || !Array.isArray(rows)) {
+                  return (
+                    <div key={param.id}>
+                      <Typography sx={{ mt: 3 }}>{param.name}</Typography>
+                      <FormHelperText>This table has not been set up yet.</FormHelperText>
+                      {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
+                    </div>
+                  );
+                }
                 return (
                   <div key={param.id}>
                     <ParamTableOnForm
                       title={param.name}
-                      columns={param.tableData.columns}
-                      rows={param.tableData.rows}
+                      columns={columns}
+                      rows={rows}
                     />
                   </div>
                 );

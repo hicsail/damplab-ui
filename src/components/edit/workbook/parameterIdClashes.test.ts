@@ -12,7 +12,6 @@ const catalog = catalogOf({
 });
 const options = { allowPricing: true, hideMissing: false };
 const book = (sheets: RawWorkbook['sheets']): RawWorkbook => ({ ignoredSheets: [], sheets });
-const CLASH = 'Parameter id "cycles" is in both "PCR" and "Buffers".';
 
 const recorder = () => {
   const calls: Array<[string, ...unknown[]]> = [];
@@ -39,29 +38,32 @@ const apply = async (raw: RawWorkbook, planCatalog = catalog, applyCatalog = pla
   return { plan, summary, ...rec };
 };
 
-describe('planning refuses a new set parameter that takes an id its operation already has (unseeded case 3)', () => {
+// Until the set-clash fix this row was refused (`Parameter id "cycles" is in both "PCR" and "Buffers".`). Its id is
+// now minted clear of the own parameters of the operations that use the set, like any other id it would share an
+// operation with; the refusal remains for what the plan could not know (see the last describe).
+describe('a new set parameter never takes an id its operation already has (unseeded case 3)', () => {
   const raw = book({ parameterList: rawSheet('parameterList', ['parameterSet', 'parameter', 'type'], [['Buffers', 'Cycles', 'Number'], ['Buffers', 'Temperature', 'Number']]) });
 
-  it('is an error on that row only', () => {
+  it('is no error: both rows are creates', () => {
     const rows = allRows(planWorkbook(raw, catalog, options));
-    expect(rows[0]).toMatchObject({ action: 'skip', errors: [CLASH], selectedByDefault: false });
+    expect(rows[0]).toMatchObject({ action: 'create', errors: [] });
     expect(rows[1]).toMatchObject({ action: 'create', errors: [] });
   });
 
-  it('applies the clean row and reports nothing about the refused one as written', async () => {
+  it('is written with the next free id', async () => {
     const { calls, summary } = await apply(raw);
-    expect(calls.find((c) => c[0] === 'updateParameterSet')![2]).toMatchObject({ parameters: [{ id: 'volume' }, { id: 'temperature' }] });
-    expect(summary.sheets.parameterList).toMatchObject({ created: 1, failed: 0 });
+    expect(calls.find((c) => c[0] === 'updateParameterSet')![2]).toMatchObject({ parameters: [{ id: 'volume' }, { id: 'cycles_2', name: 'Cycles' }, { id: 'temperature' }] });
+    expect(summary.sheets.parameterList).toMatchObject({ created: 2, failed: 0 });
   });
 
-  it('also sees a set this upload creates, once an operation row puts the operation on it', () => {
-    const rows = allRows(planWorkbook(book({
+  it('also in a set this upload creates, once an operation row puts the operation on it', async () => {
+    const { plan, calls, summary } = await apply(book({
       parameterList: rawSheet('parameterList', ['parameterSet', 'parameter'], [['Fresh', 'Cycles']]),
       operations: rawSheet('operations', ['id', 'parameterSet1', 'parameterSet2'], [['op1', 'Buffers', 'Fresh']])
-    }), catalog, options));
-    expect(rows.find((r) => r.key === 'parameterList:2')).toMatchObject({ action: 'skip', errors: ['Parameter id "cycles" is in both "PCR" and "Fresh".'] });
-    // The operation row that needs the set then cannot be applied either: its provider is not applicable.
-    expect(rows.find((r) => r.key === 'operations:2')!.needs).toEqual([{ what: 'parameter set “Fresh”', anyOf: ['parameterList:2'] }]);
+    }));
+    expect(allRows(plan).flatMap((r) => r.errors)).toEqual([]);
+    expect(calls.find((c) => c[0] === 'createParameterSet')![1]).toMatchObject({ name: 'Fresh', parameters: [{ id: 'cycles_2', name: 'Cycles' }] });
+    expect(summary.rowErrors).toEqual({});
   });
 
   it('leaves a collision that is already stored alone', () => {

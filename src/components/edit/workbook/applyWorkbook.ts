@@ -1,7 +1,7 @@
 import { formatGqlError } from '../../../utils/gqlError';
 import { findIdClashes } from './parameterIdClashes';
 import { categoryWrites } from './operationsWorkbookSheet';
-import { OwnerWork, resolveOwnerParameters } from './parameterListSheet';
+import { OwnerWork, resolveOwnerParameters, setReservations } from './parameterListSheet';
 import { allRows, sheetPlans, WorkbookPlan } from './planWorkbook';
 import { CatalogSet, CatalogSnapshot, isApplicable, LOG_ENTITY_TYPE, SHEET_TITLES, SheetKey } from './types';
 
@@ -72,9 +72,10 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   const total = [...rowsByKey.keys()].filter(wanted).length;
   const done = new Set<string>();
   const rowErrors: Record<string, string> = {};
-  // Rule 20 once more, for the rows actually ticked: unticking a row can change the ids minted for the rows after it.
+  // Rule 20 once more, for the rows actually ticked: unticking a row can change the ids minted for the rows after it,
+  // and the catalog may hold ids it did not when the plan was made.
   const clashes = findIdClashes(plan, catalog, new Set([...rowsByKey.keys()].filter(wanted)));
-  /** wanted, and not refused for taking an id its operation already has. */
+  /** wanted, and not refused for giving an operation one parameter id twice. */
   const usable = (key: string): boolean => wanted(key) && !(key in clashes);
   const errors: string[] = [];
   const snapshots: Record<SheetKey, Snapshot[]> = { operations: [], parameterList: [], bundles: [], sowSections: [] };
@@ -133,6 +134,9 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   //    still to be written goes after it. A ring of such sets cannot be ordered: those go in sheet order,
   //    and the rows left without what they need say so.
   const pendingSets: OwnerWork[] = owners.filter((owner) => owner.kind === 'set');
+  // Ids are minted for the rows being applied, as the plan mints them: clear of the sets that share an operation.
+  // Worked out up front and in sheet order, because the sets below are not always written in that order.
+  const setReserved = setReservations(owners, new Set([...rowsByKey.keys()].filter(usable)));
   while (pendingSets.length > 0) {
     const ownerOfRow = (key: string): OwnerWork | undefined => pendingSets.find((other) => other.entries.some((entry) => entry.rowKey === key));
     const waits = (candidate: OwnerWork): boolean =>
@@ -143,7 +147,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
     const ready = readyTogether(owner.entries.map((entry) => entry.rowKey).filter(usable));
     if (ready.length === 0) continue;
     // Conditions are resolved here, against what was actually written: the ids the plan showed can differ once rows are unticked.
-    const built = resolveOwnerParameters(owner, new Set(ready), owner.reservedIds, resultSets, owners);
+    const built = resolveOwnerParameters(owner, new Set(ready), setReserved.get(owner) ?? owner.reservedIds, resultSets, owners);
     for (const [key, text] of Object.entries(built.failed)) settle([key], `conditionalDisplayLogic: ${text}`);
     const keys = ready.filter((key) => !(key in built.failed));
     if (keys.length === 0) continue;

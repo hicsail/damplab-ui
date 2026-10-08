@@ -189,3 +189,23 @@ describe('Params — rule 15 through the form (show-only-if)', () => {
     expect(savedFormData().find((e) => e.id === 'lysis').value).toBe('beads');
   });
 });
+
+describe('Params — a Table parameter with no template', () => {
+  it('renders its name and a helper line instead of crashing, and leaves the other fields usable', () => {
+    const defs = [
+      { id: 'grid', name: 'Plate layout', type: 'table', tableData: null },
+      { id: 'label', name: 'Sample label', type: 'string' }
+    ];
+    const formData = defs.map((d) => ({ id: d.id, nodeId: 'n1', name: d.name, type: d.type, options: null, paramType: 'input', value: d.type === 'string' ? 'S1' : null, required: false, tableData: null }));
+    const markup = renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData } } as any} />
+      </CanvasContext.Provider>
+    );
+    expect(text(markup)).toContain('Plate layout');
+    expect(text(markup)).toContain('This table has not been set up yet.');
+    expect(text(markup)).toContain('Sample label');
+    expect(markup).toContain('value="S1"');
+    expect(markup).not.toContain('<table');
+  });
+});
