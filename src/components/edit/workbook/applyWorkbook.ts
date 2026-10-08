@@ -187,7 +187,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   //    to leave it are still listed in it. The category is never reported as saved.
   const categoryFailure = (label: string, joining: ReadonlySet<string>, leaving: ReadonlySet<string>, error: unknown): void => {
     const reason = formatGqlError(error).replace(/[\s.]+$/, '');
-    const namesFor = (ids: ReadonlySet<string>): string[] => [...new Set(moves.filter((move) => ids.has(move.operationId)).map((move) => `“${move.operationName}”`))];
+    const namesFor = (ids: ReadonlySet<string>): string[] => [...new Map(moves.filter((move) => ids.has(move.operationId)).map((move) => [move.operationId, `“${move.operationName}”`] as const)).values()];
     const sentence = (names: string[], one: string, many: string): string => (names.length === 0 ? '' : names.length === 1 ? ` Operation ${names[0]} ${one}.` : ` Operations ${names.join(', ')} ${many}.`);
     errors.push(
       `Category “${label}” could not be saved: ${reason}.` +

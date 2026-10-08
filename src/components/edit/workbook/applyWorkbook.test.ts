@@ -189,11 +189,9 @@ describe('applyWorkbook — failures (rules 8, 20)', () => {
 
   it('M2/F24: a failed category write is reported by operation and category; the written operation still counts, as the upload log has it', async () => {
     const { summary, plan } = await run(chained, {}, { createCategory: 'boom' });
-    const operationRow = plan.operations!.rows[0].key;
     expect(summary.rowErrors).toEqual({});
     expect(summary.errors).toEqual([`Category “Sequencing” could not be saved: boom. Operation “${plan.operations!.rows[0].label}” was saved but is not in it.`]);
     expect(summary.sheets.operations).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0 });
-    expect(summary.rowErrors[operationRow]).toBeUndefined();
     // The operation itself was written, so the rows that depend on it still went ahead.
     expect(summary.sheets.bundles).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0 });
   });
@@ -212,6 +210,20 @@ describe('applyWorkbook — failures (rules 8, 20)', () => {
     const raw: RawWorkbook = { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['id', 'name', 'serviceCategory'], [['', 'Alpha', 'Fresh'], ['', 'Beta', 'Fresh']]) } };
     const { summary } = await run(raw, {}, { createCategory: 'boom' });
     expect(summary.errors).toEqual(['Category “Fresh” could not be saved: boom. Operations “Alpha”, “Beta” were saved but are not in it.']);
+  });
+
+  it('F29: two operations sharing a name are both listed, each once', async () => {
+    const twins = catalogOf({
+      operations: [
+        { id: 't1', name: 'Twin', hiddenFromClients: false, parameterSetIds: [], ownParameters: [] } as any,
+        { id: 't2', name: 'Twin', hiddenFromClients: false, parameterSetIds: [], ownParameters: [] } as any
+      ],
+      sets: [], categories: [], bundles: [], sowPresets: [], sowSectionKeys: []
+    });
+    const raw: RawWorkbook = { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['id', 'name', 'serviceCategory'], [['t1', 'Twin', 'Fresh'], ['t2', 'Twin', 'Fresh']]) } };
+    const plan = planWorkbook(raw, twins, { allowPricing: true, hideMissing: false });
+    const summary = await applyWorkbook(plan, tickedKeys(plan, {}), twins, recorder({ createCategory: 'boom' }).mutator, meta);
+    expect(summary.errors).toEqual(['Category “Fresh” could not be saved: boom. Operations “Twin”, “Twin” were saved but are not in it.']);
   });
 
   it('M2/F24: a failed category write is never reported as if the category had been saved', async () => {
