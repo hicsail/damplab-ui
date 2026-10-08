@@ -10,6 +10,7 @@ const catalog = catalogOf({
     { id: 'p3', sectionKey: 'invoiceProcedures', name: 'Default', text: '', order: 1000 }
   ]
 });
+const SAME_NAME = 'Same name as an existing SOW text block — this row creates a second one. Add the id to update it instead.';
 const plan = (columns: string[], rows: string[][]) => planSowSections(rawSheet('sowSections', columns, rows), catalog);
 
 describe('SOW Sections — download rows (rule 33)', () => {
@@ -24,17 +25,25 @@ describe('SOW Sections — download rows (rule 33)', () => {
 });
 
 describe('SOW Sections — upload (rules 2, 3, 5, 33)', () => {
-  it('a downloaded sheet uploaded unchanged is all "unchanged", with and without ids', () => {
+  it('a downloaded sheet uploaded unchanged is all "unchanged" with its ids; without them each block would be created a second time', () => {
     const [header, ...rows] = sowSectionsExportRows(catalog);
     const asText = rows.map((r) => r.map(String));
     expect(plan(header.map(String), asText).rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged']);
-    expect(plan(header.map(String).slice(1), asText.map((r) => r.slice(1))).rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged']);
+    const idless = plan(header.map(String).slice(1), asText.map((r) => r.slice(1)));
+    expect(idless.rows.map((r) => [r.action, r.warnings, r.selectedByDefault])).toEqual(Array(3).fill(['create', [SAME_NAME], false]));
   });
 
-  it('matches by sectionKey + name, so two sections may each have a "Default"', () => {
-    const result = plan(['sectionKey', 'name', 'text'], [['invoiceProcedures', 'Default', 'Invoices are sent monthly.']]);
-    expect(result.rows[0]).toMatchObject({ action: 'update', matchedByName: true, changed: ['text'], label: 'invoiceProcedures › Default' });
+  it('updates the block its id gives', () => {
+    const result = plan(['id', 'sectionKey', 'name', 'text'], [['p3', 'invoiceProcedures', 'Default', 'Invoices are sent monthly.']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['text'], label: 'invoiceProcedures › Default' });
     expect(result.work.rows['sowSections:2']).toEqual({ existingId: 'p3', changes: { text: 'Invoices are sent monthly.' }, before: { text: '' } });
+  });
+
+  it('a row without an id never updates: a name is "the same" only inside its section, where it warns and is unticked', () => {
+    const result = plan(['sectionKey', 'name', 'text'], [['invoiceProcedures', 'Default', 'Invoices are sent monthly.'], ['invoiceProcedures', 'Net-60', 'Net 60.']]);
+    expect(result.rows[0]).toMatchObject({ action: 'create', errors: [], warnings: [SAME_NAME], selectedByDefault: false });
+    expect(result.work.rows['sowSections:2']).toEqual({ create: { sectionKey: 'invoiceProcedures', name: 'Default', text: 'Invoices are sent monthly.' } });
+    expect(result.rows[1]).toMatchObject({ action: 'create', warnings: [], selectedByDefault: true });
   });
 
   it('creates a block in a known section', () => {

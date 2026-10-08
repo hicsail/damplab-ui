@@ -21,12 +21,13 @@ const catalog = catalogOf({
     { id: 'op3', name: 'Gel', hiddenFromClients: false, parameterSetIds: ['setB'], ownParameters: [] } as any
   ]
 });
-const LIST = ['parameterSet', 'operation', 'parameter', 'type', 'options', 'conditionalDisplayLogic'];
+/** `parameterId` is last so a row that creates its parameter can leave it off; a row that updates one gives it as a seventh cell. */
+const LIST = ['parameterSet', 'operation', 'parameter', 'type', 'options', 'conditionalDisplayLogic', 'parameterId'];
 const book = (rows: string[][], operations?: string[][]): RawWorkbook => ({
   ignoredSheets: [],
   sheets: {
     parameterList: rawSheet('parameterList', LIST, rows),
-    ...(operations ? { operations: rawSheet('operations', ['name', 'parameterSet1', 'parameterSet2'], operations) } : {})
+    ...(operations ? { operations: rawSheet('operations', ['id', 'name', 'parameterSet1', 'parameterSet2'], operations) } : {})
   }
 });
 const planOf = (raw: RawWorkbook) => planWorkbook(raw, catalog, { allowPricing: true, hideMissing: false });
@@ -68,7 +69,7 @@ describe('planning: the catalog as this upload would leave it (rule 27)', () => 
 
   it('a condition can name an option another row adds, and needs that row', () => {
     const rows = rowsOf(book([
-      ['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria; Yeast; Fungi', ''],
+      ['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria; Yeast; Fungi', '', 'sample_type'],
       ['Extraction', '', 'Spore prep', 'Text', '', '"Sample Type"=="Fungi"']
     ]));
     expect(rows['parameterList:3']).toMatchObject({ action: 'create', errors: [], needs: [{ what: 'an option of “Sample Type” this condition names', anyOf: ['parameterList:2'] }] });
@@ -76,7 +77,7 @@ describe('planning: the catalog as this upload would leave it (rule 27)', () => 
 
   it('a condition that names only what is already stored needs nothing, even when its controller’s row changes something else', () => {
     const rows = rowsOf(book([
-      ['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria; Yeast; Fungi', ''],
+      ['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria; Yeast; Fungi', '', 'sample_type'],
       ['Extraction', '', 'Spore prep', 'Text', '', '"Sample Type"=="Yeast"']
     ]));
     expect(rows['parameterList:3']).toMatchObject({ action: 'create', errors: [], needs: [] });
@@ -98,7 +99,7 @@ describe('planning: the catalog as this upload would leave it (rule 27)', () => 
       ['Extraction', '', 'Bead material', 'Text', '', '"Bead size">0.5']
     ]));
     expect(rows['parameterList:2'].errors).toEqual(['Unknown type “Sphere”.']);
-    expect(rows['parameterList:3']).toMatchObject({ action: 'skip', errors: ['conditionalDisplayLogic: No parameter is named “Bead size” here.'] });
+    expect(rows['parameterList:3']).toMatchObject({ action: 'skip', errors: ['conditionalDisplayLogic: Row 2, which would create “Bead size”, has an error.'] });
   });
 
   it('a row refused for its condition creates nothing either: the refusal carries to the rows that name it', () => {
@@ -108,7 +109,7 @@ describe('planning: the catalog as this upload would leave it (rule 27)', () => 
       ['Extraction', '', 'Wash', 'Text', '', '"Sample Type"=="Yeast"']
     ]));
     expect(rows['parameterList:2'].errors).toEqual(['conditionalDisplayLogic: No parameter is named “Nowhere” here.']);
-    expect(rows['parameterList:3'].errors).toEqual(['conditionalDisplayLogic: No parameter is named “Bead size” here.']);
+    expect(rows['parameterList:3'].errors).toEqual(['conditionalDisplayLogic: Row 2, which would create “Bead size”, has an error.']);
     expect(rows['parameterList:4']).toMatchObject({ action: 'create', errors: [] });
   });
 
@@ -119,14 +120,14 @@ describe('planning: the catalog as this upload would leave it (rule 27)', () => 
     ]));
     expect(rows['parameterList:3'].errors).toEqual(['conditionalDisplayLogic: This condition would form a loop: the parameter it depends on depends, in turn, on this one.']);
     // With B refused, A names a parameter that will not exist.
-    expect(rows['parameterList:2'].errors).toEqual(['conditionalDisplayLogic: No parameter is named “B” here.']);
+    expect(rows['parameterList:2'].errors).toEqual(['conditionalDisplayLogic: Row 3, which would create “B”, has an error.']);
   });
 
   it('a loop that spans two sets is refused when planned — on the later row — not discovered at import', async () => {
     // Each set gets a new condition naming the other set's existing parameter.
     const raw = book([
-      ['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria; Yeast', '"Buffers"."Volume">5'],
-      ['Buffers', '', 'Volume', 'Number', '', '"Extraction"."Sample Type"=="Yeast"']
+      ['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria; Yeast', '"Buffers"."Volume">5', 'sample_type'],
+      ['Buffers', '', 'Volume', 'Number', '', '"Extraction"."Sample Type"=="Yeast"', 'volume']
     ]);
     const rows = rowsOf(raw);
     expect(rows['parameterList:2']).toMatchObject({ action: 'update', errors: [] });
@@ -153,7 +154,7 @@ describe('planning: warnings (rule 29)', () => {
   });
 
   it('counts the sets each operation would have after this upload', () => {
-    const rows = rowsOf(book([['Extraction', '', 'Wash', 'Text', '', '"Buffers"."Volume">5']], [['Miniprep', 'Extraction', 'Buffers'], ['Gel', 'Extraction', '']]));
+    const rows = rowsOf(book([['Extraction', '', 'Wash', 'Text', '', '"Buffers"."Volume">5']], [['op2', 'Miniprep', 'Extraction', 'Buffers'], ['op3', 'Gel', 'Extraction', '']]));
     expect(rows['parameterList:2'].warnings).toEqual(['“Gel” uses “Extraction” without “Buffers”: there this parameter is always shown.']);
   });
 
@@ -176,7 +177,7 @@ describe('planning: warnings (rule 29)', () => {
   });
 
   it('dropping (or renaming) an option that a condition elsewhere names warns on the row that drops it, naming those parameters', () => {
-    const rows = rowsOf(book([['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria; Yeasts', '']]));
+    const rows = rowsOf(book([['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria; Yeasts', '', 'sample_type']]));
     expect(rows['parameterList:2']).toMatchObject({
       action: 'update',
       errors: [],
@@ -185,12 +186,12 @@ describe('planning: warnings (rule 29)', () => {
   });
 
   it('no such warning when the option stays, or when the same upload re-points the condition', () => {
-    const kept = rowsOf(book([['Extraction', '', 'Sample Type', 'Dropdown', 'Yeast; Bacteria; Fungi', '']]));
+    const kept = rowsOf(book([['Extraction', '', 'Sample Type', 'Dropdown', 'Yeast; Bacteria; Fungi', '', 'sample_type']]));
     expect(kept['parameterList:2'].warnings).toEqual([]);
     const repointed = rowsOf(book([
-      ['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria', ''],
-      ['Extraction', '', 'Lysis', 'Text', '', '"Sample Type"=="Bacteria"'],
-      ['', 'PCR', 'Cycles', 'Number', '', '']
+      ['Extraction', '', 'Sample Type', 'Dropdown', 'Bacteria', '', 'sample_type'],
+      ['Extraction', '', 'Lysis', 'Text', '', '"Sample Type"=="Bacteria"', 'lysis'],
+      ['', 'PCR', 'Cycles', 'Number', '', '', 'cycles']
     ]));
     expect(repointed['parameterList:2'].warnings).toEqual(['Option “Yeast” will be removed']);
     expect(repointed['parameterList:4']).toMatchObject({ action: 'update', warnings: ['The conditionalDisplayLogic cell is blank: the condition will be removed.'] });
@@ -280,12 +281,12 @@ describe('applying: conditions are written with the ids the upload produced (rul
       ['Beta', '', 'B', 'Text', '', '"Alpha"."A"=="x"']
     ]));
     expect(rows['parameterList:3'].errors).toEqual(['conditionalDisplayLogic: This condition would form a loop: the parameter it depends on depends, in turn, on this one.']);
-    // With B refused, the set "Beta" is not created, so A names a set that will not exist.
-    expect(rows['parameterList:2'].errors).toEqual(['conditionalDisplayLogic: No parameter set is named “Beta”.']);
+    // With B refused, nothing creates the parameter A names (nor the set "Beta").
+    expect(rows['parameterList:2'].errors).toEqual(['conditionalDisplayLogic: Row 3, which would create “B”, has an error.']);
   });
 
   it('an unchanged condition is not rewritten: a row that changes another cell keeps the stored tree', async () => {
-    const { calls } = await run(book([['Extraction', '', 'Lysis', 'Number', '', '"Sample Type"=="Yeast"']]));
+    const { calls } = await run(book([['Extraction', '', 'Lysis', 'Number', '', '"Sample Type"=="Yeast"', 'lysis']]));
     expect(byId((calls[0][2] as any).parameters, 'lysis')).toEqual({ id: 'lysis', name: 'Lysis', type: 'number', showIf: { parameterId: 'sample_type', op: 'eq', optionIds: ['yeast'] } });
   });
 });

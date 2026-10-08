@@ -1,8 +1,9 @@
 import { makeUniqueIds } from '../../../utils/idFromName';
 import { effectiveValidation, parseValidation } from '../../../utils/parameterValidation';
-import { ConditionAst, ConditionScope, conditionText, parseCondition, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
+import { ConditionAst, ConditionScope, conditionText, looseKey, named, parseCondition, RefAst, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
 import { nearKey, normalizeEol, parseYesNo, sameList, splitList, yesNo } from './cells';
-import { matchRows } from './matching';
+import { matchRows, rowList } from './matching';
+import { OperationRowRef, resolveOperationName } from './operationsWorkbookSheet';
 import { CatalogSet, CatalogSnapshot, Need, PlanRow, RawRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
 /**
@@ -273,13 +274,25 @@ export interface ParameterEntry {
   condition?: ConditionAst;
 }
 
+/** A Parameter List row as a condition's reference sees it: where it is, its id cell and its name cell. */
+export interface OwnerRow {
+  rowKey: string;
+  rowNumber: number;
+  /** '' for a row that creates its parameter. */
+  id: string;
+  /** The `parameter` cell as uploaded; '' when blank or when the sheet has no such column. */
+  name: string;
+}
+
 export interface OwnerWork {
   kind: 'set' | 'operation';
   name: string;
   /** Absent for a set this upload creates, and for an operation this upload creates. */
   existingId?: string;
-  /** The Operations row that creates the owning operation, when it does not exist yet. */
+  /** The Operations row that creates the owning operation, when that row is the operation meant. */
   operationRowKey?: string;
+  /** Every row of the sheet under this owner — applied or not, an error or not. A condition's names are looked up here first. */
+  rows: OwnerRow[];
   /** The owner's parameters as stored. */
   stored: any[];
   /** Ids a minted id must also avoid: for an operation, its parameter sets' parameter ids. */
@@ -307,7 +320,7 @@ export function newSetRowKeys(sheet: RawSheet | undefined, catalog: CatalogSnaps
 export function planParameterList(
   sheet: RawSheet,
   catalog: CatalogSnapshot,
-  ctx: { newOperationRows: ReadonlyMap<string, string>; /** Absent: every operation keeps the sets it has. */ operationSets?: ReadonlyArray<OperationSets> }
+  ctx: { operationRows: ReadonlyMap<string, ReadonlyArray<OperationRowRef>>; /** Absent: every operation keeps the sets it has. */ operationSets?: ReadonlyArray<OperationSets> }
 ): SheetPlan<ParameterListWork> {
   const dataColumns = sheet.columns.filter((column) => !OWNER_COLUMNS.has(column));
   const planned = new Map<number, PlanRow>();
@@ -321,7 +334,7 @@ export function planParameterList(
     if ((set === '') === (operation === '')) {
       planned.set(raw.rowNumber, {
         key: rowKey('parameterList', raw.rowNumber), sheet: 'parameterList', rowNumber: raw.rowNumber, label: labelOf(set || operation || '?', raw),
-        action: 'skip', matchedByName: false, changed: [], errors: ['Fill exactly one of parameterSet / operation.'], warnings: [], selectedByDefault: false, needs: []
+        action: 'skip', changed: [], errors: ['Fill exactly one of parameterSet / operation.'], warnings: [], selectedByDefault: false, needs: []
       });
       continue;
     }
@@ -336,7 +349,10 @@ export function planParameterList(
     const ownerErrors: string[] = [];
     const ownerWarnings: string[] = [];
     const needs: Need[] = [];
-    const owner: OwnerWork = { kind: group.kind, name: group.name, stored: [], reservedIds: [], entries: [] };
+    const owner: OwnerWork = {
+      kind: group.kind, name: group.name, stored: [], reservedIds: [], entries: [],
+      rows: group.rows.map((raw) => ({ rowKey: rowKey('parameterList', raw.rowNumber), rowNumber: raw.rowNumber, id: raw.cells.parameterId ?? '', name: raw.cells.parameter ?? '' }))
+    };
     let tickedByDefault = true;
 
     if (group.kind === 'set') {
@@ -356,17 +372,19 @@ export function planParameterList(
         }
       }
     } else {
-      const matches = catalog.operations.filter((o) => o.name.trim() === group.name);
-      if (matches.length === 1) {
-        owner.existingId = matches[0].id;
-        owner.stored = matches[0].ownParameters;
-        const setIds = new Set(matches[0].parameterSetIds);
+      const found = resolveOperationName(group.name, ctx.operationRows, catalog);
+      if (found.kind === 'existing') {
+        owner.existingId = found.operation.id;
+        owner.stored = found.operation.ownParameters;
+        const setIds = new Set(found.operation.parameterSetIds);
         owner.reservedIds = catalog.sets.filter((s) => setIds.has(s.id)).flatMap((s) => s.parameters.map((p) => String(p?.id ?? '')));
-      } else if (matches.length > 1) {
-        ownerErrors.push(`${matches.length} operations are named “${group.name}” — its parameters cannot say which.`);
-      } else if (ctx.newOperationRows.has(group.name)) {
-        owner.operationRowKey = ctx.newOperationRows.get(group.name);
-        needs.push({ what: `operation “${group.name}”`, anyOf: [owner.operationRowKey!] });
+      } else if (found.kind === 'row') {
+        owner.operationRowKey = found.rowKey;
+        needs.push({ what: `operation “${group.name}”`, anyOf: [found.rowKey] });
+      } else if (found.kind === 'error') {
+        ownerErrors.push(found.message);
+      } else if (found.count > 1) {
+        ownerErrors.push(`${found.count} operations are named “${group.name}” — its parameters cannot say which.`);
       } else {
         ownerErrors.push(`No operation named “${group.name}”.`);
       }
@@ -411,7 +429,7 @@ export function planParameterList(
       const writes = action === 'create' || action === 'update';
       planned.set(raw.rowNumber, {
         key, sheet: 'parameterList', rowNumber: raw.rowNumber, label: labelOf(group.name, raw), action,
-        matchedByName: match.matchedByName && action !== 'skip', changed: writes ? changed : [], errors, warnings,
+        changed: writes ? changed : [], errors, warnings,
         selectedByDefault: writes && match.selectedByDefault && tickedByDefault, needs: writes ? needs : []
       });
     });
@@ -432,13 +450,85 @@ function refuseRow(row: PlanRow, error: string): void {
   row.changed = [];
   row.selectedByDefault = false;
   row.needs = [];
-  row.matchedByName = false;
 }
 
 /** The id a set this upload creates stands under until it is written and has a real one. */
 const newSetId = (name: string): string => `new:${name}`;
 const ownerSetId = (owner: OwnerWork): string | undefined => (owner.kind === 'set' ? owner.existingId ?? newSetId(owner.name) : undefined);
 const idOfParam = (parameter: any): string => String(parameter?.id ?? '');
+
+/** The owner whose rows hold this set's parameters. A set this upload creates is known by its name until it has an id. */
+const ownerOfSet = (owners: ReadonlyArray<OwnerWork>, set: { id: string; name: string }): OwnerWork | undefined =>
+  owners.find((owner) => owner.kind === 'set' && (owner.existingId !== undefined ? owner.existingId === set.id : owner.name === String(set.name ?? '').trim()));
+
+/** A name no condition can write: what a stored parameter is listed under while a row of this upload carries its name. */
+const SHADOWED = '\u0000';
+
+/**
+ * An owner's parameters under the names a condition finds them by. The rows of
+ * this upload come first, whether or not they are applied:
+ *
+ * - a parameter a row gives by id is listed under that row's name cell, so a
+ *   renamed parameter is found by its new name and not by its old one;
+ * - a stored parameter no row gives by id is hidden while a row carries its
+ *   name. That row's parameter is the one meant — the one it creates — and if
+ *   the row is not applied the name finds nothing: it never falls back to the
+ *   stored parameter.
+ *
+ * Everything but `name` is as in `parameters`, in the same order.
+ */
+function parametersAsNamed(owner: OwnerWork | undefined, parameters: ReadonlyArray<any>): any[] {
+  const rows = (owner?.rows ?? []).filter((row) => row.name !== '');
+  if (rows.length === 0) return [...parameters];
+  const nameById = new Map<string, string>();
+  for (const row of rows) if (row.id !== '' && !nameById.has(row.id)) nameById.set(row.id, row.name);
+  const carried = new Set(rows.map((row) => looseKey(row.name)));
+  const storedIds = new Set(owner!.stored.map(idOfParam));
+  return parameters.map((parameter) => {
+    const id = idOfParam(parameter);
+    if (nameById.has(id)) return { ...parameter, name: nameById.get(id) };
+    return storedIds.has(id) && carried.has(looseKey(parameter?.name)) ? { ...parameter, name: SHADOWED } : parameter;
+  });
+}
+
+/** Where a condition of this owner is resolved: the scope it lives in, with every list under the names of `parametersAsNamed`. */
+function namedScope(owner: OwnerWork, owners: ReadonlyArray<OwnerWork>, parameters: ReadonlyArray<any>, carrierIndex: number, sets: ReadonlyArray<CatalogSet>): ConditionScope {
+  return {
+    list: parametersAsNamed(owner, parameters),
+    carrierIndex,
+    setId: ownerSetId(owner),
+    sets: sets.map((set) => ({ ...set, parameters: parametersAsNamed(ownerOfSet(owners, set), set.parameters) }))
+  };
+}
+
+const refsIn = (condition: ConditionAst, out: RefAst[] = []): RefAst[] => {
+  if ('all' in condition) for (const child of condition.all) refsIn(child, out);
+  else if ('any' in condition) for (const child of condition.any) refsIn(child, out);
+  else out.push(condition.ref);
+  return out;
+};
+
+/**
+ * Why a condition of `owner` cannot say which parameter one of its names means,
+ * judged from the rows alone: two rows carry the name, or the one row that
+ * carries it gives no parameter (it would create one but has an error, or its
+ * id matches nothing). Undefined when every name is left to the resolver.
+ */
+function rowProblem(condition: ConditionAst, owner: OwnerWork, owners: ReadonlyArray<OwnerWork>): string | undefined {
+  for (const ref of refsIn(condition)) {
+    const targets = ref.set === undefined ? [owner] : named(owners.filter((other) => other.kind === 'set'), (other) => other.name, ref.set);
+    if (targets.length !== 1) continue;
+    const [target] = targets;
+    const carrying = named(target.rows.filter((row) => row.name !== ''), (row) => row.name, ref.name);
+    if (carrying.length > 1) return `Rows ${rowList(carrying.map((row) => row.rowNumber))} are both named “${ref.name}” — rename one so this row can say which.`;
+    if (carrying.length === 0) continue;
+    const [row] = carrying;
+    if (row.id === '') {
+      if (!target.entries.some((entry) => entry.rowKey === row.rowKey)) return `Row ${row.rowNumber}, which would create “${ref.name}”, has an error.`;
+    } else if (!target.stored.some((parameter) => idOfParam(parameter) === row.id)) return `Row ${row.rowNumber} is named “${ref.name}”, but no parameter has its id.`;
+  }
+  return undefined;
+}
 
 /** Every parameter set as the given rows would leave it: parameters and options created or renamed by those rows count. */
 export function projectedSets(owners: ReadonlyArray<OwnerWork>, sets: ReadonlyArray<CatalogSet>, liveRowKeys: ReadonlySet<string>): CatalogSet[] {
@@ -466,11 +556,12 @@ export interface ResolvedOwnerParameters {
  * `planOwnerParameters`, with every changed condition resolved to ids against
  * the list it produces and against `sets` — the other sets as they stand (when
  * planning: as this upload would leave them; when applying: as written so far,
- * with their real ids). A row whose condition does not resolve is left out and
- * the list rebuilt without it, since leaving a create out changes the ids
- * minted after it.
+ * with their real ids). A name is looked up among the rows of `owners` before
+ * the stored parameters (`parametersAsNamed`). A row whose condition does not
+ * resolve is left out and the list rebuilt without it, since leaving a create
+ * out changes the ids minted after it.
  */
-export function resolveOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySet<string>, reservedIds: readonly string[], sets: ReadonlyArray<CatalogSet>): ResolvedOwnerParameters {
+export function resolveOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySet<string>, reservedIds: readonly string[], sets: ReadonlyArray<CatalogSet>, owners: ReadonlyArray<OwnerWork>): ResolvedOwnerParameters {
   const failed: Record<string, string> = {};
   for (;;) {
     const live = new Set([...liveRowKeys].filter((key) => !(key in failed)));
@@ -486,7 +577,7 @@ export function resolveOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySe
     let anyFailed = false;
     for (const entry of conditioned) {
       const index = indexOf(entry);
-      const resolved = resolveCondition(entry.condition!, { list: parameters, carrierIndex: index, setId, sets: scopeSets });
+      const resolved = resolveCondition(entry.condition!, namedScope(owner, owners, parameters, index, scopeSets));
       if ('error' in resolved) {
         failed[entry.rowKey] = resolved.error;
         anyFailed = true;
@@ -518,10 +609,11 @@ const listNames = (names: string[]): string => (names.length > 5 ? `${names.slic
  * Turns every changed conditionalDisplayLogic cell into the stored tree
  * (`next.showIf`), resolving its names against the catalog as this upload
  * would leave it (rule 27): parameters, options and sets created or renamed by
- * other rows count. A cell that does not resolve is a row error and the row is
- * skipped, like a bad validation rule. A row whose condition relies on another
- * row of this upload `needs` that row. A cell that resolves to exactly what is
- * stored leaves the row unchanged.
+ * other rows count, and a name a row of this upload carries means that row's
+ * parameter before any stored one. A cell that does not resolve is a row error
+ * and the row is skipped, like a bad validation rule. A row whose condition
+ * relies on another row of this upload `needs` that row. A cell that resolves
+ * to exactly what is stored leaves the row unchanged.
  *
  * The ids written here are the ones this plan would mint; the apply step
  * resolves again against what was actually written (resolveOwnerParameters),
@@ -532,7 +624,7 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
   const entryRows = (owner: OwnerWork): string[] => owner.entries.map((entry) => entry.rowKey);
   const resolveAll = (live: ReadonlySet<string>): { sets: CatalogSet[]; byOwner: ResolvedOwnerParameters[] } => {
     const sets = projectedSets(owners, catalog.sets, live);
-    return { sets, byOwner: owners.map((owner) => resolveOwnerParameters(owner, new Set(entryRows(owner).filter((key) => live.has(key))), owner.reservedIds, sets)) };
+    return { sets, byOwner: owners.map((owner) => resolveOwnerParameters(owner, new Set(entryRows(owner).filter((key) => live.has(key))), owner.reservedIds, sets, owners)) };
   };
   const paramOf = (result: ResolvedOwnerParameters, entry: ParameterEntry): any => {
     const id = entry.existingParamId ?? result.created.find((c) => c.rowKey === entry.rowKey)?.id;
@@ -543,15 +635,32 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
   let all: ReadonlySet<string>;
   let full: { sets: CatalogSet[]; byOwner: ResolvedOwnerParameters[] };
   for (;;) {
-    all = new Set(owners.flatMap(entryRows));
-    full = resolveAll(all);
     const refuse = (rowKey: string, error: string): void => {
       refuseRow(rowsByKey.get(rowKey)!, `conditionalDisplayLogic: ${error}`);
       for (const owner of owners) owner.entries = owner.entries.filter((entry) => entry.rowKey !== rowKey);
     };
+    // A name the rows of this upload cannot settle. Refusing a row can leave another without the row it names, so look again.
+    const unsettled = owners.flatMap((owner) =>
+      owner.entries.flatMap((entry) => {
+        const problem = entry.condition === undefined ? undefined : rowProblem(entry.condition, owner, owners);
+        return problem === undefined ? [] : [{ rowKey: entry.rowKey, problem }];
+      })
+    );
+    if (unsettled.length > 0) {
+      for (const { rowKey, problem } of unsettled) refuse(rowKey, problem);
+      continue;
+    }
+    all = new Set(owners.flatMap(entryRows));
+    full = resolveAll(all);
     const failures = full.byOwner.flatMap((result) => Object.entries(result.failed));
     if (failures.length > 0) {
-      for (const [rowKey, error] of failures) refuse(rowKey, error);
+      // One failure can be the cause of the next (a row that names a parameter the failed row would have created).
+      // They come in the order they were found, cause first, so refusing them in turn tells a later one what it is missing.
+      for (const [rowKey, error] of failures) {
+        const owner = owners.find((candidate) => candidate.entries.some((entry) => entry.rowKey === rowKey))!;
+        const condition = owner.entries.find((entry) => entry.rowKey === rowKey)!.condition!;
+        refuse(rowKey, rowProblem(condition, owner, owners) ?? error);
+      }
       continue;
     }
     // A loop through another set. Each owner was resolved against the other sets without their new conditions,
@@ -564,7 +673,7 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
       owner.entries.flatMap((entry) => {
         if (entry.condition === undefined) return [];
         const parameters = full.byOwner[ownerIndex].parameters;
-        const again = resolveCondition(entry.condition, { list: parameters, carrierIndex: parameters.indexOf(paramOf(full.byOwner[ownerIndex], entry)), setId: ownerSetId(owner), sets: resolvedSets });
+        const again = resolveCondition(entry.condition, namedScope(owner, owners, parameters, parameters.indexOf(paramOf(full.byOwner[ownerIndex], entry)), resolvedSets));
         return 'error' in again ? [{ rowKey: entry.rowKey, error: again.error }] : [];
       })
     );

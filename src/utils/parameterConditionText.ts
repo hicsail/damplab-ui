@@ -264,9 +264,9 @@ export interface ConditionScope {
 
 const key = (s: unknown): string => String(s ?? '').trim().toLowerCase();
 /** `key` with quotes straightened, so a hand-typed "Buyer's note" finds `Buyer’s note`. */
-const looseKey = (s: unknown): string => straighten(key(s));
+export const looseKey = (s: unknown): string => straighten(key(s));
 /** The items named `wanted` (rule 4): an exact match wins; failing one, a match with quotes straightened on both sides. */
-function named<T>(items: readonly T[], nameOf: (item: T) => unknown, wanted: unknown): T[] {
+export function named<T>(items: readonly T[], nameOf: (item: T) => unknown, wanted: unknown): T[] {
   const exact = items.filter((item) => key(nameOf(item)) === key(wanted));
   return exact.length > 0 ? exact : items.filter((item) => looseKey(nameOf(item)) === looseKey(wanted));
 }

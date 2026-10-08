@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categoryLabelOf, categoryWrites, newOperationRowKeys, operationsExportRows, planOperations, setColumnCount } from './operationsWorkbookSheet';
+import { categoryLabelOf, categoryWrites, operationRowsByName, operationsExportRows, planOperations, resolveOperationName, setColumnCount } from './operationsWorkbookSheet';
 import { catalogOf, rawSheet } from './testSupport';
 
 const pcr: any = {
@@ -14,6 +14,7 @@ const catalog = catalogOf({
   sets: [{ id: 's1', name: 'Buffers', parameters: [] }, { id: 's2', name: 'Cleanup', parameters: [] }],
   categories: [{ id: 'c1', label: 'Molecular Biology', serviceIds: ['op1', 'op3'] }, { id: 'c2', label: 'Cloning', serviceIds: [] }]
 });
+const SAME_NAME = 'Same name as an existing operation — this row creates a second one. Add the id to update it instead.';
 const ctx = { newSetRows: new Map<string, string[]>(), allowPricing: true, hideMissing: false };
 const plan = (columns: string[], rows: string[][], over: Partial<typeof ctx> = {}) => planOperations(rawSheet('operations', columns, rows), catalog, { ...ctx, ...over });
 
@@ -44,11 +45,13 @@ describe('Operations — download rows (rules 11, 13)', () => {
 });
 
 describe('Operations — a downloaded sheet uploaded unchanged (rule 2)', () => {
-  it('is all "unchanged", with and without ids', () => {
+  it('is all "unchanged" with its ids; without them each operation would be created a second time', () => {
     const [header, ...rows] = operationsExportRows(catalog, true);
     const asText = rows.map((r) => r.map(String));
     expect(plan(header.map(String), asText).rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged']);
-    expect(plan(header.map(String).slice(1), asText.map((r) => r.slice(1))).rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged']);
+    const idless = plan(header.map(String).slice(1), asText.map((r) => r.slice(1)));
+    expect(idless.rows.map((r) => [r.action, r.warnings[0], r.selectedByDefault])).toEqual(Array(3).fill(['create', SAME_NAME, false]));
+    expect(Object.values(idless.work.rows).map((work) => work.existingId)).toEqual([undefined, undefined, undefined]);
   });
 });
 
@@ -92,7 +95,38 @@ describe('Operations — fields (rules 6, 11)', () => {
       existingId: undefined, name: 'Ligation', category: 'Cloning',
       fields: { name: 'Ligation', icon: '', description: 'Join', allowedConnections: [], parameters: [], paramGroups: [], deliverables: [], protocolIds: [], pricingMode: 'SERVICE', serviceCategoryName: 'Cloning' }
     });
-    expect(newOperationRowKeys(rawSheet('operations', ['name'], [['Ligation'], ['PCR']]), catalog)).toEqual(new Map([['Ligation', 'operations:2']]));
+  });
+});
+
+describe('Operations — what a name on another sheet means (workbook first)', () => {
+  const sheet = rawSheet('operations', ['id', 'name'], [['', 'Ligation'], ['op1', 'PCR v2'], ['', 'Twice'], ['op2', 'Twice'], ['gone', 'Lost'], ['op3', '']]);
+  const rows = operationRowsByName(sheet);
+
+  it('lists every row under its name cell as uploaded — with an id or without; a blank name carries none', () => {
+    expect(rows).toEqual(new Map([
+      ['Ligation', [{ rowKey: 'operations:2', rowNumber: 2, id: '' }]],
+      ['PCR v2', [{ rowKey: 'operations:3', rowNumber: 3, id: 'op1' }]],
+      ['Twice', [{ rowKey: 'operations:4', rowNumber: 4, id: '' }, { rowKey: 'operations:5', rowNumber: 5, id: 'op2' }]],
+      ['Lost', [{ rowKey: 'operations:6', rowNumber: 6, id: 'gone' }]]
+    ]));
+    expect(operationRowsByName(undefined)).toEqual(new Map());
+  });
+
+  it.each([
+    ['one row with an id: the stored operation, by its new name', 'PCR v2', { kind: 'existing', operation: pcr }],
+    ['one row without an id: the operation that row creates', 'Ligation', { kind: 'row', rowKey: 'operations:2' }],
+    ['two rows: cannot say which', 'Twice', { kind: 'error', message: 'Rows 4 and 5 are both named “Twice” — rename one so this row can say which.' }],
+    ['one row whose id matches nothing', 'Lost', { kind: 'error', message: 'Row 6 is named “Lost”, but no operation has its id.' }],
+    ['no row: the one stored operation of that name', 'Gibson Assembly', { kind: 'existing', operation: gibson }],
+    ['no row: a stored name a row has renamed is still found', 'PCR', { kind: 'existing', operation: pcr }],
+    ['no row and no stored operation', 'Nope', { kind: 'catalog', count: 0 }]
+  ])('%s', (_case, name, expected) => {
+    expect(resolveOperationName(name, rows, catalog)).toEqual(expected);
+  });
+
+  it('no row and two stored operations of that name', () => {
+    const twins = catalogOf({ operations: [{ ...old, id: 'a', name: 'Twin' }, { ...old, id: 'b', name: 'Twin ' }] });
+    expect(resolveOperationName('Twin', new Map(), twins)).toEqual({ kind: 'catalog', count: 2 });
   });
 });
 
@@ -193,12 +227,13 @@ describe('Operations — F16: the category warning belongs to a row that writes 
   });
 });
 
-describe('Operations — M1: hide rows leave out an operation the sheet names ambiguously', () => {
-  it('a row whose name matches two operations errors, and neither is offered for hiding', () => {
+describe('Operations — M1: hide rows leave out an operation the sheet names, id or not', () => {
+  it('a row without an id creates a second operation of that name, and no stored operation of that name is offered for hiding', () => {
     const twinA: any = { id: 'tw1', name: 'Twin', parameterSetIds: [], ownParameters: [] };
     const twinB: any = { id: 'tw2', name: 'Twin', parameterSetIds: [], ownParameters: [] };
     const twins = catalogOf({ operations: [twinA, twinB, old] });
     const result = planOperations(rawSheet('operations', ['name'], [['Twin']]), twins, { ...ctx, hideMissing: true });
-    expect(result.rows.map((r) => [r.key, r.action])).toEqual([['operations:2', 'skip'], ['hide:op3', 'hide']]);
+    expect(result.rows.map((r) => [r.key, r.action])).toEqual([['operations:2', 'create'], ['hide:op3', 'hide']]);
+    expect(result.rows[0]).toMatchObject({ warnings: [SAME_NAME], selectedByDefault: false });
   });
 });

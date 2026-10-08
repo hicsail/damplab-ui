@@ -107,7 +107,6 @@ export function WorkbookUploadPreview({ raw, catalog: openedWith, fileName, allo
       renderCell: (p) => (
         <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', height: '100%' }}>
           <Chip size='small' color={ACTION_COLOR[p.row.action]} label={p.row.action} />
-          {p.row.matchedByName && <Chip size='small' variant='outlined' label='matched by name' />}
         </Box>
       )
     },

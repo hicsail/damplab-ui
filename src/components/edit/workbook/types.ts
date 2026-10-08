@@ -94,7 +94,6 @@ export interface PlanRow {
   rowNumber: number | null;
   label: string;
   action: RowAction;
-  matchedByName: boolean;
   /** Columns whose cell differs from the stored record. */
   changed: string[];
   errors: string[];

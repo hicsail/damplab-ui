@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
-import { allRows, planWorkbook, sheetPlans } from './planWorkbook';
+import { allRows, planWorkbook, sheetPlans, tickedKeys, unmetNeeds } from './planWorkbook';
 import { readWorkbook } from './readWorkbook';
 import { catalogOf } from './testSupport';
 import { buildWorkbookData, SPARE_ROWS, WorkbookData, writeWorkbook } from './writeWorkbook';
@@ -59,14 +59,36 @@ describe('download → upload, unchanged (rule 2)', () => {
     expect(sheetPlans(plan).flatMap((s) => s.ignoredColumns)).toEqual([]);
   });
 
-  it('is still all unchanged with every id column removed — a hand-authored workbook uploaded twice (Review Focus 1)', async () => {
+  it('with every id column removed nothing is matched by name: every row is a create, and each one that names a stored record is warned and unticked', async () => {
     const data = buildWorkbookData(catalog, { includePricing: true });
     const withoutIds: WorkbookData = { ...data, sheets: data.sheets.map((sheet) => ({ ...sheet, rows: sheet.rows.map((row) => row.slice(1)) })) };
     expect(withoutIds.sheets.map((s) => s.rows[0][0])).toEqual(['serviceCategory', 'parameterSet', 'BundleName', 'sectionKey']);
     const { plan } = await upload(withoutIds);
     const rows = allRows(plan);
-    expect(rows.filter((r) => r.action !== 'unchanged').map((r) => `${r.key}: ${r.action} ${r.changed.join(',')} ${r.errors.join(' ')}`)).toEqual([]);
-    expect(rows.filter((r) => r.matchedByName === false && r.action !== 'unchanged')).toEqual([]);
+    expect(rows.map((r) => `${r.key}: ${r.action} ${r.errors.join(' ')}`)).toEqual([
+      'operations:2: create ', 'operations:3: create ',
+      'parameterList:2: create ', 'parameterList:3: create ', 'parameterList:4: create ', 'parameterList:5: create ', 'parameterList:6: create ',
+      'bundles:2: create ', 'bundles:5: create ',
+      'sowSections:2: create ', 'sowSections:3: create '
+    ]);
+    const same = (noun: string): string => `Same name as an existing ${noun} — this row creates a second one. Add the id to update it instead.`;
+    const warned = (sheet: string, noun: string): boolean => rows.filter((r) => r.sheet === sheet).every((r) => r.warnings.includes(same(noun)) && !r.selectedByDefault);
+    expect(warned('operations', 'operation')).toBe(true);
+    expect(warned('bundles', 'bundle')).toBe(true);
+    expect(warned('sowSections', 'SOW text block')).toBe(true);
+    // The sets are still found by name, so their parameters would be second ones.
+    expect(rows.filter((r) => r.sheet === 'parameterList').slice(0, 3).every((r) => r.warnings.includes(same('parameter')) && !r.selectedByDefault)).toBe(true);
+    // "PCR" now means the operation the Operations row creates, which has no parameters yet: these wait for that row.
+    expect(rows.filter((r) => r.sheet === 'parameterList').slice(3).map((r) => [r.warnings, r.needs[0]])).toEqual([
+      [[], { what: 'operation “PCR”', anyOf: ['operations:2'] }],
+      [[], { what: 'operation “PCR”', anyOf: ['operations:2'] }]
+    ]);
+    expect(plan.bundles!.work.bundles['bundles:2'].changes.steps).toEqual([
+      { name: 'PCR', rowKey: 'operations:2' }, { name: 'Gibson Assembly', rowKey: 'operations:3' }, { name: 'PCR', rowKey: 'operations:2' }
+    ]);
+    // Nothing that is ticked by default can be applied: no stored record is touched.
+    const ticked = tickedKeys(plan, {});
+    expect([...ticked].filter((key) => !(key in unmetNeeds(plan, ticked)))).toEqual([]);
   });
 
   it('is unchanged without the pricing columns too (a reader without internal-fields:read)', async () => {

@@ -143,7 +143,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
     const ready = readyTogether(owner.entries.map((entry) => entry.rowKey).filter(usable));
     if (ready.length === 0) continue;
     // Conditions are resolved here, against what was actually written: the ids the plan showed can differ once rows are unticked.
-    const built = resolveOwnerParameters(owner, new Set(ready), owner.reservedIds, resultSets);
+    const built = resolveOwnerParameters(owner, new Set(ready), owner.reservedIds, resultSets, owners);
     for (const [key, text] of Object.entries(built.failed)) settle([key], `conditionalDisplayLogic: ${text}`);
     const keys = ready.filter((key) => !(key in built.failed));
     if (keys.length === 0) continue;
@@ -209,7 +209,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
       continue;
     }
     const reserved = (operationSetIds.get(id) ?? []).flatMap((setId) => setParameterIds.get(setId) ?? []);
-    const built = resolveOwnerParameters(owner, new Set(readyKeys), reserved, resultSets);
+    const built = resolveOwnerParameters(owner, new Set(readyKeys), reserved, resultSets, owners);
     for (const [key, text] of Object.entries(built.failed)) settle([key], `conditionalDisplayLogic: ${text}`);
     const keys = readyKeys.filter((key) => !(key in built.failed));
     if (keys.length === 0) continue;
