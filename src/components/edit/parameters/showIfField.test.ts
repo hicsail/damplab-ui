@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ConditionContext, showIfError, showIfText, showIfWarning } from './showIfField';
+import { ConditionContext, effectiveShowIfSummary, showIfError, showIfSummary, showIfText, showIfWarning, withShowIfSummary } from './showIfField';
 
 const sample = { id: 'sample', name: 'Sample Type', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }] };
 const extraction = { id: 'set1', name: 'Extraction', parameters: [sample] };
@@ -36,5 +36,29 @@ describe('the "Show only if" field (rules 30–32)', () => {
     expect(showIfWarning(retyped, 1, { setId: 'set1', sets: [] })).toBe('This condition refers to “Sample Type”, whose answer format has changed since. Until it is corrected the parameter is always shown.');
     // Once the field is being edited the typed text is what counts.
     expect(showIfWarning([{ ...orphan[0], _showIfText: '' }], 0, onOperation)).toBeNull();
+  });
+});
+
+describe('read-only views of a parameter (rule 33)', () => {
+  it('showIfSummary writes the condition for a set parameter listed on an operation page', () => {
+    const kit = { id: 'kit', name: 'Kit', type: 'string', showIf: { parameterId: 'sample', op: 'eq', optionIds: ['bact'] } };
+    expect(showIfSummary(kit.showIf, { list: [sample, kit], setId: 'set1', sets: [extraction] })).toBe('Show only if: "Sample Type"=="Bacteria"');
+    expect(showIfSummary(undefined, { list: [sample], setId: 'set1', sets: [] })).toBeNull();
+  });
+
+  it('effectiveShowIfSummary reads an operation’s effective list (the staff catalog dialog)', () => {
+    const effective = [
+      { id: 'polymerase', name: 'Polymerase', type: 'string', showIf: stored },
+      { ...sample, fromParameterSetId: 'set1', fromParameterSetName: 'Extraction' }
+    ];
+    expect(effectiveShowIfSummary(effective[0], effective)).toBe('Show only if: "Extraction"."Sample Type"=="Bacteria"');
+    expect(effectiveShowIfSummary(effective[1], effective)).toBeNull();
+  });
+
+  it('withShowIfSummary appends the line to whatever the view already shows', () => {
+    expect(withShowIfSummary('In µL', 'Show only if: "A"==1')).toBe('In µL — Show only if: "A"==1');
+    expect(withShowIfSummary(undefined, 'Show only if: "A"==1')).toBe('Show only if: "A"==1');
+    expect(withShowIfSummary('number', null)).toBe('number');
+    expect(withShowIfSummary(undefined, null)).toBeUndefined();
   });
 });

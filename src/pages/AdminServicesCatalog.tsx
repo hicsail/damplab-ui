@@ -24,6 +24,7 @@ import { withoutHidden } from '../utils/paletteVisibility';
 import { useShowHiddenOperations } from '../hooks/useShowHiddenOperations';
 import { ShowHiddenOperationsToggle } from '../components/edit/ShowHiddenOperationsToggle';
 import { HiddenFromClientsChip } from '../components/edit/HiddenFromClientsChip';
+import { effectiveShowIfSummary, withShowIfSummary } from '../components/edit/parameters/showIfField';
 
 /**
  * The client-facing services catalog (despite the filename — the route is
@@ -348,7 +349,7 @@ export default function AdminServicesCatalog() {
                         )}
                       </Box>
                     }
-                    secondary={p.description || p.type}
+                    secondary={withShowIfSummary(p.description || p.type, effectiveShowIfSummary(p, parameters))}
                   />
                 </ListItem>
               ))}

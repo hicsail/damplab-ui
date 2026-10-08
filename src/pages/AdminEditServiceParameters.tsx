@@ -24,6 +24,7 @@ import { formatGqlError, formatSaveError } from '../utils/gqlError';
 import { EQUIPMENT_PARAM_DEFS } from '../controllers/ReactFlowEvents';
 import ParameterListEditor from '../components/edit/parameters/ParameterListEditor';
 import { EditableParameter, prepareParametersForSave, withDragKeys } from '../components/edit/parameters/parameterSave';
+import { showIfSummary, withShowIfSummary } from '../components/edit/parameters/showIfField';
 
 export default function AdminEditServiceParameters() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -85,7 +86,13 @@ export default function AdminEditServiceParameters() {
             <List dense disablePadding>
               {setRows.filter((r) => r.setId === set.id).map((r) => (
                 <ListItemButton key={`${set.id}-${r.parameter.id}`} disabled sx={{ pl: 2 }}>
-                  <ListItemText primary={r.parameter.name ?? r.parameter.id} secondary={r.overriddenByOwn ? 'overridden by this operation' : undefined} />
+                  <ListItemText
+                    primary={r.parameter.name ?? r.parameter.id}
+                    secondary={withShowIfSummary(
+                      r.overriddenByOwn ? 'overridden by this operation' : undefined,
+                      showIfSummary(r.parameter.showIf, { list: Array.isArray(set.parameters) ? set.parameters : [], setId: set.id, sets: allSets })
+                    )}
+                  />
                 </ListItemButton>
               ))}
             </List>

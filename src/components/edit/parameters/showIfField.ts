@@ -1,4 +1,4 @@
-import { conditionFromText, ConditionScope, conditionText, missingReferences, ScopeSet } from '../../../utils/parameterConditionText';
+import { conditionFromText, ConditionScope, conditionText, effectiveScope, missingReferences, ScopeSet } from '../../../utils/parameterConditionText';
 
 /**
  * The "Show only if" field of the parameter form.
@@ -51,4 +51,22 @@ export function showIfWarning(parameters: ReadonlyArray<Row>, index: number, con
   const missing = missingReferences(parameter.showIf as any, showIfScope(parameters, index, context));
   if (missing.length === 0) return null;
   return `This condition refers to ${missing.join(' and ')}. Until it is corrected the parameter is always shown.`;
+}
+
+/** "Show only if: …" for a read-only view of a parameter, or null when it has no condition (rule 33). */
+export function showIfSummary(condition: unknown, scope: ConditionScope): string | null {
+  const text = conditionText(condition as any, scope);
+  return text === '' ? null : `Show only if: ${text}`;
+}
+
+/** The same line for one parameter of an operation's effective list, where no set list is at hand (the staff catalog dialog). */
+export function effectiveShowIfSummary(parameter: any, effectiveParameters: ReadonlyArray<any>): string | null {
+  if (!parameter?.showIf) return null;
+  return showIfSummary(parameter.showIf, effectiveScope(parameter, effectiveParameters));
+}
+
+/** A description (or whatever a view already shows under a name) followed by the condition line. */
+export function withShowIfSummary(existing: string | undefined | null, summary: string | null): string | undefined {
+  const parts = [existing, summary].filter((part): part is string => typeof part === 'string' && part !== '');
+  return parts.length > 0 ? parts.join(' — ') : undefined;
 }
