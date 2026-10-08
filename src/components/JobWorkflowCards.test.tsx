@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import JobWorkflowCards from './JobWorkflowCards';
+import JobWorkflowCards, { formatParameterValue } from './JobWorkflowCards';
 
 const text = (el: React.ReactElement): string => renderToStaticMarkup(el).replace(/<style[^>]*>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
@@ -30,5 +30,31 @@ describe('JobWorkflowCards — parameter snapshot fallback (B22)', () => {
     expect(out).toContain('Volume: 10');
     expect(out).not.toContain('old@x.org');
     expect(out).not.toContain('Authorized booker emails');
+  });
+});
+
+describe('JobWorkflowCards — "Other" (rule 28)', () => {
+  const sampleType = { id: 'sample_type', name: 'Sample Type', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }] };
+  const workflows = [{
+    id: 'w1', name: 'Workflow', state: 'QUEUED',
+    nodes: [{
+      id: 'a', label: 'Extraction', state: 'QUEUED',
+      service: { id: 'svc', parameters: [sampleType] },
+      formData: [{ id: 'sample_type', value: ['bact', 'oth'] }, { id: 'sample_type__otherText', value: 'Yeast' }],
+      parameterSnapshot: [{ id: 'sample_type', name: 'Sample Type', type: 'dropdown', displayValue: 'Bacteria, Other: Yeast' }]
+    }]
+  }];
+
+  it('reads "Other: <text>" and does not list the text entry as a parameter', () => {
+    const out = text(<JobWorkflowCards workflows={workflows} />);
+    expect(out).toContain('Sample Type: Bacteria, Other: Yeast');
+    expect(out).not.toContain('sample_type__otherText');
+    expect(out).not.toContain('Parameter: Yeast');
+  });
+
+  it('formats a single answer, and leaves a plain option alone', () => {
+    expect(formatParameterValue(sampleType, 'oth', 'Yeast')).toBe('Other: Yeast');
+    expect(formatParameterValue(sampleType, 'oth')).toBe('Other');
+    expect(formatParameterValue(sampleType, 'bact', 'Yeast')).toBe('Bacteria');
   });
 });

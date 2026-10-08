@@ -31,6 +31,7 @@ import { UserContextProps } from '../contexts/UserContext';
 import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import ProtocolViewer from '../components/ProtocolViewer';
 import { CommentsSection } from '../components/CommentsSection';
+import { isOtherTextEntryId, otherLabel, otherTextFrom } from '../utils/otherOption';
 
 type StateName = 'QUEUED' | 'IN_PROGRESS' | 'COMPLETE';
 const STATE_NAMES: StateName[] = ['QUEUED', 'IN_PROGRESS', 'COMPLETE'];
@@ -137,14 +138,16 @@ function paramNameLookup(parameters: any): Record<string, string> {
  * paramId -> (option id -> option name) for dropdown parameters. A dropdown
  * stores the option's id ("1-kb-plus-ladder"), which is not what anyone reads.
  */
-export function optionLabelLookup(parameters: any): Record<string, Record<string, string>> {
+export function optionLabelLookup(parameters: any, formData?: unknown): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {};
   if (Array.isArray(parameters)) {
     for (const p of parameters) {
       if (!p || typeof p.id !== 'string' || !Array.isArray(p.options)) continue;
       out[p.id] = {};
+      // The "Other" option reads with the text the customer gave for it.
+      const otherText = otherTextFrom(formData, p.id);
       for (const o of p.options) {
-        if (o && o.id != null) out[p.id][String(o.id)] = String(o.name ?? o.id);
+        if (o && o.id != null) out[p.id][String(o.id)] = otherLabel(String(o.name ?? o.id), otherText);
       }
     }
   }
@@ -307,8 +310,8 @@ export default function TechnicianBench() {
           const serverSteps: string[] = Array.isArray(op.completedSteps) ? op.completedSteps : [];
           const effectiveSteps = stepOverrides[op._id] ?? serverSteps;
           const names = paramNameLookup(service.parameters);
-          const optionLabels = optionLabelLookup(service.parameters);
-          const entries: Array<{ id: string; value: any }> = Array.isArray(op.formData) ? op.formData : [];
+          const optionLabels = optionLabelLookup(service.parameters, op.formData);
+          const entries: Array<{ id: string; value: any }> = (Array.isArray(op.formData) ? op.formData : []).filter((entry: any) => !isOtherTextEntryId(entry?.id));
 
           return (
             <Accordion key={op._id} defaultExpanded={st === 'IN_PROGRESS'} disableGutters>

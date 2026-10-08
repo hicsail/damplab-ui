@@ -39,6 +39,7 @@ import { CanvasContext } from "../contexts/Canvas";
 import { UserContext, UserContextProps } from "../contexts/UserContext";
 import { getWorkflowsFromGraph } from "../controllers/GraphHelpers";
 import { calculateServiceCost } from "../utils/servicePricing";
+import { isOtherTextEntryId, otherLabel, otherTextEntryId, otherTextFrom } from '../utils/otherOption';
 
 
 import { PausePresentationRounded } from "@mui/icons-material";
@@ -213,7 +214,7 @@ export default function Checkout() {
     return String(value);
   };
 
-  const formatParameterDisplayValue = (parameterDef: any, value: unknown): string => {
+  const formatParameterDisplayValue = (parameterDef: any, value: unknown, otherText?: string): string => {
     const base = formatParameterValue(value);
     if (!parameterDef || parameterDef.type !== 'dropdown') {
       return base;
@@ -223,7 +224,7 @@ export default function Checkout() {
     const optionNameById = new Map<string, string>(
       options
         .filter((opt: any) => opt && typeof opt.id === 'string')
-        .map((opt: any) => [String(opt.id), String(opt.name ?? 'Option')] as const)
+        .map((opt: any) => [String(opt.id), otherLabel(String(opt.name ?? 'Option'), otherText)] as const)
     );
 
     const mapOne = (raw: unknown): string => {
@@ -342,7 +343,7 @@ export default function Checkout() {
 
           items.push({
             id: `${param.id}:${optId}`,
-            name: `${param.name} – ${opt.name ?? optId}`,
+            name: `${param.name} – ${otherLabel(String(opt.name ?? optId), formDataMap.get(otherTextEntryId(param.id)))}`,
             count: 1,
             unitPrice,
             total: unitPrice,
@@ -565,7 +566,7 @@ export default function Checkout() {
                                       Estimated cost: {formatPriceLabel(getNodeCost(node))}
                                     </Typography>
                                   )}
-                                  {node.data?.formData?.map((param) => {
+                                  {node.data?.formData?.filter((param) => !isOtherTextEntryId(param.id)).map((param) => {
                                     const paramDef = (node.data.parameters || []).find((p: any) => p?.id === param.id);
                                     return (
                                     <Typography
@@ -574,7 +575,7 @@ export default function Checkout() {
                                       color="text.secondary"
                                       sx={{ fontSize: '0.875rem' }}
                                     >
-                                      {param.name}: {formatParameterDisplayValue(paramDef, param.value)}
+                                      {param.name}: {formatParameterDisplayValue(paramDef, param.value, otherTextFrom(node.data.formData, param.id))}
                                     </Typography>
                                     );
                                   })}
