@@ -41,14 +41,15 @@ export function planWorkbook(raw: RawWorkbook, catalog: CatalogSnapshot, options
 /**
  * The sets each operation would end with if every Operations row were applied,
  * by set id (`new:<name>` for a set this upload creates). The Parameter List
- * sheet warns from it when a condition names a set some operation lacks.
+ * sheet warns from it when a condition names a set some operation lacks, and
+ * mints a set parameter's id clear of the sets it would share an operation with.
  */
 function operationSetsAfter(operations: SheetPlan<OperationsWork> | undefined, catalog: CatalogSnapshot): OperationSets[] {
   const rows = Object.values(operations?.work.rows ?? {});
   const keyOf = (name: string): string => catalog.sets.find((set) => set.name.trim() === name)?.id ?? `new:${name}`;
   const existing = catalog.operations.map((operation) => {
     const row = rows.find((work) => work.existingId === operation.id);
-    return { name: operation.name.trim(), setKeys: row?.setNames ? row.setNames.map(keyOf) : operation.parameterSetIds };
+    return { name: operation.name.trim(), setKeys: row?.setNames ? row.setNames.map(keyOf) : operation.parameterSetIds, ownIds: operation.ownParameters.map((p) => String(p?.id ?? '')) };
   });
   const created = rows.filter((work) => work.existingId === undefined).map((work) => ({ name: work.name, setKeys: (work.setNames ?? []).map(keyOf) }));
   return [...existing, ...created];

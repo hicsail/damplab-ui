@@ -299,8 +299,13 @@ export interface OwnerWork {
   rows: OwnerRow[];
   /** The owner's parameters as stored. */
   stored: any[];
-  /** Ids a minted id must also avoid: for an operation, its parameter sets' parameter ids. */
+  /**
+   * Stored ids a minted id must also avoid. For an operation: its parameter sets' parameter ids. For a set: the
+   * stored parameter ids of every set that shares an operation with it, and those operations' own (reserveAcrossSets).
+   */
   reservedIds: string[];
+  /** For a set: the sets earlier in the sheet that share an operation with it. The ids they mint are avoided too (setReservations). */
+  mintedBefore: OwnerWork[];
   entries: ParameterEntry[];
 }
 
@@ -376,7 +381,7 @@ export function planParameterList(
     const ownerWarnings: string[] = [];
     const needs: Need[] = [];
     const owner: OwnerWork = {
-      kind: group.kind, name: group.name, stored: [], reservedIds: [], entries: [],
+      kind: group.kind, name: group.name, stored: [], reservedIds: [], mintedBefore: [], entries: [],
       rows: group.rows.map((raw) => ({ rowKey: rowKey('parameterList', raw.rowNumber), rowNumber: raw.rowNumber, id: raw.cells.parameterId ?? '', name: raw.cells.parameter ?? '' }))
     };
     let tickedByDefault = true;
@@ -474,6 +479,7 @@ export function planParameterList(
   }
 
   const operationSets = ctx.operationSets ?? catalog.operations.map((operation) => ({ name: operation.name.trim(), setKeys: operation.parameterSetIds }));
+  reserveAcrossSets(owners, catalog, operationSets);
   resolveConditions(owners, catalog, new Map([...planned.values()].map((row) => [row.key, row] as const)), operationSets);
 
   // Said last, once it is known what each row does: a row that ends up unchanged, or refused, writes nothing anywhere.
@@ -501,6 +507,60 @@ function refuseRow(row: PlanRow, error: string): void {
 const newSetId = (name: string): string => `new:${name}`;
 const ownerSetId = (owner: OwnerWork): string | undefined => (owner.kind === 'set' ? owner.existingId ?? newSetId(owner.name) : undefined);
 const idOfParam = (parameter: any): string => String(parameter?.id ?? '');
+
+/**
+ * What a parameter this upload creates in a set must not be given as its id,
+ * so that no operation ends up with one id from two places (the server refuses
+ * that operation): the ids of every parameter that shares an operation with it.
+ *
+ * Two sets share an operation when one uses both — as stored, or as its
+ * Operations row would leave it. Both count whether or not the row is applied:
+ * a set is written before the operations are, while they still have the sets
+ * they had. Reserving an id that turns out not to be in the way only costs a
+ * suffix.
+ *
+ * Stored ids never change, so they are settled here (`reservedIds`): the other
+ * sets' stored parameters and the operations' own. Ids minted by this upload
+ * depend on the rows applied; `mintedBefore` says whose count, and
+ * `setReservations` works them out. The earlier set in the sheet keeps the
+ * plain id.
+ */
+function reserveAcrossSets(owners: OwnerWork[], catalog: CatalogSnapshot, operationSets: ReadonlyArray<OperationSets>): void {
+  const storedIds = new Map(catalog.sets.map((set) => [set.id, set.parameters.map(idOfParam)] as const));
+  const uses: Array<{ setKeys: readonly string[]; ownIds: readonly string[] }> = [
+    ...catalog.operations.map((operation) => ({ setKeys: operation.parameterSetIds, ownIds: operation.ownParameters.map(idOfParam) })),
+    ...operationSets.map((operation) => ({ setKeys: operation.setKeys, ownIds: operation.ownIds ?? [] }))
+  ];
+  owners.forEach((owner, index) => {
+    const key = ownerSetId(owner);
+    if (key === undefined) return;
+    const sharing = uses.filter((use) => use.setKeys.includes(key));
+    const others = new Set(sharing.flatMap((use) => use.setKeys).filter((other) => other !== key));
+    const ids = [...sharing.flatMap((use) => use.ownIds), ...[...others].flatMap((other) => storedIds.get(other) ?? [])];
+    owner.reservedIds = [...new Set(ids)].filter((id) => id !== '');
+    owner.mintedBefore = owners.slice(0, index).filter((earlier) => others.has(ownerSetId(earlier) ?? ''));
+  });
+}
+
+/**
+ * The ids each set's minted ids must avoid for the rows being applied: its
+ * `reservedIds`, and the ids minted — for the same rows — by the sets before it
+ * that share an operation with it. One pass in sheet order, so planning,
+ * the clash check and the apply step all mint a set's ids the same way. An
+ * earlier set that ends up writing fewer rows than `liveRowKeys` only mints a
+ * subset of what is reserved for it here.
+ */
+export function setReservations(owners: ReadonlyArray<OwnerWork>, liveRowKeys: ReadonlySet<string>): Map<OwnerWork, string[]> {
+  const reserved = new Map<OwnerWork, string[]>();
+  const minted = new Map<OwnerWork, string[]>();
+  for (const owner of owners) {
+    if (owner.kind !== 'set') continue;
+    const ids = [...owner.reservedIds, ...owner.mintedBefore.flatMap((earlier) => minted.get(earlier) ?? [])];
+    reserved.set(owner, ids);
+    minted.set(owner, planOwnerParameters(owner, liveRowKeys, ids).created.map((created) => created.id));
+  }
+  return reserved;
+}
 
 /** The owner whose rows hold this set's parameters. A set this upload creates is known by its name until it has an id. */
 const ownerOfSet = (owners: ReadonlyArray<OwnerWork>, set: { id: string; name: string }): OwnerWork | undefined =>
@@ -586,9 +646,10 @@ function rowProblem(condition: ConditionAst, owner: OwnerWork, owners: ReadonlyA
 /** Every parameter set as the given rows would leave it: parameters and options created or renamed by those rows count. */
 export function projectedSets(owners: ReadonlyArray<OwnerWork>, sets: ReadonlyArray<CatalogSet>, liveRowKeys: ReadonlySet<string>): CatalogSet[] {
   const out = sets.map((set) => ({ ...set }));
+  const reserved = setReservations(owners, liveRowKeys);
   for (const owner of owners) {
     if (owner.kind !== 'set') continue;
-    const parameters = planOwnerParameters(owner, liveRowKeys).parameters;
+    const parameters = planOwnerParameters(owner, liveRowKeys, reserved.get(owner)).parameters;
     const at = out.findIndex((set) => set.id === owner.existingId);
     if (at >= 0) out[at] = { ...out[at], parameters };
     else if (owner.existingId === undefined && owner.entries.some((entry) => liveRowKeys.has(entry.rowKey))) out.push({ id: newSetId(owner.name), name: owner.name, parameters });
@@ -647,6 +708,8 @@ export function resolveOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySe
 export interface OperationSets {
   name: string;
   setKeys: string[];
+  /** The ids of the operation's own stored parameters. Absent for an operation this upload creates. */
+  ownIds?: string[];
 }
 
 const comparisonsIn = (condition: any, out: any[] = []): any[] => {
@@ -677,7 +740,8 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
   const entryRows = (owner: OwnerWork): string[] => owner.entries.map((entry) => entry.rowKey);
   const resolveAll = (live: ReadonlySet<string>): { sets: CatalogSet[]; byOwner: ResolvedOwnerParameters[] } => {
     const sets = projectedSets(owners, catalog.sets, live);
-    return { sets, byOwner: owners.map((owner) => resolveOwnerParameters(owner, new Set(entryRows(owner).filter((key) => live.has(key))), owner.reservedIds, sets, owners)) };
+    const reserved = setReservations(owners, live);
+    return { sets, byOwner: owners.map((owner) => resolveOwnerParameters(owner, new Set(entryRows(owner).filter((key) => live.has(key))), reserved.get(owner) ?? owner.reservedIds, sets, owners)) };
   };
   const paramOf = (result: ResolvedOwnerParameters, entry: ParameterEntry): any => {
     if (entry.storedIndex !== undefined) return result.parameters[entry.storedIndex];
@@ -817,7 +881,9 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
  *
  * `reservedIds` are the ids a minted id must also avoid. They default to the
  * operation's stored sets' parameter ids; the apply step passes the ids of the
- * operation's *resulting* set list, which is what rule 17 means.
+ * operation's *resulting* set list, which is what rule 17 means. For a set,
+ * pass what `setReservations` gives: the default leaves out the ids minted by
+ * the other sets of this upload.
  */
 export function buildOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySet<string>, reservedIds: readonly string[] = owner.reservedIds): any[] {
   return planOwnerParameters(owner, liveRowKeys, reservedIds).parameters;
