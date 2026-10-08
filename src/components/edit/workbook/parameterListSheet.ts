@@ -386,12 +386,21 @@ export function planParameterList(sheet: RawSheet, catalog: CatalogSnapshot, ctx
  * parameters in stored order, updates swapped in by id, then creates in sheet
  * order with ids minted by the editor's rule (idFromName + makeUniqueIds).
  * A stored parameter no row mentions — or whose row is not applied — is untouched.
+ *
+ * `reservedIds` are the ids a minted id must also avoid. They default to the
+ * operation's stored sets' parameter ids; the apply step passes the ids of the
+ * operation's *resulting* set list, which is what rule 17 means.
  */
-export function buildOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySet<string>): any[] {
+export function buildOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySet<string>, reservedIds: readonly string[] = owner.reservedIds): any[] {
+  return planOwnerParameters(owner, liveRowKeys, reservedIds).parameters;
+}
+
+/** `buildOwnerParameters`, plus which row each created parameter came from and the id it was minted. */
+export function planOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySet<string>, reservedIds: readonly string[] = owner.reservedIds): { parameters: any[]; created: Array<{ rowKey: string; id: string }> } {
   const live = owner.entries.filter((entry) => liveRowKeys.has(entry.rowKey));
   const updates = new Map(live.filter((entry) => entry.existingParamId !== undefined).map((entry) => [entry.existingParamId, entry.next] as const));
   const kept = owner.stored.map((parameter) => updates.get(String(parameter?.id ?? '')) ?? parameter);
-  const creates = live.filter((entry) => entry.existingParamId === undefined).map((entry) => ({ ...entry.next, id: '' }));
-  const minted = makeUniqueIds(creates, [...kept.map((parameter) => String(parameter?.id ?? '')), ...owner.reservedIds]);
-  return [...kept, ...minted];
+  const createEntries = live.filter((entry) => entry.existingParamId === undefined);
+  const minted = makeUniqueIds(createEntries.map((entry) => ({ ...entry.next, id: '' })), [...kept.map((parameter) => String(parameter?.id ?? '')), ...reservedIds]);
+  return { parameters: [...kept, ...minted], created: createEntries.map((entry, index) => ({ rowKey: entry.rowKey, id: minted[index].id })) };
 }

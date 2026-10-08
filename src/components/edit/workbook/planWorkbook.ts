@@ -1,4 +1,5 @@
 import { BundlesWork, planBundles } from './bundlesSheet';
+import { findIdClashes } from './parameterIdClashes';
 import { newOperationRowKeys, OperationsWork, planOperations } from './operationsWorkbookSheet';
 import { newSetRowKeys, ParameterListWork, planParameterList } from './parameterListSheet';
 import { planSowSections, SowSectionsWork } from './sowSectionsSheet';
@@ -33,7 +34,23 @@ export function planWorkbook(raw: RawWorkbook, catalog: CatalogSnapshot, options
   if (raw.sheets.parameterList) plan.parameterList = planParameterList(raw.sheets.parameterList, catalog, { newOperationRows });
   if (raw.sheets.bundles) plan.bundles = planBundles(raw.sheets.bundles, catalog, { newOperationRows });
   if (raw.sheets.sowSections) plan.sowSections = planSowSections(raw.sheets.sowSections, catalog);
+  refuseIdClashes(plan, catalog);
   return plan;
+}
+
+/** Rule 20, across sheets: a set parameter this upload creates must not take an id its using operations already have. */
+function refuseIdClashes(plan: WorkbookPlan, catalog: CatalogSnapshot): void {
+  const rows = allRows(plan);
+  const clashes = findIdClashes(plan, catalog, new Set(rows.filter((row) => row.errors.length === 0 && (row.action === 'create' || row.action === 'update')).map((row) => row.key)));
+  for (const row of rows) {
+    if (!(row.key in clashes)) continue;
+    row.errors.push(clashes[row.key]);
+    row.action = 'skip';
+    row.changed = [];
+    row.selectedByDefault = false;
+    row.needs = [];
+    row.matchedByName = false;
+  }
 }
 
 /** The planned sheets, in tab order. */

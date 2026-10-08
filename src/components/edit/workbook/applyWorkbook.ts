@@ -1,4 +1,5 @@
 import { formatGqlError } from '../../../utils/gqlError';
+import { findIdClashes } from './parameterIdClashes';
 import { categoryWrites } from './operationsWorkbookSheet';
 import { buildOwnerParameters } from './parameterListSheet';
 import { allRows, sheetPlans, WorkbookPlan } from './planWorkbook';
@@ -69,6 +70,10 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   const total = [...rowsByKey.keys()].filter(wanted).length;
   const done = new Set<string>();
   const rowErrors: Record<string, string> = {};
+  // Rule 20 once more, for the rows actually ticked: unticking a row can change the ids minted for the rows after it.
+  const clashes = findIdClashes(plan, catalog, new Set([...rowsByKey.keys()].filter(wanted)));
+  /** wanted, and not refused for taking an id its operation already has. */
+  const usable = (key: string): boolean => wanted(key) && !(key in clashes);
   const errors: string[] = [];
   const snapshots: Record<SheetKey, Snapshot[]> = { operations: [], parameterList: [], bundles: [], sowSections: [] };
   let finished = 0;
@@ -91,13 +96,18 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
     return false;
   };
 
+  for (const [key, text] of Object.entries(clashes)) settle([key], text);
+
   const owners = plan.parameterList?.work.owners ?? [];
+  // What each set and operation ends with, so an operation's own parameters are minted against its resulting sets.
+  const setParameterIds = new Map(catalog.sets.map((set) => [set.id, set.parameters.map((p) => String(p?.id ?? ''))] as const));
+  const operationSetIds = new Map(catalog.operations.map((operation) => [operation.id, operation.parameterSetIds] as const));
   const setIdByName = new Map(catalog.sets.map((set) => [set.name.trim(), set.id] as const));
 
   // 1. Parameter sets, each with its whole parameter list.
   for (const owner of owners) {
     if (owner.kind !== 'set') continue;
-    const keys = owner.entries.map((entry) => entry.rowKey).filter(wanted);
+    const keys = owner.entries.map((entry) => entry.rowKey).filter(usable);
     if (keys.length === 0) continue;
     const parameters = buildOwnerParameters(owner, new Set(keys));
     try {
@@ -107,6 +117,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
         id = await mutator.createParameterSet({ name: owner.name, parameters });
         setIdByName.set(owner.name, id);
       }
+      setParameterIds.set(id, parameters.map((p) => String(p?.id ?? '')));
       snapshots.parameterList.push({ itemId: id, action: owner.existingId ? 'UPDATE' : 'CREATE', before: owner.existingId ? { parameters: owner.stored } : undefined, after: { parameters } });
       settle(keys);
     } catch (error) {
@@ -118,7 +129,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   const operationIdByRowKey = new Map<string, string>();
   const moves: Array<{ operationId: string; label: string }> = [];
   for (const row of plan.operations?.rows ?? []) {
-    if (row.action === 'hide' || !wanted(row.key) || !ready(row.key)) continue;
+    if (row.action === 'hide' || !usable(row.key) || !ready(row.key)) continue;
     const item = plan.operations!.work.rows[row.key];
     const fields: Record<string, unknown> = { ...item.fields };
     if (item.setNames) {
@@ -137,6 +148,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
         id = await mutator.createService(fields);
       }
       operationIdByRowKey.set(row.key, id);
+      operationSetIds.set(id, (fields.parameterSetIds as string[] | undefined) ?? operationSetIds.get(id) ?? []);
       if (item.category !== undefined) moves.push({ operationId: id, label: item.category });
       snapshots.operations.push({ itemId: id, action: item.existingId ? 'UPDATE' : 'CREATE', before: item.existingId ? item.before : undefined, after: fields });
       settle([row.key]);
@@ -148,14 +160,15 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   // 3. Operations' own parameters — after step 2, so an operation this upload created exists.
   for (const owner of owners) {
     if (owner.kind !== 'operation') continue;
-    const keys = owner.entries.map((entry) => entry.rowKey).filter(wanted).filter(ready);
+    const keys = owner.entries.map((entry) => entry.rowKey).filter(usable).filter(ready);
     if (keys.length === 0) continue;
     const id = owner.existingId ?? (owner.operationRowKey !== undefined ? operationIdByRowKey.get(owner.operationRowKey) : undefined);
     if (!id) {
       settle(keys, `Operation “${owner.name}” was not created.`);
       continue;
     }
-    const parameters = buildOwnerParameters(owner, new Set(keys));
+    const reserved = (operationSetIds.get(id) ?? []).flatMap((setId) => setParameterIds.get(setId) ?? []);
+    const parameters = buildOwnerParameters(owner, new Set(keys), reserved);
     try {
       await mutator.updateService(id, { parameters });
       snapshots.parameterList.push({ itemId: id, action: 'UPDATE', before: { parameters: owner.stored }, after: { parameters } });
@@ -187,7 +200,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
 
   // 5. "Hide operations not in this sheet from clients" — only ever sets the flag.
   for (const [key, hide] of Object.entries(plan.operations?.work.hides ?? {})) {
-    if (!wanted(key)) continue;
+    if (!usable(key)) continue;
     try {
       await mutator.updateService(hide.id, { hiddenFromClients: true });
       snapshots.operations.push({ itemId: hide.id, action: 'UPDATE', before: { hiddenFromClients: false }, after: { hiddenFromClients: true } });
@@ -199,7 +212,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
 
   // 6. Bundles.
   for (const row of plan.bundles?.rows ?? []) {
-    if (!wanted(row.key) || !ready(row.key)) continue;
+    if (!usable(row.key) || !ready(row.key)) continue;
     const item = plan.bundles!.work.bundles[row.key];
     const changes: Record<string, unknown> = {};
     if (item.changes.label !== undefined) changes.label = item.changes.label;
@@ -226,7 +239,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
 
   // 7. SOW text blocks.
   for (const row of plan.sowSections?.rows ?? []) {
-    if (!wanted(row.key)) continue;
+    if (!usable(row.key)) continue;
     const item = plan.sowSections!.work.rows[row.key];
     try {
       if (item.existingId) {
