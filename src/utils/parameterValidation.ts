@@ -52,7 +52,8 @@ function breaks(rule: ValidationRule, n: number): boolean {
 
 /** The first broken rule's message, or null. An empty value breaks nothing: "required" is a separate rule. */
 export function checkValue(rules: ReadonlyArray<ValidationRule>, value: unknown): string | null {
-  if (value === null || value === undefined || value === '') return null;
+  // A whitespace-only answer is an empty answer: Number('   ') is 0, which `<5` would accept and `>0` refuse.
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null;
   if (rules.length === 0) return null;
   const n = typeof value === 'number' ? value : Number(String(value).trim());
   if (!Number.isFinite(n)) return 'Must be a number';

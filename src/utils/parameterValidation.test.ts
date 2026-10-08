@@ -28,6 +28,18 @@ describe('ruleMessage / checkValue (rule 25)', () => {
     expect(ruleMessage({ kind: 'lte', n: 2.5 })).toBe('Must be at most 2.5');
     expect(ruleMessage({ kind: 'integer' })).toBe('Must be a whole number');
   });
+  it('F11: a whitespace-only answer is an empty answer, not the number 0', () => {
+    for (const blank of [' ', '   ', '\t', '\n', ' \r\n ']) {
+      expect(checkValue(rules('<5'), blank)).toBeNull();
+      expect(checkValue(rules('>0'), blank)).toBeNull();
+      expect(checkValue(rules('>=1 && <=3'), blank)).toBeNull();
+    }
+    // An answer with text in it is still checked, padded or not.
+    expect(checkValue(rules('>0'), ' 0 ')).toBe('Must be greater than 0');
+    expect(checkValue(rules('<5'), ' 7 ')).toBe('Must be less than 5');
+    expect(checkValue(rules('>0'), ' x ')).toBe('Must be a number');
+  });
+
   it('returns the first broken rule, null for a pass, null for an empty value', () => {
     expect(checkValue(rules('>0 && <100 && integer'), 5)).toBeNull();
     expect(checkValue(rules('>0 && <100 && integer'), 0)).toBe('Must be greater than 0');
