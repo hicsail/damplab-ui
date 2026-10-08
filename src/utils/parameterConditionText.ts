@@ -15,7 +15,8 @@
  *
  * Pure. UI only: the backend never sees text.
  */
-import type { ConditionOp } from './parameterConditions';
+import { comparisonFits } from './parameterConditions';
+import type { Comparison, Condition, ConditionOp } from './parameterConditions';
 
 // ------------------------------------------------------------------ syntax tree
 
@@ -230,4 +231,259 @@ export function sameConditionText(a: string, b: string): boolean {
   const right = tokenize(b);
   if ('error' in left || 'error' in right) return a.trim() === b.trim();
   return JSON.stringify(left.tokens) === JSON.stringify(right.tokens);
+}
+
+// ------------------------------------------------------------------ scope
+
+export interface ScopeSet {
+  id: string;
+  name: string;
+  parameters?: unknown;
+}
+
+/** Where a condition lives: what its references are resolved against, and printed from. */
+export interface ConditionScope {
+  /** The list the carrier is in: one set's parameters, or an operation's own parameters. */
+  list: ReadonlyArray<any>;
+  /** The carrier's position in `list`. Omit when only printing. */
+  carrierIndex?: number;
+  /** The id of the set `list` belongs to; absent for an operation's own parameters (and for a set not saved yet). */
+  setId?: string;
+  /** Every parameter set, for qualified references. */
+  sets: ReadonlyArray<ScopeSet>;
+}
+
+const key = (s: unknown): string => String(s ?? '').trim().toLowerCase();
+const listOf = (set: ScopeSet): any[] => (Array.isArray(set.parameters) ? set.parameters : []);
+const optionsOf = (parameter: any): any[] => (Array.isArray(parameter?.options) ? parameter.options : []);
+const labelOf = (parameter: any): string => String(parameter?.name ?? parameter?.id ?? '').trim();
+const TYPE_NAMES: Record<string, string> = { table: 'Table', file: 'File upload', sampleSheet: 'Samples spreadsheet' };
+
+// ------------------------------------------------------------------ resolver (rules 5–7)
+
+const OPERATOR_TEXT: Record<string, string> = { eq: '==', ne: '!=', gt: '>', ge: '>=', lt: '<', le: '<=' };
+
+class ResolveProblem extends Error {}
+
+/** Key order is fixed (parameterId, parameterSetId, op, optionIds, value, values) so two equal conditions serialise the same. */
+function comparisonOf(parameterId: string, parameterSetId: string | undefined, op: ConditionOp, payload: Pick<Comparison, 'optionIds' | 'value' | 'values'>): Comparison {
+  return {
+    parameterId,
+    ...(parameterSetId !== undefined ? { parameterSetId } : {}),
+    op,
+    ...(payload.optionIds !== undefined ? { optionIds: payload.optionIds } : {}),
+    ...(payload.value !== undefined ? { value: payload.value } : {}),
+    ...(payload.values !== undefined ? { values: payload.values } : {})
+  };
+}
+
+function resolveComparison(ast: ComparisonAst, scope: ConditionScope): Comparison {
+  // 1. Which list (rule 5).
+  let list: ReadonlyArray<any> = scope.list;
+  let parameterSetId: string | undefined;
+  let where = 'here';
+  if (ast.ref.set !== undefined) {
+    const named = scope.sets.filter((set) => key(set.name) === key(ast.ref.set));
+    if (named.length === 0) throw new ResolveProblem(`No parameter set is named “${ast.ref.set}”.`);
+    if (named.length > 1) throw new ResolveProblem(`${named.length} parameter sets are named “${ast.ref.set}”.`);
+    where = `in “${named[0].name.trim()}”`;
+    // Naming the carrier's own set is the same as not naming it.
+    if (scope.setId === undefined || named[0].id !== scope.setId) {
+      list = listOf(named[0]);
+      parameterSetId = named[0].id;
+    }
+  }
+
+  // 2. Which parameter.
+  const matches = list.map((parameter, index) => ({ parameter, index })).filter(({ parameter }) => key(parameter?.name) === key(ast.ref.name));
+  if (matches.length === 0) throw new ResolveProblem(`No parameter is named “${ast.ref.name}” ${where}.`);
+  if (matches.length > 1) throw new ResolveProblem(`${matches.length} parameters are named “${ast.ref.name}” ${where}.`);
+  const { parameter, index } = matches[0];
+  const name = labelOf(parameter);
+  if (parameterSetId === undefined && index === scope.carrierIndex) throw new ResolveProblem('A parameter cannot depend on itself.');
+  const id = String(parameter?.id ?? '');
+  if (id === '') throw new ResolveProblem(`“${name}” has no id yet — save it first.`);
+
+  // 3. What may be asked of it (rule 6).
+  const type = String(parameter?.type ?? 'string');
+  if (type in TYPE_NAMES) throw new ResolveProblem(`“${name}” is a ${TYPE_NAMES[type]} parameter and cannot control a condition.`);
+  const { op } = ast;
+  const ordering = op === 'gt' || op === 'ge' || op === 'lt' || op === 'le';
+  const literals: LiteralAst[] = op === 'in' ? [...(ast.values ?? [])] : [ast.value as LiteralAst];
+
+  if (type === 'boolean') {
+    if (op !== 'eq' && op !== 'ne') throw new ResolveProblem(`“${name}” is a Yes/No parameter: compare it with == or != to true or false.`);
+    if (typeof ast.value !== 'boolean') throw new ResolveProblem(`“${name}” is a Yes/No parameter: compare it to true or false, without quotes.`);
+    return comparisonOf(id, parameterSetId, op, { value: ast.value });
+  }
+  if (literals.some((value) => typeof value === 'boolean')) throw new ResolveProblem(`true / false can only be compared with a Yes/No parameter; “${name}” is not one.`);
+
+  if (ordering) {
+    if (type !== 'number') throw new ResolveProblem(`“${OPERATOR_TEXT[op]}” needs a Number parameter; “${name}” is not one.`);
+    const n = typeof ast.value === 'number' ? ast.value : Number(String(ast.value).trim());
+    if (String(ast.value).trim() === '' || !Number.isFinite(n)) throw new ResolveProblem(`“${OPERATOR_TEXT[op]}” needs a number, not “${String(ast.value)}”.`);
+    return comparisonOf(id, parameterSetId, op, { value: n });
+  }
+
+  if (op === 'includes') {
+    if (type === 'number') throw new ResolveProblem(`.includes cannot be used on “${name}”: it is a Number parameter.`);
+    if (String(ast.value) === '') throw new ResolveProblem('.includes needs some text.');
+    return comparisonOf(id, parameterSetId, op, { value: String(ast.value) });
+  }
+
+  if (type === 'dropdown') {
+    const optionIds = literals.map((value) => {
+      const found = optionsOf(parameter).filter((option) => key(option?.name) === key(value));
+      if (found.length === 0) throw new ResolveProblem(`“${String(value)}” is not an option of “${name}”.`);
+      const optionId = String(found[0]?.id ?? '');
+      if (optionId === '') throw new ResolveProblem(`Option “${String(value)}” of “${name}” has no id yet — save it first.`);
+      return optionId;
+    });
+    return comparisonOf(id, parameterSetId, op, { optionIds });
+  }
+
+  if (op === 'in') return comparisonOf(id, parameterSetId, op, { values: literals.map(String) });
+  return comparisonOf(id, parameterSetId, op, { value: ast.value as string | number });
+}
+
+const isGroup = (c: unknown, k: 'all' | 'any'): c is Record<string, any[]> => !!c && typeof c === 'object' && Array.isArray((c as Record<string, unknown>)[k]);
+
+function comparisonsOf(condition: unknown, out: Comparison[] = []): Comparison[] {
+  if (isGroup(condition, 'all')) for (const child of condition.all) comparisonsOf(child, out);
+  else if (isGroup(condition, 'any')) for (const child of condition.any) comparisonsOf(child, out);
+  else if (condition && typeof condition === 'object' && typeof (condition as Comparison).parameterId === 'string') out.push(condition as Comparison);
+  return out;
+}
+
+/** A cycle among the parameters the resolver can see: the carrier's list and every set (rule 6). */
+function findLoop(condition: Condition, scope: ConditionScope): string | null {
+  const OWN = '';
+  const carrierKey = scope.setId ?? OWN;
+  const lists = new Map<string, ReadonlyArray<any>>(scope.sets.map((set) => [set.id, listOf(set)] as const));
+  lists.set(carrierKey, scope.list);
+  const carrier = scope.carrierIndex !== undefined ? scope.list[scope.carrierIndex] : undefined;
+  const nodeKey = (listKey: string, id: string): string => `${listKey}\u0000${id}`;
+  const start = nodeKey(carrierKey, String(carrier?.id ?? ''));
+  const targets = (c: unknown, fromList: string): Array<{ listKey: string; id: string }> => comparisonsOf(c).map((comparison) => ({ listKey: comparison.parameterSetId ?? fromList, id: comparison.parameterId }));
+
+  const seen = new Set<string>();
+  const queue = targets(condition, carrierKey);
+  while (queue.length > 0) {
+    const next = queue.pop()!;
+    const k = nodeKey(next.listKey, next.id);
+    if (k === start) return 'This condition would form a loop: the parameter it depends on depends, in turn, on this one.';
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const parameter = (lists.get(next.listKey) ?? []).find((p) => String(p?.id ?? '') === next.id);
+    if (parameter?.showIf) queue.push(...targets(parameter.showIf, next.listKey));
+  }
+  return null;
+}
+
+/** The stored tree for a syntax tree, or the first error, naming the offending part (rules 5–7). */
+export function resolveCondition(tree: ConditionAst, scope: ConditionScope): { condition: Condition } | { error: string } {
+  const walk = (node: ConditionAst): Condition => {
+    if ('all' in node) return { all: node.all.map(walk) };
+    if ('any' in node) return { any: node.any.map(walk) };
+    return resolveComparison(node, scope);
+  };
+  try {
+    const condition = walk(tree);
+    const loop = findLoop(condition, scope);
+    return loop ? { error: loop } : { condition };
+  } catch (error) {
+    if (error instanceof ResolveProblem) return { error: error.message };
+    throw error;
+  }
+}
+
+/** Text straight to a stored condition: '' is "no condition". */
+export function conditionFromText(text: string, scope: ConditionScope): { condition: Condition | undefined } | { error: string } {
+  if (text.trim() === '') return { condition: undefined };
+  const parsed = parseCondition(text);
+  if ('error' in parsed) return { error: parsed.error };
+  return resolveCondition(parsed.tree, scope);
+}
+
+// ------------------------------------------------------------------ printer (rule 25)
+
+export const MISSING = '<missing>';
+const quote = (s: string): string => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
+/** The parameter a stored comparison means in this scope, with how to write it; `text` is "<missing>" when it no longer resolves. */
+function lookup(comparison: Comparison, scope: ConditionScope): { parameter?: any; text: string; missing?: string } {
+  const sameList = comparison.parameterSetId === undefined || comparison.parameterSetId === scope.setId;
+  if (sameList) {
+    const parameter = scope.list.find((p) => String(p?.id ?? '') === comparison.parameterId);
+    return parameter ? { parameter, text: quote(labelOf(parameter)) } : { text: quote(MISSING), missing: 'a parameter that no longer exists' };
+  }
+  const set = scope.sets.find((s) => s.id === comparison.parameterSetId);
+  if (!set) return { text: quote(MISSING), missing: 'a parameter set that no longer exists' };
+  const parameter = listOf(set).find((p) => String(p?.id ?? '') === comparison.parameterId);
+  if (!parameter) return { text: quote(MISSING), missing: `a parameter that is no longer in “${set.name.trim()}”` };
+  return { parameter, text: `${quote(set.name.trim())}.${quote(labelOf(parameter))}` };
+}
+
+function comparisonText(comparison: Comparison, scope: ConditionScope, missing: string[]): string {
+  const found = lookup(comparison, scope);
+  if (found.missing) missing.push(found.missing);
+  // The parameter is still there but its answer format changed under the condition: the evaluator treats that as unresolved too.
+  // One phrase says it; the options it no longer has are not listed on top.
+  const fits = !found.parameter || comparisonFits(comparison, found.parameter);
+  if (!fits) missing.push(`“${labelOf(found.parameter)}”, whose answer format has changed since`);
+  const literal = (value: unknown): string => (typeof value === 'string' ? quote(value) : String(value));
+  const optionText = (id: string): string => {
+    const option = optionsOf(found.parameter).find((o) => String(o?.id ?? '') === id);
+    if (!option && found.parameter && fits) missing.push(`an option “${labelOf(found.parameter)}” no longer has`);
+    return quote(option ? String(option.name ?? '').trim() : MISSING);
+  };
+  const values = comparison.optionIds !== undefined ? comparison.optionIds.map(optionText) : comparison.values !== undefined ? comparison.values.map(literal) : [literal(comparison.value)];
+  if (comparison.op === 'includes') return `${found.text}.includes(${values[0]})`;
+  if (comparison.op === 'in') return `${found.text} in (${values.join(',')})`;
+  return `${found.text}${OPERATOR_TEXT[comparison.op]}${values[0]}`;
+}
+
+function print(condition: Condition, scope: ConditionScope, missing: string[], parent?: 'all' | 'any'): string {
+  for (const kind of ['all', 'any'] as const) {
+    if (!isGroup(condition, kind)) continue;
+    const children = (condition as Record<string, Condition[]>)[kind];
+    const body = children.map((child) => print(child, scope, missing, kind)).join(kind === 'all' ? ' && ' : ' || ');
+    // && binds tighter than ||, so only an && group directly under || goes without parentheses.
+    return parent === undefined || (kind === 'all' && parent === 'any') ? body : `(${body})`;
+  }
+  return comparisonText(condition as Comparison, scope, missing);
+}
+
+/** The stored condition as text, with current names (rule 25). '' for no condition. */
+export function conditionText(condition: Condition | null | undefined, scope: ConditionScope): string {
+  if (condition === null || condition === undefined) return '';
+  return print(condition, scope, []);
+}
+
+/** What a stored condition refers to that no longer resolves in this scope — one phrase each, no repeats (rule 32). */
+export function missingReferences(condition: Condition | null | undefined, scope: ConditionScope): string[] {
+  if (condition === null || condition === undefined) return [];
+  const missing: string[] = [];
+  print(condition, scope, missing);
+  return [...new Set(missing)];
+}
+
+/**
+ * The scope of one parameter of an operation's EFFECTIVE list (own, then each
+ * set's, set entries carrying fromParameterSetId / fromParameterSetName) — for
+ * read-only views that have no set list of their own (rule 33). A set the
+ * operation does not use is not in scope there, so a reference into it prints
+ * as "<missing>", which is also how the form treats it.
+ */
+export function effectiveScope(parameter: any, effectiveParameters: ReadonlyArray<any>): ConditionScope {
+  const setIdOf = (p: any): string | undefined => (p?.fromParameterSetId ? String(p.fromParameterSetId) : undefined);
+  const sets = new Map<string, ScopeSet & { parameters: any[] }>();
+  for (const p of effectiveParameters) {
+    const id = setIdOf(p);
+    if (id === undefined) continue;
+    if (!sets.has(id)) sets.set(id, { id, name: String(p.fromParameterSetName ?? id), parameters: [] });
+    sets.get(id)!.parameters.push(p);
+  }
+  const setId = setIdOf(parameter);
+  return { list: setId === undefined ? effectiveParameters.filter((p) => setIdOf(p) === undefined) : sets.get(setId)!.parameters, setId, sets: [...sets.values()] };
 }
