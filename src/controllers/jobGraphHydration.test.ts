@@ -75,6 +75,23 @@ describe('mergeSavedFormData', () => {
     const merged = mergeSavedFormData(parameters, [{ id: 'vol', value: 5 }], 'n1', { allowMultipleRuns: true });
     expect(merged.find((p) => p.id === '__runCount')!.value).toBe(1);
   });
+
+  it('keeps the "Other" text of a saved answer, directly after its parameter (Review Focus 3)', () => {
+    const withOther = [
+      { id: 'kind', name: 'Kind', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }] },
+      ...parameters
+    ];
+    const saved = [{ id: 'kind', value: 'oth' }, { id: 'kind__otherText', value: 'Yeast' }, { id: 'vol', value: 5 }];
+    const merged = mergeSavedFormData(withOther, saved, 'n1');
+    expect(merged.map((p) => p.id)).toEqual(['kind', 'kind__otherText', 'vol', 'buf']);
+    expect(merged[1]).toMatchObject({ id: 'kind__otherText', value: 'Yeast', name: 'Kind (Other)' });
+  });
+
+  it('does not carry "Other" text for an answer that no longer selects Other', () => {
+    const withOther = [{ id: 'kind', name: 'Kind', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }] }];
+    const merged = mergeSavedFormData(withOther, [{ id: 'kind', value: 'bact' }, { id: 'kind__otherText', value: 'stale' }], 'n1');
+    expect(merged.map((p) => p.id)).toEqual(['kind']);
+  });
 });
 
 describe('hydrateJobGraph', () => {

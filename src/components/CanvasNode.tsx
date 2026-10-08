@@ -7,6 +7,7 @@ import CloseIcon       from '@mui/icons-material/Close';
 import { CanvasContext } from '../contexts/Canvas';
 import { getServiceIcon }   from '../assets/icons';
 import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { answerProblems } from '../utils/parameterAnswers';
 
 
 type Input = {
@@ -78,7 +79,8 @@ export default memo((input: Input) => {
         } else {
             setBackground('white');
         }
-        setAllFilled(checkIfDataFilled(data.data.formData))
+        // Incomplete is "a required value is missing" or "an answer breaks a rule" (rule 25).
+        setAllFilled(checkIfDataFilled(data.data.formData) && Object.keys(answerProblems(data.data.formData ?? [], data.data.parameters)).length === 0)
     }, [activeComponentId, data.data.id, data.data.formData]);
 
     const checkIfDataFilled = (formData: any) => {

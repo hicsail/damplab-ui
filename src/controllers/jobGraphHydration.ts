@@ -4,6 +4,8 @@ import { NodeParameter } from '../types/CanvasTypes';
 import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 import { isSampleSheetParam } from '../utils/sampleSheetValue';
 import { applyNodeChanges, NodeChange } from 'reactflow';
+import { syncOtherTextEntries } from '../utils/parameterAnswers';
+import { isOtherTextEntryId } from '../utils/otherOption';
 
 /**
  * Rebuilding a submitted job as an editable canvas.
@@ -74,7 +76,12 @@ export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId
     if (retired && !merged.some((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID)) {
         merged.push({ ...retired, id: EQUIPMENT_BOOKERS_PARAM_ID, nodeId, value: retired.value } as NodeParameter);
     }
-    return merged;
+    // The "Other" text is not generated from a parameter either. Put it back
+    // beside the answer that selects "Other": dropping it would read, on the next
+    // save, as an edit the server refuses on a node whose work has started.
+    const otherTexts: Record<string, unknown> = {};
+    for (const entry of savedList) if (entry && isOtherTextEntryId(entry.id)) otherTexts[entry.id] = entry.value;
+    return syncOtherTextEntries(merged, otherTexts) as NodeParameter[];
 };
 
 /**

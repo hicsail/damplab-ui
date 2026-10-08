@@ -8,7 +8,9 @@ import {
   Checkbox,
   FormControl,
   FormControlLabel,
+  FormGroup,
   FormHelperText,
+  FormLabel,
   IconButton,
   InputLabel,
   MenuItem,
@@ -32,6 +34,8 @@ import { isRetiredEquipmentParam, validateEquipmentValues } from "../utils/equip
 import SampleSheetField from "./SampleSheetField";
 import { isSampleSheetParam } from "../utils/sampleSheet";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
+import { answerProblems, isCheckboxList, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
+import { isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, selectsOther } from "../utils/otherOption";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -93,7 +97,8 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     // keystroke (when the parameter first counts as changed, and for a node
     // with no changes yet, when its set first exists) would remount the input
     // under it and drop focus mid-word.
-    const changed = changedParamIds?.has(param?.id) === true;
+    // An edit to the "Other" text is an edit to this parameter's answer.
+    const changed = changedParamIds?.has(param?.id) === true || changedParamIds?.has(otherTextEntryId(String(param?.id))) === true;
     return (
       <Box
         key={param.id}
@@ -106,6 +111,9 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
   };
   const { setNodes } = useContext(CanvasContext);
 
+  /** The node's definition of a form entry: `validation` and `display` live there, not on the entry. */
+  const definitionOf = (param: any) => (activeNode?.data?.parameters ?? []).find((p: any) => p?.id === param?.id);
+
   // Backend may return formData with value as array for multi-value params without allowMultipleValues set
   const isMultiValueParam = (param: any) =>
     param.allowMultipleValues === true || Array.isArray(param.value);
@@ -115,6 +123,10 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     // init values using formDataState and setFormDataState
     let initValues: any = {};
     activeNode.data.formData.forEach((obj: any) => {
+      if (isOtherTextEntryId(obj.id)) {
+        initValues[obj.id] = typeof obj.value === "string" ? obj.value : "";
+        return;
+      }
       if (obj.paramType === "result") {
         obj.value = obj.value !== null ? obj.value : true;
         initValues[obj.id] = obj.value !== null ? obj.value : true;
@@ -143,14 +155,34 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     // Now a dedicated field in each service (should always accompany other params)
     // initValues[`addinst${activeNode?.data.id}`] = activeNode?.data.additionalInstructions ? activeNode?.data.additionalInstructions : '';
 
+    // Every parameter that offers "Other" has a text value, blank until typed:
+    // formik must know the key before the field is first shown.
+    activeNode.data.formData.forEach((obj: any) => {
+      if (isOtherTextEntryId(obj.id) || otherOptionIdOf(obj) === null) return;
+      const key = otherTextEntryId(obj.id);
+      if (!(key in initValues)) initValues[key] = "";
+    });
     return initValues;
+  };
+
+  const buildUpdatedFormData = (values: any) => {
+    const updated = activeNode.data.formData.map((obj: any) => {
+      const next = { ...obj };
+      if (next.paramType === "result") {
+        next.resultParamValue = values[`resultParamValue${next.id}`];
+      }
+      next.value = values[next.id];
+      return next;
+    });
+    // The "Other" text entry exists exactly while "Other" is selected.
+    return syncOtherTextEntries(updated, values);
   };
 
   // validation function for formik to check for empty fields
   const validate = (values: any) => {
     let errors: any = {};
     activeNode.data.formData.forEach((obj: any) => {
-      if (obj.paramType === "result") return;
+      if (obj.paramType === "result" || isOtherTextEntryId(obj.id)) return;
       const key = obj.id;
       if (isMultiValueParam(obj)) {
         if (obj.required) {
@@ -180,19 +212,14 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     // Returns nothing at all for a node that has none of them.
     Object.assign(errors, validateEquipmentValues(values));
 
+    // A number that breaks its rule, and "Other" with no text. A "Required"
+    // already recorded for the same field wins: it is the more basic problem.
+    for (const [key, message] of Object.entries(answerProblems(buildUpdatedFormData(values), activeNode?.data?.parameters))) {
+      if (!errors[key]) errors[key] = message;
+    }
+
     setParamErrors(errors);
     return errors;
-  };
-
-  const buildUpdatedFormData = (values: any) => {
-    return activeNode.data.formData.map((obj: any) => {
-      const updated = { ...obj };
-      if (updated.paramType === "result") {
-        updated.resultParamValue = values[`resultParamValue${updated.id}`];
-      }
-      updated.value = values[updated.id];
-      return updated;
-    });
   };
 
   const toPendingFiles = (files: FileList | null): PendingParamFile[] => {
@@ -242,6 +269,33 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     onFormDataChange?.();
   }, [formik.values]);
 
+  /** The "Please specify" field, directly under a control whose answer selects "Other". */
+  const renderOtherText = (param: any) => {
+    if (!selectsOther(param, formik.values[param.id])) return null;
+    const key = otherTextEntryId(param.id);
+    return (
+      <TextField
+        size="small"
+        required
+        label={OTHER_TEXT_LABEL}
+        name={key}
+        value={formik.values[key] ?? ""}
+        onChange={formik.handleChange}
+        onBlur={formik.handleBlur}
+        error={Boolean(formik.errors[key])}
+        helperText={formik.errors[key] ? String(formik.errors[key]) : null}
+        sx={{ mt: 1, width: "26ch", display: "block" }}
+        InputLabelProps={{ shrink: true }}
+        InputProps={{ readOnly }}
+      />
+    );
+  };
+
+  /** Deselecting "Other" discards its text. */
+  const clearOtherTextUnlessSelected = (param: any, nextValue: unknown) => {
+    if (otherOptionIdOf(param) !== null && !selectsOther(param, nextValue)) formik.setFieldValue(otherTextEntryId(param.id), "");
+  };
+
   const setHeadings = parameterSetHeadings(activeNode?.data?.formData ?? [], activeNode?.data?.parameters);
 
   return (
@@ -254,7 +308,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
         {Object.keys(paramErrors).length > 0 ? (
           <Alert severity="warning" sx={{ py: 0.5 }}>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {Object.keys(paramErrors).length} required field(s) still need values.
+              {Object.keys(paramErrors).length} field(s) still need attention.
             </Typography>
             <Box component="ul" sx={{ my: 0.5, pl: 2 }}>
               {Object.keys(paramErrors).slice(0, 6).map((key: any) => {
@@ -287,6 +341,42 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
         <div className="input-params" style={{ marginLeft: 8 }}>
           {activeNode.data.formData.map((param: any, index: number) => isRetiredEquipmentParam(param) ? null : <React.Fragment key={param.id ?? index}>{setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}{wrapChanged(param, (() => {
             if (param.paramType !== "result") {
+              // The "Other" text is drawn under its parameter, never as a field of its own.
+              if (isOtherTextEntryId(param.id)) return null;
+              if (isCheckboxList(param, definitionOf(param))) {
+                const ticked: string[] = (Array.isArray(formik.values[param.id]) ? formik.values[param.id] : []).map(String);
+                return (
+                  <FormControl key={param.id} component="fieldset" error={Boolean(formik.errors[param.id])} sx={{ mt: 2, display: "block" }}>
+                    <FormLabel component="legend" sx={{ fontSize: "0.875rem" }}>
+                      {param.name}{param.required ? " *" : ""}
+                    </FormLabel>
+                    <FormGroup>
+                      {(param.options ?? []).map((option: any) => (
+                        <FormControlLabel
+                          key={option.id}
+                          label={option.name}
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={ticked.includes(String(option.id))}
+                              disabled={readOnly}
+                              onChange={(e) => {
+                                const next = toggleChecked(formik.values[param.id], String(option.id), e.target.checked);
+                                formik.setFieldValue(param.id, next);
+                                clearOtherTextUnlessSelected(param, next);
+                              }}
+                            />
+                          }
+                        />
+                      ))}
+                    </FormGroup>
+                    <FormHelperText>
+                      {formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
+                    </FormHelperText>
+                    {renderOtherText(param)}
+                  </FormControl>
+                );
+              }
               if (param.type === "date") {
                 const raw = formik.values[param.id];
                 const parsed = typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)
@@ -359,10 +449,10 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
               }
               if (param.type === "dropdown" && !isMultiValueParam(param)) {
                 return (
+                  <div key={param.id}>
                   <FormControl
                     size="small"
                     sx={{ mt: 3, width: "26ch" }}
-                    key={param.id}
                   >
                     {param.dynamicAdd && !readOnly && (
                       <IconButton onClick={() => {
@@ -419,7 +509,10 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                       value={
                         formik.values[param.id] ? formik.values[param.id] : ""
                       }
-                      onChange={formik.handleChange}
+                      onChange={(e) => {
+                        formik.handleChange(e);
+                        clearOtherTextUnlessSelected(param, e.target.value);
+                      }}
                       onBlur={formik.handleBlur}
                       error={Boolean(formik.errors[param.id])}
                       readOnly={readOnly}
@@ -436,6 +529,8 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                         : (param.description ? param.description : null)}
                     </FormHelperText>
                   </FormControl>
+                  {renderOtherText(param)}
+                  </div>
                 );
               }
               if (param.type === "dropdown" && isMultiValueParam(param)) {
@@ -456,6 +551,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                                   const next = [...values];
                                   next[idx] = e.target.value;
                                   formik.setFieldValue(param.id, next);
+                                  clearOtherTextUnlessSelected(param, next);
                                 }}
                                 onBlur={formik.handleBlur}
                                 readOnly={readOnly}
@@ -476,6 +572,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                                 onClick={() => {
                                   const next = values.filter((_: any, i: number) => i !== idx);
                                   formik.setFieldValue(param.id, next.length ? next : [""]);
+                                  clearOtherTextUnlessSelected(param, next);
                                 }}
                                 aria-label="Remove value"
                               >
@@ -496,6 +593,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                         ))}
                       </Box>
                     </Box>
+                    {renderOtherText(param)}
                   </div>
                 );
               }
@@ -605,7 +703,8 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                           <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
                             <TextField
                               multiline={param.name === "Additional Notes"}
-                              helperText={idx === 0 && param.description ? param.description : null}
+                              error={idx === 0 && Boolean(formik.errors[param.id])}
+                              helperText={idx === 0 ? (formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)) : null}
                               size="small"
                               label={idx === 0 ? param.name : undefined}
                               type={param.type}
