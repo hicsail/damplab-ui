@@ -7,7 +7,7 @@ const SAME_NAME = 'Same name as an existing operation — this row creates a sec
 
 describe('matchRows — rows are matched by id only', () => {
   it('A1: a non-blank id that matches is an update', () => {
-    expect(matchRows([row(2, 'op1', 'PCR renamed')], existing, 'operation')[0]).toEqual({ action: 'update', existingId: 'op1', errors: [], warnings: [], selectedByDefault: true });
+    expect(matchRows([row(2, 'op1', 'PCR renamed')], existing, 'operation')[0]).toEqual({ action: 'update', existingId: 'op1', existingIndex: 0, errors: [], warnings: [], selectedByDefault: true });
   });
 
   it('A1: a non-blank id that matches nothing is an error', () => {
@@ -71,5 +71,28 @@ describe('matchRows — rows are matched by id only', () => {
 
   it('a new row needs a name', () => {
     expect(matchRows([row(2, '', '')], existing, 'operation')[0].errors).toEqual(['A new operation needs a name.']);
+  });
+});
+
+describe('matchRows — a stored record that has no id (fix I3)', () => {
+  const stored = [{ id: '', name: 'Sequencing type ' }, { id: 'vol', name: 'Volume' }, { id: '', name: 'Notes' }];
+
+  it('a blank-id row is the one id-less record of exactly that name: an update, by position, with no warning', () => {
+    expect(matchRows([row(2, '', 'Notes')], stored, 'parameter')[0]).toEqual({ action: 'update', existingId: '', existingIndex: 2, errors: [], warnings: [], selectedByDefault: true });
+    expect(matchRows([row(2, '', 'Sequencing type')], stored, 'parameter')[0]).toMatchObject({ action: 'update', existingIndex: 0 });
+  });
+
+  it('never a record that has an id, and never on a near name', () => {
+    expect(matchRows([row(2, '', 'Volume')], stored, 'parameter')[0]).toMatchObject({ action: 'create', selectedByDefault: false });
+    expect(matchRows([row(2, '', 'notes')], stored, 'parameter')[0]).toMatchObject({ action: 'create', warnings: ['Looks like “Notes” — a near-duplicate'] });
+  });
+
+  it('two id-less records keep apart: each row is its own, and two rows for one are both errors', () => {
+    const results = matchRows([row(2, '', 'Notes'), row(3, '', 'Sequencing type'), row(4, '', 'Notes')], stored, 'parameter');
+    expect(results.map((r) => r.errors)).toEqual([['Rows 2 and 4 both resolve to “Notes”.'], [], ['Rows 2 and 4 both resolve to “Notes”.']]);
+  });
+
+  it('an update by id reports its position too', () => {
+    expect(matchRows([row(2, 'vol', 'Volume')], stored, 'parameter')[0]).toMatchObject({ action: 'update', existingId: 'vol', existingIndex: 1 });
   });
 });

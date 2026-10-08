@@ -57,6 +57,7 @@ const run = async (raw: RawWorkbook, overrides: Record<string, boolean> = {}) =>
 };
 
 const SAME = (noun: string): string => `Same name as an existing ${noun} — this row creates a second one. Add the id to update it instead.`;
+const NEW_PCR = '“PCR” means the new operation in row 2, not the existing operation named “PCR”.';
 const BOTH = 'Rows 2 and 3 are both named “PCR” — rename one so this row can say which.';
 
 describe('A, on every sheet with an id column: a blank id is a create, whatever its name', () => {
@@ -117,8 +118,8 @@ describe('C — an operation named from a Parameter List row', () => {
     const raw = book({ operations: [['', 'PCR', '']], parameterList: [['', '', 'PCR', 'Cycles', 'Number', '']] });
     const rows = rowsOf(raw);
     expect(rows['operations:2']).toMatchObject({ action: 'create', selectedByDefault: false });
-    // The new operation has no parameters, so "Cycles" is not a second one.
-    expect(rows['parameterList:2']).toMatchObject({ action: 'create', errors: [], warnings: [], needs: [{ what: 'operation “PCR”', anyOf: ['operations:2'] }] });
+    // The new operation has no parameters, so "Cycles" is not a second one; the row says which PCR it means.
+    expect(rows['parameterList:2']).toMatchObject({ action: 'create', errors: [], warnings: [NEW_PCR], selectedByDefault: true, needs: [{ what: 'operation “PCR”', anyOf: ['operations:2'] }] });
     expect(ownerOf(raw)).toMatchObject({ operationRowKey: 'operations:2', stored: [] });
     expect(ownerOf(raw).existingId).toBeUndefined();
   });
@@ -311,9 +312,12 @@ describe('a hand-authored workbook with no ids, against a catalog that already h
     const rows = rowsOf(raw);
     expect(Object.values(rows).map((row) => row.action)).toEqual(['create', 'create', 'create', 'create', 'create', 'create']);
     expect(Object.values(rows).flatMap((row) => row.errors)).toEqual([]);
-    for (const [key, noun] of [['operations:2', 'operation'], ['parameterList:2', 'parameter'], ['bundles:2', 'bundle'], ['sowSections:2', 'SOW text block']]) {
+    for (const [key, noun] of [['operations:2', 'operation'], ['parameterList:2', 'parameter'], ['sowSections:2', 'SOW text block']]) {
       expect(rows[key]).toMatchObject({ action: 'create', warnings: [SAME(noun)], selectedByDefault: false });
     }
+    // The bundle is a second "Cloning", and its step is the new PCR.
+    expect(rows['bundles:2']).toMatchObject({ action: 'create', warnings: [SAME('bundle'), NEW_PCR], selectedByDefault: false });
+    expect(rows['parameterList:4']).toMatchObject({ action: 'create', warnings: [NEW_PCR], selectedByDefault: true });
   });
 
   it('its dependents resolve to the new rows', () => {
@@ -352,5 +356,181 @@ describe('a hand-authored workbook with no ids, against a catalog that already h
     expect(calls[2][1]).toBe('new-createService-1');
     expect((calls[2][2] as any).parameters).toEqual([expect.objectContaining({ id: 'cycles', name: 'Cycles', showIf: { parameterId: 'volume_2', parameterSetId: 's1', op: 'gt', value: 2 } })]);
     expect(calls[3][1]).toMatchObject({ label: 'Cloning', services: ['new-createService-1'] });
+  });
+});
+
+// ---------------------------------------------------------------- fix round 1
+
+describe('fix C1 — one operation reached by two names is one owner and one write', () => {
+  const raw = book({
+    operations: [['op1', 'PCR v2', '']],
+    parameterList: [['cycles', '', 'PCR', 'Cycles', 'Text', ''], ['', '', 'PCR v2', 'Extension', 'Number', '']]
+  });
+
+  it('rows on the old name and on the new name plan under one owner, each labelled as written', () => {
+    const plan = planOf(raw);
+    expect(plan.parameterList!.work.owners).toHaveLength(1);
+    expect(plan.parameterList!.work.owners[0]).toMatchObject({ kind: 'operation', existingId: 'op1' });
+    expect(plan.parameterList!.rows.map((r) => [r.label, r.action, r.errors, r.warnings])).toEqual([['PCR › Cycles', 'update', [], []], ['PCR v2 › Extension', 'create', [], []]]);
+  });
+
+  it('a single update carries both edits', async () => {
+    const { calls, summary } = await run(raw);
+    expect(summary.rowErrors).toEqual({});
+    expect(calls).toEqual([
+      ['updateService', 'op1', { name: 'PCR v2' }],
+      ['updateService', 'op1', { parameters: [{ id: 'cycles', name: 'Cycles', type: 'string' }, expect.objectContaining({ id: 'extension', name: 'Extension', type: 'number' })] }]
+    ]);
+  });
+
+  it('one parameterId given under both names is the usual error on both rows', () => {
+    const rows = rowsOf(book({ operations: [['op1', 'PCR v2', '']], parameterList: [['cycles', '', 'PCR', 'Cycles', 'Text', ''], ['cycles', '', 'PCR v2', 'Cycles', 'Number', '']] }));
+    expect(rows['parameterList:2'].errors).toEqual(['Rows 2 and 3 both resolve to “Cycles”.']);
+    expect(rows['parameterList:3'].errors).toEqual(['Rows 2 and 3 both resolve to “Cycles”.']);
+  });
+});
+
+describe('fix C2 / W2 — a name that now means another operation says so on the rows that use it', () => {
+  // Both operations have an own parameter `cycles`; Gel's is Text, PCR's is Number.
+  const two = catalogOf({
+    ...catalog,
+    operations: [catalog.operations[0], op('op2', 'Gel', { ownParameters: [{ id: 'cycles', name: 'Cycles', type: 'string' }] })],
+    bundles: [{ id: 'b1', label: 'Cloning', icon: '', steps: [{ id: 'op2', name: 'Gel' }] }]
+  });
+  const rowsIn = (raw: RawWorkbook): Record<string, PlanRow> => Object.fromEntries(allRows(planOf(raw, two)).map((row) => [row.key, row]));
+  const NOW = (name: string, row: number): string => `“${name}” now means the operation in row ${row}, not the operation currently named “${name}”.`;
+  const NEW = (name: string, row: number): string => `“${name}” means the new operation in row ${row}, not the existing operation named “${name}”.`;
+  const asDownloaded = [['cycles', '', 'PCR', 'Cycles', 'Number', ''], ['cycles', '', 'Gel', 'Cycles', 'Text', '']];
+  const swap = [['op1', 'Gel', ''], ['op2', 'PCR', '']];
+
+  it('two operations swap names: each Parameter List row that would now write to the other operation is warned and unticked', () => {
+    const rows = rowsIn(book({ operations: swap, parameterList: asDownloaded }));
+    expect(rows['parameterList:2']).toMatchObject({ action: 'update', errors: [], warnings: [NOW('PCR', 3)], selectedByDefault: false });
+    expect(rows['parameterList:3']).toMatchObject({ action: 'update', errors: [], warnings: [NOW('Gel', 2)], selectedByDefault: false });
+  });
+
+  it('a referencing row that ends up unchanged needs no warning', () => {
+    // Swapped in both sheets: each row already says what its operation holds.
+    const rows = rowsIn(book({ operations: swap, parameterList: [['cycles', '', 'Gel', 'Cycles', 'Number', ''], ['cycles', '', 'PCR', 'Cycles', 'Text', '']] }));
+    expect(rows['parameterList:2']).toMatchObject({ action: 'unchanged', warnings: [] });
+    expect(rows['parameterList:3']).toMatchObject({ action: 'unchanged', warnings: [] });
+  });
+
+  it('an operation renamed onto a name another operation is leaving: same warning, unticked', () => {
+    const rows = rowsIn(book({ operations: [['op1', 'PCR old', ''], ['op2', 'PCR', '']], parameterList: [['cycles', '', 'PCR', 'Cycles', 'Number', '']] }));
+    expect(rows['parameterList:2']).toMatchObject({ action: 'update', warnings: [NOW('PCR', 3)], selectedByDefault: false });
+  });
+
+  it('an operation renamed onto a name whose holder has no row in the workbook: same warning, unticked (nothing else holds it back)', () => {
+    const rows = rowsIn(book({ operations: [['op2', 'PCR', '']], parameterList: [['cycles', '', 'PCR', 'Cycles', 'Number', '']] }));
+    expect(rows['parameterList:2']).toMatchObject({ action: 'update', warnings: [NOW('PCR', 2)], selectedByDefault: false });
+  });
+
+  it('Bundles: a step whose name moved is warned and unticked; a bundle that ends up unchanged is not', () => {
+    const moved = rowsIn(book({ operations: swap, bundles: [['b1', 'Cloning', '1', 'Gel']] }));
+    expect(moved['bundles:2']).toMatchObject({ action: 'update', changed: ['steps'], errors: [], warnings: [NOW('Gel', 2)], selectedByDefault: false });
+    const same = rowsIn(book({ operations: swap, bundles: [['b1', 'Cloning', '1', 'PCR']] }));
+    expect(same['bundles:2']).toMatchObject({ action: 'unchanged', warnings: [] });
+    const vacated = rowsIn(book({ operations: [['op2', 'Gel old', ''], ['op1', 'Gel', '']], bundles: [['b1', 'Cloning', '1', 'Gel']] }));
+    expect(vacated['bundles:2']).toMatchObject({ action: 'update', warnings: [NOW('Gel', 3)], selectedByDefault: false });
+  });
+
+  it('a plain rename — a name nobody else has or had — raises no such warning', () => {
+    const rows = rowsIn(book({ operations: [['op1', 'PCR v2', '']], parameterList: [['', '', 'PCR v2', 'Extension', 'Number', '']], bundles: [['b1', 'Cloning', '1', 'PCR v2']] }));
+    expect(rows['parameterList:2']).toMatchObject({ action: 'create', warnings: [], selectedByDefault: true });
+    expect(rows['bundles:2']).toMatchObject({ action: 'update', warnings: [], selectedByDefault: true });
+  });
+
+  it('W2: a namesake create with no row for the stored operation warns its dependents, and leaves their default alone', () => {
+    const rows = rowsIn(book({ operations: [['', 'PCR', '']], parameterList: [['', '', 'PCR', 'Cycles', 'Number', '']], bundles: [['b1', 'Cloning', '1', 'PCR']] }));
+    expect(rows['parameterList:2']).toMatchObject({ action: 'create', warnings: [NEW('PCR', 2)], selectedByDefault: true, needs: [{ what: 'operation “PCR”', anyOf: ['operations:2'] }] });
+    expect(rows['bundles:2']).toMatchObject({ action: 'update', changed: ['steps'], warnings: [NEW('PCR', 2)], selectedByDefault: true, needs: [{ what: 'operation “PCR”', anyOf: ['operations:2'] }] });
+  });
+
+  it('W2: a create named like a stored operation that this workbook renames away is the unticked case', () => {
+    const rows = rowsIn(book({ operations: [['', 'PCR', ''], ['op1', 'PCR old', '']], bundles: [['b1', 'Cloning', '1', 'PCR']] }));
+    expect(rows['bundles:2']).toMatchObject({ action: 'update', warnings: [NOW('PCR', 2)], selectedByDefault: false });
+  });
+});
+
+describe('fix I3 — a stored parameter that has no id', () => {
+  const idless = catalogOf({ sets: [{ id: 's1', name: 'Seq', parameters: [{ name: 'Sequencing type', type: 'string' }, { id: 'volume', name: 'Volume', type: 'number' }, { name: 'Notes', type: 'string' }] }] });
+  const rowsIn = (rows: string[][]) => planOf(book({ parameterList: rows }), idless);
+
+  it('round-trips: its blank-id row is that parameter, unchanged, with no warning', () => {
+    const plan = rowsIn([['', 'Seq', '', 'Sequencing type', 'Text', ''], ['volume', 'Seq', '', 'Volume', 'Number', ''], ['', 'Seq', '', 'Notes', 'Text', '']]);
+    expect(plan.parameterList!.rows.map((r) => [r.action, r.warnings, r.errors])).toEqual(Array(3).fill(['unchanged', [], []]));
+    expect(plan.parameterList!.work.owners[0].entries).toEqual([]);
+  });
+
+  it('an edited row updates it in place, still without an id, and leaves the other id-less parameter alone', async () => {
+    const plan = rowsIn([['', 'Seq', '', 'Notes', 'Number', '']]);
+    expect(plan.parameterList!.rows[0]).toMatchObject({ action: 'update', changed: ['type'], warnings: [], errors: [], selectedByDefault: true });
+    const rec = recorder();
+    await applyWorkbook(plan, tickedKeys(plan, {}), idless, rec.mutator, { fileName: 'c.xlsx', uploaderName: 'Ada' });
+    expect(rec.calls()).toEqual([['updateParameterSet', 's1', { parameters: [idless.sets[0].parameters[0], idless.sets[0].parameters[1], { name: 'Notes', type: 'number' }] }]]);
+  });
+
+  it('a blank-id row never matches a stored parameter that has an id', () => {
+    const plan = rowsIn([['', 'Seq', '', 'Volume', 'Number', '']]);
+    expect(plan.parameterList!.rows[0]).toMatchObject({ action: 'create', warnings: [SAME('parameter')], selectedByDefault: false });
+  });
+
+  it('two id-less stored parameters of one name are not matched: the row is a warned create', () => {
+    const twins = catalogOf({ sets: [{ id: 's1', name: 'Seq', parameters: [{ name: 'Notes', type: 'string' }, { name: 'Notes', type: 'string' }] }] });
+    expect(allRows(planOf(book({ parameterList: [['', 'Seq', '', 'Notes', 'Text', '']] }), twins))[0]).toMatchObject({ action: 'create', warnings: [SAME('parameter')], selectedByDefault: false });
+  });
+
+  it('a condition that names it gets the resolver’s own answer, not a row error', () => {
+    const plan = rowsIn([['', 'Seq', '', 'Notes', 'Text', ''], ['volume', 'Seq', '', 'Volume', 'Number', '"Notes"=="x"']]);
+    expect(plan.parameterList!.rows[1].errors).toEqual(['conditionalDisplayLogic: “Notes” has no id yet — save it first.']);
+  });
+});
+
+describe('fix I4 — which row carries a condition’s name is decided on the exact name', () => {
+  const showIf = (raw: RawWorkbook): any => planOf(raw).parameterList!.work.owners[0].entries.find((entry) => entry.next.name === 'Dilution')?.next.showIf;
+  const dilution = (condition: string): string[] => ['', 'Buffers', '', 'Dilution', 'Number', condition];
+
+  it('a near-duplicate new row does not take over the stored parameter’s name', () => {
+    const raw = book({ parameterList: [['', 'Buffers', '', 'volume', 'Number', ''], dilution('"Volume">5')] });
+    expect(rowsOf(raw)['parameterList:3']).toMatchObject({ action: 'create', errors: [], needs: [] });
+    expect(showIf(raw)).toEqual({ parameterId: 'volume', op: 'gt', value: 5 });
+  });
+
+  it('nor does it make a false "both named" error when the stored parameter has its own row', () => {
+    const raw = book({ parameterList: [['volume', 'Buffers', '', 'Volume', 'Number', ''], ['', 'Buffers', '', 'volume', 'Number', ''], dilution('"Volume">5')] });
+    expect(rowsOf(raw)['parameterList:4']).toMatchObject({ action: 'create', errors: [], needs: [] });
+    expect(showIf(raw)).toEqual({ parameterId: 'volume', op: 'gt', value: 5 });
+  });
+
+  it('the exact name of the near-duplicate row means that row', () => {
+    const raw = book({ parameterList: [['', 'Buffers', '', 'volume', 'Number', ''], dilution('"volume">5')] });
+    expect(rowsOf(raw)['parameterList:3']).toMatchObject({ errors: [], needs: [{ what: 'parameter “volume”', anyOf: ['parameterList:2'] }] });
+    expect(showIf(raw)).toEqual({ parameterId: 'volume_2', op: 'gt', value: 5 });
+  });
+
+  it('only when no row and no stored parameter has the exact name does the loose lookup apply, as before', () => {
+    const raw = book({ parameterList: [dilution('"volume">5 && "PH"<9')] });
+    expect(rowsOf(raw)['parameterList:2']).toMatchObject({ action: 'create', errors: [], needs: [] });
+    expect(showIf(raw)).toEqual({ all: [{ parameterId: 'volume', op: 'gt', value: 5 }, { parameterId: 'ph', op: 'lt', value: 9 }] });
+  });
+});
+
+describe('fix W1 — parameter errors under an owner that is new or cannot be told apart', () => {
+  it('(a) when the owner has an error its rows show that error only', () => {
+    const rows = rowsOf(book({ operations: [['op1', 'PCR', ''], ['', 'PCR', '']], parameterList: [['cycles', '', 'PCR', 'Cycles', 'Number', ''], ['nope', '', 'PCR', 'Other', 'Number', '']] }));
+    expect(rows['parameterList:2'].errors).toEqual([BOTH]);
+    expect(rows['parameterList:3'].errors).toEqual([BOTH]);
+  });
+
+  it('(b) a parameterId under an operation this upload creates says the operation is new', () => {
+    const rows = rowsOf(book({ operations: [['', 'PCR', '']], parameterList: [['cycles', '', 'PCR', 'Cycles', 'Number', ''], ['', '', 'PCR', 'Extension', 'Number', '']] }));
+    expect(rows['parameterList:2']).toMatchObject({ action: 'skip', errors: ['“cycles” is a parameter id from an existing operation, but this row\'s operation is new (row 2). Clear the id to create the parameter.'] });
+    expect(rows['parameterList:3']).toMatchObject({ action: 'create', errors: [] });
+  });
+
+  it('(b) and likewise under a parameter set this upload creates', () => {
+    const rows = rowsOf(book({ parameterList: [['volume', 'Fresh', '', 'Volume', 'Number', '']] }));
+    expect(rows['parameterList:2'].errors).toEqual(['“volume” is a parameter id from an existing parameter set, but this row\'s parameter set is new. Clear the id to create the parameter.']);
   });
 });

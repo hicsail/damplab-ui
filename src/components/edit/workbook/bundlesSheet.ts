@@ -1,6 +1,6 @@
 import { sameList } from './cells';
 import { matchRows } from './matching';
-import { OperationRowRef, resolveOperationName } from './operationsWorkbookSheet';
+import { OperationRowRef, ReferenceWarning, resolveOperationName } from './operationsWorkbookSheet';
 import { CatalogSnapshot, Need, PlanRow, RawRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
 /**
@@ -82,6 +82,8 @@ export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { op
     const errors = [...groupErrors[index].errors, ...match.errors];
     const warnings = [...match.warnings];
     const needs: Need[] = [];
+    // Steps whose name a different stored operation holds today.
+    const moved: ReferenceWarning[] = [];
     const existing = match.existingId !== undefined ? catalog.bundles.find((bundle) => bundle.id === match.existingId) : undefined;
     let action: RowAction = match.action;
     const changed: string[] = [];
@@ -122,6 +124,7 @@ export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { op
         for (const { raw } of ordered) {
           const name = raw.cells.Operation;
           const found = resolveOperationName(name, ctx.operationRows, catalog);
+          if ((found.kind === 'existing' || found.kind === 'row') && found.warning && !moved.some((warning) => warning.text === found.warning!.text)) moved.push(found.warning);
           if (found.kind === 'existing') steps.push({ name, id: found.operation.id });
           else if (found.kind === 'row') {
             steps.push({ name, rowKey: found.rowKey });
@@ -148,9 +151,12 @@ export function planBundles(sheet: RawSheet, catalog: CatalogSnapshot, ctx: { op
 
     if (errors.length > 0) action = 'skip';
     const writes = action === 'create' || action === 'update';
+    // Only a bundle whose steps this upload writes: one that ends up unchanged moves nothing.
+    const said = writes && changes.steps !== undefined ? moved : [];
+    warnings.push(...said.map((warning) => warning.text));
     rows.push({
       key, sheet: 'bundles', rowNumber: first.rowNumber, label: group.name, action,
-      changed: writes ? changed : [], errors, warnings, selectedByDefault: writes && match.selectedByDefault, needs: writes ? needs : []
+      changed: writes ? changed : [], errors, warnings, selectedByDefault: writes && match.selectedByDefault && !said.some((warning) => warning.untick), needs: writes ? needs : []
     });
   });
 

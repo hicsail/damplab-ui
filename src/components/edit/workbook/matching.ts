@@ -3,6 +3,8 @@ import { nearKey } from './cells';
 export interface MatchResult {
   action: 'create' | 'update';
   existingId?: string;
+  /** The matched record's position in `existing` — what tells two records without an id apart. */
+  existingIndex?: number;
   errors: string[];
   warnings: string[];
   selectedByDefault: boolean;
@@ -16,7 +18,9 @@ export const rowList = (numbers: ReadonlyArray<number>): string => `${numbers.sl
  * parameters, all bundles, all SOW text blocks. A row is matched by id only.
  *
  * - a non-blank id that matches is an update; one that matches nothing is an error;
- * - a blank id is always a create, never an update of the record with that name;
+ * - a blank id is always a create, never an update of the record with that name —
+ *   except that a record which itself has no id has nothing else to be matched
+ *   on: the one such record of exactly the row's name is that row's, an update;
  * - a create whose name equals an existing record's exactly (trimmed) would make a
  *   second record of that name: a warning, unticked by default;
  * - a create whose name equals an existing record's, or another new row's, only
@@ -32,10 +36,11 @@ export function matchRows(
   const results: MatchResult[] = rows.map((row) => {
     const result: MatchResult = { action: 'create', errors: [], warnings: [], selectedByDefault: true };
     if (row.id !== '') {
-      const found = existing.find((e) => e.id === row.id);
-      if (found) {
+      const index = existing.findIndex((e) => e.id === row.id);
+      if (index >= 0) {
         result.action = 'update';
-        result.existingId = found.id;
+        result.existingId = row.id;
+        result.existingIndex = index;
       } else {
         result.errors.push(`No ${noun} has id “${row.id}”.`);
       }
@@ -43,6 +48,13 @@ export function matchRows(
     }
     if (row.name === '') {
       result.errors.push(`A new ${noun} needs a name.`);
+      return result;
+    }
+    const withoutId = existing.map((e, index) => ({ e, index })).filter(({ e }) => e.id === '' && e.name.trim() === row.name);
+    if (withoutId.length === 1) {
+      result.action = 'update';
+      result.existingId = '';
+      result.existingIndex = withoutId[0].index;
       return result;
     }
     if (existing.some((e) => e.name.trim() === row.name)) {
@@ -74,13 +86,13 @@ export function matchRows(
   const groups = new Map<string, number[]>();
   rows.forEach((row, i) => {
     if (results[i].errors.length > 0) return;
-    const key = results[i].action === 'update' ? `update:${results[i].existingId}` : `create:${row.name}`;
+    const key = results[i].action === 'update' ? `update:${results[i].existingIndex}` : `create:${row.name}`;
     groups.set(key, [...(groups.get(key) ?? []), i]);
   });
   for (const [key, indexes] of groups) {
     if (indexes.length < 2) continue;
     const list = rowList(indexes.map((i) => rows[i].rowNumber));
-    const name = key.startsWith('update:') ? (existing.find((e) => `update:${e.id}` === key)?.name.trim() ?? '') : rows[indexes[0]].name;
+    const name = key.startsWith('update:') ? existing[results[indexes[0]].existingIndex!].name.trim() : rows[indexes[0]].name;
     const message = key.startsWith('update:') ? `Rows ${list} both resolve to “${name}”.` : `Rows ${list} both create “${name}”.`;
     for (const i of indexes) results[i].errors.push(message);
   }

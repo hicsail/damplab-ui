@@ -79,9 +79,10 @@ describe('download → upload, unchanged (rule 2)', () => {
     // The sets are still found by name, so their parameters would be second ones.
     expect(rows.filter((r) => r.sheet === 'parameterList').slice(0, 3).every((r) => r.warnings.includes(same('parameter')) && !r.selectedByDefault)).toBe(true);
     // "PCR" now means the operation the Operations row creates, which has no parameters yet: these wait for that row.
-    expect(rows.filter((r) => r.sheet === 'parameterList').slice(3).map((r) => [r.warnings, r.needs[0]])).toEqual([
-      [[], { what: 'operation “PCR”', anyOf: ['operations:2'] }],
-      [[], { what: 'operation “PCR”', anyOf: ['operations:2'] }]
+    const newPcr = '“PCR” means the new operation in row 2, not the existing operation named “PCR”.';
+    expect(rows.filter((r) => r.sheet === 'parameterList').slice(3).map((r) => [r.warnings, r.selectedByDefault, r.needs[0]])).toEqual([
+      [[newPcr], true, { what: 'operation “PCR”', anyOf: ['operations:2'] }],
+      [[newPcr], true, { what: 'operation “PCR”', anyOf: ['operations:2'] }]
     ]);
     expect(plan.bundles!.work.bundles['bundles:2'].changes.steps).toEqual([
       { name: 'PCR', rowKey: 'operations:2' }, { name: 'Gibson Assembly', rowKey: 'operations:3' }, { name: 'PCR', rowKey: 'operations:2' }

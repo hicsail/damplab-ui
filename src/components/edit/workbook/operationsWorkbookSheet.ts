@@ -154,11 +154,17 @@ export function operationRowsByName(sheet: RawSheet | undefined): Map<string, Op
   return out;
 }
 
+/** Said on a row that names an operation by a name a different stored operation holds; `untick` when nothing else holds the row back. */
+export interface ReferenceWarning {
+  text: string;
+  untick: boolean;
+}
+
 export type OperationReference =
   /** An operation that exists. */
-  | { kind: 'existing'; operation: CatalogOperation }
+  | { kind: 'existing'; operation: CatalogOperation; warning?: ReferenceWarning }
   /** The operation this Operations row creates. */
-  | { kind: 'row'; rowKey: string }
+  | { kind: 'row'; rowKey: string; rowNumber: number; warning?: ReferenceWarning }
   /** The rows of this upload cannot say which operation is meant. */
   | { kind: 'error'; message: string }
   /** No row carries the name, and this many (none, or two or more) stored operations do. */
@@ -170,14 +176,30 @@ export type OperationReference =
  * the stored one when the row has an id (so a renamed operation is found by its
  * new name), the one the row creates when it has none; two or more cannot say
  * which. Only a name no row carries is looked up among the stored operations.
+ *
+ * When a row settles the name while a *different* stored operation is the one
+ * currently called that, the reference comes with a warning for the rows that
+ * use it: they would write to another operation than the name means today.
+ * They are unticked by default too, unless the row creates its operation and
+ * the stored namesake has no row here — then they already wait for that
+ * create, which is itself unticked.
  */
 export function resolveOperationName(name: string, operationRows: ReadonlyMap<string, ReadonlyArray<OperationRowRef>>, catalog: CatalogSnapshot): OperationReference {
   const rows = operationRows.get(name) ?? [];
   if (rows.length > 1) return { kind: 'error', message: `Rows ${rowList(rows.map((row) => row.rowNumber))} are both named “${name}” — rename one so this row can say which.` };
   if (rows.length === 1) {
-    if (rows[0].id === '') return { kind: 'row', rowKey: rows[0].rowKey };
-    const operation = catalog.operations.find((candidate) => candidate.id === rows[0].id);
-    return operation ? { kind: 'existing', operation } : { kind: 'error', message: `Row ${rows[0].rowNumber} is named “${name}”, but no operation has its id.` };
+    const [row] = rows;
+    const namesakes = catalog.operations.filter((candidate) => candidate.name.trim() === name && candidate.id !== row.id);
+    const renamedAway = namesakes.some((namesake) => [...operationRows].some(([other, others]) => other !== name && others.some((candidate) => candidate.id === namesake.id)));
+    const warning: ReferenceWarning | undefined =
+      namesakes.length === 0
+        ? undefined
+        : row.id === '' && !renamedAway
+          ? { text: `“${name}” means the new operation in row ${row.rowNumber}, not the existing operation named “${name}”.`, untick: false }
+          : { text: `“${name}” now means the operation in row ${row.rowNumber}, not the operation currently named “${name}”.`, untick: true };
+    if (row.id === '') return { kind: 'row', rowKey: row.rowKey, rowNumber: row.rowNumber, warning };
+    const operation = catalog.operations.find((candidate) => candidate.id === row.id);
+    return operation ? { kind: 'existing', operation, warning } : { kind: 'error', message: `Row ${row.rowNumber} is named “${name}”, but no operation has its id.` };
   }
   const stored = catalog.operations.filter((operation) => operation.name.trim() === name);
   return stored.length === 1 ? { kind: 'existing', operation: stored[0] } : { kind: 'catalog', count: stored.length };

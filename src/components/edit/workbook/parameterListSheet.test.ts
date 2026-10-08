@@ -56,6 +56,27 @@ describe('Parameter List — a downloaded sheet uploaded unchanged (rule 2)', ()
   });
 });
 
+describe('Parameter List — a stored parameter without an id still round-trips (fix I3)', () => {
+  const seq: any = { id: 'op7', name: 'Send Sample to Sequencing', parameterSetIds: [], ownParameters: [{ name: 'Sequencing type', type: 'dropdown', options: [{ id: 'sanger', name: 'Sanger' }] }, { id: 'notes', name: 'Notes', type: 'string' }] };
+  const cat = catalogOf({ operations: [seq] });
+
+  it('downloads with a blank parameterId and uploads as unchanged: zero creates, zero updates, no warning', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    expect(rows.map((r) => r[0])).toEqual(['', 'notes']);
+    const result = plan(header, rows, none, cat);
+    expect(result.rows.map((r) => [r.action, r.warnings, r.errors])).toEqual([['unchanged', [], []], ['unchanged', [], []]]);
+  });
+
+  it('an edit to its row updates it in place, keeping its option ids and leaving it without an id', () => {
+    const [header, first, second] = parameterListExportRows(cat);
+    const edited = [...first];
+    edited[header.indexOf('description')] = 'Which chemistry';
+    const result = plan(header, [edited, second], none, cat);
+    expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['description'], warnings: [], errors: [] });
+    expect(buildOwnerParameters(result.work.owners[0], new Set([result.rows[0].key]))).toEqual([{ ...seq.ownParameters[0], description: 'Which chemistry' }, seq.ownParameters[1]]);
+  });
+});
+
 describe('Parameter List — updates (rules 3, 6, 17)', () => {
   it('updates the parameter its parameterId gives, and changes only what the sheet changes', () => {
     const result = plan(['parameterId', 'parameterSet', 'parameter', 'description'], [['volume', 'Buffers', 'Volume', 'Microlitres']]);

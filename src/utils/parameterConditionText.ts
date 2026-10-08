@@ -260,11 +260,17 @@ export interface ConditionScope {
   setId?: string;
   /** Every parameter set, for qualified references. */
   sets: ReadonlyArray<ScopeSet>;
+  /**
+   * Lets the caller say which parameter of `list` a name means before the list is searched by name:
+   * its index, -1 for "none", or undefined to search as usual. `set` is the other set a qualified
+   * reference names; absent when `list` is the carrier's own.
+   */
+  pick?: (name: string, list: ReadonlyArray<any>, set: ScopeSet | undefined) => number | undefined;
 }
 
 const key = (s: unknown): string => String(s ?? '').trim().toLowerCase();
 /** `key` with quotes straightened, so a hand-typed "Buyer's note" finds `Buyer’s note`. */
-export const looseKey = (s: unknown): string => straighten(key(s));
+const looseKey = (s: unknown): string => straighten(key(s));
 /** The items named `wanted` (rule 4): an exact match wins; failing one, a match with quotes straightened on both sides. */
 export function named<T>(items: readonly T[], nameOf: (item: T) => unknown, wanted: unknown): T[] {
   const exact = items.filter((item) => key(nameOf(item)) === key(wanted));
@@ -299,6 +305,7 @@ function resolveComparison(ast: ComparisonAst, scope: ConditionScope): Compariso
   // 1. Which list (rule 5).
   let list: ReadonlyArray<any> = scope.list;
   let parameterSetId: string | undefined;
+  let otherSet: ScopeSet | undefined;
   let where = 'here';
   if (ast.ref.set !== undefined) {
     const found = named(scope.sets, (set) => set.name, ast.ref.set);
@@ -309,15 +316,22 @@ function resolveComparison(ast: ComparisonAst, scope: ConditionScope): Compariso
     if (scope.setId === undefined || found[0].id !== scope.setId) {
       list = listOf(found[0]);
       parameterSetId = found[0].id;
+      otherSet = found[0];
     }
   }
 
   // 2. Which parameter.
-  const matches = named(
-    list.map((parameter, index) => ({ parameter, index })),
-    ({ parameter }) => parameter?.name,
-    ast.ref.name
-  );
+  const picked = scope.pick?.(ast.ref.name, list, otherSet);
+  const matches =
+    picked === undefined
+      ? named(
+          list.map((parameter, index) => ({ parameter, index })),
+          ({ parameter }) => parameter?.name,
+          ast.ref.name
+        )
+      : picked >= 0 && picked < list.length
+        ? [{ parameter: list[picked], index: picked }]
+        : [];
   if (matches.length === 0) throw new ResolveProblem(`No parameter is named “${ast.ref.name}” ${where}.`);
   if (matches.length > 1) throw new ResolveProblem(`${matches.length} parameters are named “${ast.ref.name}” ${where}.`);
   const { parameter, index } = matches[0];

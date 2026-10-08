@@ -1,9 +1,9 @@
 import { makeUniqueIds } from '../../../utils/idFromName';
 import { effectiveValidation, parseValidation } from '../../../utils/parameterValidation';
-import { ConditionAst, ConditionScope, conditionText, looseKey, named, parseCondition, RefAst, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
+import { ConditionAst, ConditionScope, conditionText, named, parseCondition, RefAst, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
 import { nearKey, normalizeEol, parseYesNo, sameList, splitList, yesNo } from './cells';
 import { matchRows, rowList } from './matching';
-import { OperationRowRef, resolveOperationName } from './operationsWorkbookSheet';
+import { OperationReference, OperationRowRef, ReferenceWarning, resolveOperationName } from './operationsWorkbookSheet';
 import { CatalogSet, CatalogSnapshot, Need, PlanRow, RawRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
 /**
@@ -266,8 +266,10 @@ const newParameter = (): Record<string, any> => ({
 
 export interface ParameterEntry {
   rowKey: string;
-  /** Present for an update. */
+  /** Present for an update: the stored parameter's id — '' for one stored without an id. */
   existingParamId?: string;
+  /** Present for an update: the stored parameter's position in the owner's list, which also tells id-less ones apart. */
+  storedIndex?: number;
   /** The whole parameter after this row is applied. A create's id is '' until minted. */
   next: Record<string, any>;
   /** The row's conditionalDisplayLogic cell, parsed — present when the cell changed and is not blank. `next.showIf` is what it resolved to. */
@@ -282,6 +284,8 @@ export interface OwnerRow {
   id: string;
   /** The `parameter` cell as uploaded; '' when blank or when the sheet has no such column. */
   name: string;
+  /** The position in the owner's stored list of the parameter this row is; absent for a row that creates one, or is matched to none. */
+  storedIndex?: number;
 }
 
 export interface OwnerWork {
@@ -345,7 +349,29 @@ export function planParameterList(
     groups.get(key)!.rows.push(raw);
   }
 
+  // Two names can mean one operation: a renamed operation is found by its new name (its row) and still by its
+  // stored one. Their rows are that operation's rows, matched together and written once.
+  const merged: Array<{ kind: 'set' | 'operation'; name: string; rows: RawRow[]; found?: OperationReference }> = [];
+  const byOperation = new Map<string, { rows: RawRow[] }>();
+  const referenceWarnings = new Map<number, ReferenceWarning>();
   for (const group of groups.values()) {
+    if (group.kind === 'set') {
+      merged.push(group);
+      continue;
+    }
+    const found = resolveOperationName(group.name, ctx.operationRows, catalog);
+    if ((found.kind === 'existing' || found.kind === 'row') && found.warning) for (const raw of group.rows) referenceWarnings.set(raw.rowNumber, found.warning);
+    const first = found.kind === 'existing' ? byOperation.get(found.operation.id) : undefined;
+    if (first) {
+      first.rows.push(...group.rows);
+      first.rows.sort((a, b) => a.rowNumber - b.rowNumber);
+      continue;
+    }
+    if (found.kind === 'existing') byOperation.set(found.operation.id, group);
+    merged.push({ ...group, rows: group.rows, found });
+  }
+
+  for (const group of merged) {
     const ownerErrors: string[] = [];
     const ownerWarnings: string[] = [];
     const needs: Need[] = [];
@@ -354,6 +380,8 @@ export function planParameterList(
       rows: group.rows.map((raw) => ({ rowKey: rowKey('parameterList', raw.rowNumber), rowNumber: raw.rowNumber, id: raw.cells.parameterId ?? '', name: raw.cells.parameter ?? '' }))
     };
     let tickedByDefault = true;
+    /** Why a parameterId cannot be one of this owner's: the owner does not exist yet. */
+    let newOwner: string | undefined;
 
     if (group.kind === 'set') {
       const sameName = catalog.sets.filter((s) => s.name.trim() === group.name);
@@ -364,6 +392,7 @@ export function planParameterList(
         owner.existingId = set.id;
         owner.stored = set.parameters;
       } else {
+        newOwner = "is a parameter id from an existing parameter set, but this row's parameter set is new";
         if (group.name.includes(';')) ownerErrors.push('A parameter set name cannot contain “;”.');
         const near = catalog.sets.find((s) => nearKey(s.name) === nearKey(group.name));
         if (near) {
@@ -372,7 +401,7 @@ export function planParameterList(
         }
       }
     } else {
-      const found = resolveOperationName(group.name, ctx.operationRows, catalog);
+      const found = group.found!;
       if (found.kind === 'existing') {
         owner.existingId = found.operation.id;
         owner.stored = found.operation.ownParameters;
@@ -381,6 +410,7 @@ export function planParameterList(
       } else if (found.kind === 'row') {
         owner.operationRowKey = found.rowKey;
         needs.push({ what: `operation “${group.name}”`, anyOf: [found.rowKey] });
+        newOwner = `is a parameter id from an existing operation, but this row's operation is new (row ${found.rowNumber})`;
       } else if (found.kind === 'error') {
         ownerErrors.push(found.message);
       } else if (found.count > 1) {
@@ -390,22 +420,29 @@ export function planParameterList(
       }
     }
 
-    const matches = matchRows(
-      group.rows.map((raw) => ({ rowNumber: raw.rowNumber, id: raw.cells.parameterId ?? '', name: raw.cells.parameter ?? '' })),
-      owner.stored.map((p) => ({ id: String(p?.id ?? ''), name: String(p?.name ?? '') })),
-      'parameter'
-    );
+    // An owner that cannot be told has no parameters to match its rows against: they carry the owner's error and nothing more.
+    const matches =
+      ownerErrors.length > 0
+        ? undefined
+        : matchRows(
+            group.rows.map((raw) => ({ rowNumber: raw.rowNumber, id: raw.cells.parameterId ?? '', name: raw.cells.parameter ?? '' })),
+            owner.stored.map((p) => ({ id: String(p?.id ?? ''), name: String(p?.name ?? '') })),
+            'parameter'
+          );
 
     group.rows.forEach((raw, index) => {
-      const match = matches[index];
+      const match = matches?.[index];
       const key = rowKey('parameterList', raw.rowNumber);
-      const errors = [...ownerErrors, ...match.errors];
-      const warnings = [...ownerWarnings, ...match.warnings];
-      let action: RowAction = match.action;
+      const id = raw.cells.parameterId ?? '';
+      // An id under an owner this upload creates matches nothing by definition: say why, not that the id is unknown.
+      const errors = !match ? [...ownerErrors] : newOwner !== undefined && id !== '' ? [`“${id}” ${newOwner}. Clear the id to create the parameter.`] : [...match.errors];
+      const warnings = [...ownerWarnings, ...(match?.warnings ?? [])];
+      let action: RowAction = match?.action ?? 'skip';
       let changed: string[] = [];
+      owner.rows[index].storedIndex = match?.existingIndex;
 
-      if (errors.length === 0) {
-        const stored = match.existingId !== undefined ? owner.stored.find((p) => String(p?.id ?? '') === match.existingId) : undefined;
+      if (match && errors.length === 0) {
+        const stored = match.existingIndex !== undefined ? owner.stored[match.existingIndex] : undefined;
         if (stored) {
           const current = parameterCells(stored, {}, ownerScope(catalog, { kind: owner.kind, id: owner.existingId }, owner.stored));
           changed = dataColumns.filter((column) => !sameCell(column, raw.cells[column] ?? '', current[column]));
@@ -421,16 +458,16 @@ export function planParameterList(
           if (applied.errors.length === 0) {
             // A cell can differ and still change nothing (an ignored options cell, allowMultiple on a checkbox list).
             if (stored && applied.condition === undefined && JSON.stringify(applied.next) === JSON.stringify(stored)) action = 'unchanged';
-            else owner.entries.push({ rowKey: key, existingParamId: match.existingId, next: applied.next, condition: applied.condition });
+            else owner.entries.push({ rowKey: key, existingParamId: match.existingId, storedIndex: match.existingIndex, next: applied.next, condition: applied.condition });
           }
         }
       }
       if (errors.length > 0) action = 'skip';
       const writes = action === 'create' || action === 'update';
       planned.set(raw.rowNumber, {
-        key, sheet: 'parameterList', rowNumber: raw.rowNumber, label: labelOf(group.name, raw), action,
+        key, sheet: 'parameterList', rowNumber: raw.rowNumber, label: labelOf(raw.cells.parameterSet || raw.cells.operation || group.name, raw), action,
         changed: writes ? changed : [], errors, warnings,
-        selectedByDefault: writes && match.selectedByDefault && tickedByDefault, needs: writes ? needs : []
+        selectedByDefault: writes && (match?.selectedByDefault ?? false) && tickedByDefault, needs: writes ? needs : []
       });
     });
     owners.push(owner);
@@ -438,6 +475,14 @@ export function planParameterList(
 
   const operationSets = ctx.operationSets ?? catalog.operations.map((operation) => ({ name: operation.name.trim(), setKeys: operation.parameterSetIds }));
   resolveConditions(owners, catalog, new Map([...planned.values()].map((row) => [row.key, row] as const)), operationSets);
+
+  // Said last, once it is known what each row does: a row that ends up unchanged, or refused, writes nothing anywhere.
+  for (const [rowNumber, warning] of referenceWarnings) {
+    const row = planned.get(rowNumber)!;
+    if (row.action !== 'create' && row.action !== 'update') continue;
+    row.warnings.push(warning.text);
+    if (warning.untick) row.selectedByDefault = false;
+  }
 
   const rows = [...planned.values()].sort((a, b) => (a.rowNumber ?? 0) - (b.rowNumber ?? 0));
   return { sheet: 'parameterList', rowCount: sheet.rows.length, rows, ignoredColumns: sheet.ignoredColumns, work: { owners } };
@@ -461,44 +506,52 @@ const idOfParam = (parameter: any): string => String(parameter?.id ?? '');
 const ownerOfSet = (owners: ReadonlyArray<OwnerWork>, set: { id: string; name: string }): OwnerWork | undefined =>
   owners.find((owner) => owner.kind === 'set' && (owner.existingId !== undefined ? owner.existingId === set.id : owner.name === String(set.name ?? '').trim()));
 
-/** A name no condition can write: what a stored parameter is listed under while a row of this upload carries its name. */
-const SHADOWED = '\u0000';
+/** The stored parameter an update entry replaces. */
+const storedOf = (owner: OwnerWork, entry: ParameterEntry): any => (entry.storedIndex !== undefined ? owner.stored[entry.storedIndex] : undefined);
 
 /**
- * An owner's parameters under the names a condition finds them by. The rows of
- * this upload come first, whether or not they are applied:
+ * Which parameter a condition's name means, decided on the exact name and with
+ * the rows of this upload first, whether or not they are applied:
  *
- * - a parameter a row gives by id is listed under that row's name cell, so a
- *   renamed parameter is found by its new name and not by its old one;
- * - a stored parameter no row gives by id is hidden while a row carries its
- *   name. That row's parameter is the one meant — the one it creates — and if
- *   the row is not applied the name finds nothing: it never falls back to the
- *   stored parameter.
+ * - exactly one row of the owner has that name → that row's parameter: the
+ *   stored one it gives (so a renamed parameter is found by its new name), or
+ *   the one it creates. If that row is not applied the name finds nothing: it
+ *   never falls back to a stored parameter of the same name;
+ * - no row has it → the one stored parameter of exactly that name that no row
+ *   gives;
+ * - otherwise the resolver's own lookup, as before (case and quote style
+ *   forgiven, two matches an error).
  *
- * Everything but `name` is as in `parameters`, in the same order.
+ * Two rows with the name are refused before this is asked (`rowProblem`).
  */
-function parametersAsNamed(owner: OwnerWork | undefined, parameters: ReadonlyArray<any>): any[] {
-  const rows = (owner?.rows ?? []).filter((row) => row.name !== '');
-  if (rows.length === 0) return [...parameters];
-  const nameById = new Map<string, string>();
-  for (const row of rows) if (row.id !== '' && !nameById.has(row.id)) nameById.set(row.id, row.name);
-  const carried = new Set(rows.map((row) => looseKey(row.name)));
-  const storedIds = new Set(owner!.stored.map(idOfParam));
-  return parameters.map((parameter) => {
-    const id = idOfParam(parameter);
-    if (nameById.has(id)) return { ...parameter, name: nameById.get(id) };
-    return storedIds.has(id) && carried.has(looseKey(parameter?.name)) ? { ...parameter, name: SHADOWED } : parameter;
-  });
+function pickParameter(owner: OwnerWork, owners: ReadonlyArray<OwnerWork>): NonNullable<ConditionScope['pick']> {
+  return (name, list, set) => {
+    const target = set === undefined ? owner : ownerOfSet(owners, { id: set.id, name: set.name });
+    if (!target) return undefined;
+    const wanted = name.trim();
+    // A parameter without an id keeps its place in the list; every other one is found by its id.
+    const indexOfStored = (storedIndex: number): number => {
+      const id = idOfParam(target.stored[storedIndex]);
+      return id === '' ? storedIndex : list.findIndex((parameter) => idOfParam(parameter) === id);
+    };
+    const carrying = target.rows.filter((row) => row.name === wanted);
+    if (carrying.length > 1) return -1;
+    if (carrying.length === 1) {
+      const [row] = carrying;
+      if (row.storedIndex !== undefined) return indexOfStored(row.storedIndex);
+      if (row.id !== '') return -1;
+      const storedIds = new Set(target.stored.map(idOfParam));
+      return list.findIndex((parameter) => !storedIds.has(idOfParam(parameter)) && String(parameter?.name ?? '').trim() === wanted);
+    }
+    const given = new Set(target.rows.map((row) => row.storedIndex));
+    const free = target.stored.map((_parameter, index) => index).filter((index) => !given.has(index) && String(target.stored[index]?.name ?? '').trim() === wanted);
+    return free.length === 1 ? indexOfStored(free[0]) : undefined;
+  };
 }
 
-/** Where a condition of this owner is resolved: the scope it lives in, with every list under the names of `parametersAsNamed`. */
+/** Where a condition of this owner is resolved: the scope it lives in, with its names settled by `pickParameter`. */
 function namedScope(owner: OwnerWork, owners: ReadonlyArray<OwnerWork>, parameters: ReadonlyArray<any>, carrierIndex: number, sets: ReadonlyArray<CatalogSet>): ConditionScope {
-  return {
-    list: parametersAsNamed(owner, parameters),
-    carrierIndex,
-    setId: ownerSetId(owner),
-    sets: sets.map((set) => ({ ...set, parameters: parametersAsNamed(ownerOfSet(owners, set), set.parameters) }))
-  };
+  return { list: parameters, carrierIndex, setId: ownerSetId(owner), sets, pick: pickParameter(owner, owners) };
 }
 
 const refsIn = (condition: ConditionAst, out: RefAst[] = []): RefAst[] => {
@@ -519,13 +572,13 @@ function rowProblem(condition: ConditionAst, owner: OwnerWork, owners: ReadonlyA
     const targets = ref.set === undefined ? [owner] : named(owners.filter((other) => other.kind === 'set'), (other) => other.name, ref.set);
     if (targets.length !== 1) continue;
     const [target] = targets;
-    const carrying = named(target.rows.filter((row) => row.name !== ''), (row) => row.name, ref.name);
+    const carrying = target.rows.filter((row) => row.name !== '' && row.name === ref.name.trim());
     if (carrying.length > 1) return `Rows ${rowList(carrying.map((row) => row.rowNumber))} are both named “${ref.name}” — rename one so this row can say which.`;
     if (carrying.length === 0) continue;
     const [row] = carrying;
-    if (row.id === '') {
-      if (!target.entries.some((entry) => entry.rowKey === row.rowKey)) return `Row ${row.rowNumber}, which would create “${ref.name}”, has an error.`;
-    } else if (!target.stored.some((parameter) => idOfParam(parameter) === row.id)) return `Row ${row.rowNumber} is named “${ref.name}”, but no parameter has its id.`;
+    if (row.storedIndex !== undefined) continue;
+    if (row.id !== '') return `Row ${row.rowNumber} is named “${ref.name}”, but no parameter has its id.`;
+    if (!target.entries.some((entry) => entry.rowKey === row.rowKey)) return `Row ${row.rowNumber}, which would create “${ref.name}”, has an error.`;
   }
   return undefined;
 }
@@ -557,7 +610,7 @@ export interface ResolvedOwnerParameters {
  * the list it produces and against `sets` — the other sets as they stand (when
  * planning: as this upload would leave them; when applying: as written so far,
  * with their real ids). A name is looked up among the rows of `owners` before
- * the stored parameters (`parametersAsNamed`). A row whose condition does not
+ * the stored parameters (`pickParameter`). A row whose condition does not
  * resolve is left out and the list rebuilt without it, since leaving a create
  * out changes the ids minted after it.
  */
@@ -569,7 +622,7 @@ export function resolveOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySe
     const mintedId = new Map(built.created.map((c) => [c.rowKey, c.id] as const));
     const conditioned = owner.entries.filter((entry) => live.has(entry.rowKey) && entry.condition !== undefined);
     const parameters = [...built.parameters];
-    const indexOf = (entry: ParameterEntry): number => parameters.findIndex((p) => idOfParam(p) === (entry.existingParamId ?? mintedId.get(entry.rowKey)));
+    const indexOf = (entry: ParameterEntry): number => entry.storedIndex ?? parameters.findIndex((p) => idOfParam(p) === mintedId.get(entry.rowKey));
     // A changed condition replaces the stored one. All are dropped before any is resolved, so a loop is judged among the new ones.
     for (const entry of conditioned) parameters[indexOf(entry)] = { ...parameters[indexOf(entry)], showIf: undefined };
     const setId = ownerSetId(owner);
@@ -627,7 +680,8 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
     return { sets, byOwner: owners.map((owner) => resolveOwnerParameters(owner, new Set(entryRows(owner).filter((key) => live.has(key))), owner.reservedIds, sets, owners)) };
   };
   const paramOf = (result: ResolvedOwnerParameters, entry: ParameterEntry): any => {
-    const id = entry.existingParamId ?? result.created.find((c) => c.rowKey === entry.rowKey)?.id;
+    if (entry.storedIndex !== undefined) return result.parameters[entry.storedIndex];
+    const id = result.created.find((c) => c.rowKey === entry.rowKey)?.id;
     return result.parameters.find((p) => idOfParam(p) === id);
   };
 
@@ -690,7 +744,7 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
       entry.next = { ...entry.next, showIf: condition };
 
       // 2. Unchanged after all: the cell was written differently but means what is stored.
-      const stored = entry.existingParamId !== undefined ? owner.stored.find((p) => idOfParam(p) === entry.existingParamId) : undefined;
+      const stored = storedOf(owner, entry);
       if (stored && JSON.stringify(entry.next) === JSON.stringify(stored)) {
         row.action = 'unchanged';
         row.changed = [];
@@ -709,7 +763,7 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
         const without = resolveAll(new Set([...all].filter((key) => key !== provider.rowKey))).byOwner[ownerIndex];
         if (!(entry.rowKey in without.failed) && JSON.stringify(paramOf(without, entry)?.showIf) === JSON.stringify(condition)) continue;
         const name = String(provider.next.name ?? '');
-        row.needs = [...row.needs, { what: provider.existingParamId === undefined ? `parameter “${name}”` : `an option of “${name}” this condition names`, anyOf: [provider.rowKey] }];
+        row.needs = [...row.needs, { what: provider.storedIndex === undefined ? `parameter “${name}”` : `an option of “${name}” this condition names`, anyOf: [provider.rowKey] }];
       }
 
       // 4. Rule 29: a set parameter that names another set is always shown on an operation that uses its set without the other.
@@ -737,7 +791,7 @@ function resolveConditions(owners: OwnerWork[], catalog: CatalogSnapshot, rowsBy
   owners.forEach((owner) => {
     const ownerKey = owner.kind === 'set' ? ownerSetId(owner)! : `operation:${owner.existingId ?? ''}`;
     for (const entry of owner.entries) {
-      const stored = entry.existingParamId !== undefined ? owner.stored.find((p) => idOfParam(p) === entry.existingParamId) : undefined;
+      const stored = storedOf(owner, entry);
       const kept = new Set(optionsOf(entry.next).map((option) => String(option?.id ?? '')));
       const dropped = new Set(optionsOf(stored).map((option) => String(option?.id ?? '')).filter((id) => !kept.has(id)));
       if (dropped.size === 0) continue;
@@ -772,9 +826,9 @@ export function buildOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySet<
 /** `buildOwnerParameters`, plus which row each created parameter came from and the id it was minted. */
 export function planOwnerParameters(owner: OwnerWork, liveRowKeys: ReadonlySet<string>, reservedIds: readonly string[] = owner.reservedIds): { parameters: any[]; created: Array<{ rowKey: string; id: string }> } {
   const live = owner.entries.filter((entry) => liveRowKeys.has(entry.rowKey));
-  const updates = new Map(live.filter((entry) => entry.existingParamId !== undefined).map((entry) => [entry.existingParamId, entry.next] as const));
-  const kept = owner.stored.map((parameter) => updates.get(String(parameter?.id ?? '')) ?? parameter);
-  const createEntries = live.filter((entry) => entry.existingParamId === undefined);
+  const updates = new Map(live.filter((entry) => entry.storedIndex !== undefined).map((entry) => [entry.storedIndex, entry.next] as const));
+  const kept = owner.stored.map((parameter, index) => updates.get(index) ?? parameter);
+  const createEntries = live.filter((entry) => entry.storedIndex === undefined);
   const minted = makeUniqueIds(createEntries.map((entry) => ({ ...entry.next, id: '' })), [...kept.map((parameter) => String(parameter?.id ?? '')), ...reservedIds]);
   return { parameters: [...kept, ...minted], created: createEntries.map((entry, index) => ({ rowKey: entry.rowKey, id: minted[index].id })) };
 }

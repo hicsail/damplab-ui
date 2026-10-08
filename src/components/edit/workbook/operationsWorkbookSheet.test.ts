@@ -114,7 +114,7 @@ describe('Operations — what a name on another sheet means (workbook first)', (
 
   it.each([
     ['one row with an id: the stored operation, by its new name', 'PCR v2', { kind: 'existing', operation: pcr }],
-    ['one row without an id: the operation that row creates', 'Ligation', { kind: 'row', rowKey: 'operations:2' }],
+    ['one row without an id: the operation that row creates', 'Ligation', { kind: 'row', rowKey: 'operations:2', rowNumber: 2 }],
     ['two rows: cannot say which', 'Twice', { kind: 'error', message: 'Rows 4 and 5 are both named “Twice” — rename one so this row can say which.' }],
     ['one row whose id matches nothing', 'Lost', { kind: 'error', message: 'Row 6 is named “Lost”, but no operation has its id.' }],
     ['no row: the one stored operation of that name', 'Gibson Assembly', { kind: 'existing', operation: gibson }],
@@ -122,6 +122,22 @@ describe('Operations — what a name on another sheet means (workbook first)', (
     ['no row and no stored operation', 'Nope', { kind: 'catalog', count: 0 }]
   ])('%s', (_case, name, expected) => {
     expect(resolveOperationName(name, rows, catalog)).toEqual(expected);
+  });
+
+  it('a row that settles a name a different stored operation holds comes with a warning for the rows that use it', () => {
+    const NOW = { text: '“Gibson Assembly” now means the operation in row 2, not the operation currently named “Gibson Assembly”.', untick: true };
+    // PCR is renamed onto Gibson Assembly's name: Gibson Assembly has no row, or is renamed away.
+    expect(resolveOperationName('Gibson Assembly', operationRowsByName(rawSheet('operations', ['id', 'name'], [['op1', 'Gibson Assembly']])), catalog)).toEqual({ kind: 'existing', operation: pcr, warning: NOW });
+    expect(resolveOperationName('Gibson Assembly', operationRowsByName(rawSheet('operations', ['id', 'name'], [['op1', 'Gibson Assembly'], ['op2', 'PCR']])), catalog)).toEqual({ kind: 'existing', operation: pcr, warning: NOW });
+    // A create of that name: only held back by its own untick, unless the namesake is renamed away.
+    expect(resolveOperationName('PCR', operationRowsByName(rawSheet('operations', ['id', 'name'], [['', 'PCR']])), catalog)).toEqual({
+      kind: 'row', rowKey: 'operations:2', rowNumber: 2, warning: { text: '“PCR” means the new operation in row 2, not the existing operation named “PCR”.', untick: false }
+    });
+    expect(resolveOperationName('PCR', operationRowsByName(rawSheet('operations', ['id', 'name'], [['', 'PCR'], ['op1', 'PCR old']])), catalog)).toMatchObject({
+      kind: 'row', warning: { text: '“PCR” now means the operation in row 2, not the operation currently named “PCR”.', untick: true }
+    });
+    // Its own row under its own name, or a name nobody holds: nothing to say.
+    expect(resolveOperationName('PCR', operationRowsByName(rawSheet('operations', ['id', 'name'], [['op1', 'PCR']])), catalog)).toEqual({ kind: 'existing', operation: pcr, warning: undefined });
   });
 
   it('no row and two stored operations of that name', () => {
