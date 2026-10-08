@@ -37,6 +37,8 @@ import { useState } from 'react';
 import { idFromName } from '../../../utils/idFromName';
 import SampleSheetTemplateField, { SampleSheetTemplateOwner } from '../SampleSheetTemplateField';
 import { createDragKey, EditableParameter } from './parameterSave';
+import { applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
+import { ConditionContext, NO_CONDITION_CONTEXT, SHOW_IF_EXAMPLE, SHOW_IF_HELP, showIfError, showIfText, showIfWarning } from './showIfField';
 
 const TYPE_OPTIONS = [
   { value: 'string', label: 'Text' },
@@ -45,6 +47,7 @@ const TYPE_OPTIONS = [
   { value: 'sampleSheet', label: 'Samples spreadsheet' },
   { value: 'boolean', label: 'Yes/No' },
   { value: 'dropdown', label: 'Pick from list' },
+  { value: CHECKBOXES_CHOICE, label: 'Checkboxes' },
   { value: 'table', label: 'Table' }
 ];
 
@@ -121,6 +124,8 @@ export interface ParameterListEditorProps {
   listFooter?: React.ReactNode;
   /** A chip label for a row, e.g. "overrides Buffers". */
   rowChip?: (parameter: EditableParameter) => string | undefined;
+  /** What "Show only if" references are resolved against, beyond this list: the set being edited and every set. */
+  conditionContext?: ConditionContext;
 }
 
 export default function ParameterListEditor({
@@ -133,7 +138,8 @@ export default function ParameterListEditor({
   isIdLocked,
   listHeader,
   listFooter,
-  rowChip
+  rowChip,
+  conditionContext = NO_CONDITION_CONTEXT
 }: ParameterListEditorProps) {
   const [selectedParameterIndex, setSelectedParameterIndex] = useState(0);
 
@@ -199,6 +205,8 @@ export default function ParameterListEditor({
   };
 
   const selectedParameter = parameters[selectedParameterIndex];
+  const conditionError = showIfError(parameters, selectedParameterIndex, conditionContext);
+  const conditionWarning = showIfWarning(parameters, selectedParameterIndex, conditionContext);
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '280px 1fr' }, gap: 2 }}>
@@ -287,13 +295,25 @@ export default function ParameterListEditor({
                   onChange={(event) => updateParameter(selectedParameterIndex, { description: event.target.value })}
                 />
               </Grid>
+              <Grid size={12}>
+                <TextField
+                  label='Show only if'
+                  fullWidth
+                  placeholder={SHOW_IF_EXAMPLE}
+                  value={showIfText(parameters, selectedParameterIndex, conditionContext)}
+                  error={Boolean(conditionError)}
+                  helperText={conditionError ?? conditionWarning ?? SHOW_IF_HELP}
+                  FormHelperTextProps={conditionWarning && !conditionError ? { sx: { color: 'warning.main' } } : undefined}
+                  onChange={(event) => updateParameter(selectedParameterIndex, { _showIfText: event.target.value })}
+                />
+              </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
                   select
                   label='Answer format'
                   fullWidth
-                  value={selectedParameter.type ?? 'string'}
-                  onChange={(event) => updateParameter(selectedParameterIndex, { type: event.target.value })}
+                  value={typeChoiceOf(selectedParameter)}
+                  onChange={(event) => updateParameter(selectedParameterIndex, applyTypeChoice(event.target.value))}
                 >
                   {TYPE_OPTIONS.map((option) => (
                     <MenuItem key={option.value} value={option.value}>
@@ -323,6 +343,8 @@ export default function ParameterListEditor({
                   select
                   label='Allow multiple selections?'
                   fullWidth
+                  disabled={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE}
+                  helperText={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE ? 'Checkboxes always allow several.' : undefined}
                   value={selectedParameter.allowMultipleValues ? 'yes' : 'no'}
                   onChange={(event) =>
                     updateParameter(selectedParameterIndex, {
@@ -464,30 +486,15 @@ export default function ParameterListEditor({
                       <MenuItem value='no'>No</MenuItem>
                     </TextField>
                   </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
+                  <Grid size={{ xs: 12, md: 6 }}>
                     <TextField
-                      label='Minimum allowed value'
-                      type='number'
+                      label='Validation'
                       fullWidth
-                      value={selectedParameter.rangeValueMin ?? ''}
-                      onChange={(event) =>
-                        updateParameter(selectedParameterIndex, {
-                          rangeValueMin: event.target.value === '' ? undefined : Number(event.target.value)
-                        })
-                      }
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 3 }}>
-                    <TextField
-                      label='Maximum allowed value'
-                      type='number'
-                      fullWidth
-                      value={selectedParameter.rangeValueMax ?? ''}
-                      onChange={(event) =>
-                        updateParameter(selectedParameterIndex, {
-                          rangeValueMax: event.target.value === '' ? undefined : Number(event.target.value)
-                        })
-                      }
+                      placeholder='>0 && <100 && integer'
+                      value={validationText(selectedParameter)}
+                      error={Boolean(validationError(selectedParameter))}
+                      helperText={validationError(selectedParameter) ?? 'Rules joined by &&: >n, >=n, <n, <=n, integer. Leave blank for none.'}
+                      onChange={(event) => updateParameter(selectedParameterIndex, applyValidationText(event.target.value))}
                     />
                   </Grid>
                 </>

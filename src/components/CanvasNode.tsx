@@ -7,6 +7,7 @@ import CloseIcon       from '@mui/icons-material/Close';
 import { CanvasContext } from '../contexts/Canvas';
 import { getServiceIcon }   from '../assets/icons';
 import { RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
+import { nodeAnswersComplete } from '../utils/parameterAnswers';
 
 
 type Input = {
@@ -78,32 +79,10 @@ export default memo((input: Input) => {
         } else {
             setBackground('white');
         }
-        setAllFilled(checkIfDataFilled(data.data.formData))
+        // Incomplete is "a required value is missing" or "an answer breaks a rule" (rule 25),
+        // counted over the parameters that are shown: a hidden one never flags the node.
+        setAllFilled(nodeAnswersComplete(data.data.formData, data.data.parameters))
     }, [activeComponentId, data.data.id, data.data.formData]);
-
-    const checkIfDataFilled = (formData: any) => {
-
-        let filled = true;
-        formData.forEach((obj: any) => {
-            if (obj.paramType === 'result') {
-                if (obj.value === false && obj.required === true && ( obj.resultParamValue=== null || obj.resultParamValue === '')) {
-                    filled = false;
-                }
-            }
-            else if (obj.required === true) {
-                const isMulti = obj.allowMultipleValues === true || Array.isArray(obj.value);
-                if (isMulti) {
-                    const arr = obj.value;
-                    const hasValue = Array.isArray(arr) && arr.some((v: any) => v != null && String(v).trim() !== '');
-                    if (!hasValue) filled = false;
-                } else if (obj.value === '' || obj.value === undefined || obj.value === null) {
-                    filled = false;
-                }
-            }
-        });
-
-        return filled;
-    }
 
     const runCountEntry = Array.isArray(data.data.formData)
         ? data.data.formData.find((p: any) => p?.id === RUN_COUNT_PARAM_ID)

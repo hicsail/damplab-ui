@@ -9,6 +9,8 @@ import { diffWordsWithSpace } from 'diff';
 import { resolveParameterName } from '../utils/servicePricing';
 import { snapshotFallback } from '../utils/parameterSnapshot';
 import { isRetiredEquipmentParam } from '../utils/equipmentParams';
+import { isOtherTextEntryId, otherLabel, otherTextEntryId, otherTextFrom } from '../utils/otherOption';
+import { hiddenParameterIds, withoutHiddenAnswers } from '../utils/parameterConditions';
 import SowDiffText from './sow/SowDiffText';
 import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
 import { isSampleSheetParam, parseSampleSheetValue, sampleCountLabel } from '../utils/sampleSheetValue';
@@ -39,7 +41,7 @@ const parseStoredFileValue = (value: unknown): unknown => {
     }
 };
 
-export const formatParameterValue = (parameterDef: any, rawValue: unknown): string => {
+export const formatParameterValue = (parameterDef: any, rawValue: unknown, otherText?: string): string => {
     const value = parseStoredFileValue(rawValue);
     const base = (() => {
         if (Array.isArray(value)) return value.map((v) => String(v ?? '')).filter(Boolean).join(', ');
@@ -61,7 +63,7 @@ export const formatParameterValue = (parameterDef: any, rawValue: unknown): stri
     const optionNameById = new Map(
         options
             .filter((opt: any) => opt && typeof opt.id === 'string')
-            .map((opt: any) => [String(opt.id), String(opt.name ?? 'Option')] as const)
+            .map((opt: any) => [String(opt.id), otherLabel(String(opt.name ?? 'Option'), otherText)] as const)
     );
     if (Array.isArray(value)) {
         return value
@@ -115,7 +117,8 @@ export const getParameterFiles = (workflows: any[]): Array<{ label: string; file
             );
             if (!fileParamMap.size) return;
 
-            (node?.formData ?? []).forEach((entry: any) => {
+            // A file answered for a parameter that is now hidden is not listed.
+            withoutHiddenAnswers(serviceParams, Array.isArray(node?.formData) ? node.formData : []).forEach((entry: any) => {
                 if (!fileParamMap.has(entry?.id)) return;
                 const paramLabel = fileParamMap.get(entry.id);
                 const rawValues = Array.isArray(entry.value) ? entry.value : [entry.value];
@@ -171,7 +174,9 @@ export const getSampleSheets = (workflows: any[]): SampleSheetSlot[] => {
         (workflow?.nodes ?? []).forEach((node: any) => {
             const serviceParams = Array.isArray(node?.service?.parameters) ? node.service.parameters : [];
             const entries = normalizeFormEntries(node?.formData);
-            serviceParams.filter((p: any) => isSampleSheetParam(p)).forEach((param: any) => {
+            // A hidden samples-spreadsheet parameter is not asked for, so it is not a slot.
+            const hidden = hiddenParameterIds(serviceParams, entries);
+            serviceParams.filter((p: any) => isSampleSheetParam(p) && !hidden.has(p.id)).forEach((param: any) => {
                 const slot = sampleSheetSlot(node, param, entries.find((entry) => entry.id === param.id)?.value);
                 if (slot) slots.push(slot);
             });
@@ -306,11 +311,14 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                             </Box>
                                         </Box>
                                         <Box sx={{ pl: 3, pt: 0.5 }}>
-                                            {normalizeFormEntries(node?.formData).filter((entry) => !isRetiredEquipmentParam(entry)).map((entry: any) => {
+                                            {withoutHiddenAnswers(paramDefs, normalizeFormEntries(node?.formData)).filter((entry) => !isRetiredEquipmentParam(entry) && !isOtherTextEntryId(entry.id)).map((entry: any) => {
                                                 const paramDef = paramDefs.find((p: any) => p?.id === entry.id);
                                                 const fallback = snapshotFallback(node, entry.id, paramDef);
                                                 const label = fallback?.name || resolveParameterName(entry, paramDef) || 'Parameter';
                                                 const rawValue = entry.value ?? entry.resultParamValue;
+                                                const otherText = otherTextFrom(node?.formData, entry.id);
+                                                // A change to the "Other" text is a change to this answer: the differ reports it under the companion id.
+                                                const otherDiff = nodeDiff?.paramDiffs.find((p) => p.id === otherTextEntryId(entry.id));
                                                 const paramDiff = changedParamIds.has(entry.id)
                                                     ? nodeDiff!.paramDiffs.find((p) => p.id === entry.id)
                                                     : undefined;
@@ -320,10 +328,11 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                                 // Re-diffed here against the *formatted* values, so a
                                                 // dropdown reads as its option names on both sides rather
                                                 // than as the raw option ids the differ had to fall back to.
-                                                if (paramDiff) {
+                                                if (paramDiff || otherDiff) {
+                                                    const textOf = (raw: unknown): string => (typeof raw === 'string' ? raw : '');
                                                     const parts = diffWordsWithSpace(
-                                                        formatParameterValue(paramDef, paramDiff.beforeRaw),
-                                                        formatParameterValue(paramDef, paramDiff.afterRaw)
+                                                        formatParameterValue(paramDef, paramDiff ? paramDiff.beforeRaw : rawValue, otherDiff ? textOf(otherDiff.beforeRaw) : otherText),
+                                                        formatParameterValue(paramDef, paramDiff ? paramDiff.afterRaw : rawValue, otherDiff ? textOf(otherDiff.afterRaw) : otherText)
                                                     );
                                                     return (
                                                         <Box key={entry.id} sx={{ display: 'flex', gap: 0.5, alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -344,7 +353,7 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                                 const sheetSlot = sampleSheets?.canEdit && isSampleSheetParam(paramDef) ? sampleSheetSlot(node, paramDef, rawValue) : null;
                                                 return (
                                                     <Typography key={entry.id} variant='body2' color='text.secondary' component='div' sx={sheetSlot ? { display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' } : undefined}>
-                                                        <span>{label}: {formatParameterValue(paramDef, rawValue) || (sheetSlot ? 'no spreadsheet yet' : '')}</span>
+                                                        <span>{label}: {formatParameterValue(paramDef, rawValue, otherText) || (sheetSlot ? 'no spreadsheet yet' : '')}</span>
                                                         {sheetSlot && <SampleSheetReplaceButton jobId={sampleSheets!.jobId} slot={sheetSlot} onChanged={sampleSheets!.onChanged} />}
                                                     </Typography>
                                                 );

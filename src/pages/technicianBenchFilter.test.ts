@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ALL_JOBS, formatValue, jobOptionsFromOperations, nextOperationsPerWorkflow, operationsForJob, optionLabelLookup } from './TechnicianBench';
+import { ALL_JOBS, benchParameterEntries, formatValue, jobOptionsFromOperations, nextOperationsPerWorkflow, operationsForJob, optionLabelLookup } from './TechnicianBench';
 
 /**
  * "Next step only" on My Bench.
@@ -105,5 +105,25 @@ describe('parameter display', () => {
     expect(formatValue('1-kb-plus-ladder', labels.ladder)).toBe('1 kb plus ladder');
     expect(formatValue(['1-kb-plus-ladder'], labels.ladder)).toBe('1 kb plus ladder');
     expect(formatValue('free text', labels.ladder)).toBe('free text');
+  });
+});
+
+describe('hidden parameters on the bench (show-only-if rule 21)', () => {
+  const parameters = [
+    { id: 'sample', name: 'Sample Type', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }, { id: 'yeast', name: 'Yeast' }] },
+    { id: 'lysis', name: 'Lysis', type: 'dropdown', showIf: { parameterId: 'sample', op: 'eq', optionIds: ['bact'] }, options: [{ id: 'oth', name: 'Other' }] }
+  ];
+  const stored = (sample: string) => [{ id: 'sample', value: sample }, { id: 'lysis', value: 'oth' }, { id: 'lysis__otherText', value: 'Beads' }, { id: '__runCount', value: 2 }];
+
+  it('lists a conditional answer while its condition holds, without the "Other" text entry', () => {
+    expect(benchParameterEntries(parameters, stored('bact')).map((e) => e.id)).toEqual(['sample', 'lysis', '__runCount']);
+  });
+
+  it('omits the answer of a hidden parameter that is still stored (a step in flight keeps it)', () => {
+    expect(benchParameterEntries(parameters, stored('yeast')).map((e) => e.id)).toEqual(['sample', '__runCount']);
+  });
+
+  it('is empty for an operation with no stored answers', () => {
+    expect(benchParameterEntries(parameters, undefined)).toEqual([]);
   });
 });

@@ -4,6 +4,8 @@ import { NodeParameter } from '../types/CanvasTypes';
 import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
 import { isSampleSheetParam } from '../utils/sampleSheetValue';
 import { applyNodeChanges, NodeChange } from 'reactflow';
+import { syncOtherTextEntries } from '../utils/parameterAnswers';
+import { isOtherTextEntryId } from '../utils/otherOption';
 
 /**
  * Rebuilding a submitted job as an editable canvas.
@@ -60,8 +62,12 @@ export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId
     const includeEquipment = EQUIPMENT_PARAM_IDS.some((id) => savedById.has(id));
     const fresh = generateFormDataFromParams(parameters ?? [], nodeId, { includeRunCount, includeEquipment });
 
+    // Positional only for a list saved before parameters carried ids, where there is nothing else to go on. Once any
+    // entry has an id, a parameter with no entry was never saved: giving it the value at its position would hand it a
+    // neighbour's answer (or an "Other" text).
+    const savedWithoutIds = savedById.size === 0;
     const merged = fresh.map((param, index) => {
-        const matched = savedById.has(param.id) ? savedById.get(param.id) : savedList[index]?.value;
+        const matched = savedById.has(param.id) ? savedById.get(param.id) : savedWithoutIds ? savedList[index]?.value : undefined;
         if (matched === undefined || matched === null) return param;
         return { ...param, value: matched };
     });
@@ -74,7 +80,12 @@ export const mergeSavedFormData = (parameters: any[], savedFormData: any, nodeId
     if (retired && !merged.some((p) => p.id === EQUIPMENT_BOOKERS_PARAM_ID)) {
         merged.push({ ...retired, id: EQUIPMENT_BOOKERS_PARAM_ID, nodeId, value: retired.value } as NodeParameter);
     }
-    return merged;
+    // The "Other" text is not generated from a parameter either. Put it back
+    // beside the answer that selects "Other": dropping it would read, on the next
+    // save, as an edit the server refuses on a node whose work has started.
+    const otherTexts: Record<string, unknown> = {};
+    for (const entry of savedList) if (entry && isOtherTextEntryId(entry.id)) otherTexts[entry.id] = entry.value;
+    return syncOtherTextEntries(merged, otherTexts) as NodeParameter[];
 };
 
 /**

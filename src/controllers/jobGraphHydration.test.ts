@@ -53,6 +53,26 @@ describe('mergeSavedFormData', () => {
     expect(merged.some((p) => p.id === 'temp')).toBe(true);
   });
 
+  it('I4/F4: a parameter the job never saved is not given the value saved at its position', () => {
+    // The job saved vol, buf and a parameter since removed; the catalogue now has a new third parameter.
+    const saved = [{ id: 'vol', value: 5 }, { id: 'buf', value: 'TE' }, { id: 'removed', value: 'neighbour' }];
+    const merged = mergeSavedFormData([...parameters, { id: 'temp', name: 'Temp', type: 'number' }], saved, 'n1');
+    expect(merged.find((p) => p.id === 'temp')!.value).toBeNull();
+    expect(merged.find((p) => p.id === 'vol')!.value).toBe(5);
+  });
+
+  it('I4/F4: nor does an “Other” text saved in that position fill a new parameter', () => {
+    const withOther = [{ id: 'kind', name: 'Kind', type: 'dropdown', options: [{ id: 'oth', name: 'Other' }] }, { id: 'notes', name: 'Notes', type: 'string' }];
+    const merged = mergeSavedFormData(withOther, [{ id: 'kind', value: 'oth' }, { id: 'kind__otherText', value: 'BAC' }], 'n1');
+    expect(merged.find((p) => p.id === 'notes')!.value).toBeNull();
+  });
+
+  it('still reads positionally when the saved list carries no ids at all (values saved before parameters had ids)', () => {
+    const merged = mergeSavedFormData(parameters, [{ value: 25 }, { value: 'TE' }], 'n1');
+    expect(merged.find((p) => p.id === 'vol')!.value).toBe(25);
+    expect(merged.find((p) => p.id === 'buf')!.value).toBe('TE');
+  });
+
   it('carries the run-count parameter through', () => {
     const merged = mergeSavedFormData(parameters, [{ id: '__runCount', value: 4 }], 'n1');
     expect(merged.find((p) => p.id === '__runCount')!.value).toBe(4);
@@ -74,6 +94,23 @@ describe('mergeSavedFormData', () => {
   it('offers a run count on a service that allows it, even on a job saved without one', () => {
     const merged = mergeSavedFormData(parameters, [{ id: 'vol', value: 5 }], 'n1', { allowMultipleRuns: true });
     expect(merged.find((p) => p.id === '__runCount')!.value).toBe(1);
+  });
+
+  it('keeps the "Other" text of a saved answer, directly after its parameter (Review Focus 3)', () => {
+    const withOther = [
+      { id: 'kind', name: 'Kind', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }] },
+      ...parameters
+    ];
+    const saved = [{ id: 'kind', value: 'oth' }, { id: 'kind__otherText', value: 'Yeast' }, { id: 'vol', value: 5 }];
+    const merged = mergeSavedFormData(withOther, saved, 'n1');
+    expect(merged.map((p) => p.id)).toEqual(['kind', 'kind__otherText', 'vol', 'buf']);
+    expect(merged[1]).toMatchObject({ id: 'kind__otherText', value: 'Yeast', name: 'Kind (Other)' });
+  });
+
+  it('does not carry "Other" text for an answer that no longer selects Other', () => {
+    const withOther = [{ id: 'kind', name: 'Kind', type: 'dropdown', options: [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }] }];
+    const merged = mergeSavedFormData(withOther, [{ id: 'kind', value: 'bact' }, { id: 'kind__otherText', value: 'stale' }], 'n1');
+    expect(merged.map((p) => p.id)).toEqual(['kind']);
   });
 });
 

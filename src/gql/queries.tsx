@@ -815,6 +815,7 @@ export const DELETE_CATEGORY = gql`
 export const UPDATE_CATEGORY = gql`
   mutation updateCategory($category: ID!, $changes: CategoryChange!) {
     updateCategory(category: $category, changes: $changes) {
+      id
       label
     }
   }
@@ -823,6 +824,7 @@ export const UPDATE_CATEGORY = gql`
 export const CREATE_CATEGORY = gql`
   mutation createCategory($category: CreateCategory!) {
     createCategory(category: $category) {
+      id
       label
     }
   }

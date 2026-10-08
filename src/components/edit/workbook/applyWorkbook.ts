@@ -1,0 +1,371 @@
+import { formatGqlError } from '../../../utils/gqlError';
+import { findIdClashes } from './parameterIdClashes';
+import { categoryWrites } from './operationsWorkbookSheet';
+import { OwnerWork, resolveOwnerParameters } from './parameterListSheet';
+import { allRows, sheetPlans, WorkbookPlan } from './planWorkbook';
+import { CatalogSet, CatalogSnapshot, isApplicable, LOG_ENTITY_TYPE, SHEET_TITLES, SheetKey } from './types';
+
+/** The existing, gated mutations an upload calls — nothing else. Each create resolves to the new record's id. */
+export interface WorkbookMutator {
+  createParameterSet(input: { name: string; parameters: any[] }): Promise<string>;
+  updateParameterSet(id: string, changes: { parameters: any[] }): Promise<void>;
+  createService(input: Record<string, unknown>): Promise<string>;
+  updateService(id: string, changes: Record<string, unknown>): Promise<void>;
+  createCategory(input: { label: string; services: string[] }): Promise<string>;
+  updateCategory(id: string, changes: { services: string[] }): Promise<void>;
+  createBundle(input: { label: string; icon: string; services: string[] }): Promise<string>;
+  updateBundle(id: string, changes: Record<string, unknown>): Promise<void>;
+  createSowTextPreset(input: { sectionKey: string; name: string; text: string }): Promise<string>;
+  updateSowTextPreset(id: string, changes: { name?: string; text?: string }): Promise<void>;
+  createUploadLog(input: Record<string, unknown>): Promise<void>;
+}
+
+export interface SheetSummary {
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+}
+
+export interface ApplySummary {
+  /** One entry per sheet something was applied from — the sheets an upload log was written for. */
+  sheets: Partial<Record<SheetKey, SheetSummary>>;
+  /** Why a ticked row was not applied, by row key. */
+  rowErrors: Record<string, string>;
+  /** Failures that belong to no row: an upload log, or a category write (one message per category, naming the operations it affects). */
+  errors: string[];
+  /** Set when the import threw something it did not catch: what was thrown. Rows written before it stay written. */
+  stopped?: string;
+}
+
+export interface ApplyMeta {
+  fileName: string;
+  uploaderName: string;
+  uploaderSub?: string;
+  onProgress?: (done: number, total: number) => void;
+}
+
+interface Snapshot {
+  itemId: string;
+  action: 'CREATE' | 'UPDATE';
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+}
+
+/**
+ * Applies the ticked rows through the mutator, in dependency order:
+ *
+ *   parameter sets with their parameters → operations → operations' own
+ *   parameters → categories → "hide" rows → bundles → SOW text blocks
+ *
+ * then writes one upload log per sheet something was applied from. A failure
+ * stops only what depends on it: every other row carries on, and a row whose
+ * dependency was not created gets an error of its own, never a silent skip.
+ * Nothing is ever deleted.
+ */
+export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<string>, catalog: CatalogSnapshot, mutator: WorkbookMutator, meta: ApplyMeta): Promise<ApplySummary> {
+  const rowsByKey = new Map(allRows(plan).map((row) => [row.key, row] as const));
+  const wanted = (key: string): boolean => {
+    const row = rowsByKey.get(key);
+    return row !== undefined && ticked.has(key) && isApplicable(row);
+  };
+  const total = [...rowsByKey.keys()].filter(wanted).length;
+  const done = new Set<string>();
+  const rowErrors: Record<string, string> = {};
+  // Rule 20 once more, for the rows actually ticked: unticking a row can change the ids minted for the rows after it.
+  const clashes = findIdClashes(plan, catalog, new Set([...rowsByKey.keys()].filter(wanted)));
+  /** wanted, and not refused for taking an id its operation already has. */
+  const usable = (key: string): boolean => wanted(key) && !(key in clashes);
+  const errors: string[] = [];
+  const snapshots: Record<SheetKey, Snapshot[]> = { operations: [], parameterList: [], bundles: [], sowSections: [] };
+  let finished = 0;
+
+  /** Records the outcome of the rows one write covered. */
+  const settle = (keys: string[], error?: unknown): void => {
+    for (const key of keys) {
+      if (error === undefined) done.add(key);
+      else rowErrors[key] = typeof error === 'string' ? error : formatGqlError(error);
+    }
+    finished += keys.length;
+    meta.onProgress?.(finished, total);
+  };
+
+  /** False — with the row marked failed — when something the row needs was not created. */
+  const ready = (key: string): boolean => {
+    const unmet = rowsByKey.get(key)!.needs.find((need) => !need.anyOf.some((provider) => done.has(provider)));
+    if (!unmet) return true;
+    settle([key], `${unmet.what.charAt(0).toUpperCase()}${unmet.what.slice(1)} was not created.`);
+    return false;
+  };
+
+  /**
+   * The rows of one write whose needs are met — by rows already applied or by
+   * other rows of the same write (a condition may name a parameter created
+   * beside it). The rest are marked failed, and dropping one can strand another.
+   */
+  const readyTogether = (keys: string[]): string[] => {
+    let live = keys;
+    for (;;) {
+      const unmetOf = (key: string): string | undefined =>
+        rowsByKey.get(key)!.needs.find((need) => !need.anyOf.some((provider) => done.has(provider) || live.includes(provider)))?.what;
+      const blocked = live.filter((key) => unmetOf(key) !== undefined);
+      if (blocked.length === 0) return live;
+      for (const key of blocked) {
+        const what = unmetOf(key)!;
+        settle([key], `${what.charAt(0).toUpperCase()}${what.slice(1)} was not created.`);
+      }
+      live = live.filter((key) => !blocked.includes(key));
+    }
+  };
+
+  for (const [key, text] of Object.entries(clashes)) settle([key], text);
+
+  const owners = plan.parameterList?.work.owners ?? [];
+  // What each set and operation ends with, so an operation's own parameters are minted against its resulting sets.
+  const setParameterIds = new Map(catalog.sets.map((set) => [set.id, set.parameters.map((p) => String(p?.id ?? ''))] as const));
+  const operationSetIds = new Map(catalog.operations.map((operation) => [operation.id, operation.parameterSetIds] as const));
+  const setIdByName = new Map(catalog.sets.map((set) => [set.name.trim(), set.id] as const));
+
+  // The sets as written so far, with real ids — what a condition's "Set"."Parameter" is resolved against.
+  const resultSets: CatalogSet[] = catalog.sets.map((set) => ({ ...set }));
+
+  // 1. Parameter sets, each with its whole parameter list. A set whose rows need a row of another set
+  //    still to be written goes after it. A ring of such sets cannot be ordered: those go in sheet order,
+  //    and the rows left without what they need say so.
+  const pendingSets: OwnerWork[] = owners.filter((owner) => owner.kind === 'set');
+  while (pendingSets.length > 0) {
+    const ownerOfRow = (key: string): OwnerWork | undefined => pendingSets.find((other) => other.entries.some((entry) => entry.rowKey === key));
+    const waits = (candidate: OwnerWork): boolean =>
+      candidate.entries.some(
+        (entry) => usable(entry.rowKey) && rowsByKey.get(entry.rowKey)!.needs.some((need) => need.anyOf.some((provider) => usable(provider) && ![undefined, candidate].includes(ownerOfRow(provider))))
+      );
+    const [owner] = pendingSets.splice(Math.max(0, pendingSets.findIndex((candidate) => !waits(candidate))), 1);
+    const ready = readyTogether(owner.entries.map((entry) => entry.rowKey).filter(usable));
+    if (ready.length === 0) continue;
+    // Conditions are resolved here, against what was actually written: the ids the plan showed can differ once rows are unticked.
+    const built = resolveOwnerParameters(owner, new Set(ready), owner.reservedIds, resultSets, owners);
+    for (const [key, text] of Object.entries(built.failed)) settle([key], `conditionalDisplayLogic: ${text}`);
+    const keys = ready.filter((key) => !(key in built.failed));
+    if (keys.length === 0) continue;
+    const parameters = built.parameters;
+    try {
+      let id = owner.existingId;
+      if (id) await mutator.updateParameterSet(id, { parameters });
+      else {
+        id = await mutator.createParameterSet({ name: owner.name, parameters });
+        setIdByName.set(owner.name, id);
+      }
+      setParameterIds.set(id, parameters.map((p) => String(p?.id ?? '')));
+      const at = resultSets.findIndex((set) => set.id === id);
+      if (at >= 0) resultSets[at] = { ...resultSets[at], parameters };
+      else resultSets.push({ id, name: owner.name, parameters });
+      snapshots.parameterList.push({ itemId: id, action: owner.existingId ? 'UPDATE' : 'CREATE', before: owner.existingId ? { parameters: owner.stored } : undefined, after: { parameters } });
+      settle(keys);
+    } catch (error) {
+      settle(keys, error);
+    }
+  }
+
+  // 2. Operations.
+  const operationIdByRowKey = new Map<string, string>();
+  const moves: Array<{ operationId: string; label: string; rowKey: string; operationName: string }> = [];
+  for (const row of plan.operations?.rows ?? []) {
+    if (row.action === 'hide' || !usable(row.key) || !ready(row.key)) continue;
+    const item = plan.operations!.work.rows[row.key];
+    const fields: Record<string, unknown> = { ...item.fields };
+    if (item.setNames) {
+      const missing = item.setNames.find((name) => !setIdByName.has(name));
+      if (missing !== undefined) {
+        settle([row.key], `Parameter set “${missing}” was not created.`);
+        continue;
+      }
+      fields.parameterSetIds = item.setNames.map((name) => setIdByName.get(name)!);
+    }
+    try {
+      let id = item.existingId;
+      if (id) {
+        if (Object.keys(fields).length > 0) await mutator.updateService(id, fields);
+      } else {
+        id = await mutator.createService(fields);
+      }
+      operationIdByRowKey.set(row.key, id);
+      operationSetIds.set(id, (fields.parameterSetIds as string[] | undefined) ?? operationSetIds.get(id) ?? []);
+      if (item.category !== undefined) moves.push({ operationId: id, label: item.category, rowKey: row.key, operationName: row.label });
+      snapshots.operations.push({ itemId: id, action: item.existingId ? 'UPDATE' : 'CREATE', before: item.existingId ? item.before : undefined, after: fields });
+      settle([row.key]);
+    } catch (error) {
+      settle([row.key], error);
+    }
+  }
+
+  // 3. Operations' own parameters — after step 2, so an operation this upload created exists.
+  for (const owner of owners) {
+    if (owner.kind !== 'operation') continue;
+    const readyKeys = readyTogether(owner.entries.map((entry) => entry.rowKey).filter(usable));
+    if (readyKeys.length === 0) continue;
+    const id = owner.existingId ?? (owner.operationRowKey !== undefined ? operationIdByRowKey.get(owner.operationRowKey) : undefined);
+    if (!id) {
+      settle(readyKeys, `Operation “${owner.name}” was not created.`);
+      continue;
+    }
+    const reserved = (operationSetIds.get(id) ?? []).flatMap((setId) => setParameterIds.get(setId) ?? []);
+    const built = resolveOwnerParameters(owner, new Set(readyKeys), reserved, resultSets, owners);
+    for (const [key, text] of Object.entries(built.failed)) settle([key], `conditionalDisplayLogic: ${text}`);
+    const keys = readyKeys.filter((key) => !(key in built.failed));
+    if (keys.length === 0) continue;
+    const parameters = built.parameters;
+    try {
+      await mutator.updateService(id, { parameters });
+      snapshots.parameterList.push({ itemId: id, action: 'UPDATE', before: { parameters: owner.stored }, after: { parameters } });
+      settle(keys);
+    } catch (error) {
+      settle(keys, error);
+    }
+  }
+
+  // 4. Categories — one write per category whose list changed, after the creates so new ids exist.
+  //    A failed write does not undo the operation: its record was written in step 2 (and the upload log carries
+  //    that), so the row stays counted as created or updated. The failure is one warning per category, naming the
+  //    category and the operations it affects: those meant to join it were saved but are not in it, those meant
+  //    to leave it are still listed in it. The category is never reported as saved.
+  const categoryFailure = (label: string, joining: ReadonlySet<string>, leaving: ReadonlySet<string>, error: unknown): void => {
+    const reason = formatGqlError(error).replace(/[\s.]+$/, '');
+    const namesFor = (ids: ReadonlySet<string>): string[] => [...new Map(moves.filter((move) => ids.has(move.operationId)).map((move) => [move.operationId, `“${move.operationName}”`] as const)).values()];
+    const sentence = (names: string[], one: string, many: string): string => (names.length === 0 ? '' : names.length === 1 ? ` Operation ${names[0]} ${one}.` : ` Operations ${names.join(', ')} ${many}.`);
+    errors.push(
+      `Category “${label}” could not be saved: ${reason}.` +
+        sentence(namesFor(joining), 'was saved but is not in it', 'were saved but are not in it') +
+        sentence(namesFor(leaving), 'is still listed in it', 'are still listed in it')
+    );
+  };
+  const writes = categoryWrites(catalog.categories, moves);
+  for (const create of writes.creates) {
+    try {
+      const id = await mutator.createCategory(create);
+      snapshots.operations.push({ itemId: id, action: 'CREATE', after: { label: create.label, services: create.services } });
+    } catch (error) {
+      categoryFailure(create.label, new Set(create.services), new Set(), error);
+    }
+  }
+  for (const update of writes.updates) {
+    const before = catalog.categories.find((category) => category.id === update.id)?.serviceIds ?? [];
+    try {
+      await mutator.updateCategory(update.id, { services: update.services });
+      snapshots.operations.push({ itemId: update.id, action: 'UPDATE', before: { services: before }, after: { services: update.services } });
+    } catch (error) {
+      categoryFailure(update.label, new Set(update.services.filter((id) => !before.includes(id))), new Set(before.filter((id) => !update.services.includes(id))), error);
+    }
+  }
+
+  // 5. "Hide operations not in this sheet from clients" — only ever sets the flag.
+  for (const [key, hide] of Object.entries(plan.operations?.work.hides ?? {})) {
+    if (!usable(key)) continue;
+    try {
+      await mutator.updateService(hide.id, { hiddenFromClients: true });
+      snapshots.operations.push({ itemId: hide.id, action: 'UPDATE', before: { hiddenFromClients: false }, after: { hiddenFromClients: true } });
+      settle([key]);
+    } catch (error) {
+      settle([key], error);
+    }
+  }
+
+  // 6. Bundles.
+  for (const row of plan.bundles?.rows ?? []) {
+    if (!usable(row.key) || !ready(row.key)) continue;
+    const item = plan.bundles!.work.bundles[row.key];
+    const changes: Record<string, unknown> = {};
+    if (item.changes.label !== undefined) changes.label = item.changes.label;
+    if (item.changes.icon !== undefined) changes.icon = item.changes.icon;
+    if (item.changes.steps) {
+      const ids = item.changes.steps.map((step) => step.id ?? (step.rowKey !== undefined ? operationIdByRowKey.get(step.rowKey) : undefined));
+      const missing = item.changes.steps.find((_step, index) => ids[index] === undefined);
+      if (missing) {
+        settle([row.key], `Operation “${missing.name}” was not created.`);
+        continue;
+      }
+      changes.services = ids as string[];
+    }
+    try {
+      let id = item.existingId;
+      if (id) await mutator.updateBundle(id, changes);
+      else id = await mutator.createBundle({ label: item.label, icon: (changes.icon as string | undefined) ?? '', services: (changes.services as string[] | undefined) ?? [] });
+      snapshots.bundles.push({ itemId: id, action: item.existingId ? 'UPDATE' : 'CREATE', before: item.existingId ? item.before : undefined, after: changes });
+      settle([row.key]);
+    } catch (error) {
+      settle([row.key], error);
+    }
+  }
+
+  // 7. SOW text blocks.
+  for (const row of plan.sowSections?.rows ?? []) {
+    if (!usable(row.key)) continue;
+    const item = plan.sowSections!.work.rows[row.key];
+    try {
+      if (item.existingId) {
+        await mutator.updateSowTextPreset(item.existingId, item.changes ?? {});
+        snapshots.sowSections.push({ itemId: item.existingId, action: 'UPDATE', before: item.before, after: item.changes });
+      } else {
+        const id = await mutator.createSowTextPreset(item.create!);
+        snapshots.sowSections.push({ itemId: id, action: 'CREATE', after: item.create });
+      }
+      settle([row.key]);
+    } catch (error) {
+      settle([row.key], error);
+    }
+  }
+
+  // 8. One upload log per sheet something was applied from.
+  const sheets: Partial<Record<SheetKey, SheetSummary>> = {};
+  for (const sheet of sheetPlans(plan)) {
+    if (!sheet.rows.some((row) => wanted(row.key))) continue;
+    const applied = sheet.rows.filter((row) => done.has(row.key) && !(row.key in rowErrors));
+    const created = applied.filter((row) => row.action === 'create').length;
+    const failed = sheet.rows.filter((row) => row.key in rowErrors).length;
+    const summary: SheetSummary = { created, updated: applied.length - created, failed, skipped: sheet.rows.length - applied.length - failed };
+    sheets[sheet.sheet] = summary;
+    try {
+      await mutator.createUploadLog({
+        entityType: LOG_ENTITY_TYPE[sheet.sheet],
+        uploaderName: meta.uploaderName,
+        uploaderSub: meta.uploaderSub,
+        fileName: meta.fileName,
+        rowCount: sheet.rowCount,
+        createdCount: summary.created,
+        updatedCount: summary.updated,
+        skippedCount: summary.skipped,
+        failedCount: summary.failed,
+        affectedItemIds: [...new Set(snapshots[sheet.sheet].map((snapshot) => snapshot.itemId))],
+        fieldSnapshots: snapshots[sheet.sheet]
+      });
+    } catch (error) {
+      // The rows were applied; only the audit record is missing. Say so rather than report a clean import.
+      errors.push(`The upload history record for ${SHEET_TITLES[sheet.sheet]} could not be saved: ${formatGqlError(error)}`);
+    }
+  }
+
+  return { sheets, rowErrors, errors };
+}
+
+/** The summary for an import that threw: nothing is known about which rows were written. */
+export function stoppedSummary(error: unknown): ApplySummary {
+  return { sheets: {}, rowErrors: {}, errors: [], stopped: formatGqlError(error) };
+}
+
+/** The one-line result shown after an import. */
+export function summaryText(summary: ApplySummary): string {
+  if (summary.stopped !== undefined) return `The import stopped unexpectedly: ${summary.stopped} Rows written before it stopped stay written, so check the catalog and the upload history.`;
+  const clauses = (Object.keys(summary.sheets) as SheetKey[]).map((sheet) => {
+    const s = summary.sheets[sheet]!;
+    return `${SHEET_TITLES[sheet]}: ${s.created} created, ${s.updated} updated, ${s.skipped} skipped${s.failed > 0 ? `, ${s.failed} failed` : ''}.`;
+  });
+  if (clauses.length === 0) return 'Import complete — nothing was applied.';
+  return ['Import complete —', ...clauses, ...summary.errors].join(' ');
+}
+
+/** The message and severity shown once the preview closes. */
+export function completionMessage(summary: ApplySummary): { severity: 'success' | 'warning' | 'error'; text: string } {
+  const failed = Object.values(summary.rowErrors);
+  if (summary.stopped !== undefined) return { severity: 'error', text: summaryText(summary) };
+  const text = failed.length > 0 ? `${summaryText(summary)} ${failed.length} row${failed.length === 1 ? '' : 's'} failed: ${failed.join(' ')}` : summaryText(summary);
+  return { severity: failed.length > 0 || summary.errors.length > 0 ? 'warning' : 'success', text };
+}

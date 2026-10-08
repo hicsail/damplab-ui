@@ -4,6 +4,8 @@ import { Document, Page, Canvas, StyleSheet, View, Text, Image } from '@react-pd
 import { Workflow } from '../gql/graphql';
 import { resolveParameterName } from '../utils/servicePricing';
 import { isRetiredEquipmentParam } from '../utils/equipmentParams';
+import { isOtherTextEntryId, otherLabel, otherTextFrom } from '../utils/otherOption';
+import { withoutHiddenAnswers } from '../utils/parameterConditions';
 
 // Register font
 import { Font } from '@react-pdf/renderer';
@@ -86,7 +88,7 @@ const formatParameterValue = (value: unknown): string => {
   return String(value);
 };
 
-const formatParameterDisplayValue = (parameterDef: any, value: unknown): string => {
+const formatParameterDisplayValue = (parameterDef: any, value: unknown, otherText?: string): string => {
   if (!parameterDef || parameterDef.type !== 'dropdown') {
     return formatParameterValue(value);
   }
@@ -94,7 +96,7 @@ const formatParameterDisplayValue = (parameterDef: any, value: unknown): string 
   const optionNameById = new Map<string, string>(
     options
       .filter((opt: any) => opt && typeof opt.id === 'string')
-      .map((opt: any) => [String(opt.id), String(opt.name ?? opt.id)] as const)
+      .map((opt: any) => [String(opt.id), otherLabel(String(opt.name ?? opt.id), otherText)] as const)
   );
   const mapOne = (raw: unknown): string => {
     const key = String(raw ?? '');
@@ -192,12 +194,12 @@ const JobPDFDocument: React.FC<JobPDFDocumentProps> = ({
         {workflow.nodes.map((service, ind) => (
           <View key={ind} style={styles.section}>
             <Text style={styles.service}>{service.label}</Text>
-            {(Array.isArray(service.formData) ? service.formData : []).filter((parameter: any) => !isRetiredEquipmentParam(parameter)).map((parameter: any, i: number) => {
+            {withoutHiddenAnswers((service as any).parameters || service.service?.parameters || [], Array.isArray(service.formData) ? service.formData : []).filter((parameter: any) => !isRetiredEquipmentParam(parameter) && !isOtherTextEntryId(parameter?.id)).map((parameter: any, i: number) => {
               const parameterDef = ((service as any).parameters || service.service?.parameters || []).find(
                 (p: any) => p?.id === parameter.id
               );
               const label = resolveParameterName(parameter, parameterDef) ?? parameter.id ?? 'Parameter';
-              const displayValue = formatParameterDisplayValue(parameterDef, parameter.value);
+              const displayValue = formatParameterDisplayValue(parameterDef, parameter.value, otherTextFrom(service.formData, parameter.id));
               if (parameter.type === 'boolean') {
                 if (parameter.value === true) {
                   return(<Text key={i} style={styles.parameter}>{label}: true</Text>)
