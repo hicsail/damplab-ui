@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PERMISSIONS, PermissionName } from '../../../hooks/usePermissions';
 import { EditTypes } from '../ToolBar';
-import { workbookAccess } from './workbookAccess';
+import { workbookAccess, workbookHistoryLink } from './workbookAccess';
 
 const holder = (...held: PermissionName[]) => (permission: PermissionName): boolean => held.includes(permission);
 const technician = holder(PERMISSIONS.CatalogEditorRead);
@@ -26,5 +26,25 @@ describe('workbook buttons (rule 1)', () => {
 
   it('gives a caller with neither permission nothing', () => {
     expect(workbookAccess('Services', holder())).toEqual({ show: false, download: false, upload: false });
+  });
+});
+
+describe('upload history link (M3)', () => {
+  it('is for the write tier only, as it was when it sat inside the write gate', () => {
+    expect(workbookHistoryLink('Services', technician)).toBeNull();
+    expect(workbookHistoryLink('Services', holder())).toBeNull();
+    expect(workbookHistoryLink('Services', administrator)).not.toBeNull();
+  });
+
+  it('opens the history already filtered to what the view’s upload writes', () => {
+    expect(workbookHistoryLink('Services', administrator)).toBe('/edit/inventory/upload-history?type=OPERATION');
+    expect(workbookHistoryLink('Categories', administrator)).toBe('/edit/inventory/upload-history?type=OPERATION');
+    expect(workbookHistoryLink('Parameter Sets', administrator)).toBe('/edit/inventory/upload-history?type=PARAMETER_SET');
+    expect(workbookHistoryLink('Bundles', administrator)).toBe('/edit/inventory/upload-history?type=BUNDLE');
+    expect(workbookHistoryLink('SOWs', administrator)).toBe('/edit/inventory/upload-history?type=SOW_SECTION');
+  });
+
+  it('is absent on the Inventory view, which has its own', () => {
+    expect(workbookHistoryLink('Inventory', administrator)).toBeNull();
   });
 });

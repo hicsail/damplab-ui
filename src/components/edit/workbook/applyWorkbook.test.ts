@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyWorkbook, summaryText, WorkbookMutator } from './applyWorkbook';
+import { applyWorkbook, completionMessage, stoppedSummary, summaryText, WorkbookMutator } from './applyWorkbook';
 import { planWorkbook, tickedKeys } from './planWorkbook';
 import { catalogOf, rawSheet } from './testSupport';
 import { RawWorkbook } from './types';
@@ -176,16 +176,33 @@ describe('applyWorkbook — failures (rules 8, 20)', () => {
     expect(summary.sheets.parameterList).toEqual({ created: 0, updated: 0, skipped: 0, failed: 2 });
   });
 
-  it('says so when a category write or an upload log fails, without undoing the rows', async () => {
-    const { summary } = await run(chained, {}, { createCategory: 'boom', createUploadLog: 'down' });
+  it('says so when an upload log fails, without undoing the rows', async () => {
+    const { summary } = await run(chained, {}, { createUploadLog: 'down' });
     expect(summary.rowErrors).toEqual({});
     expect(summary.errors).toEqual([
-      'Category “Sequencing”: boom',
       'The upload history record for Operations could not be saved: down',
       'The upload history record for Parameter List could not be saved: down',
       'The upload history record for Bundles could not be saved: down',
       'The upload history record for SOW Sections could not be saved: down'
     ]);
+  });
+
+  it('M2: a failed category write is an error on the row whose move it carried, and the row is not counted applied', async () => {
+    const { summary, plan } = await run(chained, {}, { createCategory: 'boom' });
+    const operationRow = plan.operations!.rows[0].key;
+    expect(summary.rowErrors).toEqual({ [operationRow]: 'Category “Sequencing” could not be saved: boom' });
+    expect(summary.errors).toEqual([]);
+    expect(summary.sheets.operations).toEqual({ created: 0, updated: 0, skipped: 0, failed: 1 });
+    // The operation itself was written, so the rows that depend on it still went ahead.
+    expect(summary.sheets.bundles).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0 });
+  });
+
+  it('M2: a failed update of the category an operation left is on that operation’s row too', async () => {
+    const { summary } = await run(
+      { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['id', 'serviceCategory'], [['op1', 'Cloning']]) } }, {}, { updateCategory: 'locked' }
+    );
+    expect(summary.rowErrors).toEqual({ 'operations:2': 'Category “Molecular Biology” could not be saved: locked' });
+    expect(summary.sheets.operations).toEqual({ created: 0, updated: 0, skipped: 0, failed: 1 });
   });
 });
 
@@ -195,5 +212,25 @@ describe('summaryText', () => {
       'Import complete — Operations: 1 created, 2 updated, 3 skipped. Bundles: 0 created, 1 updated, 0 skipped, 1 failed. Category “A”: boom'
     );
     expect(summaryText({ sheets: {}, rowErrors: {}, errors: [] })).toBe('Import complete — nothing was applied.');
+  });
+});
+
+describe('F20: an import that threw reads on its own terms', () => {
+  it('does not say nothing was applied, and says rows may be written', () => {
+    const text = summaryText(stoppedSummary(new Error('Network down')));
+    expect(text).toBe('The import stopped unexpectedly: Network down Rows written before it stopped stay written, so check the catalog and the upload history.');
+    expect(text).not.toContain('nothing was applied');
+    expect(text).not.toContain('Import complete');
+  });
+
+  it('is an error, not a warning, and shows the cause', () => {
+    expect(completionMessage(stoppedSummary(new Error('Network down')))).toMatchObject({ severity: 'error', text: expect.stringContaining('Network down') });
+  });
+
+  it('keeps the ordinary messages: success, and warning with the failed rows listed', () => {
+    expect(completionMessage({ sheets: { bundles: { created: 1, updated: 0, skipped: 0, failed: 0 } }, rowErrors: {}, errors: [] })).toEqual({ severity: 'success', text: 'Import complete — Bundles: 1 created, 0 updated, 0 skipped.' });
+    expect(completionMessage({ sheets: { bundles: { created: 0, updated: 0, skipped: 0, failed: 1 } }, rowErrors: { 'bundles:2': 'x' }, errors: [] })).toEqual({
+      severity: 'warning', text: 'Import complete — Bundles: 0 created, 0 updated, 0 skipped, 1 failed. 1 row failed: x'
+    });
   });
 });

@@ -32,8 +32,10 @@ export interface ApplySummary {
   sheets: Partial<Record<SheetKey, SheetSummary>>;
   /** Why a ticked row was not applied, by row key. */
   rowErrors: Record<string, string>;
-  /** Failures that belong to no row: a category write, an upload log. */
+  /** Failures that belong to no row: an upload log. */
   errors: string[];
+  /** Set when the import threw something it did not catch: what was thrown. Rows written before it stay written. */
+  stopped?: string;
 }
 
 export interface ApplyMeta {
@@ -127,7 +129,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
 
   // 2. Operations.
   const operationIdByRowKey = new Map<string, string>();
-  const moves: Array<{ operationId: string; label: string }> = [];
+  const moves: Array<{ operationId: string; label: string; rowKey: string }> = [];
   for (const row of plan.operations?.rows ?? []) {
     if (row.action === 'hide' || !usable(row.key) || !ready(row.key)) continue;
     const item = plan.operations!.work.rows[row.key];
@@ -149,7 +151,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
       }
       operationIdByRowKey.set(row.key, id);
       operationSetIds.set(id, (fields.parameterSetIds as string[] | undefined) ?? operationSetIds.get(id) ?? []);
-      if (item.category !== undefined) moves.push({ operationId: id, label: item.category });
+      if (item.category !== undefined) moves.push({ operationId: id, label: item.category, rowKey: row.key });
       snapshots.operations.push({ itemId: id, action: item.existingId ? 'UPDATE' : 'CREATE', before: item.existingId ? item.before : undefined, after: fields });
       settle([row.key]);
     } catch (error) {
@@ -179,22 +181,31 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   }
 
   // 4. Categories — one write per category whose list changed, after the creates so new ids exist.
+  //    A failed write is put on the rows whose move it carried: the operation's name was written in step 2,
+  //    so a row left reading "updated" would disagree with the category it was meant to land in.
+  const categoryFailure = (label: string, changedOperationIds: ReadonlySet<string>, error: unknown): void => {
+    const text = `Category “${label}” could not be saved: ${formatGqlError(error)}`;
+    const carried = moves.filter((move) => changedOperationIds.has(move.operationId));
+    if (carried.length === 0) errors.push(text);
+    for (const move of carried) rowErrors[move.rowKey] = rowErrors[move.rowKey] && !rowErrors[move.rowKey].includes(text) ? `${rowErrors[move.rowKey]} ${text}` : text;
+  };
   const writes = categoryWrites(catalog.categories, moves);
   for (const create of writes.creates) {
     try {
       const id = await mutator.createCategory(create);
       snapshots.operations.push({ itemId: id, action: 'CREATE', after: { label: create.label, services: create.services } });
     } catch (error) {
-      errors.push(`Category “${create.label}”: ${formatGqlError(error)}`);
+      categoryFailure(create.label, new Set(create.services), error);
     }
   }
   for (const update of writes.updates) {
+    const before = catalog.categories.find((category) => category.id === update.id)?.serviceIds ?? [];
     try {
       await mutator.updateCategory(update.id, { services: update.services });
-      const before = catalog.categories.find((category) => category.id === update.id)?.serviceIds ?? [];
       snapshots.operations.push({ itemId: update.id, action: 'UPDATE', before: { services: before }, after: { services: update.services } });
     } catch (error) {
-      errors.push(`Category “${update.label}”: ${formatGqlError(error)}`);
+      const touched = new Set([...before.filter((id) => !update.services.includes(id)), ...update.services.filter((id) => !before.includes(id))]);
+      categoryFailure(update.label, touched, error);
     }
   }
 
@@ -259,7 +270,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   const sheets: Partial<Record<SheetKey, SheetSummary>> = {};
   for (const sheet of sheetPlans(plan)) {
     if (!sheet.rows.some((row) => wanted(row.key))) continue;
-    const applied = sheet.rows.filter((row) => done.has(row.key));
+    const applied = sheet.rows.filter((row) => done.has(row.key) && !(row.key in rowErrors));
     const created = applied.filter((row) => row.action === 'create').length;
     const failed = sheet.rows.filter((row) => row.key in rowErrors).length;
     const summary: SheetSummary = { created, updated: applied.length - created, failed, skipped: sheet.rows.length - applied.length - failed };
@@ -287,12 +298,26 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   return { sheets, rowErrors, errors };
 }
 
+/** The summary for an import that threw: nothing is known about which rows were written. */
+export function stoppedSummary(error: unknown): ApplySummary {
+  return { sheets: {}, rowErrors: {}, errors: [], stopped: formatGqlError(error) };
+}
+
 /** The one-line result shown after an import. */
 export function summaryText(summary: ApplySummary): string {
+  if (summary.stopped !== undefined) return `The import stopped unexpectedly: ${summary.stopped} Rows written before it stopped stay written, so check the catalog and the upload history.`;
   const clauses = (Object.keys(summary.sheets) as SheetKey[]).map((sheet) => {
     const s = summary.sheets[sheet]!;
     return `${SHEET_TITLES[sheet]}: ${s.created} created, ${s.updated} updated, ${s.skipped} skipped${s.failed > 0 ? `, ${s.failed} failed` : ''}.`;
   });
   if (clauses.length === 0) return 'Import complete — nothing was applied.';
   return ['Import complete —', ...clauses, ...summary.errors].join(' ');
+}
+
+/** The message and severity shown once the preview closes. */
+export function completionMessage(summary: ApplySummary): { severity: 'success' | 'warning' | 'error'; text: string } {
+  const failed = Object.values(summary.rowErrors);
+  if (summary.stopped !== undefined) return { severity: 'error', text: summaryText(summary) };
+  const text = failed.length > 0 ? `${summaryText(summary)} ${failed.length} row${failed.length === 1 ? '' : 's'} failed: ${failed.join(' ')}` : summaryText(summary);
+  return { severity: failed.length > 0 || summary.errors.length > 0 ? 'warning' : 'success', text };
 }

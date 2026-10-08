@@ -10,10 +10,10 @@ import { PERMISSIONS, usePermissions } from '../../../hooks/usePermissions';
 import { formatGqlError } from '../../../utils/gqlError';
 import { isExcelFileName } from '../inventoryUploadUtils';
 import type { EditTypes } from '../ToolBar';
-import { ApplySummary, summaryText } from './applyWorkbook';
+import { ApplySummary, completionMessage } from './applyWorkbook';
 import { readWorkbookFile } from './readWorkbook';
 import { CatalogSnapshot, RawWorkbook } from './types';
-import { workbookAccess } from './workbookAccess';
+import { workbookAccess, workbookHistoryLink } from './workbookAccess';
 import { loadCatalogSnapshot } from './workbookCatalog';
 import { WorkbookUploadPreview } from './WorkbookUploadPreview';
 import { buildWorkbookData, WORKBOOK_FILE_NAME, writeWorkbook } from './writeWorkbook';
@@ -34,6 +34,7 @@ export function WorkbookButtons({ editType, onMessage }: { editType: EditTypes; 
   const { can } = usePermissions();
   const { refreshCatalog } = useContext(AppContext);
   const access = workbookAccess(editType, can);
+  const historyLink = workbookHistoryLink(editType, can);
   const allowPricing = can(PERMISSIONS.InternalFieldsRead);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState<'download' | 'upload' | null>(null);
@@ -87,9 +88,7 @@ export function WorkbookButtons({ editType, onMessage }: { editType: EditTypes; 
 
   const handleComplete = async (summary: ApplySummary) => {
     setUpload(null);
-    const failed = Object.values(summary.rowErrors);
-    const text = failed.length > 0 ? `${summaryText(summary)} ${failed.length} row${failed.length === 1 ? '' : 's'} failed: ${failed.join(' ')}` : summaryText(summary);
-    onMessage({ severity: failed.length > 0 || summary.errors.length > 0 ? 'warning' : 'success', text });
+    onMessage(completionMessage(summary));
     await refreshCatalog();
     await client.refetchQueries({ include: 'active' });
   };
@@ -109,9 +108,11 @@ export function WorkbookButtons({ editType, onMessage }: { editType: EditTypes; 
           <input ref={fileInput} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleFile} />
         </>
       )}
-      <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history')}>
-        Upload history
-      </Button>
+      {historyLink && (
+        <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate(historyLink)}>
+          Upload history
+        </Button>
+      )}
       {upload && (
         <WorkbookUploadPreview
           raw={upload.raw}
