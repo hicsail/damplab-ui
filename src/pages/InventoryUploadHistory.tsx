@@ -18,7 +18,7 @@ import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { GET_UPLOAD_LOG, GET_UPLOAD_LOGS } from '../gql/queries';
-import { entityTypeLabel, filterUploadLogs, UploadLogTypeFilter, uploadLogFilterFromSearch } from '../utils/uploadLogs';
+import { entityTypeLabel, filterUploadLogs, UPLOAD_LOG_TYPES, UploadLogTypeFilter, uploadLogFilterFromSearch } from '../utils/uploadLogs';
 
 export default function InventoryUploadHistory() {
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ export default function InventoryUploadHistory() {
   const shown = filterUploadLogs(logs, typeFilter);
 
   const columns: GridColDef[] = [
-    { field: 'entityType', headerName: 'Type', width: 110, valueGetter: (_v, row) => entityTypeLabel(row.entityType) },
+    { field: 'entityType', headerName: 'Type', width: 130, valueGetter: (_v, row) => entityTypeLabel(row.entityType) },
     {
       field: 'uploadDate',
       headerName: 'Date',
@@ -87,8 +87,9 @@ export default function InventoryUploadHistory() {
         onChange={(_e, value) => value && setTypeFilter(value)}
       >
         <ToggleButton value='ALL'>All</ToggleButton>
-        <ToggleButton value='INVENTORY'>Inventory</ToggleButton>
-        <ToggleButton value='OPERATION'>Operations</ToggleButton>
+        {UPLOAD_LOG_TYPES.map((type) => (
+          <ToggleButton key={type} value={type}>{entityTypeLabel(type)}</ToggleButton>
+        ))}
       </ToggleButtonGroup>
 
       {loading && logs.length === 0 && (
