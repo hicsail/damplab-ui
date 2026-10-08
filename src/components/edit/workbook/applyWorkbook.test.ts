@@ -191,9 +191,9 @@ describe('applyWorkbook — failures (rules 8, 20)', () => {
     const { summary, plan } = await run(chained, {}, { createCategory: 'boom' });
     const operationRow = plan.operations!.rows[0].key;
     expect(summary.rowErrors).toEqual({});
-    expect(summary.errors).toEqual([`Operation “${plan.operations!.rows[0].label}” was saved, but category “Sequencing” could not be saved: boom`]);
+    expect(summary.errors).toEqual([`Category “Sequencing” could not be saved: boom. Operation “${plan.operations!.rows[0].label}” was saved but is not in it.`]);
     expect(summary.sheets.operations).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0 });
-    expect(operationRow).toBeTruthy();
+    expect(summary.rowErrors[operationRow]).toBeUndefined();
     // The operation itself was written, so the rows that depend on it still went ahead.
     expect(summary.sheets.bundles).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0 });
   });
@@ -204,8 +204,14 @@ describe('applyWorkbook — failures (rules 8, 20)', () => {
     );
     expect(summary.rowErrors).toEqual({});
     expect(summary.errors).toHaveLength(1);
-    expect(summary.errors[0]).toMatch(/^Operation “.+” was saved, but category “Molecular Biology” could not be saved: locked$/);
+    expect(summary.errors[0]).toMatch(/^Category “Molecular Biology” could not be saved: locked\. Operation “.+” is still listed in it\.$/);
     expect(summary.sheets.operations).toEqual({ created: 0, updated: 1, skipped: 0, failed: 0 });
+  });
+
+  it('F28: one failed category write is one message, with a full stop per sentence, for every operation it affects', async () => {
+    const raw: RawWorkbook = { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['id', 'name', 'serviceCategory'], [['', 'Alpha', 'Fresh'], ['', 'Beta', 'Fresh']]) } };
+    const { summary } = await run(raw, {}, { createCategory: 'boom' });
+    expect(summary.errors).toEqual(['Category “Fresh” could not be saved: boom. Operations “Alpha”, “Beta” were saved but are not in it.']);
   });
 
   it('M2/F24: a failed category write is never reported as if the category had been saved', async () => {

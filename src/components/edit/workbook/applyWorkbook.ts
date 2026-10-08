@@ -32,7 +32,7 @@ export interface ApplySummary {
   sheets: Partial<Record<SheetKey, SheetSummary>>;
   /** Why a ticked row was not applied, by row key. */
   rowErrors: Record<string, string>;
-  /** Failures that belong to no row: an upload log, or a category write (named with the operation whose move it carried). */
+  /** Failures that belong to no row: an upload log, or a category write (one message per category, naming the operations it affects). */
   errors: string[];
   /** Set when the import threw something it did not catch: what was thrown. Rows written before it stay written. */
   stopped?: string;
@@ -182,13 +182,18 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
 
   // 4. Categories — one write per category whose list changed, after the creates so new ids exist.
   //    A failed write does not undo the operation: its record was written in step 2 (and the upload log carries
-  //    that), so the row stays counted as created or updated. The failure is an error naming the operation and
-  //    the category, so the category is never reported as saved.
-  const categoryFailure = (label: string, changedOperationIds: ReadonlySet<string>, error: unknown): void => {
-    const reason = formatGqlError(error);
-    const carried = moves.filter((move) => changedOperationIds.has(move.operationId));
-    if (carried.length === 0) errors.push(`Category “${label}” could not be saved: ${reason}`);
-    for (const move of carried) errors.push(`Operation “${move.operationName}” was saved, but category “${label}” could not be saved: ${reason}`);
+  //    that), so the row stays counted as created or updated. The failure is one warning per category, naming the
+  //    category and the operations it affects: those meant to join it were saved but are not in it, those meant
+  //    to leave it are still listed in it. The category is never reported as saved.
+  const categoryFailure = (label: string, joining: ReadonlySet<string>, leaving: ReadonlySet<string>, error: unknown): void => {
+    const reason = formatGqlError(error).replace(/[\s.]+$/, '');
+    const namesFor = (ids: ReadonlySet<string>): string[] => [...new Set(moves.filter((move) => ids.has(move.operationId)).map((move) => `“${move.operationName}”`))];
+    const sentence = (names: string[], one: string, many: string): string => (names.length === 0 ? '' : names.length === 1 ? ` Operation ${names[0]} ${one}.` : ` Operations ${names.join(', ')} ${many}.`);
+    errors.push(
+      `Category “${label}” could not be saved: ${reason}.` +
+        sentence(namesFor(joining), 'was saved but is not in it', 'were saved but are not in it') +
+        sentence(namesFor(leaving), 'is still listed in it', 'are still listed in it')
+    );
   };
   const writes = categoryWrites(catalog.categories, moves);
   for (const create of writes.creates) {
@@ -196,7 +201,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
       const id = await mutator.createCategory(create);
       snapshots.operations.push({ itemId: id, action: 'CREATE', after: { label: create.label, services: create.services } });
     } catch (error) {
-      categoryFailure(create.label, new Set(create.services), error);
+      categoryFailure(create.label, new Set(create.services), new Set(), error);
     }
   }
   for (const update of writes.updates) {
@@ -205,8 +210,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
       await mutator.updateCategory(update.id, { services: update.services });
       snapshots.operations.push({ itemId: update.id, action: 'UPDATE', before: { services: before }, after: { services: update.services } });
     } catch (error) {
-      const touched = new Set([...before.filter((id) => !update.services.includes(id)), ...update.services.filter((id) => !before.includes(id))]);
-      categoryFailure(update.label, touched, error);
+      categoryFailure(update.label, new Set(update.services.filter((id) => !before.includes(id))), new Set(before.filter((id) => !update.services.includes(id))), error);
     }
   }
 

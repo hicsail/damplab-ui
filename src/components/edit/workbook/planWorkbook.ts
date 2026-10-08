@@ -143,11 +143,14 @@ export function untickedCounts(rows: ReadonlyArray<PlanRow>, ticked: ReadonlySet
 }
 
 /**
- * The overrides to keep after the plan is replaced by a fresh one: only those
- * whose row is still in it. A tick on a row that still exists is the person's
- * decision and survives; one on a row that is gone has nothing to apply to.
+ * The overrides to keep after the plan is replaced by a fresh one: only the unticks
+ * (`false`) whose row is still in it. An untick on a row that still exists is the
+ * person's decision and survives. A tick (`true`) is never carried over: the row it
+ * was set on may now plan something else (a create that became a near-duplicate is
+ * unticked by default for a reason), so it falls back to the new plan's default.
+ * An override on a row that is gone has nothing to apply to.
  */
 export function survivingOverrides(overrides: Readonly<Record<string, boolean>>, plan: WorkbookPlan): Record<string, boolean> {
   const keys = new Set(allRows(plan).map((row) => row.key));
-  return Object.fromEntries(Object.entries(overrides).filter(([key]) => keys.has(key)));
+  return Object.fromEntries(Object.entries(overrides).filter(([key, ticked]) => ticked === false && keys.has(key)));
 }

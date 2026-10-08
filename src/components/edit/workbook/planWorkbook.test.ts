@@ -162,12 +162,16 @@ describe('survivingOverrides (F23: a refreshed preview keeps the ticks that stil
   const plan = planWorkbook(file, catalog, options);
   const [first, second] = plan.operations!.rows.map((row) => row.key);
 
-  it('keeps an override whose row is still in the new plan, ticked or unticked', () => {
-    expect(survivingOverrides({ [first]: false, [second]: true }, plan)).toEqual({ [first]: false, [second]: true });
+  it('keeps an untick whose row is still in the new plan', () => {
+    expect(survivingOverrides({ [first]: false, [second]: false }, plan)).toEqual({ [first]: false, [second]: false });
+  });
+
+  it('F26: never carries a hand-set tick over, since the row it was set on may now plan something else', () => {
+    expect(survivingOverrides({ [first]: false, [second]: true }, plan)).toEqual({ [first]: false });
   });
 
   it('drops an override whose row is no longer in the new plan', () => {
-    expect(survivingOverrides({ [first]: false, 'operations:99': true, 'hide:gone': false }, plan)).toEqual({ [first]: false });
+    expect(survivingOverrides({ [first]: false, 'operations:99': false, 'hide:gone': false }, plan)).toEqual({ [first]: false });
   });
 
   it('is empty when there is nothing to keep', () => {
