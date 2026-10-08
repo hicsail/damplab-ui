@@ -36,12 +36,10 @@ describe('upload history link (M3)', () => {
     expect(workbookHistoryLink('Services', administrator)).not.toBeNull();
   });
 
-  it('opens the history already filtered to what the view’s upload writes', () => {
-    expect(workbookHistoryLink('Services', administrator)).toBe('/edit/inventory/upload-history?type=OPERATION');
-    expect(workbookHistoryLink('Categories', administrator)).toBe('/edit/inventory/upload-history?type=OPERATION');
-    expect(workbookHistoryLink('Parameter Sets', administrator)).toBe('/edit/inventory/upload-history?type=PARAMETER_SET');
-    expect(workbookHistoryLink('Bundles', administrator)).toBe('/edit/inventory/upload-history?type=BUNDLE');
-    expect(workbookHistoryLink('SOWs', administrator)).toBe('/edit/inventory/upload-history?type=SOW_SECTION');
+  it('opens the history unfiltered from every catalog view, since one upload writes a log per sheet (F25)', () => {
+    for (const view of ['Services', 'Categories', 'Parameter Sets', 'Bundles', 'SOWs'] as const) {
+      expect(workbookHistoryLink(view, administrator)).toBe('/edit/inventory/upload-history');
+    }
   });
 
   it('is absent on the Inventory view, which has its own', () => {

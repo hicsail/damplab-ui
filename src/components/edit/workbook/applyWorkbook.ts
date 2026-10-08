@@ -32,7 +32,7 @@ export interface ApplySummary {
   sheets: Partial<Record<SheetKey, SheetSummary>>;
   /** Why a ticked row was not applied, by row key. */
   rowErrors: Record<string, string>;
-  /** Failures that belong to no row: an upload log. */
+  /** Failures that belong to no row: an upload log, or a category write (named with the operation whose move it carried). */
   errors: string[];
   /** Set when the import threw something it did not catch: what was thrown. Rows written before it stay written. */
   stopped?: string;
@@ -129,7 +129,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
 
   // 2. Operations.
   const operationIdByRowKey = new Map<string, string>();
-  const moves: Array<{ operationId: string; label: string; rowKey: string }> = [];
+  const moves: Array<{ operationId: string; label: string; rowKey: string; operationName: string }> = [];
   for (const row of plan.operations?.rows ?? []) {
     if (row.action === 'hide' || !usable(row.key) || !ready(row.key)) continue;
     const item = plan.operations!.work.rows[row.key];
@@ -151,7 +151,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
       }
       operationIdByRowKey.set(row.key, id);
       operationSetIds.set(id, (fields.parameterSetIds as string[] | undefined) ?? operationSetIds.get(id) ?? []);
-      if (item.category !== undefined) moves.push({ operationId: id, label: item.category, rowKey: row.key });
+      if (item.category !== undefined) moves.push({ operationId: id, label: item.category, rowKey: row.key, operationName: row.label });
       snapshots.operations.push({ itemId: id, action: item.existingId ? 'UPDATE' : 'CREATE', before: item.existingId ? item.before : undefined, after: fields });
       settle([row.key]);
     } catch (error) {
@@ -181,13 +181,14 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
   }
 
   // 4. Categories — one write per category whose list changed, after the creates so new ids exist.
-  //    A failed write is put on the rows whose move it carried: the operation's name was written in step 2,
-  //    so a row left reading "updated" would disagree with the category it was meant to land in.
+  //    A failed write does not undo the operation: its record was written in step 2 (and the upload log carries
+  //    that), so the row stays counted as created or updated. The failure is an error naming the operation and
+  //    the category, so the category is never reported as saved.
   const categoryFailure = (label: string, changedOperationIds: ReadonlySet<string>, error: unknown): void => {
-    const text = `Category “${label}” could not be saved: ${formatGqlError(error)}`;
+    const reason = formatGqlError(error);
     const carried = moves.filter((move) => changedOperationIds.has(move.operationId));
-    if (carried.length === 0) errors.push(text);
-    for (const move of carried) rowErrors[move.rowKey] = rowErrors[move.rowKey] && !rowErrors[move.rowKey].includes(text) ? `${rowErrors[move.rowKey]} ${text}` : text;
+    if (carried.length === 0) errors.push(`Category “${label}” could not be saved: ${reason}`);
+    for (const move of carried) errors.push(`Operation “${move.operationName}” was saved, but category “${label}” could not be saved: ${reason}`);
   };
   const writes = categoryWrites(catalog.categories, moves);
   for (const create of writes.creates) {

@@ -120,14 +120,14 @@ export function plansMatch(previewed: WorkbookPlan, fresh: WorkbookPlan): boolea
 
 /**
  * The preview grid's order: rows with errors (or blocked by something unmet),
- * then rows with warnings, then creates / updates / hides, then unchanged rows.
+ * then rows with warnings (whatever their action), then creates / updates / hides, then unchanged rows.
  * Sheet order within each band, so the "Row" column still reads as the sheet's.
  */
 export function previewOrder(rows: ReadonlyArray<PlanRow>, blocked: Readonly<Record<string, string>>): PlanRow[] {
   const band = (row: PlanRow): number => {
     if (row.errors.length > 0 || row.key in blocked) return 0;
-    if (row.action === 'unchanged') return 3;
-    return row.warnings.length > 0 ? 1 : 2;
+    if (row.warnings.length > 0) return 1;
+    return row.action === 'unchanged' ? 3 : 2;
   };
   return rows.map((row, index) => ({ row, index })).sort((a, b) => band(a.row) - band(b.row) || a.index - b.index).map(({ row }) => row);
 }
@@ -140,4 +140,14 @@ export function untickedCounts(rows: ReadonlyArray<PlanRow>, ticked: ReadonlySet
     if (row.action === 'create' || row.action === 'update' || row.action === 'hide') counts[row.action] += 1;
   }
   return counts;
+}
+
+/**
+ * The overrides to keep after the plan is replaced by a fresh one: only those
+ * whose row is still in it. A tick on a row that still exists is the person's
+ * decision and survives; one on a row that is gone has nothing to apply to.
+ */
+export function survivingOverrides(overrides: Readonly<Record<string, boolean>>, plan: WorkbookPlan): Record<string, boolean> {
+  const keys = new Set(allRows(plan).map((row) => row.key));
+  return Object.fromEntries(Object.entries(overrides).filter(([key]) => keys.has(key)));
 }

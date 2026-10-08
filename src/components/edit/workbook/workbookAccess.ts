@@ -14,22 +14,14 @@ export function workbookAccess(editType: EditTypes, can: (permission: Permission
   return { show: download || upload, download, upload };
 }
 
-const HISTORY_TYPE: Partial<Record<EditTypes, string>> = {
-  Services: 'OPERATION',
-  Categories: 'OPERATION',
-  'Parameter Sets': 'PARAMETER_SET',
-  Bundles: 'BUNDLE',
-  SOWs: 'SOW_SECTION'
-};
-
 /**
  * Where "Upload history" goes from a Catalog Editor view, or null for a caller
  * who should not see the button: it sits behind the write tier, as it did when
- * only the operations upload wrote logs, and opens already filtered to the
- * kind of log the view's upload writes.
+ * only the operations upload wrote logs. It opens unfiltered: one upload writes
+ * a log per sheet it applied from, whichever view it was started from, so no
+ * single type is the view's own.
  */
 export function workbookHistoryLink(editType: EditTypes, can: (permission: PermissionName) => boolean): string | null {
-  const type = HISTORY_TYPE[editType];
-  if (!type || !can(PERMISSIONS.CatalogEditorWrite)) return null;
-  return `/edit/inventory/upload-history?type=${type}`;
+  if (editType === 'Inventory' || !can(PERMISSIONS.CatalogEditorWrite)) return null;
+  return '/edit/inventory/upload-history';
 }

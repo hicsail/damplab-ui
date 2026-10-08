@@ -187,22 +187,31 @@ describe('applyWorkbook — failures (rules 8, 20)', () => {
     ]);
   });
 
-  it('M2: a failed category write is an error on the row whose move it carried, and the row is not counted applied', async () => {
+  it('M2/F24: a failed category write is reported by operation and category; the written operation still counts, as the upload log has it', async () => {
     const { summary, plan } = await run(chained, {}, { createCategory: 'boom' });
     const operationRow = plan.operations!.rows[0].key;
-    expect(summary.rowErrors).toEqual({ [operationRow]: 'Category “Sequencing” could not be saved: boom' });
-    expect(summary.errors).toEqual([]);
-    expect(summary.sheets.operations).toEqual({ created: 0, updated: 0, skipped: 0, failed: 1 });
+    expect(summary.rowErrors).toEqual({});
+    expect(summary.errors).toEqual([`Operation “${plan.operations!.rows[0].label}” was saved, but category “Sequencing” could not be saved: boom`]);
+    expect(summary.sheets.operations).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0 });
+    expect(operationRow).toBeTruthy();
     // The operation itself was written, so the rows that depend on it still went ahead.
     expect(summary.sheets.bundles).toEqual({ created: 1, updated: 0, skipped: 0, failed: 0 });
   });
 
-  it('M2: a failed update of the category an operation left is on that operation’s row too', async () => {
+  it('M2/F24: a failed update of the category an operation left is reported against that operation, and it counts as updated', async () => {
     const { summary } = await run(
       { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['id', 'serviceCategory'], [['op1', 'Cloning']]) } }, {}, { updateCategory: 'locked' }
     );
-    expect(summary.rowErrors).toEqual({ 'operations:2': 'Category “Molecular Biology” could not be saved: locked' });
-    expect(summary.sheets.operations).toEqual({ created: 0, updated: 0, skipped: 0, failed: 1 });
+    expect(summary.rowErrors).toEqual({});
+    expect(summary.errors).toHaveLength(1);
+    expect(summary.errors[0]).toMatch(/^Operation “.+” was saved, but category “Molecular Biology” could not be saved: locked$/);
+    expect(summary.sheets.operations).toEqual({ created: 0, updated: 1, skipped: 0, failed: 0 });
+  });
+
+  it('M2/F24: a failed category write is never reported as if the category had been saved', async () => {
+    const { summary } = await run(chained, {}, { createCategory: 'boom' });
+    expect(summaryText(summary)).toContain('could not be saved: boom');
+    expect(completionMessage(summary).severity).toBe('warning');
   });
 });
 

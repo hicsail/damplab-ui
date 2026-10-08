@@ -5,7 +5,7 @@ import { useContext, useMemo, useState } from 'react';
 import { UserContext } from '../../../contexts/UserContext';
 import { formatGqlError } from '../../../utils/gqlError';
 import { ApplySummary, applyWorkbook, stoppedSummary } from './applyWorkbook';
-import { countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, tickedKeys, unmetNeeds, untickedCounts } from './planWorkbook';
+import { countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, survivingOverrides, tickedKeys, unmetNeeds, untickedCounts } from './planWorkbook';
 import { CatalogSnapshot, isApplicable, PlanRow, RawWorkbook, SHEET_TITLES, SheetKey } from './types';
 import { apolloWorkbookMutator, loadCatalogSnapshot } from './workbookCatalog';
 
@@ -66,7 +66,7 @@ export function WorkbookUploadPreview({ raw, catalog: openedWith, fileName, allo
       const replanned = planWorkbook(raw, fresh, { allowPricing, hideMissing });
       if (!plansMatch(plan, replanned)) {
         setCatalog(fresh);
-        setOverrides({});
+        setOverrides((prev) => survivingOverrides(prev, replanned));
         setNotice({ severity: 'warning', text: 'The catalog changed while this preview was open, so nothing was imported. The preview now shows what would happen against the current catalog. Check it, then import again.' });
         setImporting(false);
         return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allRows, countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, tickedKeys, unmetNeeds, untickedCounts } from './planWorkbook';
+import { allRows, countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, survivingOverrides, tickedKeys, unmetNeeds, untickedCounts } from './planWorkbook';
 import { catalogOf, rawSheet } from './testSupport';
 import { PlanRow, RawWorkbook } from './types';
 
@@ -132,8 +132,8 @@ describe('previewOrder (I3: the rows that matter come first)', () => {
     row('hide:x', { action: 'hide' })
   ];
 
-  it('puts errors, then warnings, then writes, then unchanged; sheet order within each band', () => {
-    expect(previewOrder(rows, {}).map((r) => r.key)).toEqual(['operations:5', 'operations:9', 'operations:7', 'operations:3', 'operations:6', 'hide:x', 'operations:2', 'operations:4', 'operations:8']);
+  it('puts errors, then warnings (whatever the action, F22), then writes, then unchanged; sheet order within each band', () => {
+    expect(previewOrder(rows, {}).map((r) => r.key)).toEqual(['operations:5', 'operations:9', 'operations:7', 'operations:8', 'operations:3', 'operations:6', 'hide:x', 'operations:2', 'operations:4']);
   });
 
   it('treats a row that is blocked by an unmet need as an error row', () => {
@@ -154,5 +154,23 @@ describe('untickedCounts (I3: an unticked create or update is never uncounted)',
     expect(untickedCounts(plan.parameterList!.rows, ticked)).toEqual({ create: 1, update: 0, hide: 0 });
     expect(untickedCounts(plan.sowSections!.rows, ticked)).toEqual({ create: 1, update: 0, hide: 0 });
     expect(untickedCounts(plan.operations!.rows, ticked)).toEqual({ create: 0, update: 0, hide: 0 });
+  });
+});
+
+describe('survivingOverrides (F23: a refreshed preview keeps the ticks that still apply)', () => {
+  const file = { ignoredSheets: [], sheets: { operations: rawSheet('operations', ['id', 'name'], [['op1', 'PCR'], ['', 'Ligation']]) } };
+  const plan = planWorkbook(file, catalog, options);
+  const [first, second] = plan.operations!.rows.map((row) => row.key);
+
+  it('keeps an override whose row is still in the new plan, ticked or unticked', () => {
+    expect(survivingOverrides({ [first]: false, [second]: true }, plan)).toEqual({ [first]: false, [second]: true });
+  });
+
+  it('drops an override whose row is no longer in the new plan', () => {
+    expect(survivingOverrides({ [first]: false, 'operations:99': true, 'hide:gone': false }, plan)).toEqual({ [first]: false });
+  });
+
+  it('is empty when there is nothing to keep', () => {
+    expect(survivingOverrides({}, plan)).toEqual({});
   });
 });
