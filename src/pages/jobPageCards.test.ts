@@ -9,11 +9,18 @@ describe('client job page (behaviour 1)', () => {
     expect(count(clientView, '<ResultsPanel')).toBe(0);
   });
 
-  it('renders no Biosecurity card and no identity-verification entry point', () => {
-    expect(count(clientView, 'title="Biosecurity"')).toBe(0);
+  it('shows only identity verification, and only when the account flag is on', () => {
+    expect(count(clientView, 'title="Biosecurity"')).toBe(1);
+    expect(clientView).toContain('showBiosecurity');
+    expect(clientView).toContain('customerVerificationPresentation');
+    expect(clientView).toContain('Submitted');
     expect(clientView).not.toContain('BiosecurityScreeningSections');
-    expect(clientView).not.toContain('START_JOB_CUSTOMER_VERIFICATION');
-    expect(clientView).not.toContain('Verify identity');
+    expect(clientView).toContain('START_JOB_CUSTOMER_VERIFICATION');
+    expect(clientView).toContain('loadAclidWidget');
+    expect(clientView).toContain('showDressedEmbeddedVerification');
+    expect(clientView).toContain('openHostedVerification');
+    expect(clientView).toContain('Verify identity');
+    expect(clientView).toContain('Open Aclid page');
   });
 });
 
@@ -22,8 +29,10 @@ describe('staff job page (behaviours 2, 3)', () => {
     expect(count(technicianView, '<ResultsPanel')).toBe(1);
   });
 
-  it('keeps the Biosecurity card and its Copy verification link action', () => {
+  it('keeps the full Biosecurity card for accounts that can see it', () => {
     expect(count(technicianView, 'title="Biosecurity"')).toBe(1);
+    expect(technicianView).toContain('showBiosecurity');
     expect(technicianView).toContain('COPY_VERIFICATION_LINK');
+    expect(technicianView).toContain('BiosecurityScreeningSections');
   });
 });

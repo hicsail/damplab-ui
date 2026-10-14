@@ -27,9 +27,16 @@ import {
 } from "../gql/queries";
 import {
   CANCEL_JOB,
+  REFRESH_JOB_ACLID_SCREENING,
   REJECT_JOB_REVIEW,
   RESTORE_JOB_VERSION,
+  START_JOB_CUSTOMER_VERIFICATION,
 } from "../gql/mutations";
+import {
+  loadAclidWidget,
+  openHostedVerification,
+  showDressedEmbeddedVerification,
+} from "../aclid/verificationWidget";
 import { buildReasonedJobInput, retryOperationId } from "../utils/jobReview";
 import { formatGqlError } from "../utils/gqlError";
 import {
@@ -49,6 +56,7 @@ import { jobPeople, viewerIsJobMember } from "../utils/jobMembers";
 import { useEffectiveUser } from "../hooks/useEffectiveUser";
 import ProcessCard from "../components/technician/ProcessCard";
 import StatusPaneHeader from "../components/technician/StatusPaneHeader";
+import { customerVerificationPresentation } from "../components/technician/biosecurityStatus";
 import { CommentsSection } from "../components/CommentsSection";
 import ResubmitJobModal from "../components/ResubmitJobModal";
 import RequestEditAccessModal from "../components/RequestEditAccessModal";
@@ -262,6 +270,104 @@ export default function Tracking() {
     }
   };
 
+  // Identity verification runs here and only here: the customer is the one
+  // being verified. The staff page copies or opens the hosted URL rather than
+  // completing KYC as the technician.
+  const [startJobCustomerVerification] = useMutation(
+    START_JOB_CUSTOMER_VERIFICATION,
+  );
+  const [refreshJobAclidScreening] = useMutation(REFRESH_JOB_ACLID_SCREENING);
+  const [verifyingIdentity, setVerifyingIdentity] = useState(false);
+
+  // Pull Aclid's latest verdict onto the job, then re-read the job so the card
+  // reports it. Failures are swallowed: this runs from the widget's success
+  // callback and right after the flow opens, where there is nothing sensible
+  // to do with an error, and the Refresh Job button is always there to try again.
+  const refreshAclid = async () => {
+    if (!id) return;
+    try {
+      await refreshJobAclidScreening({ variables: { jobId: id } });
+      await refetch();
+    } catch {
+      // Reported on the next explicit refresh instead.
+    }
+  };
+
+  /**
+   * Start (or resume) identity verification in Aclid's embedded widget.
+   *
+   * The widget iframes the verification URL on origins Aclid has allow-listed.
+   * If that script cannot load, open the same URL on Aclid's hosted page so
+   * the customer can still finish. Either way the card refreshes so it reads
+   * In Progress while they do, and again when the widget reports success.
+   */
+  const handleVerifyIdentity = async () => {
+    // Also reached from the status-pane icon and the details chip, which
+    // stay enabled (a disabled Tooltip child is a MUI warning), so the
+    // re-entry guard lives here rather than on each control.
+    if (!id || verifyingIdentity) return;
+    setVerifyingIdentity(true);
+    try {
+      const result = await startJobCustomerVerification({
+        variables: { jobId: id },
+      });
+      const url: string | undefined =
+        result.data?.startJobCustomerVerification?.url;
+      if (!url) throw new Error("No verification link was returned.");
+      try {
+        const widget = await loadAclidWidget();
+        showDressedEmbeddedVerification(widget, {
+          verificationUrl: url,
+          onSuccess: () => {
+            void refreshAclid();
+          },
+        });
+      } catch {
+        // The open is two awaits past the click, so it may no longer count
+        // as the customer's gesture. Show them the link rather than leaving
+        // nothing to happen.
+        if (!openHostedVerification(url)) {
+          window.alert(
+            `Your browser blocked the verification window. Open this link to verify your identity:\n\n${url}`,
+          );
+        }
+      }
+      await refreshAclid();
+    } catch (e) {
+      window.alert(formatGqlError(e, "Could not start identity verification."));
+    } finally {
+      setVerifyingIdentity(false);
+    }
+  };
+
+  /**
+   * The same verification URL, opened on Aclid's own page. Always offered
+   * beside the embed, because a framed page can still come up blank when the
+   * origin is not allow-listed.
+   */
+  const handleOpenAclidPage = async () => {
+    if (!id || verifyingIdentity) return;
+    setVerifyingIdentity(true);
+    try {
+      const result = await startJobCustomerVerification({
+        variables: { jobId: id },
+      });
+      const url: string | undefined =
+        result.data?.startJobCustomerVerification?.url;
+      if (!url) throw new Error("No verification link was returned.");
+      if (!openHostedVerification(url)) {
+        window.alert(
+          `Your browser blocked the new tab. Open this link to verify your identity:\n\n${url}`,
+        );
+      }
+      await refreshAclid();
+    } catch (e) {
+      window.alert(formatGqlError(e, "Could not open the Aclid page."));
+    } finally {
+      setVerifyingIdentity(false);
+    }
+  };
+
   const activeSow = sowFullData?.activeVersion ?? null;
   const visibleActiveSow =
     activeSow?.visibleToCustomer === true ? activeSow : null;
@@ -415,6 +521,11 @@ export default function Tracking() {
   const customerJobVersion = partyVersionLabel(
     latestCustomerVisibleJobVersion(versions),
   );
+
+  // On unless an admin has hidden it for this account.
+  const showBiosecurity = userContext.userProps?.showBiosecurity !== false;
+  const verification = customerVerificationPresentation(job?.aclidScreening);
+  const canOpenAclid = Boolean(job?.aclidScreening?.screenId);
 
   const workflowCard = (
     <>
@@ -782,7 +893,54 @@ export default function Tracking() {
           />
         </div>
 
-        {/* Biosecurity and Results are staff-only for now (UI-only hide; staff send the verification link from their card). */}
+        {showBiosecurity && (
+          <ProcessCard
+            title="Biosecurity"
+            defaultExpanded={verification.canVerify}
+            customerBadge={null}
+            staffBadge={null}
+            statusPane={
+              <StatusPaneHeader
+                status={verification.label}
+                description={
+                  verification.canVerify
+                    ? "Submit your identity verification."
+                    : verification.label === "Submitted"
+                      ? "Your identity verification has been submitted."
+                      : verification.label === "Not required"
+                        ? "Identity verification is not required for this job."
+                        : "Identity verification is not available for this job yet."
+                }
+              />
+            }
+            actions={
+              verification.canVerify || canOpenAclid ? (
+                <>
+                  {verification.canVerify && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      sx={railBtnSx}
+                      disabled={!id || verifyingIdentity}
+                      onClick={handleVerifyIdentity}
+                    >
+                      {verifyingIdentity ? "Opening…" : "Verify identity"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    sx={railBtnSx}
+                    disabled={!id || verifyingIdentity}
+                    onClick={handleOpenAclidPage}
+                  >
+                    Open Aclid page
+                  </Button>
+                </>
+              ) : undefined
+            }
+          />
+        )}
 
         {/* Always rendered, like the staff page's SOW card: "the lab has not
                     sent you one" is a status, and a card that appears out of nowhere

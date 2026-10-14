@@ -28,14 +28,16 @@ describe('job review GraphQL contracts', () => {
   });
 
   /**
-   * The customer card composites Homology with the other rows, so a query that
-   * does not select `homologyScreening` does not read Unavailable — it lets the
-   * card say Passed once KYC clears, on a job whose homology failed.
+   * Staff still composite Homology with the other rows. The customer query
+   * asks only whether identity verification was submitted, so a homology
+   * failure cannot reach that page.
    */
-  it('requests the homology verdict in both job-detail queries, not just the staff one', () => {
-    for (const document of [GET_JOB_BY_ID, GET_OWN_JOB_BY_ID]) {
-      expect(compact(document)).toMatch(/homologyScreening \{[^}]*\bstatus\b[^}]*\bdetail\b[^}]*\bbatchId\b[^}]*\}/);
-    }
+  it('requests the homology verdict on the staff job, and only verification submission on the customer job', () => {
+    expect(compact(GET_JOB_BY_ID)).toMatch(/homologyScreening \{[^}]*\bstatus\b[^}]*\bdetail\b[^}]*\bbatchId\b[^}]*\}/);
+    const customer = compact(GET_OWN_JOB_BY_ID);
+    expect(customer).not.toMatch(/\bhomologyScreening\b/);
+    expect(customer).not.toMatch(/\bdecisionStatus\b/);
+    expect(customer).toMatch(/aclidScreening \{[^}]*\bscreenId\b[^}]*\bverificationStatus\b[^}]*\bverificationCompletedAt\b[^}]*\}/);
   });
 
   it('requests review and acceptance facts in both job-detail queries', () => {
