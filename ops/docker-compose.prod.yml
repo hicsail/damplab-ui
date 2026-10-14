@@ -35,6 +35,14 @@ services:
       - KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET}
       - KEYCLOAK_LAB_STAFF_GROUP_NAME=${KEYCLOAK_LAB_STAFF_GROUP_NAME}
+      # Aclid. Values live in this directory's .env on the box, not in GitHub.
+      # ACLID_API_KEY empty means Aclid is skipped. APP_BASE_URL is the Canvas
+      # origin Aclid allow-listed (no path). BIOSECURITY_HOMOLOGY_MODE is
+      # aclid, securedna, or both.
+      - ACLID_API_KEY=${ACLID_API_KEY}
+      - ACLID_API_URL=${ACLID_API_URL:-https://api.aclid.bio}
+      - APP_BASE_URL=${APP_BASE_URL}
+      - BIOSECURITY_HOMOLOGY_MODE=${BIOSECURITY_HOMOLOGY_MODE:-aclid}
     restart: unless-stopped
     depends_on:
       - backend-db

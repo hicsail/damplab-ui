@@ -187,6 +187,8 @@ export default function TechnicianView() {
   const navigate = useNavigate();
   const apolloClient = useApolloClient();
   const userContext = useContext(UserContext);
+  // On unless an admin has hidden it. Staff with it see the full card.
+  const showBiosecurity = userContext.userProps?.showBiosecurity !== false;
   // The catalogue, for re-attaching parameter definitions to a version snapshot.
   const { services } = useContext(AppContext);
 
@@ -1215,6 +1217,7 @@ export default function TechnicianView() {
           />
         </div>
 
+        {showBiosecurity && (
         <ProcessCard
           title="Biosecurity"
           customerBadge={demoCustomer ? "check" : null}
@@ -1369,6 +1372,7 @@ export default function TechnicianView() {
             )
           }
         />
+        )}
 
         <div ref={sowSectionRef}>
           <ProcessCard

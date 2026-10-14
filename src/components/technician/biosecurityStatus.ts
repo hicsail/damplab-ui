@@ -163,6 +163,26 @@ export function biosecurityFromJob(
  * The one-line "why" under a screening, when there is one worth showing.
  * Passed needs no explanation; the others do.
  */
+/**
+ * The customer job page. Submission state only — never the homology verdict
+ * or whether Aclid approved or rejected them.
+ */
+export function customerVerificationPresentation(aclid?: {
+  screenId?: string | null;
+  verificationStatus?: string | null;
+  verificationCompletedAt?: string | null;
+} | null): { label: string; canVerify: boolean } {
+  // No screen yet is not a dead end: opening verification screens the job
+  // and mints the link when Aclid is configured.
+  if (!aclid?.screenId) return { label: 'Not submitted', canVerify: true };
+  const status = aclid.verificationStatus?.trim().toLowerCase();
+  if (status === 'not_required') return { label: 'Not required', canVerify: false };
+  if (status === 'submitted' || aclid.verificationCompletedAt) {
+    return { label: 'Submitted', canVerify: false };
+  }
+  return { label: 'Not submitted', canVerify: true };
+}
+
 export function customerDetail(aclid?: AclidScreeningResult | null): string | null {
   const status = homologyStatusFrom({ status: aclid?.customerStatus });
   if (status === 'IN_PROGRESS') return 'Complete identity verification';

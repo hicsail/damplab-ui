@@ -7,7 +7,9 @@ import {
   Box,
   Button,
   Chip,
+  Checkbox,
   FormControl,
+  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
@@ -25,7 +27,7 @@ import {
 } from '@mui/material';
 
 import { LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT, SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT } from '../gql/queries';
-import { SET_USER_KEYCLOAK_ACCESS_TIER, SET_USER_KEYCLOAK_CUSTOMER_CATEGORY } from '../gql/mutations';
+import { SET_USER_KEYCLOAK_ACCESS_TIER, SET_USER_KEYCLOAK_CUSTOMER_CATEGORY, SET_USER_SHOW_BIOSECURITY } from '../gql/mutations';
 import { ACCESS_TIERS, ACCESS_TIER_HINTS, ACCESS_TIER_LABELS, ASSIGNABLE_ACCESS_TIERS } from '../constants/accessTiers';
 import { UserContext } from '../contexts/UserContext';
 
@@ -70,6 +72,7 @@ type SearchRow = {
   customerCategory?: string | null;
   isDefaultExternalCustomer?: boolean | null;
   accessTier?: string | null;
+  showBiosecurity?: boolean | null;
 };
 
 function normTier(t: string | null | undefined): string {
@@ -94,6 +97,7 @@ export default function CustomerManagement() {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [pendingByUser, setPendingByUser] = useState<Record<string, string>>({});
   const [pendingTierByUser, setPendingTierByUser] = useState<Record<string, string>>({});
+  const [pendingBiosecurityByUser, setPendingBiosecurityByUser] = useState<Record<string, boolean>>({});
   /**
    * Set when a tier write succeeded but the realm had no group -> role mapping, so
    * the user gained nothing. Worth its own banner: everything else about the request
@@ -131,12 +135,16 @@ export default function CustomerManagement() {
     SET_USER_KEYCLOAK_ACCESS_TIER
   );
 
-  const saving = savingCategory || savingTier;
-  const saveError = categoryError ?? tierError;
+  const [setShowBiosecurity, { loading: savingBiosecurity, error: biosecurityError, reset: resetBiosecurityError }] =
+    useMutation(SET_USER_SHOW_BIOSECURITY);
+
+  const saving = savingCategory || savingTier || savingBiosecurity;
+  const saveError = categoryError ?? tierError ?? biosecurityError;
   const resetSaveError = useCallback(() => {
     resetCategoryError();
     resetTierError();
-  }, [resetCategoryError, resetTierError]);
+    resetBiosecurityError();
+  }, [resetCategoryError, resetTierError, resetBiosecurityError]);
 
   const rows: SearchRow[] = useMemo(
     () => (data?.searchKeycloakUsersForCustomerManagement ?? []) as SearchRow[],
@@ -183,9 +191,12 @@ export default function CustomerManagement() {
     return normCategory(row.customerCategory);
   };
 
+  const showsBiosecurity = (row: SearchRow) => row.showBiosecurity !== false;
   const isCategoryDirty = (row: SearchRow) => (pendingByUser[row.id] ?? initialSelectValue(row)) !== initialSelectValue(row);
   const isTierDirty = (row: SearchRow) => (pendingTierByUser[row.id] ?? normTier(row.accessTier)) !== normTier(row.accessTier);
-  const isDirty = (row: SearchRow) => isCategoryDirty(row) || isTierDirty(row);
+  const isBiosecurityDirty = (row: SearchRow) =>
+    (pendingBiosecurityByUser[row.id] ?? showsBiosecurity(row)) !== showsBiosecurity(row);
+  const isDirty = (row: SearchRow) => isCategoryDirty(row) || isTierDirty(row) || isBiosecurityDirty(row);
 
   /**
    * Apply whichever of the two axes the admin actually changed.
@@ -200,6 +211,7 @@ export default function CustomerManagement() {
       setUnmappedRoleUser(null);
       const chosenCategory = pendingByUser[userId] ?? initialSelectValue(row);
       const chosenTier = pendingTierByUser[userId] ?? normTier(row.accessTier);
+      const chosenBiosecurity = pendingBiosecurityByUser[userId] ?? showsBiosecurity(row);
       try {
         if (isCategoryDirty(row)) {
           await setCategory({ variables: { userId, category: chosenCategory === '' ? null : chosenCategory } });
@@ -212,6 +224,9 @@ export default function CustomerManagement() {
             setUnmappedRoleUser(displayName(row));
           }
         }
+        if (isBiosecurityDirty(row)) {
+          await setShowBiosecurity({ variables: { userId, enabled: chosenBiosecurity } });
+        }
         setPendingByUser((prev) => {
           const next = { ...prev };
           delete next[userId];
@@ -222,13 +237,18 @@ export default function CustomerManagement() {
           delete next[userId];
           return next;
         });
+        setPendingBiosecurityByUser((prev) => {
+          const next = { ...prev };
+          delete next[userId];
+          return next;
+        });
         refetchLast();
       } catch {
         /* Apollo surfaces error in saveError */
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pendingByUser, pendingTierByUser, refetchLast, resetSaveError, setCategory, setAccessTier]
+    [pendingByUser, pendingTierByUser, pendingBiosecurityByUser, refetchLast, resetSaveError, setCategory, setAccessTier, setShowBiosecurity]
   );
 
   const isSearching = lastQuery.length >= 2;
@@ -279,7 +299,9 @@ export default function CustomerManagement() {
         <strong>pricing category</strong>, which decides what they are billed, and their <strong>access tier</strong>,
         which decides what they may do. Changing one never changes the other. Pricing changes apply in Keycloak
         immediately and existing jobs keep the category stored at submission time; <strong>access changes take effect
-        at the user&rsquo;s next sign-in</strong>, because Keycloak does not invalidate tokens already issued.
+        at the user&rsquo;s next sign-in</strong>, because Keycloak does not invalidate tokens already issued.{' '}
+        <strong>Biosecurity</strong> is separate again: shown for everyone until you turn it off. They see the
+        change the next time they load the app.
       </Typography>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }} alignItems={{ sm: 'center' }}>
@@ -344,6 +366,7 @@ export default function CustomerManagement() {
                 <TableCell>Email</TableCell>
                 <TableCell>Pricing category</TableCell>
                 <TableCell>Access tier</TableCell>
+                <TableCell>Biosecurity</TableCell>
                 <TableCell align="right">Update</TableCell>
               </TableRow>
             </TableHead>
@@ -351,6 +374,7 @@ export default function CustomerManagement() {
               {pagedRows.map((row) => {
                 const selectValue = pendingByUser[row.id] ?? initialSelectValue(row);
                 const tierValue = pendingTierByUser[row.id] ?? normTier(row.accessTier);
+                const biosecurityValue = pendingBiosecurityByUser[row.id] ?? showsBiosecurity(row);
                 const isOwnRow = Boolean(ownSubject) && row.id === ownSubject;
                 return (
                   <TableRow key={row.id}>
@@ -405,6 +429,21 @@ export default function CustomerManagement() {
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                         {ACCESS_TIER_HINTS[tierValue]}
                       </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <FormControlLabel
+                        sx={{ mr: 0 }}
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={biosecurityValue}
+                            onChange={(e) =>
+                              setPendingBiosecurityByUser((prev) => ({ ...prev, [row.id]: e.target.checked }))
+                            }
+                          />
+                        }
+                        label="Show block"
+                      />
                     </TableCell>
                     <TableCell align="right">
                       <Button
