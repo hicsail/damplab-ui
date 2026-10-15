@@ -22,6 +22,7 @@ import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { getWorkflowsFromGraph } from '../controllers/GraphHelpers';
 import { submitCanvasJob } from '../utils/canvasJobSubmission';
+import { formatGqlError } from '../utils/gqlError';
 import { parseEmailList, splitClientEmails, JOB_DESCRIPTION_MAX_LENGTH } from '../utils/jobMembers';
 
 const CANVAS_AUTOSAVE_KEY = 'canvas:autosave';
@@ -145,7 +146,7 @@ export default function StaffJobSubmit() {
       setTouched({ jobName: false, clientEmails: false, institute: false });
     } catch (err) {
       console.error('Staff job submission failed:', err);
-      setSnackbarMessage('Failed to submit job. Please try again.');
+      setSnackbarMessage(formatGqlError(err, 'Failed to submit job. Please try again.'));
       setSnackbarOpen(true);
     } finally {
       setJobLoading(false);

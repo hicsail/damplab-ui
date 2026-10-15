@@ -47,6 +47,37 @@ export const isPendingParamFile = (value: unknown): value is PendingParamFile =>
   (value as PendingParamFile).__kind === 'pending-file' &&
   (value as PendingParamFile).file instanceof File;
 
+/**
+ * A picked file whose file is gone: the canvas autosave keeps a placeholder's name and row count, never the file,
+ * so after a reload it still looks picked while there is nothing to upload.
+ */
+export const isStalePendingFile = (value: unknown): boolean =>
+  !!value && typeof value === 'object' && (value as PendingParamFile).__kind === 'pending-file' && !((value as PendingParamFile).file instanceof File);
+
+/**
+ * A restored canvas without its stale placeholders: an answer that was one becomes empty (or drops out of a list),
+ * so the form asks for the file again instead of looking done. Nodes with none are returned as they were.
+ */
+export function withoutStalePendingFiles<N extends { data?: any }>(nodes: N[]): N[] {
+  return nodes.map((node) => {
+    const formData = node?.data?.formData;
+    if (!Array.isArray(formData)) return node;
+    let changed = false;
+    const cleaned = formData.map((entry: any) => {
+      if (Array.isArray(entry?.value)) {
+        const kept = entry.value.filter((v: unknown) => !isStalePendingFile(v));
+        if (kept.length === entry.value.length) return entry;
+        changed = true;
+        return { ...entry, value: kept };
+      }
+      if (!isStalePendingFile(entry?.value)) return entry;
+      changed = true;
+      return { ...entry, value: null };
+    });
+    return changed ? { ...node, data: { ...node.data, formData: cleaned } } : node;
+  });
+}
+
 export type SubmitCanvasJobInput = {
   workflows: any[];
   edges: Edge[];
@@ -139,6 +170,11 @@ export async function submitCanvasJob(
         );
         (node.data.formData || []).forEach((entry: any) => {
           if (!fileParamIds.has(entry.id)) return;
+          // Never save a placeholder as the answer: the job would have no file to download.
+          const stale = (Array.isArray(entry.value) ? entry.value : [entry.value]).find(isStalePendingFile);
+          if (stale) {
+            throw new Error(`The file “${stale.filename || 'file'}” on “${node.data?.label ?? 'an operation'}” needs to be picked again: files are not kept when the page reloads.`);
+          }
           if (Array.isArray(entry.value)) {
             const tokens = entry.value
               .filter((v: any) => isPendingParamFile(v))
