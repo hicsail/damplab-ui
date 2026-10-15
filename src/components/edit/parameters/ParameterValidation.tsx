@@ -7,7 +7,12 @@ export interface ParameterValidationError {
   errorMsg: string;
 }
 
-export function validateParameter(row: GridRowModel): ParameterValidationError[] {
+export interface ParameterValidationOptions {
+  /** A Table loaded from the server that this edit did not change: rule 12 does not hold it, so an unrelated edit to its catalog still saves. */
+  tableUntouched?: boolean;
+}
+
+export function validateParameter(row: GridRowModel, options: ParameterValidationOptions = {}): ParameterValidationError[] {
   let errors: ParameterValidationError[] = [];
 
   // Name is required
@@ -47,8 +52,8 @@ export function validateParameter(row: GridRowModel): ParameterValidationError[]
     errors.push({ field: "Answer format", errorMsg: "Checkboxes needs “Allow multiple selections” to be Yes." });
   }
 
-  // A Table needs a column or a staff template, or no upload could be checked against it.
-  if (isTableType(row.type) && !tableIsSetUp(row)) {
+  // A Table needs a column or a staff template, or no upload could be checked against it. Held only when this edit is what leaves it so.
+  if (isTableType(row.type) && !tableIsSetUp(row) && !options.tableUntouched) {
     errors.push({ field: "Columns", errorMsg: "Add at least one column." });
   }
 

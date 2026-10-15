@@ -42,7 +42,7 @@ describe('prepareParametersForSave', () => {
     it('saves a stored sampleSheet as `sampleSheet` — the string it is stored with — and keeps its templateFile (R2b)', () => {
       const templateFile = { key: 'sample-sheet-templates/a.xlsx', filename: 'blank.xlsx' };
       const [loaded] = withDragKeys([{ id: 't', name: 'Samples', type: 'sampleSheet', templateFile }]);
-      expect(loaded._storedTable).toEqual({ type: 'sampleSheet', allowMultipleValues: undefined });
+      expect(loaded._storedTable).toMatchObject({ type: 'sampleSheet', allowMultipleValues: undefined });
       const { parameters, errors } = prepareParametersForSave([{ ...loaded, name: 'Samples renamed' }]);
       expect(errors).toEqual([]);
       expect(parameters[0]).toMatchObject({ type: 'sampleSheet', name: 'Samples renamed', templateFile });
@@ -94,6 +94,38 @@ describe('prepareParametersForSave', () => {
       expect(prepareParametersForSave([table()]).errors).toContain('Parameter 1: Columns - Add at least one column.');
       expect(prepareParametersForSave([table({ tableData: { columns: [{ header: 'A', field: 'a' }] }, _columnsText: '' })]).errors).toContain('Parameter 1: Columns - Add at least one column.');
       expect(prepareParametersForSave([table({ type: 'sampleSheet' })]).errors).toContain('Parameter 1: Columns - Add at least one column.');
+    });
+
+    // I3 / rule 12: only a write that leaves a Table unconfigured is refused; the server (tableDefinitionError) and the workbook do the same.
+    describe('a stored Table that was never set up', () => {
+      const legacy = (): any[] => [
+        { id: 'a', name: 'Old samples', type: 'sampleSheet' },
+        { id: 'b', name: 'Old table', type: 'table', tableData: { rows: [{ x: 1 }] } },
+        { id: 'n', name: 'Notes', type: 'string' }
+      ];
+
+      it('still saves when the edit is elsewhere', () => {
+        const loaded = withDragKeys(legacy());
+        loaded[2] = { ...loaded[2], name: 'Notes renamed' };
+        loaded[0] = { ...loaded[0], name: 'Old samples renamed' };
+        const { errors, parameters } = prepareParametersForSave(loaded);
+        expect(errors).toEqual([]);
+        expect(parameters.map((p) => p.type)).toEqual(['sampleSheet', 'table', 'string']);
+      });
+
+      it('is accepted while the edit leaves it as it was, and refused when the edit removes its template, turns another type into a Table, or adds a new one', () => {
+        const [a, b, n] = withDragKeys(legacy());
+        expect(prepareParametersForSave([{ ...a, _columnsText: '' }, b, n]).errors).toEqual([]);
+        expect(prepareParametersForSave([{ ...a, tableData: { columns: [] }, templateFile: null }, b, n]).errors).toEqual([]);
+        const added = { ...b, templateFile: { key: 'sample-sheet-templates/x.xlsx' } };
+        expect(prepareParametersForSave([a, added, n]).errors).toEqual([]);
+        // Changed into a still-unconfigured state: a template removed that was there.
+        const [withTemplate] = withDragKeys([{ id: 'w', name: 'W', type: 'sampleSheet', templateFile: { key: 'sample-sheet-templates/x.xlsx' } }]);
+        expect(prepareParametersForSave([{ ...withTemplate, templateFile: null }]).errors).toContain('Parameter 1: Columns - Add at least one column.');
+        const turned = { ...n, ...applyTypeChoice('table') };
+        expect(prepareParametersForSave([a, b, turned]).errors).toContain('Parameter 3: Columns - Add at least one column.');
+        expect(prepareParametersForSave([a, b, n, table()]).errors).toContain('Parameter 4: Columns - Add at least one column.');
+      });
     });
 
     it('does not touch tableData on a parameter that is not a Table', () => {

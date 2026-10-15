@@ -1,7 +1,7 @@
 import { idFromName, makeUniqueIds } from '../../../utils/idFromName';
 import { validateParameter } from './ParameterValidation';
 import { conditionFromText } from '../../../utils/parameterConditionText';
-import { isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
+import { expectedColumnsOf, hasStaffTemplate, isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
 import { columnNamesFromText, resolveTableColumns } from '../../../utils/tableColumns';
 import { ConditionContext, NO_CONDITION_CONTEXT } from './showIfField';
 
@@ -16,13 +16,18 @@ export interface EditableParameter {
    * `sampleSheet`) and the allowMultipleValues it is stored with. Never saved.
    * prepareParametersForSave writes both back as they were, because the price
    * of every job that already answered the parameter is computed from them.
+   * `definition` is the columns and template it was loaded with, so a save can
+   * tell whether this edit touched them (rule 12 holds only a touched Table).
    */
-  _storedTable?: { type: string; allowMultipleValues?: unknown };
+  _storedTable?: { type: string; allowMultipleValues?: unknown; definition?: string };
   id?: string;
   name?: string;
   type?: string;
   [key: string]: any;
 }
+
+/** What makes a Table answerable: its column headers and its staff template. Compared before and after an edit. */
+const tableDefinitionOf = (parameter: any): string => JSON.stringify([expectedColumnsOf(parameter), hasStaffTemplate(parameter) ? parameter.templateFile.key : null]);
 
 export const createDragKey = (): string =>
   typeof crypto !== 'undefined' && crypto.randomUUID
@@ -33,9 +38,15 @@ export function withDragKeys(parameters: ReadonlyArray<any>): EditableParameter[
   return parameters.map((p) => ({
     ...p,
     _dragKey: createDragKey(),
-    ...(isTableType(p?.type) ? { _storedTable: { type: p.type, allowMultipleValues: p.allowMultipleValues } } : {})
+    ...(isTableType(p?.type) ? { _storedTable: { type: p.type, allowMultipleValues: p.allowMultipleValues, definition: tableDefinitionOf(p) } } : {})
   }));
 }
+
+/** A Table loaded from the server whose type, columns and template this edit left as they were. The server's rule (`tableDefinitionError`). */
+const isStoredTableUntouched = (edited: EditableParameter | undefined, saved: any): boolean => {
+  const stored = edited?._storedTable;
+  return !!stored && stored.definition !== undefined && isTableType(stored.type) && isTableType(saved?.type) && stored.definition === tableDefinitionOf(saved);
+};
 
 export function prepareParametersForSave(
   parameters: ReadonlyArray<EditableParameter>,
@@ -115,7 +126,7 @@ export function prepareParametersForSave(
   });
 
   const validationErrors = unique.flatMap((parameter, index) =>
-    validateParameter(parameter as any).map(
+    validateParameter(parameter as any, { tableUntouched: isStoredTableUntouched(parameters[index], parameter) }).map(
       (error) => `Parameter ${index + 1}: ${error.field} - ${error.errorMsg}`
     )
   );
