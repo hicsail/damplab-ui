@@ -8,6 +8,7 @@
  * hidden answers itself); this copy is what lets the form, the badge, the price
  * shown on the canvas and every answer display agree with it. Keep the two in step.
  */
+import { parseSampleSheetValue, TABLE_PARAM_TYPE } from './sampleSheetValue';
 import { isOtherTextEntryId, otherTextEntryId, otherTextParentId } from './otherOption';
 
 export type ConditionOp = 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'in' | 'includes';
@@ -280,6 +281,12 @@ export function withoutHiddenAnswers<T>(effectiveParameters: unknown, formData: 
 
 /** The value a form field holds before anything is entered — what Params.tsx seeds formik with for an entry with no saved value. */
 function emptyFormValue(entry: Record<string, any>): unknown {
+  // A Table's file field starts as, and is cleared back to, null — never '',
+  // which a priced `table` parameter bills as one. But an answer stored on a
+  // `table` parameter before it took files (the old '', text, an array) is not
+  // a file: it keeps resetting exactly as it always did, so hiding and
+  // re-showing it cannot move its bill. `sampleSheet` is handled, unchanged, below.
+  if (entry.type === TABLE_PARAM_TYPE && (entry.value === null || entry.value === undefined || parseSampleSheetValue(entry.value) !== null)) return null;
   const multi = entry.allowMultipleValues === true || Array.isArray(entry.value);
   if (multi) return entry.type === 'file' ? [] : [''];
   if (entry.type === 'file' || entry.type === 'sampleSheet') return null;

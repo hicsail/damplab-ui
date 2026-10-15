@@ -313,3 +313,30 @@ describe('comparisonFits', () => {
     expect(comparisonFits({ parameterId: 'cycles', op: 'eq', value: 'abc' }, CYCLES)).toBe(true);
   });
 });
+
+describe('resetHiddenValues — a hidden Table (table-upload R2)', () => {
+  const parameters = [
+    { id: 'kind', name: 'Kind', type: 'dropdown', options: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }] },
+    { id: 'plate', name: 'Plate map', type: 'table', showIf: { parameterId: 'kind', op: 'eq', optionIds: ['a'] } }
+  ];
+  // The node's form entries: `value` is what the entry held when the form opened.
+  const entries = (value: unknown) => [{ id: 'kind', type: 'dropdown', value: 'b' }, { id: 'plate', type: 'table', value }];
+  const picked = { __kind: 'pending-file', filename: 'a.csv', sampleCount: 2 };
+
+  it('clears a file to null, never to the empty string a priced `table` parameter bills as one', () => {
+    expect(resetHiddenValues({ kind: 'b', plate: picked }, entries(null), parameters)).toEqual({ kind: 'b', plate: null });
+    expect(resetHiddenValues({ kind: 'b', plate: picked }, entries(picked), parameters)).toEqual({ kind: 'b', plate: null });
+  });
+
+  it('has nothing to reset on an old empty answer: it stays the empty string', () => {
+    expect(resetHiddenValues({ kind: 'b', plate: '' }, entries(''), parameters)).toBeNull();
+  });
+
+  it('resets old text on a `table` to the empty string, as it always did', () => {
+    expect(resetHiddenValues({ kind: 'b', plate: 'legacy' }, entries('legacy'), parameters)).toEqual({ kind: 'b', plate: '' });
+  });
+
+  it('leaves an old multi-value array on a `table` as it is', () => {
+    expect(resetHiddenValues({ kind: 'b', plate: [''] }, entries(['']), parameters)).toBeNull();
+  });
+});

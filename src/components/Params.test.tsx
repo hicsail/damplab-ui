@@ -6,7 +6,7 @@ import { CanvasContext } from '../contexts/Canvas';
 
 // There is no DOM here, so effects never run on their own. Params' effects are collected so a test can run them,
 // (with the dependency list each was given) and formik's setValues is observed (the real useFormik still supplies the values). Everything else is untouched.
-const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn() }));
+const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn(), initialValues: [] as any[] }));
 vi.mock('react', async (importOriginal) => {
   const actual: any = await importOriginal();
   const useEffect = (effect: () => void, deps?: unknown[]): void => {
@@ -17,7 +17,11 @@ vi.mock('react', async (importOriginal) => {
 });
 vi.mock('formik', async (importOriginal) => {
   const actual: any = await importOriginal();
-  return { ...actual, useFormik: (config: any) => ({ ...actual.useFormik(config), setValues: spy.setValues }) };
+  return { ...actual, useFormik: (config: any) => {
+      spy.initialValues.push(config.initialValues);
+      return { ...actual.useFormik(config), setValues: spy.setValues };
+    }
+  };
 });
 
 const options = [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }];
@@ -207,5 +211,36 @@ describe('Params — a Table parameter with no template', () => {
     expect(text(markup)).toContain('Sample label');
     expect(markup).toContain('value="S1"');
     expect(markup).not.toContain('<table');
+  });
+});
+
+describe('Params — how a Table answer is seeded (table-upload rules 13a, 30)', () => {
+  const columns = { columns: [{ header: 'Inducer', field: 'inducer' }] };
+  const defs = [{ id: 'plate', name: 'Plate map', type: 'table', tableData: columns, allowMultipleValues: true }];
+  const seedFor = (value: unknown): unknown => {
+    spy.initialValues.length = 0;
+    renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData: [{ id: 'plate', nodeId: 'n1', name: 'Plate map', type: 'table', paramType: 'input', value, required: false, tableData: columns, allowMultipleValues: true }] } } as any} />
+      </CanvasContext.Provider>
+    );
+    return spy.initialValues[0].plate;
+  };
+
+  it('seeds a new Table answer as null, never an empty string or an array', () => {
+    expect(seedFor(null)).toBeNull();
+    expect(seedFor(undefined)).toBeNull();
+  });
+
+  // Review Focus 2: opening a job must not rewrite a Table answer, or its bill moves on the next save.
+  it.each([
+    ['the old empty string', ''],
+    ['old text', 'legacy'],
+    ['an old multi-value array', ['']],
+    ['an old array of two', ['', '']],
+    ['a stored file', { filename: 'old.xlsx', key: 'workflow-parameters/u/old.xlsx', sampleCount: 7 }],
+    ['a stored file inside an array', [JSON.stringify({ filename: 'old.xlsx', key: 'workflow-parameters/u/old.xlsx', sampleCount: 7 })]]
+  ])('seeds %s exactly as it is stored', (_what, value) => {
+    expect(seedFor(value)).toEqual(value);
   });
 });

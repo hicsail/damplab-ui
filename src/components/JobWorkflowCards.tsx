@@ -13,7 +13,7 @@ import { isOtherTextEntryId, otherLabel, otherTextEntryId, otherTextFrom } from 
 import { hiddenParameterIds, withoutHiddenAnswers } from '../utils/parameterConditions';
 import SowDiffText from './sow/SowDiffText';
 import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
-import { isSampleSheetParam, parseSampleSheetValue, sampleCountLabel } from '../utils/sampleSheetValue';
+import { isTableParam, parseSampleSheetValue, sampleCountLabel } from '../utils/sampleSheetValue';
 import { SampleSheetReplaceButton } from './SampleSheetSection';
 
 /**
@@ -176,7 +176,7 @@ export const getSampleSheets = (workflows: any[]): SampleSheetSlot[] => {
             const entries = normalizeFormEntries(node?.formData);
             // A hidden samples-spreadsheet parameter is not asked for, so it is not a slot.
             const hidden = hiddenParameterIds(serviceParams, entries);
-            serviceParams.filter((p: any) => isSampleSheetParam(p) && !hidden.has(p.id)).forEach((param: any) => {
+            serviceParams.filter((p: any) => isTableParam(p) && !hidden.has(p.id)).forEach((param: any) => {
                 const slot = sampleSheetSlot(node, param, entries.find((entry) => entry.id === param.id)?.value);
                 if (slot) slots.push(slot);
             });
@@ -204,7 +204,7 @@ export const overlayLiveSampleSheets = (cardWorkflows: any[], liveWorkflows: any
         nodes: (workflow?.nodes ?? []).map((node: any) => {
             const live = liveByNodeId.get(node?.id);
             const params = Array.isArray(live?.service?.parameters) ? live.service.parameters : [];
-            const sheetIds = new Set(params.filter((p: any) => isSampleSheetParam(p)).map((p: any) => p.id));
+            const sheetIds = new Set(params.filter((p: any) => isTableParam(p)).map((p: any) => p.id));
             if (!sheetIds.size) return node;
             const liveValues = new Map(normalizeFormEntries(live.formData).filter((e) => sheetIds.has(e.id)).map((e) => [e.id, e.value]));
             return {
@@ -350,7 +350,7 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                                         </Typography>
                                                     );
                                                 }
-                                                const sheetSlot = sampleSheets?.canEdit && isSampleSheetParam(paramDef) ? sampleSheetSlot(node, paramDef, rawValue) : null;
+                                                const sheetSlot = sampleSheets?.canEdit && isTableParam(paramDef) ? sampleSheetSlot(node, paramDef, rawValue) : null;
                                                 return (
                                                     <Typography key={entry.id} variant='body2' color='text.secondary' component='div' sx={sheetSlot ? { display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' } : undefined}>
                                                         <span>{label}: {formatParameterValue(paramDef, rawValue, otherText) || (sheetSlot ? 'no spreadsheet yet' : '')}</span>

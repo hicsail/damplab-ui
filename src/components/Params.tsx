@@ -32,7 +32,7 @@ import ParamTableOnForm from "./ParamTableOnForm";
 import { CanvasContext } from "../contexts/Canvas";
 import { isRetiredEquipmentParam, validateEquipmentValues } from "../utils/equipmentParams";
 import SampleSheetField from "./SampleSheetField";
-import { isSampleSheetParam } from "../utils/sampleSheet";
+import { isTableParam } from "../utils/sampleSheet";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
 import { answerProblems, isCheckboxList, requiredProblems, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
 import { errorLabel, isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, otherTextParentId, selectsOther } from "../utils/otherOption";
@@ -135,6 +135,14 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
         initValues[`resultParamValue${obj.id}`] = obj.resultParamValue
           ? obj.resultParamValue
           : "";
+      } else if (isTableParam(obj)) {
+        // A Table answer is seeded exactly as it is stored — '' stays '', null
+        // stays null, an old array stays that array — so opening the form and
+        // saving it untouched sends back what was there. Pricing reads the
+        // difference: '' on a priced `table` parameter bills once, null bills
+        // nothing. (The old form turned null into '' here.) Picking a file
+        // replaces whatever this is; removing it leaves null.
+        initValues[obj.id] = obj.value ?? null;
       } else if (isMultiValueParam(obj)) {
         if (obj.type === "file") {
           const arr = Array.isArray(obj.value) ? obj.value : obj.value ? [obj.value] : [];
@@ -146,7 +154,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
           : [obj.value ?? ""];
         initValues[obj.id] = arr;
       } else {
-        if (obj.type === "file" || isSampleSheetParam(obj)) {
+        if (obj.type === "file") {
           initValues[obj.id] = obj.value ?? null;
           return;
         }
@@ -185,7 +193,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     // only if" is false for these values) raises no required, validation or
     // "Other" message.
     const shown = withoutHiddenAnswers(activeNode?.data?.parameters, buildUpdatedFormData(values));
-    let errors: any = requiredProblems(shown, values);
+    let errors: any = requiredProblems(shown, values, activeNode?.data?.parameters);
 
     // The reserved equipment parameters carry rules the generic required-field pass
     // cannot express: a date pair that must not invert, and an integer floor.
@@ -604,7 +612,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                   </div>
                 );
               }
-              if (isSampleSheetParam(param)) {
+              if (isTableParam(param)) {
                 // The form entry carries only the fields generateFormDataFromParams
                 // copies; the template reference lives on the service's parameter
                 // definition, which the node keeps alongside.

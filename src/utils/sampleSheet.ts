@@ -17,7 +17,10 @@ import * as XLSX from 'xlsx';
  * one, and why the number is shown to the person who packed the samples.
  */
 
-export { SAMPLE_SHEET_PARAM_TYPE, isSampleSheetParam, parseSampleSheetValue, sampleCountFromValue, sampleCountLabel } from './sampleSheetValue';
+export {
+  TABLE_PARAM_TYPE, SAMPLE_SHEET_PARAM_TYPE, SAMPLE_SHEET_TEMPLATE_KEY_PREFIX, SERVER_COUNTED, isTableType, isTableParam, expectedColumnsOf, hasStaffTemplate, tableIsSetUp,
+  parseSampleSheetValue, sampleCountFromValue, sampleCountLabel, countedRows, tableFileOf
+} from './sampleSheetValue';
 export type { StoredSampleSheet } from './sampleSheetValue';
 
 /** `accept` for the file pickers. Legacy `.xls` is not supported. */

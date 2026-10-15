@@ -1,4 +1,5 @@
 
+import { isTableParam } from '../utils/sampleSheetValue';
 import { NodeData, NodeParameter } from '../types/CanvasTypes';
 import {
     RUN_COUNT_PARAM_ID,
@@ -163,7 +164,8 @@ export const generateFormDataFromParams = (paramsData: any, nodeId: string, opti
     for (let i = 0; i < paramsData.length; i++) {
         const parameter = paramsData[i];
         const formId    = Math.random().toString(36).substring(2, 9);
-        const allowMultipleValues = !!parameter.allowMultipleValues;
+        // A Table holds one file: allowMultipleValues is ignored for it, so its answer starts as null, never [''].
+        const allowMultipleValues = !!parameter.allowMultipleValues && !isTableParam(parameter);
         formData.push({
             id              : parameter.id ?? formId,
             nodeId          : nodeId,
