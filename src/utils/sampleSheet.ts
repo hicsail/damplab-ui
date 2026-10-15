@@ -116,6 +116,26 @@ const parseCsv = (text: string): string[][] => {
 };
 
 /**
+ * A worksheet's rows from the cells it actually holds, each cell as its raw
+ * value (so 7 formatted `000` is `7`, as the server's exceljs reads it). Not `sheet_to_json`, which walks the sheet's whole
+ * range cell by cell: a range reaching column XFD is 16,384 cells a row. Rows
+ * with no cell are left out, which the reader treats the same as empty ones.
+ */
+const sparseRows = (worksheet: XLSX.WorkSheet): unknown[][] => {
+  const byRow = new Map<number, unknown[]>();
+  for (const address of Object.keys(worksheet)) {
+    if (address.charCodeAt(0) === 33) continue; // '!ref', '!merges' and the like
+    const cell = worksheet[address] as XLSX.CellObject | undefined;
+    if (!cell || cell.v === undefined || cell.v === null) continue;
+    const { r, c } = XLSX.utils.decode_cell(address);
+    const row = byRow.get(r) ?? [];
+    row[c] = cell.v;
+    byRow.set(r, row);
+  }
+  return [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r)!);
+};
+
+/**
  * The header row and row count of a file held in memory, by what its bytes
  * are: `PK` magic is a workbook; anything else is CSV text, unless it holds a
  * NUL byte, which no text file does (that turns away `.xls`, PDFs and images).
@@ -141,8 +161,7 @@ export const readTableBytes = (data: ArrayBuffer | Uint8Array): TableFileContent
   const sheetName = workbook.SheetNames.find((_name, index) => (sheetMeta[index]?.Hidden ?? 0) === 0) ?? workbook.SheetNames[0];
   const worksheet = sheetName ? workbook.Sheets[sheetName] : undefined;
   if (!worksheet) throw new SampleSheetError(TABLE_FILE_NO_SHEETS_MESSAGE);
-  // Cells by their value's text, as the server's exceljs reads them (`cell.text`), not as a display format renders them: 7 formatted `000` is `7` in both.
-  return readTableRows(XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, raw: true, defval: '' }));
+  return readTableRows(sparseRows(worksheet));
 };
 
 /**

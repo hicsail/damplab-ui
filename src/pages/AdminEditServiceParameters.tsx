@@ -38,11 +38,12 @@ export default function AdminEditServiceParameters() {
     [serviceId, services]
   );
 
-  const [parameters, setParameters] = useState<EditableParameter[]>([]);
+  // Loaded on the first render when the catalog is already there, else by the effect below once it arrives.
+  const [parameters, setParameters] = useState<EditableParameter[]>(() => (service ? withDragKeys(ownParametersOf(service)) : []));
   // The parameters loaded from the server keep their ids: recorded job answers are keyed by them. One added in this session is not locked.
-  const [lockedKeys, setLockedKeys] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const [lockedKeys, setLockedKeys] = useState<ReadonlySet<string>>(() => lockedDragKeys(parameters));
   // The list is loaded once; a later refetch of the service never replaces what is being edited.
-  const loadedRef = useRef(false);
+  const loadedRef = useRef(service !== undefined);
   const isIdLocked = (p: EditableParameter): boolean => lockedKeys.has(p._dragKey);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);

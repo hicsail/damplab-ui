@@ -248,6 +248,21 @@ describe('readTableBytes', () => {
     expect(readTableBytes(fixture('numeric-header.xlsx'))).toEqual({ header: ['Sample ID', '2024', '7', '1.5'], rowCount: 2 });
   });
 
+  // C1 twin: a sheet whose range spans to column XFD must not be walked cell by cell.
+  it('reads rows whose only cell is in the last column (XFD) quickly and without a dense walk', () => {
+    const sheet: XLSX.WorkSheet = { A1: { t: 's', v: 'Inducer' }, XFD1: { t: 's', v: 'Far' }, '!ref': 'A1:XFD1000' };
+    for (let r = 2; r <= 1000; r++) sheet[`XFD${r}`] = { t: 's', v: 'x' };
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Table');
+    const bytes = new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
+    const before = process.memoryUsage().heapUsed;
+    const started = Date.now();
+    expect(readTableBytes(bytes)).toEqual({ header: ['Inducer', 'Far'], rowCount: 999 });
+    // Walking the range cell by cell takes seconds here; the sparse read takes milliseconds.
+    expect(Date.now() - started).toBeLessThan(1500);
+    expect(process.memoryUsage().heapUsed - before).toBeLessThan(300 * 1024 * 1024);
+  }, 60000);
+
   it('refuses a CSV with an unterminated quote as unreadable, as the server does', () => {
     const text = (t: string) => readTableBytes(new TextEncoder().encode(t));
     expect(() => text('Inducer,"Concentration\nIPTG,1\n')).toThrow(TABLE_FILE_UNREADABLE_MESSAGE);
