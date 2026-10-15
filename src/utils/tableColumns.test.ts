@@ -28,8 +28,10 @@ describe('resolveTableColumns (rules 6, 7)', () => {
     expect(resolveTableColumns(['A B', 'a  b'], []).columns.map((c) => c.field)).toEqual(['a_b', 'a_b_2']);
   });
 
-  it('does not match a stored column that has a blank field', () => {
-    expect(resolveTableColumns(['Inducer'], [{ header: 'Other', field: '' }]).columns).toEqual([{ header: 'Inducer', field: 'inducer' }]);
+  it('gives a matched stored column with a blank field a slugged one, keeping what else it carries', () => {
+    expect(resolveTableColumns(['Inducer'], [{ header: 'Inducer', field: '', width: 1 }]).columns).toEqual([{ header: 'Inducer', field: 'inducer', width: 1 }]);
+    // A stored column that does not match by header is not carried over.
+    expect(resolveTableColumns(['Inducer'], [{ header: 'Other', field: '', width: 1 }]).columns).toEqual([{ header: 'Inducer', field: 'inducer' }]);
   });
 
   it('refuses two names equal ignoring case, once per repeated name', () => {
@@ -61,5 +63,12 @@ describe('the Columns field', () => {
     expect(columnsError({ type: 'sampleSheet', templateFile: { key: 'sample-sheet-templates/a.xlsx' } })).toBeNull();
     expect(columnsError({ type: 'table', _columnsText: 'A' })).toBeNull();
     expect(columnsError({ type: 'string' })).toBeNull();
+  });
+
+  // M3: the save refuses a repeated name only in what was typed; the field must not contradict it.
+  it('reports a repeated name only in the text being edited, not in columns already stored', () => {
+    const stored = { type: 'table', tableData: { columns: [{ header: 'A', field: 'a' }, { header: 'a', field: 'a_2' }] } };
+    expect(columnsError(stored)).toBeNull();
+    expect(columnsError({ ...stored, _columnsText: 'A\na' })).toBe('Column “a” is listed twice.');
   });
 });

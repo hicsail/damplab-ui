@@ -65,9 +65,13 @@ export const columnsText = (parameter: any): string => (typeof parameter?._colum
 /** Why the Columns field cannot be saved as it stands, or null. */
 export function columnsError(parameter: any): string | null {
   if (!isTableType(parameter?.type)) return null;
-  const names = typeof parameter?._columnsText === 'string' ? columnNamesFromText(parameter._columnsText) : expectedColumnsOf(parameter);
-  const { errors } = resolveTableColumns(names, []);
-  if (errors.length > 0) return errors[0];
+  const edited = typeof parameter?._columnsText === 'string';
+  const names = edited ? columnNamesFromText(parameter._columnsText) : expectedColumnsOf(parameter);
+  // The save refuses a repeated name only in the text that was typed; stored columns are not re-judged.
+  if (edited) {
+    const { errors } = resolveTableColumns(names, []);
+    if (errors.length > 0) return errors[0];
+  }
   if (names.length === 0 && !hasStaffTemplate(parameter)) return 'Add at least one column.';
   return null;
 }

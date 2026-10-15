@@ -89,7 +89,7 @@ function unanswerableTable(entry: any, definitions: ReadonlyMap<string, any>): b
 const definitionsById = (parameters: ReadonlyArray<any> | null | undefined): Map<string, any> =>
   new Map<string, any>((parameters ?? []).filter((p) => p && typeof p.id === 'string').map((p) => [p.id, p]));
 
-/** A Table holds one file: its answer is a stored or pending file object, or its JSON string. Nothing, the old empty string, or an old array of them, is no file. */
+/** Whether a Table has been answered: any value that is not null, undefined or blank text, or an array with one such element. It does not check that the value is a file; the file's shape is the server's to judge. */
 const hasTableFile = (value: unknown): boolean => (Array.isArray(value) ? value : [value]).some((v) => v !== null && v !== undefined && !(typeof v === 'string' && v.trim() === ''));
 
 /** Whether every required entry of a form-data list has a value. */

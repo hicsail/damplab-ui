@@ -3,7 +3,7 @@ import { Alert, Box, Button, Chip, CircularProgress, List, ListItem, ListItemTex
 import { useMutation } from '@apollo/client';
 import { CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, REPLACE_SAMPLE_SHEET } from '../gql/mutations';
 import { formatSaveError } from '../utils/gqlError';
-import { checkTableFile, SAMPLE_SHEET_ACCEPT, sampleCountLabel, SampleSheetError } from '../utils/sampleSheet';
+import { checkTableFile, SAMPLE_SHEET_ACCEPT, sampleCountLabel, SampleSheetError, TABLE_NOT_SET_UP_MESSAGE } from '../utils/sampleSheet';
 import type { SampleSheetSlot } from './JobWorkflowCards';
 
 interface Props {
@@ -16,16 +16,11 @@ interface Props {
 }
 
 /**
- * The Tables on a job, on both the customer's and the lab's
- * view. Either side can upload a new version here at any point until the job
- * is closed; the browser's count of the new file is a preview, and the server
- * stores its own.
- */
-/**
  * The replace flow, shared by the section below and the inline button on a
- * workflow card: count in this browser, presign, PUT, then point the node at
- * the new key. The count is what the operation is priced on when the service
- * is priced by parameter, so it is read before anything is uploaded.
+ * workflow card: check the file against the Table's columns in this browser
+ * (a preview, made before anything is uploaded), presign, PUT, then point the
+ * node at the new key. The server reads the stored file itself; its check and
+ * its row count are the ones that stand and are priced on.
  */
 export function useSampleSheetUpload(jobId: string, onChanged: () => Promise<unknown> | void) {
   const [createUploadUrls] = useMutation(CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS);
@@ -99,10 +94,8 @@ export function SampleSheetReplaceButton({ jobId, slot, onChanged }: { jobId: st
 }
 
 /**
- * The Tables on a job, on both the customer's and the lab's
- * view. Either side can upload a new version here at any point until the job
- * is closed; the browser's count of the new file is a preview, and the server
- * stores its own.
+ * The Tables on a job, on both the customer's and the lab's view. Either side
+ * can upload a new version here at any point until the job is closed.
  */
 export default function SampleSheetSection({ jobId, slots, canEdit, onChanged }: Props) {
   const { upload, busyKey, error, clearError } = useSampleSheetUpload(jobId, onChanged);
@@ -130,8 +123,10 @@ export default function SampleSheetSection({ jobId, slots, canEdit, onChanged }:
                   <Box component='span' sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                     {slot.filename ? (
                       slot.url ? <MuiLink href={slot.url} target='_blank' rel='noopener noreferrer'>{slot.filename}</MuiLink> : slot.filename
-                    ) : (
+                    ) : slot.setUp ? (
                       'No spreadsheet uploaded yet'
+                    ) : (
+                      TABLE_NOT_SET_UP_MESSAGE
                     )}
                     {slot.sampleCount !== undefined && <Chip size='small' label={sampleCountLabel(slot.sampleCount)} />}
                   </Box>
