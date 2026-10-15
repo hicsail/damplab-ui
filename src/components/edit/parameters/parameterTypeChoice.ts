@@ -1,3 +1,4 @@
+import { isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
 import { effectiveValidation, parseValidation } from '../../../utils/parameterValidation';
 
 /**
@@ -9,6 +10,8 @@ export const CHECKBOXES_CHOICE = 'checkboxes';
 
 export function typeChoiceOf(parameter: { type?: string; display?: unknown }): string {
   if (parameter.type === 'dropdown' && parameter.display === 'checkboxes') return CHECKBOXES_CHOICE;
+  // A stored `sampleSheet` is a Table: there is one entry for both in the type list.
+  if (isTableType(parameter.type)) return TABLE_PARAM_TYPE;
   return parameter.type ?? 'string';
 }
 

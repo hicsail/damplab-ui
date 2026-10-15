@@ -1,3 +1,4 @@
+import { isTableParam, tableIsSetUp } from './sampleSheetValue';
 import { checkValue, effectiveValidation, parseValidation } from './parameterValidation';
 import { isOtherTextEntryId, otherTextEntryId, otherTextFrom, selectsOther } from './otherOption';
 import { withoutHiddenAnswers } from './parameterConditions';
@@ -79,13 +80,30 @@ export function isCheckboxList(entry: any, definition: any): boolean {
   return entry?.type === 'dropdown' && definition?.display === 'checkboxes';
 }
 
+/** A Table that has not been set up (no columns, no staff template) cannot be answered, so it is never required. The staff template lives on the definition, not on the form entry. */
+function unanswerableTable(entry: any, definitions: ReadonlyMap<string, any>): boolean {
+  if (!isTableParam(entry)) return false;
+  return !tableIsSetUp({ ...entry, ...(definitions.get(entry.id) ?? {}) });
+}
+
+const definitionsById = (parameters: ReadonlyArray<any> | null | undefined): Map<string, any> =>
+  new Map<string, any>((parameters ?? []).filter((p) => p && typeof p.id === 'string').map((p) => [p.id, p]));
+
+/** Whether a Table has been answered: any value that is not null, undefined or blank text, or an array with one such element. It does not check that the value is a file; the file's shape is the server's to judge. */
+const hasTableFile = (value: unknown): boolean => (Array.isArray(value) ? value : [value]).some((v) => v !== null && v !== undefined && !(typeof v === 'string' && v.trim() === ''));
+
 /** Whether every required entry of a form-data list has a value. */
-function requiredAnswersFilled(formData: ReadonlyArray<any>): boolean {
+function requiredAnswersFilled(formData: ReadonlyArray<any>, parameters?: ReadonlyArray<any> | null): boolean {
+  const definitions = definitionsById(parameters);
   for (const entry of formData ?? []) {
     if (!entry) continue;
     if (entry.paramType === 'result') {
       if (entry.value === false && entry.required === true && (entry.resultParamValue === null || entry.resultParamValue === '')) return false;
     } else if (entry.required === true) {
+      if (isTableParam(entry)) {
+        if (!unanswerableTable(entry, definitions) && !hasTableFile(entry.value)) return false;
+        continue;
+      }
       const isMulti = entry.allowMultipleValues === true || Array.isArray(entry.value);
       if (isMulti) {
         if (!(Array.isArray(entry.value) && entry.value.some((v: any) => v != null && String(v).trim() !== ''))) return false;
@@ -104,22 +122,30 @@ function requiredAnswersFilled(formData: ReadonlyArray<any>): boolean {
  */
 export function nodeAnswersComplete(formData: ReadonlyArray<any> | null | undefined, parameters: ReadonlyArray<any> | null | undefined): boolean {
   const shown = withoutHiddenAnswers(parameters, formData ?? []);
-  return requiredAnswersFilled(shown) && Object.keys(answerProblems(shown, parameters)).length === 0;
+  return requiredAnswersFilled(shown, parameters) && Object.keys(answerProblems(shown, parameters)).length === 0;
 }
 
 /**
  * The form's "Required" messages, keyed by entry id. `values` is the form's
  * current values by entry id; `formData` the entries to check — pass only the
  * shown ones (withoutHiddenAnswers), so a hidden parameter is never required.
+ * `parameters` (optional) are the node's definitions: a Table is set up by a staff
+ * template that only the definition carries.
  */
-export function requiredProblems(formData: ReadonlyArray<any>, values: Record<string, any>): Record<string, string> {
+export function requiredProblems(formData: ReadonlyArray<any>, values: Record<string, any>, parameters?: ReadonlyArray<any> | null): Record<string, string> {
   const problems: Record<string, string> = {};
+  const definitions = definitionsById(parameters);
   for (const entry of formData ?? []) {
     if (!entry || entry.paramType === 'result' || isOtherTextEntryId(entry.id) || !entry.required) continue;
     const value = values[entry.id];
-    const isFile = entry.type === 'file' || entry.type === 'sampleSheet';
+    // A Table holds one file whatever allowMultipleValues says, and one that is not set up is never required.
+    if (isTableParam(entry)) {
+      if (!unanswerableTable(entry, definitions) && !hasTableFile(value)) problems[entry.id] = 'Required';
+      continue;
+    }
+    const isFile = entry.type === 'file';
     if (entry.allowMultipleValues === true || Array.isArray(entry.value)) {
-      const hasValue = entry.type === 'file' ? Array.isArray(value) && value.length > 0 : Array.isArray(value) && value.some((v: any) => v != null && String(v).trim() !== '');
+      const hasValue = isFile ? Array.isArray(value) && value.length > 0 : Array.isArray(value) && value.some((v: any) => v != null && String(v).trim() !== '');
       if (!hasValue) problems[entry.id] = 'Required (at least one value)';
     } else if (isFile ? !value : value === '' || value === undefined || value === null) {
       problems[entry.id] = 'Required';

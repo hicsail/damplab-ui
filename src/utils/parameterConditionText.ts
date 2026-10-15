@@ -281,7 +281,7 @@ const optionsOf = (parameter: any): any[] => (Array.isArray(parameter?.options) 
 const labelOf = (parameter: any): string => String(parameter?.name ?? parameter?.id ?? '').trim();
 /** The evaluator's `isChoice`: a legacy `enum` is a choice too. */
 const isChoiceType = (type: string): boolean => type === 'dropdown' || type === 'enum';
-const TYPE_NAMES: Record<string, string> = { table: 'Table', file: 'File upload', sampleSheet: 'Samples spreadsheet' };
+const TYPE_NAMES: Record<string, string> = { table: 'Table', file: 'File upload', sampleSheet: 'Table' };
 
 // ------------------------------------------------------------------ resolver (rules 5–7)
 

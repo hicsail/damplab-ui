@@ -102,7 +102,27 @@ describe('hidden parameters raise nothing (show-only-if rule 16)', () => {
     const shown = form('bact');
     expect(requiredProblems(shown, valuesOf(shown))).toEqual({ kit: 'Required', files: 'Required (at least one value)' });
     expect(requiredProblems(shown, { ...valuesOf(shown), kit: 'K', files: [{}] })).toEqual({});
-    expect(requiredProblems([{ id: 'sheet', type: 'sampleSheet', value: null, required: true }, { id: 'opt', type: 'string', value: '', required: false }], { sheet: null, opt: '' })).toEqual({ sheet: 'Required' });
+    const columns = { columns: [{ header: 'A', field: 'a' }] };
+    // A Table that can be answered is required like a file, under either stored string.
+    expect(requiredProblems([{ id: 'sheet', type: 'sampleSheet', value: null, required: true, tableData: columns }], { sheet: null })).toEqual({ sheet: 'Required' });
+    expect(requiredProblems([{ id: 'sheet', type: 'table', value: null, required: true, tableData: columns }], { sheet: null })).toEqual({ sheet: 'Required' });
+    // The old empty answer is not a file, alone or in an old multi-value array.
+    expect(requiredProblems([{ id: 'sheet', type: 'table', value: '', required: true, tableData: columns }], { sheet: '' })).toEqual({ sheet: 'Required' });
+    expect(requiredProblems([{ id: 'sheet', type: 'table', value: [''], required: true, tableData: columns }], { sheet: [''] })).toEqual({ sheet: 'Required' });
+    // Set up by a staff template that only the definition carries.
+    expect(requiredProblems([{ id: 'sheet', type: 'sampleSheet', value: null, required: true }], { sheet: null }, [{ id: 'sheet', type: 'sampleSheet', templateFile: { key: 'sample-sheet-templates/a.xlsx' } }])).toEqual({ sheet: 'Required' });
+    // Rule 16: a Table that has not been set up cannot be answered and is never flagged.
+    expect(requiredProblems([{ id: 'sheet', type: 'table', value: null, required: true, tableData: null }], { sheet: null })).toEqual({});
+    // Rule 13a: allowMultipleValues is ignored for a Table.
+    expect(requiredProblems([{ id: 'sheet', type: 'table', value: null, required: true, allowMultipleValues: true, tableData: columns }], { sheet: null })).toEqual({ sheet: 'Required' });
+  });
+
+  it('the node badge: an unconfigured required Table never counts against the node; a configured one with no file does', () => {
+    const bare = [{ id: 'sheet', type: 'table', required: true }];
+    expect(nodeAnswersComplete([{ id: 'sheet', type: 'table', value: null, required: true, tableData: null }], bare)).toBe(true);
+    const configured = [{ id: 'sheet', type: 'table', required: true, tableData: { columns: [{ header: 'A', field: 'a' }] } }];
+    expect(nodeAnswersComplete([{ id: 'sheet', type: 'table', value: null, required: true, tableData: configured[0].tableData }], configured)).toBe(false);
+    expect(nodeAnswersComplete([{ id: 'sheet', type: 'table', value: { filename: 'a.csv', sampleCount: 2 }, required: true, tableData: configured[0].tableData }], configured)).toBe(true);
   });
 
   it('the form: a hidden parameter is neither required, nor range-checked, nor asked for "Other" text', () => {

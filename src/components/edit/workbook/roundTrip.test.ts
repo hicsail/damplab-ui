@@ -126,7 +126,7 @@ describe('download formatting (rule 34)', () => {
       categories: ['Molecular Biology', 'Cloning'],
       sets: ['Buffers', 'Cleanup'],
       yesNo: ['Y', 'N'],
-      types: ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload', 'Sample Upload'],
+      types: ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload'],
       operations: ['PCR', 'Gibson Assembly']
     });
   });
@@ -144,7 +144,7 @@ describe('download formatting (rule 34)', () => {
     expect(validation('Operations', 'hiddenFromClients', 3)).toMatchObject({ type: 'list', formulae: ['Lists!$C$2:$C$3'] });
     expect(validation('Operations', 'parameterSet5', 2)).toMatchObject({ type: 'list', formulae: ['Lists!$B$2:$B$3'] });
     expect(validation('Parameter List', 'required', 2)).toMatchObject({ type: 'list', formulae: ['Lists!$C$2:$C$3'] });
-    expect(validation('Parameter List', 'type', 2)).toMatchObject({ type: 'list', formulae: ['Lists!$D$2:$D$9'] });
+    expect(validation('Parameter List', 'type', 2)).toMatchObject({ type: 'list', formulae: ['Lists!$D$2:$D$8'] });
     expect(validation('Bundles', 'Operation', 2)).toMatchObject({ type: 'list', formulae: ['Lists!$E$2:$E$3'] });
     // A row someone adds below the data still gets the dropdown.
     expect(validation('Bundles', 'Operation', data.sheets[2].rows.length + SPARE_ROWS)).toMatchObject({ type: 'list' });

@@ -13,7 +13,7 @@ import { isOtherTextEntryId, otherLabel, otherTextEntryId, otherTextFrom } from 
 import { hiddenParameterIds, withoutHiddenAnswers } from '../utils/parameterConditions';
 import SowDiffText from './sow/SowDiffText';
 import { jobVersionDisplayLabel, type GraphDiff, type JobVersionLike } from '../utils/jobGraphDiff';
-import { isSampleSheetParam, parseSampleSheetValue, sampleCountLabel } from '../utils/sampleSheetValue';
+import { expectedColumnsOf, isTableParam, sampleCountLabel, tableFileOf, tableIsSetUp } from '../utils/sampleSheetValue';
 import { SampleSheetReplaceButton } from './SampleSheetSection';
 
 /**
@@ -137,6 +137,10 @@ export const getParameterFiles = (workflows: any[]): Array<{ label: string; file
 
 /** One samples-spreadsheet parameter on one operation of a job, filled in or not. */
 export interface SampleSheetSlot {
+    /** The columns a replacement file must carry; empty for a legacy sample sheet with only a staff template. */
+    columns: string[];
+    /** False when the Table has no columns and no staff template: it cannot be answered, so no upload is offered. */
+    setUp: boolean;
     /** The node's database id — what `replaceSampleSheet` takes. */
     nodeDbId: string;
     nodeLabel: string;
@@ -156,12 +160,14 @@ export interface SampleSheetSlot {
 export const sampleSheetSlot = (node: any, param: any, value: unknown): SampleSheetSlot | null => {
     const nodeDbId = node?._id;
     if (typeof nodeDbId !== 'string' || !param || typeof param.id !== 'string') return null;
-    const stored = parseSampleSheetValue(value);
+    const stored = tableFileOf(value);
     return {
         nodeDbId,
         nodeLabel: node.label ?? node?.service?.name ?? 'Operation',
         parameterId: param.id,
-        parameterName: param.name ?? 'Samples spreadsheet',
+        parameterName: param.name ?? 'Table',
+        columns: expectedColumnsOf(param),
+        setUp: tableIsSetUp(param),
         filename: stored?.filename,
         url: stored?.url,
         sampleCount: stored?.sampleCount
@@ -176,7 +182,7 @@ export const getSampleSheets = (workflows: any[]): SampleSheetSlot[] => {
             const entries = normalizeFormEntries(node?.formData);
             // A hidden samples-spreadsheet parameter is not asked for, so it is not a slot.
             const hidden = hiddenParameterIds(serviceParams, entries);
-            serviceParams.filter((p: any) => isSampleSheetParam(p) && !hidden.has(p.id)).forEach((param: any) => {
+            serviceParams.filter((p: any) => isTableParam(p) && !hidden.has(p.id)).forEach((param: any) => {
                 const slot = sampleSheetSlot(node, param, entries.find((entry) => entry.id === param.id)?.value);
                 if (slot) slots.push(slot);
             });
@@ -204,7 +210,7 @@ export const overlayLiveSampleSheets = (cardWorkflows: any[], liveWorkflows: any
         nodes: (workflow?.nodes ?? []).map((node: any) => {
             const live = liveByNodeId.get(node?.id);
             const params = Array.isArray(live?.service?.parameters) ? live.service.parameters : [];
-            const sheetIds = new Set(params.filter((p: any) => isSampleSheetParam(p)).map((p: any) => p.id));
+            const sheetIds = new Set(params.filter((p: any) => isTableParam(p)).map((p: any) => p.id));
             if (!sheetIds.size) return node;
             const liveValues = new Map(normalizeFormEntries(live.formData).filter((e) => sheetIds.has(e.id)).map((e) => [e.id, e.value]));
             return {
@@ -350,7 +356,8 @@ export default function JobWorkflowCards({ workflows, fallbackName, diff, curren
                                                         </Typography>
                                                     );
                                                 }
-                                                const sheetSlot = sampleSheets?.canEdit && isSampleSheetParam(paramDef) ? sampleSheetSlot(node, paramDef, rawValue) : null;
+                                                const slot = sampleSheets?.canEdit && isTableParam(paramDef) ? sampleSheetSlot(node, paramDef, rawValue) : null;
+                                                const sheetSlot = slot?.setUp ? slot : null;
                                                 return (
                                                     <Typography key={entry.id} variant='body2' color='text.secondary' component='div' sx={sheetSlot ? { display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' } : undefined}>
                                                         <span>{label}: {formatParameterValue(paramDef, rawValue, otherText) || (sheetSlot ? 'no spreadsheet yet' : '')}</span>

@@ -7,7 +7,7 @@ import {
   CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS,
 } from '../gql/mutations';
 import { transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
-import { isSampleSheetParam } from './sampleSheet';
+import { isTableParam } from './sampleSheet';
 import { withoutHiddenAnswers } from './parameterConditions';
 
 export type PendingParamFile = {
@@ -134,7 +134,7 @@ export async function submitCanvasJob(
         // only difference is the count that rides along in its stored value.
         const fileParamIds = new Set(
           parameters
-            .filter((p: any) => (p?.type === 'file' || isSampleSheetParam(p)) && typeof p.id === 'string')
+            .filter((p: any) => (p?.type === 'file' || isTableParam(p)) && typeof p.id === 'string')
             .map((p: any) => p.id)
         );
         (node.data.formData || []).forEach((entry: any) => {

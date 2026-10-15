@@ -188,7 +188,7 @@ describe('resolveCondition — errors name the offending part (rule 6)', () => {
 
   it('file and samples-spreadsheet controllers', () => {
     expect(problem('"Upload"=="x"', onOperation)).toBe('“Upload” is a File upload parameter and cannot control a condition.');
-    expect(problem('"Samples"=="x"', onOperation)).toBe('“Samples” is a Samples spreadsheet parameter and cannot control a condition.');
+    expect(problem('"Samples"=="x"', onOperation)).toBe('“Samples” is a Table parameter and cannot control a condition.');
   });
 
   it('two parameters with that name in that scope', () => {
