@@ -31,7 +31,7 @@ export const LISTS_SHEET_TITLE = 'Lists';
 /** Fixed columns, in download order. Operations additionally takes parameterSet1…N. */
 export const SHEET_COLUMNS: Record<SheetKey, readonly string[]> = {
   operations: [
-    'id', 'serviceCategory', 'name', 'description', 'unit', 'hiddenFromClients', 'pricingMode',
+    'id', 'serviceCategory', 'name', 'SuggestedPostConnections', 'description', 'unit', 'hiddenFromClients', 'pricingMode',
     'pricingInternal', 'pricingExternalAcademic', 'pricingExternalMarket', 'pricingExternalNoSalary', 'pricingLegacy'
   ],
   parameterList: ['parameterId', 'parameterSet', 'operation', 'parameter', 'description', 'required', 'type', 'options', 'validation', 'conditionalDisplayLogic', 'allowMultiple', 'defaultValue'],
@@ -61,7 +61,16 @@ export interface RawWorkbook {
 }
 
 /** An operation as GET_SERVICES returns it; `ownParameters` is the list stored on the operation itself. */
-export type CatalogOperation = OperationLike & { ownParameters: any[]; parameterSetIds: string[] };
+export type CatalogOperation = OperationLike & {
+  ownParameters: any[];
+  parameterSetIds: string[];
+  /** The operations suggested to come after this one: ids, or `{ id, name }` as GET_SERVICES returns them. */
+  allowedConnections?: ReadonlyArray<string | { id: string; name?: string }> | null;
+};
+
+/** An operation's suggested next operations, as ids. */
+export const connectionIdsOf = (operation: Pick<CatalogOperation, 'allowedConnections'>): string[] =>
+  (operation.allowedConnections ?? []).map((entry) => String(typeof entry === 'string' ? entry : entry?.id)).filter((id) => id !== '' && id !== 'undefined');
 export interface CatalogSet { id: string; name: string; parameters: any[] }
 export interface CatalogCategory { id: string; label: string; serviceIds: string[] }
 export interface CatalogBundle { id: string; label: string; icon: string; steps: Array<{ id: string; name: string }> }

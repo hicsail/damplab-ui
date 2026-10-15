@@ -67,12 +67,14 @@ describe('download → upload, unchanged (rule 2)', () => {
     const rows = allRows(plan);
     expect(rows.map((r) => `${r.key}: ${r.action} ${r.errors.join(' ')}`)).toEqual([
       'operations:2: create ', 'operations:3: create ',
+      // Matched by id only, so the stored operations of those names are hidden like any other (op2 already is).
+      'hide:op1: hide ',
       'parameterList:2: create ', 'parameterList:3: create ', 'parameterList:4: create ', 'parameterList:5: create ', 'parameterList:6: create ',
       'bundles:2: create ', 'bundles:5: create ',
       'sowSections:2: create ', 'sowSections:3: create '
     ]);
     const same = (noun: string): string => `Same name as an existing ${noun} — this row creates a second one. Add the id to update it instead.`;
-    const warned = (sheet: string, noun: string): boolean => rows.filter((r) => r.sheet === sheet).every((r) => r.warnings.includes(same(noun)) && !r.selectedByDefault);
+    const warned = (sheet: string, noun: string): boolean => rows.filter((r) => r.sheet === sheet && r.action === 'create').every((r) => r.warnings.includes(same(noun)) && !r.selectedByDefault);
     expect(warned('operations', 'operation')).toBe(true);
     expect(warned('bundles', 'bundle')).toBe(true);
     expect(warned('sowSections', 'SOW text block')).toBe(true);

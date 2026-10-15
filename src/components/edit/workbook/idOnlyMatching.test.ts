@@ -534,3 +534,24 @@ describe('fix W1 — parameter errors under an owner that is new or cannot be to
     expect(rows['parameterList:2'].errors).toEqual(['“volume” is a parameter id from an existing parameter set, but this row\'s parameter set is new. Clear the id to create the parameter.']);
   });
 });
+
+describe('"Hide operations not in this sheet" with a row that has no id', () => {
+  const raw = book({ operations: [['', 'Gel', '']] });
+  const hidePlan = planWorkbook(raw, catalog, { allowPricing: true, hideMissing: true });
+  const apply = async (overrides: Record<string, boolean>) => {
+    const rec = recorder();
+    await applyWorkbook(hidePlan, tickedKeys(hidePlan, overrides), catalog, rec.mutator, { fileName: 'c.xlsx', uploaderName: 'Ada' });
+    return rec.calls();
+  };
+  const hidden = (calls: Array<[string, ...unknown[]]>) => calls.filter((c) => c[0] === 'updateService' && (c[2] as any)?.hiddenFromClients === true).map((c) => c[1]);
+
+  it('keeps the stored “Gel” visible while the new one is not created', async () => {
+    expect(hidden(await apply({}))).not.toContain('op2');
+  });
+
+  it('hides the stored “Gel” once the new one is created', async () => {
+    const calls = await apply({ 'operations:2': true });
+    expect(calls.some((c) => c[0] === 'createService')).toBe(true);
+    expect(hidden(calls)).toContain('op2');
+  });
+});

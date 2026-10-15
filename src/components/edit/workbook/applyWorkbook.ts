@@ -202,6 +202,31 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
     }
   }
 
+  // 2b. Suggested next operations — after every operation of step 2 exists, so a row may name a later row, or itself.
+  //     Suggestions only, so one that cannot be saved does not undo the operation: it is a warning naming it.
+  for (const row of plan.operations?.rows ?? []) {
+    const item = plan.operations!.work.rows[row.key];
+    if (row.action === 'hide' || !item?.connections || !done.has(row.key)) continue;
+    const id = operationIdByRowKey.get(row.key)!;
+    const ids = item.connections.map((next) => next.id ?? (next.rowKey !== undefined ? operationIdByRowKey.get(next.rowKey) : undefined));
+    const missing = item.connections.find((_next, index) => ids[index] === undefined);
+    if (missing) {
+      errors.push(`Suggested connections for “${row.label}” were not saved: operation “${missing.name}” was not created.`);
+      continue;
+    }
+    try {
+      await mutator.updateService(id, { allowedConnections: ids });
+      snapshots.operations.push({
+        itemId: id,
+        action: 'UPDATE',
+        before: item.existingId ? { allowedConnections: item.before.allowedConnections ?? [] } : undefined,
+        after: { allowedConnections: item.connections.map((next) => next.name) }
+      });
+    } catch (error) {
+      errors.push(`Suggested connections for “${row.label}” were not saved: ${formatGqlError(error).replace(/[\s.]+$/, '')}.`);
+    }
+  }
+
   // 3. Operations' own parameters — after step 2, so an operation this upload created exists.
   for (const owner of owners) {
     if (owner.kind !== 'operation') continue;
@@ -263,7 +288,7 @@ export async function applyWorkbook(plan: WorkbookPlan, ticked: ReadonlySet<stri
 
   // 5. "Hide operations not in this sheet from clients" — only ever sets the flag.
   for (const [key, hide] of Object.entries(plan.operations?.work.hides ?? {})) {
-    if (!usable(key)) continue;
+    if (!usable(key) || !ready(key)) continue;
     try {
       await mutator.updateService(hide.id, { hiddenFromClients: true });
       snapshots.operations.push({ itemId: hide.id, action: 'UPDATE', before: { hiddenFromClients: false }, after: { hiddenFromClients: true } });
