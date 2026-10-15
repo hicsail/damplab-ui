@@ -1,62 +1,19 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { countedRows, countSampleRows, countSampleSheetBytes, countSampleSheetFile, expectedColumnsOf, hasStaffTemplate, isTableParam, isTableType, parseSampleSheetValue, sampleCountLabel, SampleSheetError, SERVER_COUNTED, tableFileOf, tableIsSetUp } from './sampleSheet';
+import { buildTableTemplate, checkTableFile, countedRows, expectedColumnsOf, hasStaffTemplate, isTableParam, isTableType, missingColumns, missingColumnsMessage, parseSampleSheetValue, readTableBytes, readTableRows, sampleCountLabel, SampleSheetError, SERVER_COUNTED, tableFileOf, tableIsSetUp, tableTemplateFilename, TABLE_FILE_NO_SHEETS_MESSAGE, TABLE_FILE_TOO_LARGE_MESSAGE, TABLE_FILE_UNREADABLE_MESSAGE, TABLE_NOT_SET_UP_MESSAGE } from './sampleSheet';
+
+/** Byte-for-byte the files in `damplab-backend/test-fixtures/sample-sheets/`; the hash test pins that without reading across repos. */
+const fixture = (name: string): Uint8Array => new Uint8Array(readFileSync(resolve(__dirname, '../../test-fixtures/sample-sheets', name)));
+const fileOf = (name: string, bytes: Uint8Array | string): File => new File([bytes as BlobPart], name);
 
 const xlsxBytes = (rows: unknown[][]): Uint8Array => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), 'Samples');
   return new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
 };
-
-describe('countSampleRows', () => {
-  it('counts every populated row below the header', () => {
-    expect(countSampleRows([['Sample', 'Volume'], ['A1', 10], ['A2', 12], ['A3', 9]])).toBe(3);
-  });
-
-  it('ignores blank rows wherever they sit', () => {
-    expect(countSampleRows([[], [null, ''], ['Sample', 'Volume'], ['A1', 10], [null, null], ['A2', 12], ['', '  ']])).toBe(2);
-  });
-
-  it('is zero for a header with nothing below it, and for an empty sheet', () => {
-    expect(countSampleRows([['Sample', 'Volume']])).toBe(0);
-    expect(countSampleRows([])).toBe(0);
-  });
-
-  it('counts a row that only has a value in a later column', () => {
-    expect(countSampleRows([['Sample', 'Volume', 'Note'], [null, null, 'see tube']])).toBe(1);
-  });
-});
-
-describe('countSampleSheetBytes', () => {
-  it('counts an .xlsx workbook', () => {
-    expect(countSampleSheetBytes(xlsxBytes([['Sample', 'Volume'], ['A1', 10], ['A2', 12]]))).toBe(2);
-  });
-
-  it('counts a .csv', () => {
-    const csv = new TextEncoder().encode('Sample,Volume\nA1,10\nA2,12\n\nA3,7\n');
-    expect(countSampleSheetBytes(csv)).toBe(3);
-  });
-
-  it('reads arbitrary bytes as text rather than refusing them, which is why the picker checks the extension', () => {
-    expect(countSampleSheetBytes(new TextEncoder().encode('just one line'))).toBe(0);
-  });
-});
-
-describe('countSampleSheetFile', () => {
-  it('refuses a file that is not .xlsx or .csv before reading it', async () => {
-    await expect(countSampleSheetFile(new File(['%PDF-1.4'], 'samples.pdf'))).rejects.toBeInstanceOf(SampleSheetError);
-    await expect(countSampleSheetFile(new File(['a,b'], 'samples.xls'))).rejects.toThrow(/\.xlsx or \.csv/);
-  });
-
-  it('refuses a file over the size cap', async () => {
-    const big = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'samples.csv');
-    await expect(countSampleSheetFile(big)).rejects.toThrow(/10 MB/);
-  });
-
-  it('counts a small .csv file', async () => {
-    await expect(countSampleSheetFile(new File(['Sample,Volume\nA1,10\nA2,12\n'], 'samples.csv'))).resolves.toBe(2);
-  });
-});
 
 describe('parseSampleSheetValue', () => {
   it('reads the stored JSON string', () => {
@@ -175,5 +132,148 @@ describe('countedRows (R2d — twin of the backend’s serverCountedRows)', () =
     expect(countedRows(JSON.stringify(counted('12')))).toBeUndefined();
     expect(countedRows(JSON.stringify(counted(-1)))).toBeUndefined();
     expect(countedRows(JSON.stringify(counted(12, { countedBy: 'client' })))).toBeUndefined();
+  });
+});
+
+describe('the messages (identical in damplab-backend/src/workflow/utils/table-file.ts)', () => {
+  it('are these exact strings', () => {
+    expect(TABLE_FILE_UNREADABLE_MESSAGE).toBe('This file could not be read as a spreadsheet. Save it as .xlsx or .csv and try again.');
+    expect(TABLE_FILE_NO_SHEETS_MESSAGE).toBe('This spreadsheet has no sheets in it.');
+    expect(TABLE_FILE_TOO_LARGE_MESSAGE).toBe('This file must be smaller than 10 MB.');
+    expect(TABLE_NOT_SET_UP_MESSAGE).toBe('This table has not been set up yet.');
+    expect(missingColumnsMessage(['Concentration', 'Location'])).toBe('This file is missing the columns: Concentration, Location.');
+    expect(missingColumnsMessage(['Location'])).toBe('This file is missing the columns: Location.');
+  });
+});
+
+describe('readTableRows (rule 18)', () => {
+  it('takes the first row with any content as the header and counts every later row with any content', () => {
+    expect(readTableRows([[], ['', '  '], ['Inducer', ' Concentration ', ''], ['IPTG', '1'], [null, undefined], ['', '2'], ['  ']])).toEqual({ header: ['Inducer', 'Concentration'], rowCount: 2 });
+  });
+
+  it('is an empty header and zero rows for nothing at all, and zero rows for a header alone', () => {
+    expect(readTableRows([])).toEqual({ header: [], rowCount: 0 });
+    expect(readTableRows([['Inducer', 'Concentration']])).toEqual({ header: ['Inducer', 'Concentration'], rowCount: 0 });
+  });
+
+  it('does not look for the header: a title row above it is the header, and the real header is counted', () => {
+    expect(readTableRows([['Plate map v3'], ['Inducer', 'Concentration'], ['IPTG', '1']])).toEqual({ header: ['Plate map v3'], rowCount: 2 });
+  });
+});
+
+describe('missingColumns (rule 19)', () => {
+  it('matches after trimming and ignoring case, in any order, with extra header cells ignored', () => {
+    expect(missingColumns(['  location', 'NOTES', 'Inducer ', 'concentration'], ['Inducer', 'Concentration', 'Location'])).toEqual([]);
+  });
+
+  it('names every missing column in expected order and expected spelling', () => {
+    expect(missingColumns(['inducer'], ['Inducer', 'Concentration', 'Location'])).toEqual(['Concentration', 'Location']);
+  });
+
+  it('is never missing anything when no columns are expected (rule 20)', () => {
+    expect(missingColumns(['Anything'], [])).toEqual([]);
+  });
+});
+
+describe('readTableBytes', () => {
+  it('reads an .xlsx workbook and a .csv', () => {
+    expect(readTableBytes(xlsxBytes([['Inducer', 'Concentration'], ['IPTG', 1], ['aTc', 2]]))).toEqual({ header: ['Inducer', 'Concentration'], rowCount: 2 });
+    expect(readTableBytes(new TextEncoder().encode('Inducer,Concentration\nIPTG,1\n\n"aTc, fresh",2\n,\n'))).toEqual({ header: ['Inducer', 'Concentration'], rowCount: 2 });
+  });
+
+  it('reads the first sheet only, skipping a hidden first sheet', () => {
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Ignore'], ['x1'], ['x2']]), 'Hidden');
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Inducer'], ['IPTG']]), 'Table');
+    workbook.Workbook = { Sheets: [{ Hidden: 1 }, { Hidden: 0 }] } as any;
+    const bytes = new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
+    expect(readTableBytes(bytes)).toEqual({ header: ['Inducer'], rowCount: 1 });
+  });
+
+  // Review Focus 1: Excel's "CSV UTF-8" starts with a byte-order mark.
+  it('ignores a UTF-8 byte-order mark, so the first header cell still matches its column', () => {
+    const bytes = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode('Inducer,Concentration\nIPTG,1\n')]);
+    const contents = readTableBytes(bytes);
+    expect(contents).toEqual({ header: ['Inducer', 'Concentration'], rowCount: 1 });
+    expect(missingColumns(contents.header, ['Inducer', 'Concentration'])).toEqual([]);
+  });
+
+  it('refuses bytes that are neither a workbook nor text (rule 21)', () => {
+    const xls = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]);
+    expect(() => readTableBytes(xls)).toThrow(TABLE_FILE_UNREADABLE_MESSAGE);
+    expect(() => readTableBytes(xls)).toThrow(SampleSheetError);
+    expect(() => readTableBytes(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x0a, 0x00, 0x01]))).toThrow(TABLE_FILE_UNREADABLE_MESSAGE);
+  });
+
+  it('refuses a zip that is not a workbook', () => {
+    expect(() => readTableBytes(new Uint8Array([0x50, 0x4b, ...new Array(40).fill(7)]))).toThrow(SampleSheetError);
+  });
+
+  it('reads the shared fixtures exactly as the server does', () => {
+    expect(readTableBytes(fixture('samples-96.xlsx'))).toEqual({ header: ['Sample ID', 'Volume (uL)', 'Notes'], rowCount: 96 });
+    expect(readTableBytes(fixture('samples-with-gaps.csv'))).toEqual({ header: ['Sample ID', 'Volume'], rowCount: 3 });
+    expect(readTableBytes(fixture('samples-with-banner.xlsx')).rowCount).toBe(5);
+    expect(readTableBytes(fixture('template-with-banner.xlsx')).rowCount).toBe(1);
+  });
+
+  it('keeps the fixtures byte-identical to the backend copy (pinned hashes)', () => {
+    const expected: Record<string, string> = {
+      'samples-96.xlsx': '65f9e17b5e998608381f5979a4a96021ca8440227fc92d38b17426c931f90bfc',
+      'samples-with-gaps.csv': '4b2fd83ec9429a8704a4243db216a0834d402386df7e532aece603315e4dcc70',
+      'template-with-banner.xlsx': 'd86034e74901ca53b82d59b0d657f6c14a0395531bc2f1759bffcbc51371211a',
+      'samples-with-banner.xlsx': 'a0447dc38ae4007ab9f03885c10b42f872743ddb17139b3fbee2306699a815fd'
+    };
+    for (const [name, hash] of Object.entries(expected)) expect(createHash('sha256').update(fixture(name)).digest('hex')).toBe(hash);
+  });
+});
+
+describe('checkTableFile (rule 17: the same check the server makes, as a preview)', () => {
+  it('returns the row count when every expected column is in the header', async () => {
+    await expect(checkTableFile(fileOf('samples.xlsx', fixture('samples-96.xlsx')), ['sample id', 'Notes'])).resolves.toBe(96);
+    await expect(checkTableFile(fileOf('samples.csv', fixture('samples-with-gaps.csv')), ['Volume', 'Sample ID'])).resolves.toBe(3);
+  });
+
+  it('refuses with the message naming every missing column', async () => {
+    await expect(checkTableFile(fileOf('samples.csv', fixture('samples-with-gaps.csv')), ['Sample ID', 'Concentration', 'Location'])).rejects.toThrow('This file is missing the columns: Concentration, Location.');
+    await expect(checkTableFile(fileOf('samples.csv', 'Strain\nBL21\n'), ['Inducer'])).rejects.toBeInstanceOf(SampleSheetError);
+  });
+
+  it('refuses a sheet with a title row above its header when columns are expected', async () => {
+    await expect(checkTableFile(fileOf('banner.xlsx', fixture('samples-with-banner.xlsx')), ['Sample ID'])).rejects.toThrow('This file is missing the columns: Sample ID.');
+  });
+
+  it('has no column check when no columns are expected (rule 20), and accepts a header with zero rows', async () => {
+    await expect(checkTableFile(fileOf('banner.xlsx', fixture('samples-with-banner.xlsx')), [])).resolves.toBe(5);
+    await expect(checkTableFile(fileOf('empty.csv', 'Inducer,Concentration\n'), ['Inducer', 'Concentration'])).resolves.toBe(0);
+  });
+
+  it('judges the file by its bytes, never its name', async () => {
+    await expect(checkTableFile(fileOf('really-a-workbook.csv', fixture('samples-96.xlsx')), ['Sample ID'])).resolves.toBe(96);
+    await expect(checkTableFile(fileOf('really-text.xlsx', 'Inducer\nIPTG\n'), ['Inducer'])).resolves.toBe(1);
+  });
+
+  it('refuses a file over the size cap without reading it', async () => {
+    await expect(checkTableFile(fileOf('big.csv', new Uint8Array(10 * 1024 * 1024 + 1)), [])).rejects.toThrow(TABLE_FILE_TOO_LARGE_MESSAGE);
+  });
+});
+
+describe('buildTableTemplate / tableTemplateFilename (rule 15)', () => {
+  it('is an .xlsx with one sheet holding one header row of the columns in order and nothing else', () => {
+    const bytes = buildTableTemplate(['Inducer', 'Concentration', 'Location']);
+    expect([bytes[0], bytes[1]]).toEqual([0x50, 0x4b]);
+    const workbook = XLSX.read(bytes, { type: 'array' });
+    expect(workbook.SheetNames).toHaveLength(1);
+    expect(XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 })).toEqual([['Inducer', 'Concentration', 'Location']]);
+  });
+
+  it('round-trips through the reader: the template itself passes its own column check with zero rows', () => {
+    const contents = readTableBytes(buildTableTemplate(['Inducer', 'Concentration']));
+    expect(contents).toEqual({ header: ['Inducer', 'Concentration'], rowCount: 0 });
+  });
+
+  it('names the file after the parameter, without characters a filename cannot hold', () => {
+    expect(tableTemplateFilename('Plate map')).toBe('Plate map template.xlsx');
+    expect(tableTemplateFilename('  Inducers / doses?  ')).toBe('Inducers  doses template.xlsx');
+    expect(tableTemplateFilename('')).toBe('Table template.xlsx');
   });
 });
