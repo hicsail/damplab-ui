@@ -36,7 +36,6 @@ export default function ParameterSetEditor({
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [parameters, setParameters] = useState<EditableParameter[]>(() => withDragKeys(initial?.parameters ?? []));
-  const [tableDataText, setTableDataText] = useState<Record<number, string>>({});
   const [localError, setLocalError] = useState<string | null>(null);
   // Computed once from what was loaded: a parameter added in this session is not locked yet.
   const locked = useMemo(() => (lockSavedIds ? lockedDragKeys(parameters) : new Set<string>()), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -48,7 +47,7 @@ export default function ParameterSetEditor({
   const handleSave = () => {
     // Same predicate passed to ParameterListEditor below, so a new parameter
     // colliding with a saved id is the one renamed — never the saved one (C4).
-    const { payload, errors } = parameterSetPayload({ name, description, parameters, tableDataText, isIdLocked, conditionContext });
+    const { payload, errors } = parameterSetPayload({ name, description, parameters, isIdLocked, conditionContext });
     if (!payload) {
       setLocalError(errors.join(' '));
       return;
@@ -69,8 +68,6 @@ export default function ParameterSetEditor({
           <ParameterListEditor
             parameters={parameters}
             setParameters={setParameters}
-            tableDataText={tableDataText}
-            setTableDataText={setTableDataText}
             canWrite={canWrite}
             sampleSheetOwner={{ parameterSetId: initial?.id }}
             isIdLocked={isIdLocked}

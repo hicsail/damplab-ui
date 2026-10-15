@@ -10,7 +10,6 @@ export function parameterSetPayload(input: {
   name: string;
   description: string;
   parameters: ReadonlyArray<EditableParameter>;
-  tableDataText: Record<number, string>;
   /**
    * Same predicate passed to ParameterListEditor's `isIdLocked`. Forwarded to
    * prepareParametersForSave so a new parameter colliding with a saved id is
@@ -23,7 +22,7 @@ export function parameterSetPayload(input: {
   const name = input.name.trim();
   if (!name) return { errors: ['Name is required.'] };
   if (name.includes(';')) return { errors: ['A set name cannot contain ";".'] };
-  const { parameters, errors } = prepareParametersForSave(input.parameters, input.tableDataText, input.isIdLocked, input.conditionContext);
+  const { parameters, errors } = prepareParametersForSave(input.parameters, input.isIdLocked, input.conditionContext);
   if (errors.length) return { errors };
   return { payload: { name, description: input.description.trim() || null, parameters }, errors: [] };
 }

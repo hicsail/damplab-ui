@@ -1,5 +1,6 @@
 import { GridRowModel } from "@mui/x-data-grid";
 import { validationError } from './parameterTypeChoice';
+import { isTableType, tableIsSetUp } from '../../../utils/sampleSheetValue';
 
 export interface ParameterValidationError {
   field: string;
@@ -44,6 +45,11 @@ export function validateParameter(row: GridRowModel): ParameterValidationError[]
 
   if (row.display === "checkboxes" && !(row.type === "dropdown" && row.allowMultipleValues === true)) {
     errors.push({ field: "Answer format", errorMsg: "Checkboxes needs “Allow multiple selections” to be Yes." });
+  }
+
+  // A Table needs a column or a staff template, or no upload could be checked against it.
+  if (isTableType(row.type) && !tableIsSetUp(row)) {
+    errors.push({ field: "Columns", errorMsg: "Add at least one column." });
   }
 
   return errors;

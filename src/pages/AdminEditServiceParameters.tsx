@@ -38,7 +38,6 @@ export default function AdminEditServiceParameters() {
   );
 
   const [parameters, setParameters] = useState<EditableParameter[]>([]);
-  const [tableDataText, setTableDataText] = useState<Record<number, string>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -131,7 +130,7 @@ export default function AdminEditServiceParameters() {
       setErrorMessage(null);
       setSuccessMessage(null);
 
-      const { parameters: prepared, errors } = prepareParametersForSave(parameters, tableDataText, undefined, conditionContext);
+      const { parameters: prepared, errors } = prepareParametersForSave(parameters, undefined, conditionContext);
       if (errors.length) {
         setErrorMessage(errors.join(' '));
         return;
@@ -192,8 +191,6 @@ export default function AdminEditServiceParameters() {
         <ParameterListEditor
           parameters={parameters}
           setParameters={setParameters}
-          tableDataText={tableDataText}
-          setTableDataText={setTableDataText}
           canWrite={canWrite}
           sampleSheetOwner={{ serviceId: String(service.id) }}
           conditionContext={conditionContext}
