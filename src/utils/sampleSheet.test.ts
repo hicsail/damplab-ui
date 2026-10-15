@@ -248,20 +248,22 @@ describe('readTableBytes', () => {
     expect(readTableBytes(fixture('numeric-header.xlsx'))).toEqual({ header: ['Sample ID', '2024', '7', '1.5'], rowCount: 2 });
   });
 
-  // C1 twin: a sheet whose range spans to column XFD must not be walked cell by cell.
-  it('reads rows whose only cell is in the last column (XFD) quickly and without a dense walk', () => {
-    const sheet: XLSX.WorkSheet = { A1: { t: 's', v: 'Inducer' }, XFD1: { t: 's', v: 'Far' }, '!ref': 'A1:XFD1000' };
-    for (let r = 2; r <= 1000; r++) sheet[`XFD${r}`] = { t: 's', v: 'x' };
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, sheet, 'Table');
-    const bytes = new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
+  // C2/m4 twin: rows built by column position were 16,384-slot holey arrays, and 30,000 of them took about 12 s to read.
+  // The same file the server reads to the same result: A1 `Inducer`, XFD1 `Far`, then rows 2..30001 each holding one
+  // inline string in XFD.
+  it('reads 30,000 rows whose only cell is in the last column (XFD) in well under 2 s, as the server does (shared fixture)', () => {
+    const bytes = fixture('last-column-rows.xlsx');
     const before = process.memoryUsage().heapUsed;
     const started = Date.now();
-    expect(readTableBytes(bytes)).toEqual({ header: ['Inducer', 'Far'], rowCount: 999 });
-    // Walking the range cell by cell takes seconds here; the sparse read takes milliseconds.
-    expect(Date.now() - started).toBeLessThan(1500);
+    expect(readTableBytes(bytes)).toEqual({ header: ['Inducer', 'Far'], rowCount: 30000 });
+    expect(Date.now() - started).toBeLessThan(2000);
     expect(process.memoryUsage().heapUsed - before).toBeLessThan(300 * 1024 * 1024);
-  }, 60000);
+  }, 120000);
+
+  // m5: an error cell reads as its error text, as the server's exceljs reads it — not as SheetJS's code (#N/A is 42).
+  it('reads an error cell as its error text, as the server does (shared fixture)', () => {
+    expect(readTableBytes(fixture('error-cells.xlsx'))).toEqual({ header: ['#N/A', 'Inducer'], rowCount: 1 });
+  });
 
   it('refuses a CSV with an unterminated quote as unreadable, as the server does', () => {
     const text = (t: string) => readTableBytes(new TextEncoder().encode(t));
@@ -276,7 +278,9 @@ describe('readTableBytes', () => {
       'samples-with-gaps.csv': '4b2fd83ec9429a8704a4243db216a0834d402386df7e532aece603315e4dcc70',
       'template-with-banner.xlsx': 'd86034e74901ca53b82d59b0d657f6c14a0395531bc2f1759bffcbc51371211a',
       'samples-with-banner.xlsx': 'a0447dc38ae4007ab9f03885c10b42f872743ddb17139b3fbee2306699a815fd',
-      'numeric-header.xlsx': '6ea2cb9ee9f6255f3279026643fa30e3c6d124e20931d2084ebc8516027ad660'
+      'numeric-header.xlsx': '6ea2cb9ee9f6255f3279026643fa30e3c6d124e20931d2084ebc8516027ad660',
+      'last-column-rows.xlsx': '90fc23353c38dd7cf67a57c95d92acfb0bfb124352b2433d9cd43a598816af0f',
+      'error-cells.xlsx': '8cc104c8d7385a9d475f55e195bc8537a0fe427f4b9c87d6ab4feadc5e73489b'
     };
     for (const [name, hash] of Object.entries(expected)) expect(createHash('sha256').update(fixture(name)).digest('hex')).toBe(hash);
   });

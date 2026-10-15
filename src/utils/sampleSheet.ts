@@ -115,24 +115,32 @@ const parseCsv = (text: string): string[][] => {
   return rows;
 };
 
+/** SheetJS stores an error cell's value as Excel's error code; `w` normally carries its text, and this backs it up. */
+const ERROR_TEXT: Readonly<Record<number, string>> = { 0: '#NULL!', 7: '#DIV/0!', 15: '#VALUE!', 23: '#REF!', 29: '#NAME?', 36: '#NUM!', 42: '#N/A', 43: '#GETTING_DATA' };
+
+/** A cell's value as the server's exceljs reads it: raw (7 formatted `000` is `7`), and an error as its text (`#N/A`, not 42). */
+const cellValue = (cell: XLSX.CellObject): unknown => (cell.t === 'e' ? (cell.w ?? ERROR_TEXT[cell.v as number] ?? cell.v) : cell.v);
+
 /**
- * A worksheet's rows from the cells it actually holds, each cell as its raw
- * value (so 7 formatted `000` is `7`, as the server's exceljs reads it). Not `sheet_to_json`, which walks the sheet's whole
- * range cell by cell: a range reaching column XFD is 16,384 cells a row. Rows
- * with no cell are left out, which the reader treats the same as empty ones.
+ * A worksheet's rows from the cells it actually holds. Not `sheet_to_json`,
+ * which walks the sheet's whole range cell by cell, and not rows indexed by
+ * column, whose holes every later `.some`/`.map` walks: either way a cell in
+ * column XFD is 16,384 slots a row. Each row is its present cells in column
+ * order, so the cost is the cells present. Rows with no cell are left out,
+ * which the reader treats the same as empty ones.
  */
 const sparseRows = (worksheet: XLSX.WorkSheet): unknown[][] => {
-  const byRow = new Map<number, unknown[]>();
+  const byRow = new Map<number, [number, unknown][]>();
   for (const address of Object.keys(worksheet)) {
     if (address.charCodeAt(0) === 33) continue; // '!ref', '!merges' and the like
     const cell = worksheet[address] as XLSX.CellObject | undefined;
     if (!cell || cell.v === undefined || cell.v === null) continue;
     const { r, c } = XLSX.utils.decode_cell(address);
-    const row = byRow.get(r) ?? [];
-    row[c] = cell.v;
-    byRow.set(r, row);
+    const row = byRow.get(r);
+    if (row) row.push([c, cellValue(cell)]);
+    else byRow.set(r, [[c, cellValue(cell)]]);
   }
-  return [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r)!);
+  return [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r)!.sort((a, b) => a[0] - b[0]).map(([, value]) => value));
 };
 
 /**
