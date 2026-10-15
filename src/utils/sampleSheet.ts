@@ -149,11 +149,14 @@ const sparseRows = (worksheet: XLSX.WorkSheet): unknown[][] => {
 };
 
 /**
- * The bytes a workbook's archive entries actually inflate to — the count the
- * server makes before it reads a workbook, so the preview refuses exactly the
- * files the server refuses as too large. Not the sizes the zip declares, which
- * are the file's to choose. SheetJS's own zip reader inflates every entry (as
- * `XLSX.read` does anyway); the entries it adds itself are named from `\u0001`.
+ * The bytes SheetJS's own zip reader inflates a workbook's archive entries to
+ * (as `XLSX.read` does anyway); the entries it adds itself are named from
+ * `\u0001`. For an honest zip this equals the server's count, so the preview
+ * refuses the same files as too large. It is not independent of the sizes the
+ * zip declares: SheetJS stops each entry's output at its declared size. A file
+ * whose declared sizes lie low therefore passes this check and previews as 0
+ * rows, while the server, which counts the bytes that actually come out, still
+ * refuses it. The preview can be wrong there, but nothing is mis-billed.
  */
 const inflatedSize = (bytes: Uint8Array): number => {
   const archive = XLSX.CFB.read(bytes, { type: 'array' }) as { FileIndex: { name: string; content?: { length: number } }[] };
