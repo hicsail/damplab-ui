@@ -183,9 +183,8 @@ export default function DocsAbout() {
           bench, and billing — so the client and the lab are always looking at the same thing.
         </Typography>
         <Typography sx={{ maxWidth: 760 }}>
-          Canvas is built by the Software &amp; Application Innovation Lab (SAIL) at Boston University's Hariri Institute
-          for Computing, and is part of the NSF-funded Programmable Cloud Laboratories (PCL) program, which works toward a
-          national network of remotely accessible cloud labs.
+          Canvas is built for the DAMP Lab by the Software &amp; Application Innovation Lab (SAIL) at Boston University's Hariri Institute
+          for Computing along with Lattice Automation, as part of the NSF-funded Programmable Cloud Laboratories (PCL) program. 
         </Typography>
       </DocsSection>
 
