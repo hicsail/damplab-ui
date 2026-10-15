@@ -336,6 +336,13 @@ describe('resetHiddenValues — a hidden Table (table-upload R2)', () => {
     expect(resetHiddenValues({ kind: 'b', plate: 'legacy' }, entries('legacy'), parameters)).toEqual({ kind: 'b', plate: '' });
   });
 
+  it('clears a file wrapped in an array (allowMultipleValues left on a stored Table) to null', () => {
+    const counted = JSON.stringify({ filename: 'a.csv', key: 'workflow-parameters/u/a.csv', sampleCount: 12, countedBy: 'server' });
+    const multi = [parameters[0], { ...parameters[1], allowMultipleValues: true }];
+    const multiEntries = [{ id: 'kind', type: 'dropdown', value: 'b' }, { id: 'plate', type: 'table', allowMultipleValues: true, value: [counted] }];
+    expect(resetHiddenValues({ kind: 'b', plate: [counted] }, multiEntries, multi)).toEqual({ kind: 'b', plate: null });
+  });
+
   it('leaves an old multi-value array on a `table` as it is', () => {
     expect(resetHiddenValues({ kind: 'b', plate: [''] }, entries(['']), parameters)).toBeNull();
   });

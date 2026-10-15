@@ -8,7 +8,7 @@
  * hidden answers itself); this copy is what lets the form, the badge, the price
  * shown on the canvas and every answer display agree with it. Keep the two in step.
  */
-import { parseSampleSheetValue, TABLE_PARAM_TYPE } from './sampleSheetValue';
+import { tableFileOf, TABLE_PARAM_TYPE } from './sampleSheetValue';
 import { isOtherTextEntryId, otherTextEntryId, otherTextParentId } from './otherOption';
 
 export type ConditionOp = 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'in' | 'includes';
@@ -286,7 +286,7 @@ function emptyFormValue(entry: Record<string, any>): unknown {
   // `table` parameter before it took files (the old '', text, an array) is not
   // a file: it keeps resetting exactly as it always did, so hiding and
   // re-showing it cannot move its bill. `sampleSheet` is handled, unchanged, below.
-  if (entry.type === TABLE_PARAM_TYPE && (entry.value === null || entry.value === undefined || parseSampleSheetValue(entry.value) !== null)) return null;
+  if (entry.type === TABLE_PARAM_TYPE && (entry.value === null || entry.value === undefined || tableFileOf(entry.value) !== null)) return null;
   const multi = entry.allowMultipleValues === true || Array.isArray(entry.value);
   if (multi) return entry.type === 'file' ? [] : [''];
   if (entry.type === 'file' || entry.type === 'sampleSheet') return null;
