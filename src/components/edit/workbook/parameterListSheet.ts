@@ -1,6 +1,8 @@
 import { makeUniqueIds } from '../../../utils/idFromName';
 import { effectiveValidation, parseValidation } from '../../../utils/parameterValidation';
 import { ConditionAst, ConditionScope, conditionText, named, parseCondition, RefAst, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
+import { expectedColumnsOf, hasStaffTemplate, isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
+import { resolveTableColumns } from '../../../utils/tableColumns';
 import { nearKey, normalizeEol, parseYesNo, sameList, splitList, yesNo } from './cells';
 import { matchRows, rowList } from './matching';
 import { OperationReference, OperationRowRef, ReferenceWarning, resolveOperationName } from './operationsWorkbookSheet';
@@ -20,19 +22,19 @@ const TYPE_LABEL: Record<string, string> = {
   dropdown: 'Dropdown',
   boolean: 'True/False',
   table: 'Table',
-  file: 'File Upload',
-  sampleSheet: 'Sample Upload'
+  file: 'File Upload'
 };
-/** Types whose template (table layout, blank file, blank samples sheet) is set in the editor. */
-const TEMPLATE_TYPES = new Set(['table', 'file', 'sampleSheet']);
+/** What a `type` cell may also say for a Table: the stored string it had before the two types were merged, and that type's old label. */
+const TABLE_CELL_ALIASES = new Set(['samplesheet', 'sample upload']);
 /** The download's in-cell dropdown for the `type` column. */
-export const TYPE_CHOICES: readonly string[] = ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload', 'Sample Upload'];
+export const TYPE_CHOICES: readonly string[] = ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload'];
 
 const OWNER_COLUMNS = new Set(['parameterId', 'parameterSet', 'operation']);
 
 export function typeLabelOf(parameter: any): string {
   if (parameter?.type === 'dropdown' && parameter?.display === 'checkboxes') return 'Checkboxes';
-  const stored = String(parameter?.type ?? '');
+  // Both stored strings are one type: the download writes Table for either, so the alias alone is never a change.
+  const stored = isTableType(parameter?.type) ? TABLE_PARAM_TYPE : String(parameter?.type ?? '');
   return TYPE_LABEL[stored] ?? stored;
 }
 
@@ -40,6 +42,7 @@ export function typeLabelOf(parameter: any): string {
 export function parseTypeCell(raw: string): { type: string; checkboxes: boolean } | null {
   const key = raw.trim().toLowerCase();
   if (key === 'checkboxes') return { type: 'dropdown', checkboxes: true };
+  if (TABLE_CELL_ALIASES.has(key)) return { type: TABLE_PARAM_TYPE, checkboxes: false };
   for (const [stored, label] of Object.entries(TYPE_LABEL)) {
     if (key === label.toLowerCase() || key === stored.toLowerCase()) return { type: stored, checkboxes: false };
   }
@@ -68,7 +71,8 @@ export function parameterCells(parameter: any, owner: { set?: string; operation?
     description: normalizeEol(parameter?.description).trim(),
     required: yesNo(parameter?.required),
     type: typeLabelOf(parameter),
-    options: optionsOf(parameter).map(optionName).join('; '),
+    // A Table's options cell is its expected columns; a dropdown's is its option names.
+    options: isTableType(parameter?.type) ? expectedColumnsOf(parameter).join('; ') : optionsOf(parameter).map(optionName).join('; '),
     validation: parameter?.type === 'number' ? effectiveValidation(parameter) : '',
     conditionalDisplayLogic: conditionText(parameter?.showIf, scope),
     allowMultiple: yesNo(parameter?.allowMultipleValues),
@@ -174,19 +178,42 @@ function applyCells(
       } else {
         delete next.display;
       }
-      if (TEMPLATE_TYPES.has(parsed.type)) warnings.push(`Set the ${TYPE_LABEL[parsed.type]} template in the editor.`);
     }
   }
+  // A parameter stored as a Table keeps the string it is stored with — `table` or `sampleSheet` —
+  // whichever alias the cell uses: pricing reads the string, so rewriting it would move the price
+  // of jobs that already answered the parameter. Only a parameter that was not a Table becomes `table`.
+  if (isTableType(base.type) && isTableType(next.type)) next.type = base.type;
+  const isTable = isTableType(next.type);
+  // Another type turned into a Table holds one file. A stored Table keeps its flag, for the same reason.
+  if (isTable && !isTableType(base.type)) next.allowMultipleValues = false;
   const isCheckboxes = next.type === 'dropdown' && next.display === 'checkboxes';
   if (has('allowMultiple')) {
     const value = parseYesNo(cell('allowMultiple'));
     if (value === 'invalid') errors.push(`allowMultiple: “${cell('allowMultiple')}” must be Y or N.`);
-    else if (!isCheckboxes) next.allowMultipleValues = value;
+    else if (isTable) {
+      if (value === true) warnings.push('A Table holds one file; allowMultiple is ignored.');
+    } else if (!isCheckboxes) next.allowMultipleValues = value;
     else if (value === false && cell('allowMultiple') !== '') warnings.push('Checkboxes always allow multiple; allowMultiple is ignored.');
   }
   if (next.type !== 'dropdown') delete next.display;
 
-  if (has('options')) {
+  // A Table's columns are read from the options cell when the cell changed, and
+  // also when the row makes the parameter a Table (a create, or a type change):
+  // there the cell may be the same text the parameter had as dropdown options.
+  if (isTable && (has('options') || has('type') || isNew)) {
+    const storedColumns: any[] = Array.isArray(base.tableData?.columns) ? base.tableData.columns : [];
+    const text = cell('options');
+    if (storedColumns.some((column) => String(column?.header ?? '').includes(';'))) {
+      if (has('options')) warnings.push('An existing column name contains “;”, so its columns can only be edited in the editor; the options cell is ignored.');
+    } else if (text !== '') {
+      // A blank cell means "not edited", as for every other workbook cell: the columns stay as stored.
+      const resolved = resolveTableColumns(splitList(text), storedColumns);
+      errors.push(...resolved.errors);
+      // tableData.rows, and anything else stored there, is left exactly as it is.
+      next.tableData = { ...(base.tableData ?? {}), columns: resolved.columns };
+    }
+  } else if (!isTable && has('options')) {
     const stored = optionsOf(base);
     if (next.type !== 'dropdown') {
       if (cell('options') !== '') warnings.push(`options ignored: ${typeLabelOf(next)} parameters have none.`);
@@ -198,6 +225,10 @@ function applyCells(
       errors.push(...resolved.errors);
       warnings.push(...resolved.warnings);
     }
+  }
+  // Only a create, or a row that touches type or options, is held to this: an unrelated edit to a stored Table that has neither goes through.
+  if (isTable && expectedColumnsOf(next).length === 0 && !hasStaffTemplate(next) && (isNew || has('type') || has('options'))) {
+    errors.push('A Table needs at least one column: list them in options, separated by “;”.');
   }
   // Only a create, or a row that touches type or options, is held to this: an unrelated edit to a stored zero-option dropdown goes through.
   if (next.type === 'dropdown' && optionsOf(next).length === 0 && (isNew || has('type') || has('options'))) errors.push('A Dropdown or Checkboxes parameter needs at least one option.');

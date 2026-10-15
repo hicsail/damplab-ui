@@ -7,12 +7,12 @@ describe('parameter set form', () => {
   });
 
   it('requires a name and refuses ";" before the server does', () => {
-    expect(parameterSetPayload({ name: ' ', description: '', parameters: [], tableDataText: {} }).errors).toEqual(['Name is required.']);
-    expect(parameterSetPayload({ name: 'A; B', description: '', parameters: [], tableDataText: {} }).errors).toEqual(['A set name cannot contain ";".']);
+    expect(parameterSetPayload({ name: ' ', description: '', parameters: [] }).errors).toEqual(['Name is required.']);
+    expect(parameterSetPayload({ name: 'A; B', description: '', parameters: [] }).errors).toEqual(['A set name cannot contain ";".']);
   });
 
   it('builds the payload with prepared parameters, blank description as null', () => {
-    const { payload, errors } = parameterSetPayload({ name: ' Buffers ', description: '', parameters: [{ _dragKey: 'k', id: '', name: 'Buffer volume', type: 'number' }], tableDataText: {} });
+    const { payload, errors } = parameterSetPayload({ name: ' Buffers ', description: '', parameters: [{ _dragKey: 'k', id: '', name: 'Buffer volume', type: 'number' }] });
     expect(errors).toEqual([]);
     expect(payload).toEqual({ name: 'Buffers', description: null, parameters: [{ id: 'buffer_volume', name: 'Buffer volume', type: 'number' }] });
   });
@@ -35,7 +35,6 @@ describe('parameter set form', () => {
       name: 'Buffers',
       description: '',
       parameters: [added, saved],
-      tableDataText: {},
       isIdLocked: (p) => locked.has(p._dragKey)
     });
 
@@ -46,8 +45,8 @@ describe('parameter set form', () => {
   it('forwards the condition context, so a set parameter can name a parameter of another set', () => {
     const parameters = [{ _dragKey: 'a', id: 'kit', name: 'Kit', type: 'string', _showIfText: '"Cleanup"."Method"=="Column"' }];
     const cleanup = { id: 'set2', name: 'Cleanup', parameters: [{ id: 'method', name: 'Method', type: 'dropdown', options: [{ id: 'col', name: 'Column' }] }] };
-    const withContext = parameterSetPayload({ name: 'Extraction', description: '', parameters, tableDataText: {}, conditionContext: { setId: 'set1', sets: [cleanup] } });
+    const withContext = parameterSetPayload({ name: 'Extraction', description: '', parameters, conditionContext: { setId: 'set1', sets: [cleanup] } });
     expect(withContext.payload?.parameters[0].showIf).toEqual({ parameterId: 'method', parameterSetId: 'set2', op: 'eq', optionIds: ['col'] });
-    expect(parameterSetPayload({ name: 'Extraction', description: '', parameters, tableDataText: {} }).errors).toEqual(['Parameter 1: Show only if - No parameter set is named “Cleanup”.']);
+    expect(parameterSetPayload({ name: 'Extraction', description: '', parameters }).errors).toEqual(['Parameter 1: Show only if - No parameter set is named “Cleanup”.']);
   });
 });

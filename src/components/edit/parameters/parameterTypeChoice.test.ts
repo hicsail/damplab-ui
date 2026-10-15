@@ -6,6 +6,11 @@ describe('the "Checkboxes" answer format (rule 31)', () => {
   it('is a multi-value dropdown shown as checkboxes', () => {
     expect(applyTypeChoice(CHECKBOXES_CHOICE)).toEqual({ type: 'dropdown', display: 'checkboxes', allowMultipleValues: true });
   });
+  it('shows a stored sampleSheet as the Table choice (table-upload rule 2)', () => {
+    expect(typeChoiceOf({ type: 'sampleSheet' })).toBe('table');
+    expect(typeChoiceOf({ type: 'table' })).toBe('table');
+    expect(applyTypeChoice('table')).toEqual({ type: 'table', display: undefined });
+  });
   it('any other format clears the display flag and leaves "allow multiple" alone', () => {
     expect(applyTypeChoice('dropdown')).toEqual({ type: 'dropdown', display: undefined });
     expect(applyTypeChoice('number')).toEqual({ type: 'number', display: undefined });

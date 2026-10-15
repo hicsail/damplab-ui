@@ -34,9 +34,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
-import { idFromName } from '../../../utils/idFromName';
+import { hasStaffTemplate, isTableType } from '../../../utils/sampleSheetValue';
+import { columnsError, columnsText } from '../../../utils/tableColumns';
 import SampleSheetTemplateField, { SampleSheetTemplateOwner } from '../SampleSheetTemplateField';
-import { createDragKey, EditableParameter } from './parameterSave';
+import { createDragKey, EditableParameter, renamePatch } from './parameterSave';
 import { applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
 import { ConditionContext, NO_CONDITION_CONTEXT, SHOW_IF_EXAMPLE, SHOW_IF_HELP, showIfError, showIfText, showIfWarning } from './showIfField';
 
@@ -44,7 +45,6 @@ const TYPE_OPTIONS = [
   { value: 'string', label: 'Text' },
   { value: 'number', label: 'Number' },
   { value: 'file', label: 'File upload' },
-  { value: 'sampleSheet', label: 'Samples spreadsheet' },
   { value: 'boolean', label: 'Yes/No' },
   { value: 'dropdown', label: 'Pick from list' },
   { value: CHECKBOXES_CHOICE, label: 'Checkboxes' },
@@ -111,8 +111,6 @@ function SortableParamRow({
 export interface ParameterListEditorProps {
   parameters: EditableParameter[];
   setParameters: React.Dispatch<React.SetStateAction<EditableParameter[]>>;
-  tableDataText: Record<number, string>;
-  setTableDataText: React.Dispatch<React.SetStateAction<Record<number, string>>>;
   canWrite: boolean;
   /** The operation or Parameter Set these parameters are saved on; a samples-spreadsheet template is read back from it. */
   sampleSheetOwner: SampleSheetTemplateOwner;
@@ -131,8 +129,6 @@ export interface ParameterListEditorProps {
 export default function ParameterListEditor({
   parameters,
   setParameters,
-  tableDataText,
-  setTableDataText,
   canWrite,
   sampleSheetOwner,
   isIdLocked,
@@ -263,16 +259,7 @@ export default function ParameterListEditor({
                   required
                   value={selectedParameter.name ?? ''}
                   onChange={(event) => {
-                    const nextName = event.target.value;
-                    const currentName = selectedParameter.name ?? '';
-                    const currentId = String(selectedParameter.id ?? '');
-                    const currentDerived = idFromName(currentName);
-                    const locked = isIdLocked?.(selectedParameter) === true;
-                    const shouldUpdateId = !locked && (currentId.trim() === '' || currentId === currentDerived);
-                    updateParameter(selectedParameterIndex, {
-                      name: nextName,
-                      ...(shouldUpdateId ? { id: idFromName(nextName) } : {})
-                    });
+                    updateParameter(selectedParameterIndex, renamePatch(selectedParameter, event.target.value, isIdLocked?.(selectedParameter) === true));
                   }}
                 />
               </Grid>
@@ -338,24 +325,26 @@ export default function ParameterListEditor({
                   <MenuItem value='no'>No</MenuItem>
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <TextField
-                  select
-                  label='Allow multiple selections?'
-                  fullWidth
-                  disabled={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE}
-                  helperText={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE ? 'Checkboxes always allow several.' : undefined}
-                  value={selectedParameter.allowMultipleValues ? 'yes' : 'no'}
-                  onChange={(event) =>
-                    updateParameter(selectedParameterIndex, {
-                      allowMultipleValues: event.target.value === 'yes'
-                    })
-                  }
-                >
-                  <MenuItem value='yes'>Yes</MenuItem>
-                  <MenuItem value='no'>No</MenuItem>
-                </TextField>
-              </Grid>
+              {!isTableType(selectedParameter.type) && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    select
+                    label='Allow multiple selections?'
+                    fullWidth
+                    disabled={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE}
+                    helperText={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE ? 'Checkboxes always allow several.' : undefined}
+                    value={selectedParameter.allowMultipleValues ? 'yes' : 'no'}
+                    onChange={(event) =>
+                      updateParameter(selectedParameterIndex, {
+                        allowMultipleValues: event.target.value === 'yes'
+                      })
+                    }
+                  >
+                    <MenuItem value='yes'>Yes</MenuItem>
+                    <MenuItem value='no'>No</MenuItem>
+                  </TextField>
+                </Grid>
+              )}
 
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
@@ -631,34 +620,33 @@ export default function ParameterListEditor({
                 </Grid>
               )}
 
-              {selectedParameter.type === 'sampleSheet' && (
+              {isTableType(selectedParameter.type) && (
+                <Grid size={12}>
+                  <TextField
+                    label='Columns'
+                    multiline
+                    minRows={3}
+                    fullWidth
+                    placeholder={'Inducer\nConcentration\nLocation'}
+                    value={columnsText(selectedParameter)}
+                    error={Boolean(columnsError(selectedParameter))}
+                    helperText={
+                      columnsError(selectedParameter) ??
+                      'One column name per line, in order. Customers download a template with these headings, fill in one row per entry and upload it. An upload must carry every column; when this parameter has a price, it is charged once per row.'
+                    }
+                    onChange={(event) => updateParameter(selectedParameterIndex, { _columnsText: event.target.value })}
+                  />
+                </Grid>
+              )}
+
+              {/* Only for a parameter that already has a staff-uploaded template: it can be replaced or removed. New Tables are defined by columns. */}
+              {isTableType(selectedParameter.type) && hasStaffTemplate(selectedParameter) && (
                 <Grid size={12}>
                   <SampleSheetTemplateField
                     owner={sampleSheetOwner}
                     parameter={selectedParameter}
                     canWrite={canWrite}
                     onChange={(patch) => updateParameter(selectedParameterIndex, patch)}
-                  />
-                </Grid>
-              )}
-
-              {selectedParameter.type === 'table' && (
-                <Grid size={12}>
-                  <TextField
-                    label='Table setup (JSON)'
-                    multiline
-                    minRows={6}
-                    fullWidth
-                    value={
-                      tableDataText[selectedParameterIndex] ??
-                      (selectedParameter.tableData ? JSON.stringify(selectedParameter.tableData, null, 2) : '')
-                    }
-                    onChange={(event) =>
-                      setTableDataText((prev) => ({
-                        ...prev,
-                        [selectedParameterIndex]: event.target.value
-                      }))
-                    }
                   />
                 </Grid>
               )}

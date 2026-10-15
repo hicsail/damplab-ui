@@ -1,17 +1,44 @@
 import { idFromName, makeUniqueIds } from '../../../utils/idFromName';
 import { validateParameter } from './ParameterValidation';
 import { conditionFromText } from '../../../utils/parameterConditionText';
+import { expectedColumnsOf, hasStaffTemplate, isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
+import { columnNamesFromText, resolveTableColumns } from '../../../utils/tableColumns';
 import { ConditionContext, NO_CONDITION_CONTEXT } from './showIfField';
 
 export interface EditableParameter {
   _dragKey: string;
   /** The "Show only if" text being typed. Never saved: it becomes `showIf` in prepareParametersForSave. */
   _showIfText?: string;
+  /** The Columns field of a Table as typed, one name per line. Never saved: it becomes `tableData.columns` in prepareParametersForSave. Undefined: not edited. */
+  _columnsText?: string;
+  /**
+   * Set when a parameter is loaded as a Table: the type string (`table` or
+   * `sampleSheet`) and the allowMultipleValues it is stored with. Never saved.
+   * prepareParametersForSave writes both back as they were, because the price
+   * of every job that already answered the parameter is computed from them.
+   * `definition` is the columns and template it was loaded with, so a save can
+   * tell whether this edit touched them (rule 12 holds only a touched Table).
+   */
+  _storedTable?: { type: string; allowMultipleValues?: unknown; definition?: string };
   id?: string;
   name?: string;
   type?: string;
   [key: string]: any;
 }
+
+/**
+ * The patch for typing in the Name field. A new parameter's id follows its name
+ * until it is set by hand; a parameter loaded from the server (`locked`) never
+ * has its id re-derived, because recorded job answers are keyed by it.
+ */
+export function renamePatch(parameter: EditableParameter, nextName: string, locked: boolean): Partial<EditableParameter> {
+  const currentId = String(parameter.id ?? '');
+  const follows = currentId.trim() === '' || currentId === idFromName(parameter.name ?? '');
+  return { name: nextName, ...(!locked && follows ? { id: idFromName(nextName) } : {}) };
+}
+
+/** What makes a Table answerable: its column headers and its staff template. Compared before and after an edit. */
+const tableDefinitionOf = (parameter: any): string => JSON.stringify([expectedColumnsOf(parameter), hasStaffTemplate(parameter) ? parameter.templateFile.key : null]);
 
 export const createDragKey = (): string =>
   typeof crypto !== 'undefined' && crypto.randomUUID
@@ -19,19 +46,28 @@ export const createDragKey = (): string =>
     : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export function withDragKeys(parameters: ReadonlyArray<any>): EditableParameter[] {
-  return parameters.map((p) => ({ ...p, _dragKey: createDragKey() }));
+  return parameters.map((p) => ({
+    ...p,
+    _dragKey: createDragKey(),
+    ...(isTableType(p?.type) ? { _storedTable: { type: p.type, allowMultipleValues: p.allowMultipleValues, definition: tableDefinitionOf(p) } } : {})
+  }));
 }
+
+/** A Table loaded from the server whose type, columns and template this edit left as they were. The server's rule (`tableDefinitionError`). */
+const isStoredTableUntouched = (edited: EditableParameter | undefined, saved: any): boolean => {
+  const stored = edited?._storedTable;
+  return !!stored && stored.definition !== undefined && isTableType(stored.type) && isTableType(saved?.type) && stored.definition === tableDefinitionOf(saved);
+};
 
 export function prepareParametersForSave(
   parameters: ReadonlyArray<EditableParameter>,
-  tableDataText: Record<number, string>,
   isIdLocked?: (p: EditableParameter) => boolean,
   conditionContext: ConditionContext = NO_CONDITION_CONTEXT
 ): { parameters: any[]; errors: string[] } {
-  const tableParseErrors: string[] = [];
+  const columnErrors: string[] = [];
   const normalized = parameters.map((parameter, index) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _dragKey, _showIfText, ...rest } = parameter;
+    const { _dragKey, _showIfText, _columnsText, _storedTable, ...rest } = parameter;
     const next: Record<string, any> = { ...rest };
     if (!next.id || String(next.id).trim() === '') next.id = idFromName(next.name ?? '');
     // Stored trimmed; a blank one is not stored. Only a Number carries a
@@ -41,14 +77,29 @@ export function prepareParametersForSave(
     if (next.type !== 'dropdown' || next.display === undefined || next.display === null) delete next.display;
     if (next.rangeValueMin === undefined) delete next.rangeValueMin;
     if (next.rangeValueMax === undefined) delete next.rangeValueMax;
-    if (next.type === 'table') {
-      const raw = tableDataText[index];
-      if (raw && raw.trim()) {
-        try {
-          next.tableData = JSON.parse(raw);
-        } catch {
-          tableParseErrors.push(`Parameter ${index + 1} table setup must be valid JSON.`);
-        }
+    if (isTableType(next.type)) {
+      if (_storedTable && isTableType(_storedTable.type)) {
+        // Already stored as a Table: it keeps the type string and the
+        // allowMultipleValues it is stored with, whatever the editor did to
+        // them meanwhile (the type list has one "Table" entry for both
+        // strings; the flag is hidden). Pricing reads both, so rewriting
+        // either would move the price of jobs that already answered it.
+        next.type = _storedTable.type;
+        if (_storedTable.allowMultipleValues === undefined) delete next.allowMultipleValues;
+        else next.allowMultipleValues = _storedTable.allowMultipleValues;
+      } else {
+        // New, or another type turned into a Table: `table`, holding one file.
+        next.type = TABLE_PARAM_TYPE;
+        next.allowMultipleValues = false;
+      }
+      if (next.templateFile === null || next.templateFile === undefined) delete next.templateFile;
+      // Only an edited Columns field rewrites the columns. `tableData.rows` and
+      // anything else stored there is left exactly as it is; it is never read.
+      if (typeof _columnsText === 'string') {
+        const stored = Array.isArray(next.tableData?.columns) ? next.tableData.columns : [];
+        const resolved = resolveTableColumns(columnNamesFromText(_columnsText), stored);
+        columnErrors.push(...resolved.errors.map((error) => `Parameter ${index + 1}: Columns - ${error}`));
+        next.tableData = { ...(next.tableData ?? {}), columns: resolved.columns };
       }
     }
     return next;
@@ -86,9 +137,9 @@ export function prepareParametersForSave(
   });
 
   const validationErrors = unique.flatMap((parameter, index) =>
-    validateParameter(parameter as any).map(
+    validateParameter(parameter as any, { tableUntouched: isStoredTableUntouched(parameters[index], parameter) }).map(
       (error) => `Parameter ${index + 1}: ${error.field} - ${error.errorMsg}`
     )
   );
-  return { parameters: unique, errors: [...tableParseErrors, ...validationErrors, ...conditionErrors] };
+  return { parameters: unique, errors: [...columnErrors, ...validationErrors, ...conditionErrors] };
 }

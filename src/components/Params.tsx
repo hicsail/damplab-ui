@@ -28,11 +28,10 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import ParamTableOnForm from "./ParamTableOnForm";
 import { CanvasContext } from "../contexts/Canvas";
 import { isRetiredEquipmentParam, validateEquipmentValues } from "../utils/equipmentParams";
 import SampleSheetField from "./SampleSheetField";
-import { isSampleSheetParam } from "../utils/sampleSheet";
+import { isTableParam } from "../utils/sampleSheet";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
 import { answerProblems, isCheckboxList, requiredProblems, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
 import { errorLabel, isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, otherTextParentId, selectsOther } from "../utils/otherOption";
@@ -135,6 +134,14 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
         initValues[`resultParamValue${obj.id}`] = obj.resultParamValue
           ? obj.resultParamValue
           : "";
+      } else if (isTableParam(obj)) {
+        // A Table answer is seeded exactly as it is stored — '' stays '', null
+        // stays null, an old array stays that array — so opening the form and
+        // saving it untouched sends back what was there. Pricing reads the
+        // difference: '' on a priced `table` parameter bills once, null bills
+        // nothing. (The old form turned null into '' here.) Picking a file
+        // replaces whatever this is; removing it leaves null.
+        initValues[obj.id] = obj.value ?? null;
       } else if (isMultiValueParam(obj)) {
         if (obj.type === "file") {
           const arr = Array.isArray(obj.value) ? obj.value : obj.value ? [obj.value] : [];
@@ -146,7 +153,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
           : [obj.value ?? ""];
         initValues[obj.id] = arr;
       } else {
-        if (obj.type === "file" || isSampleSheetParam(obj)) {
+        if (obj.type === "file") {
           initValues[obj.id] = obj.value ?? null;
           return;
         }
@@ -185,7 +192,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     // only if" is false for these values) raises no required, validation or
     // "Other" message.
     const shown = withoutHiddenAnswers(activeNode?.data?.parameters, buildUpdatedFormData(values));
-    let errors: any = requiredProblems(shown, values);
+    let errors: any = requiredProblems(shown, values, activeNode?.data?.parameters);
 
     // The reserved equipment parameters carry rules the generic required-field pass
     // cannot express: a date pair that must not invert, and an integer floor.
@@ -433,25 +440,23 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                   </div>
                 );
               }
-              if (param.type === "table") {
-                const { columns, rows } = param.tableData ?? {};
-                if (!Array.isArray(columns) || !Array.isArray(rows)) {
-                  return (
-                    <div key={param.id}>
-                      <Typography sx={{ mt: 3 }}>{param.name}</Typography>
-                      <FormHelperText>This table has not been set up yet.</FormHelperText>
-                      {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
-                    </div>
-                  );
-                }
+              if (isTableParam(param)) {
+                // Before every multi-value branch: a Table holds one file whatever
+                // allowMultipleValues says. The form entry carries only the fields
+                // generateFormDataFromParams copies; the columns and a legacy staff
+                // template are read from the service's parameter definition, which
+                // is the effective list (parameters from a Parameter Set included).
+                const paramDef = (activeNode?.data?.parameters ?? []).find((p: any) => p?.id === param.id);
                 return (
-                  <div key={param.id}>
-                    <ParamTableOnForm
-                      title={param.name}
-                      columns={columns}
-                      rows={rows}
-                    />
-                  </div>
+                  <SampleSheetField
+                    key={param.id}
+                    param={{ ...param, tableData: paramDef?.tableData ?? param.tableData, templateFile: paramDef?.templateFile }}
+                    value={formik.values[param.id]}
+                    serviceId={activeNode?.data?.serviceId}
+                    readOnly={readOnly}
+                    uploadable={sampleSheetUploadable}
+                    onChange={(next) => formik.setFieldValue(param.id, next)}
+                  />
                 );
               }
               if (param.type === "dropdown" && !isMultiValueParam(param)) {
@@ -602,23 +607,6 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                     </Box>
                     {renderOtherText(param)}
                   </div>
-                );
-              }
-              if (isSampleSheetParam(param)) {
-                // The form entry carries only the fields generateFormDataFromParams
-                // copies; the template reference lives on the service's parameter
-                // definition, which the node keeps alongside.
-                const paramDef = (activeNode?.data?.parameters ?? []).find((p: any) => p?.id === param.id);
-                return (
-                  <SampleSheetField
-                    key={param.id}
-                    param={paramDef?.templateFile ? { ...param, templateFile: paramDef.templateFile } : param}
-                    value={formik.values[param.id]}
-                    serviceId={activeNode?.data?.serviceId}
-                    readOnly={readOnly}
-                    uploadable={sampleSheetUploadable}
-                    onChange={(next) => formik.setFieldValue(param.id, next)}
-                  />
                 );
               }
               if (param.type === "file") {

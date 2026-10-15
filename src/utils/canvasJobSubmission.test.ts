@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CREATE_JOB, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS } from '../gql/mutations';
-import { submitCanvasJob, PendingParamFile } from './canvasJobSubmission';
+import { submitCanvasJob, PendingParamFile, withoutStalePendingFiles } from './canvasJobSubmission';
 
 const service = { id: 'svc', parameters: [{ id: 'vector', type: 'file' }] };
 
@@ -169,5 +169,27 @@ describe('submitCanvasJob — answers to hidden parameters (show-only-if rule 17
     await submitNode(client, 'plasmid');
     expect(jobInputs[0].workflows[0].nodes[0].formData.map((e: any) => e.id)).toEqual(['kind', 'kind__otherText', 'vector', 'notes']);
     expect(presign).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A picked file lives only in browser memory. The canvas autosave keeps its name and row count but not the file, so
+// after a reload the answer looks picked while there is nothing left to upload.
+describe('a picked file that lost its file (the canvas was restored after a reload)', () => {
+  const stale = () => JSON.parse(JSON.stringify(pending('Master.xlsx')));
+
+  it('is refused at submission, naming the file and the operation, before anything is created', async () => {
+    const { client, jobInputs } = makeClient(async () => ({ data: { createWorkflowParameterUploadUrls: [] } }));
+    await expect(submit(client, stale())).rejects.toThrow('The file “Master.xlsx” on “Gibson Assembly” needs to be picked again: files are not kept when the page reloads.');
+    await expect(submit(client, [stale()])).rejects.toThrow('needs to be picked again');
+    expect(jobInputs).toEqual([]);
+  });
+
+  it('is cleared from a restored canvas, so the form asks for the file again', () => {
+    const nodes = [node(stale()), { ...node([pending('keep.fa'), stale()]), id: 'n2' }, { ...node('kept text'), id: 'n3' }];
+    const cleaned: any[] = withoutStalePendingFiles(nodes);
+    expect(cleaned[0].data.formData[0].value).toBeNull();
+    expect(cleaned[1].data.formData[0].value).toHaveLength(1);
+    expect(cleaned[1].data.formData[0].value[0].file).toBeInstanceOf(File);
+    expect(cleaned[2]).toBe(nodes[2]);
   });
 });
