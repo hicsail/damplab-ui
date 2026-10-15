@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { prepareParametersForSave, withDragKeys } from './parameterSave';
+import { prepareParametersForSave, renamePatch, withDragKeys } from './parameterSave';
 import { applyTypeChoice } from './parameterTypeChoice';
+
+describe('renamePatch (F15: a saved parameter keeps its id)', () => {
+  it('re-derives the id of a new parameter as its name is typed, and only while it still follows the name', () => {
+    expect(renamePatch({ _dragKey: 'k', id: 'old_name', name: 'Old name' }, 'Newer name', false)).toEqual({ name: 'Newer name', id: 'newer_name' });
+    expect(renamePatch({ _dragKey: 'k', id: '', name: '' }, 'First', false)).toEqual({ name: 'First', id: 'first' });
+    // The id was set by hand: it no longer follows the name.
+    expect(renamePatch({ _dragKey: 'k', id: 'custom', name: 'Old name' }, 'Newer', false)).toEqual({ name: 'Newer' });
+  });
+
+  it('never re-derives the id of a parameter loaded from the server, even when it matches its name', () => {
+    expect(renamePatch({ _dragKey: 'k', id: 'old_name', name: 'Old name' }, 'Newer name', true)).toEqual({ name: 'Newer name' });
+  });
+});
 
 describe('prepareParametersForSave', () => {
   it('strips drag keys, fills a blank id from the name, and de-duplicates ids', () => {

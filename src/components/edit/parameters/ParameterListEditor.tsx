@@ -34,11 +34,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
-import { idFromName } from '../../../utils/idFromName';
 import { hasStaffTemplate, isTableType } from '../../../utils/sampleSheetValue';
 import { columnsError, columnsText } from '../../../utils/tableColumns';
 import SampleSheetTemplateField, { SampleSheetTemplateOwner } from '../SampleSheetTemplateField';
-import { createDragKey, EditableParameter } from './parameterSave';
+import { createDragKey, EditableParameter, renamePatch } from './parameterSave';
 import { applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
 import { ConditionContext, NO_CONDITION_CONTEXT, SHOW_IF_EXAMPLE, SHOW_IF_HELP, showIfError, showIfText, showIfWarning } from './showIfField';
 
@@ -260,16 +259,7 @@ export default function ParameterListEditor({
                   required
                   value={selectedParameter.name ?? ''}
                   onChange={(event) => {
-                    const nextName = event.target.value;
-                    const currentName = selectedParameter.name ?? '';
-                    const currentId = String(selectedParameter.id ?? '');
-                    const currentDerived = idFromName(currentName);
-                    const locked = isIdLocked?.(selectedParameter) === true;
-                    const shouldUpdateId = !locked && (currentId.trim() === '' || currentId === currentDerived);
-                    updateParameter(selectedParameterIndex, {
-                      name: nextName,
-                      ...(shouldUpdateId ? { id: idFromName(nextName) } : {})
-                    });
+                    updateParameter(selectedParameterIndex, renamePatch(selectedParameter, event.target.value, isIdLocked?.(selectedParameter) === true));
                   }}
                 />
               </Grid>

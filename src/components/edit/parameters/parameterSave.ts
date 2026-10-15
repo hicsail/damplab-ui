@@ -26,6 +26,17 @@ export interface EditableParameter {
   [key: string]: any;
 }
 
+/**
+ * The patch for typing in the Name field. A new parameter's id follows its name
+ * until it is set by hand; a parameter loaded from the server (`locked`) never
+ * has its id re-derived, because recorded job answers are keyed by it.
+ */
+export function renamePatch(parameter: EditableParameter, nextName: string, locked: boolean): Partial<EditableParameter> {
+  const currentId = String(parameter.id ?? '');
+  const follows = currentId.trim() === '' || currentId === idFromName(parameter.name ?? '');
+  return { name: nextName, ...(!locked && follows ? { id: idFromName(nextName) } : {}) };
+}
+
 /** What makes a Table answerable: its column headers and its staff template. Compared before and after an edit. */
 const tableDefinitionOf = (parameter: any): string => JSON.stringify([expectedColumnsOf(parameter), hasStaffTemplate(parameter) ? parameter.templateFile.key : null]);
 

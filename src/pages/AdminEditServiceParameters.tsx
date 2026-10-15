@@ -13,7 +13,7 @@ import {
   Typography
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link as RouterLink } from 'react-router';
 import { AppContext } from '../contexts/App';
 import { GET_PARAMETER_SETS, UPDATE_SERVICE } from '../gql/queries';
@@ -22,6 +22,7 @@ import { ReadOnlyFieldset } from '../components/ReadOnlyFieldset';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { formatGqlError, formatSaveError } from '../utils/gqlError';
 import { EQUIPMENT_PARAM_DEFS } from '../controllers/ReactFlowEvents';
+import { lockedDragKeys } from '../components/edit/parameterSetForm';
 import ParameterListEditor from '../components/edit/parameters/ParameterListEditor';
 import { EditableParameter, prepareParametersForSave, withDragKeys } from '../components/edit/parameters/parameterSave';
 import { showIfSummary, withShowIfSummary } from '../components/edit/parameters/showIfField';
@@ -38,6 +39,11 @@ export default function AdminEditServiceParameters() {
   );
 
   const [parameters, setParameters] = useState<EditableParameter[]>([]);
+  // The parameters loaded from the server keep their ids: recorded job answers are keyed by them. One added in this session is not locked.
+  const [lockedKeys, setLockedKeys] = useState<ReadonlySet<string>>(() => new Set<string>());
+  // The list is loaded once; a later refetch of the service never replaces what is being edited.
+  const loadedRef = useRef(false);
+  const isIdLocked = (p: EditableParameter): boolean => lockedKeys.has(p._dragKey);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -46,7 +52,11 @@ export default function AdminEditServiceParameters() {
 
   useEffect(() => {
     if (!service) return;
-    setParameters((prev) => (prev.length ? prev : withDragKeys(ownParametersOf(service))));
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    const loaded = withDragKeys(ownParametersOf(service));
+    setLockedKeys(lockedDragKeys(loaded));
+    setParameters(loaded);
   }, [service]);
 
   // The five reserved equipment parameters, shown read-only above the service's
@@ -130,7 +140,7 @@ export default function AdminEditServiceParameters() {
       setErrorMessage(null);
       setSuccessMessage(null);
 
-      const { parameters: prepared, errors } = prepareParametersForSave(parameters, undefined, conditionContext);
+      const { parameters: prepared, errors } = prepareParametersForSave(parameters, isIdLocked, conditionContext);
       if (errors.length) {
         setErrorMessage(errors.join(' '));
         return;
@@ -193,6 +203,7 @@ export default function AdminEditServiceParameters() {
           setParameters={setParameters}
           canWrite={canWrite}
           sampleSheetOwner={{ serviceId: String(service.id) }}
+          isIdLocked={isIdLocked}
           conditionContext={conditionContext}
           listHeader={
             reservedParameters.length > 0 ? (
