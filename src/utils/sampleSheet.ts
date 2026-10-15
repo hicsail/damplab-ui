@@ -28,10 +28,14 @@ export type { StoredSampleSheet } from './sampleSheetValue';
 export const SAMPLE_SHEET_ACCEPT = '.xlsx,.csv';
 
 export const SAMPLE_SHEET_MAX_BYTES = 10 * 1024 * 1024;
+/** The most a workbook may inflate to, counted from the bytes actually inflated; the server's cap, applied here alike. */
+export const TABLE_FILE_MAX_INFLATED_BYTES = 50 * 1024 * 1024;
 
 export const TABLE_FILE_UNREADABLE_MESSAGE = 'This file could not be read as a spreadsheet. Save it as .xlsx or .csv and try again.';
 export const TABLE_FILE_NO_SHEETS_MESSAGE = 'This spreadsheet has no sheets in it.';
 export const TABLE_FILE_TOO_LARGE_MESSAGE = 'This file must be smaller than 10 MB.';
+/** A workbook under 10 MB whose contents inflate past TABLE_FILE_MAX_INFLATED_BYTES (about 9 MB of typical lab data). */
+export const TABLE_FILE_TOO_LARGE_TO_READ_MESSAGE = 'This spreadsheet is too large to read. Remove unused rows and columns and try again.';
 export const TABLE_NOT_SET_UP_MESSAGE = 'This table has not been set up yet.';
 
 export const missingColumnsMessage = (missing: readonly string[]): string => `This file is missing the columns: ${missing.join(', ')}.`;
@@ -134,13 +138,26 @@ const sparseRows = (worksheet: XLSX.WorkSheet): unknown[][] => {
   for (const address of Object.keys(worksheet)) {
     if (address.charCodeAt(0) === 33) continue; // '!ref', '!merges' and the like
     const cell = worksheet[address] as XLSX.CellObject | undefined;
-    if (!cell || cell.v === undefined || cell.v === null) continue;
+    // An error cell may have no value and only its text (SheetJS gives #SPILL! and #CALC! no code); the server reads it.
+    if (!cell || ((cell.v === undefined || cell.v === null) && !(cell.t === 'e' && cell.w))) continue;
     const { r, c } = XLSX.utils.decode_cell(address);
     const row = byRow.get(r);
     if (row) row.push([c, cellValue(cell)]);
     else byRow.set(r, [[c, cellValue(cell)]]);
   }
   return [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r)!.sort((a, b) => a[0] - b[0]).map(([, value]) => value));
+};
+
+/**
+ * The bytes a workbook's archive entries actually inflate to — the count the
+ * server makes before it reads a workbook, so the preview refuses exactly the
+ * files the server refuses as too large. Not the sizes the zip declares, which
+ * are the file's to choose. SheetJS's own zip reader inflates every entry (as
+ * `XLSX.read` does anyway); the entries it adds itself are named from `\u0001`.
+ */
+const inflatedSize = (bytes: Uint8Array): number => {
+  const archive = XLSX.CFB.read(bytes, { type: 'array' }) as { FileIndex: { name: string; content?: { length: number } }[] };
+  return archive.FileIndex.reduce((total, entry) => (entry.name.charCodeAt(0) === 1 ? total : total + (entry.content?.length ?? 0)), 0);
 };
 
 /**
@@ -155,6 +172,13 @@ export const readTableBytes = (data: ArrayBuffer | Uint8Array): TableFileContent
   if (bytes.byteLength > SAMPLE_SHEET_MAX_BYTES) throw new SampleSheetError(TABLE_FILE_TOO_LARGE_MESSAGE);
   let workbook: XLSX.WorkBook;
   if (isZip(bytes)) {
+    let inflated: number;
+    try {
+      inflated = inflatedSize(bytes);
+    } catch {
+      throw new SampleSheetError(TABLE_FILE_UNREADABLE_MESSAGE);
+    }
+    if (inflated > TABLE_FILE_MAX_INFLATED_BYTES) throw new SampleSheetError(TABLE_FILE_TOO_LARGE_TO_READ_MESSAGE);
     try {
       workbook = XLSX.read(bytes, { type: 'array' });
     } catch {

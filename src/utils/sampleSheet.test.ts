@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { buildTableTemplate, checkTableFile, countedRows, expectedColumnsOf, hasStaffTemplate, isTableParam, isTableType, missingColumns, missingColumnsMessage, parseSampleSheetValue, readTableBytes, readTableRows, sampleCountLabel, SampleSheetError, SERVER_COUNTED, tableFileOf, tableIsSetUp, tableTemplateFilename, TABLE_FILE_NO_SHEETS_MESSAGE, TABLE_FILE_TOO_LARGE_MESSAGE, TABLE_FILE_UNREADABLE_MESSAGE, TABLE_NOT_SET_UP_MESSAGE } from './sampleSheet';
+import { buildTableTemplate, checkTableFile, countedRows, expectedColumnsOf, hasStaffTemplate, isTableParam, isTableType, missingColumns, missingColumnsMessage, parseSampleSheetValue, readTableBytes, readTableRows, sampleCountLabel, SampleSheetError, SERVER_COUNTED, tableFileOf, tableIsSetUp, tableTemplateFilename, TABLE_FILE_NO_SHEETS_MESSAGE, TABLE_FILE_MAX_INFLATED_BYTES, TABLE_FILE_TOO_LARGE_MESSAGE, TABLE_FILE_TOO_LARGE_TO_READ_MESSAGE, TABLE_FILE_UNREADABLE_MESSAGE, TABLE_NOT_SET_UP_MESSAGE } from './sampleSheet';
 
 /** Byte-for-byte the files in `damplab-backend/test-fixtures/sample-sheets/`; the hash test pins that without reading across repos. */
 const fixture = (name: string): Uint8Array => new Uint8Array(readFileSync(resolve(__dirname, '../../test-fixtures/sample-sheets', name)));
@@ -140,6 +140,9 @@ describe('the messages (identical in damplab-backend/src/workflow/utils/table-fi
     expect(TABLE_FILE_UNREADABLE_MESSAGE).toBe('This file could not be read as a spreadsheet. Save it as .xlsx or .csv and try again.');
     expect(TABLE_FILE_NO_SHEETS_MESSAGE).toBe('This spreadsheet has no sheets in it.');
     expect(TABLE_FILE_TOO_LARGE_MESSAGE).toBe('This file must be smaller than 10 MB.');
+    expect(TABLE_FILE_TOO_LARGE_TO_READ_MESSAGE).toBe('This spreadsheet is too large to read. Remove unused rows and columns and try again.');
+    // The server's inflated-size cap, applied here before the preview accepts a file.
+    expect(TABLE_FILE_MAX_INFLATED_BYTES).toBe(50 * 1024 * 1024);
     expect(TABLE_NOT_SET_UP_MESSAGE).toBe('This table has not been set up yet.');
     expect(missingColumnsMessage(['Concentration', 'Location'])).toBe('This file is missing the columns: Concentration, Location.');
     expect(missingColumnsMessage(['Location'])).toBe('This file is missing the columns: Location.');
@@ -234,6 +237,16 @@ describe('readTableBytes', () => {
 
   it('refuses a zip that is not a workbook', () => {
     expect(() => readTableBytes(new Uint8Array([0x50, 0x4b, ...new Array(40).fill(7)]))).toThrow(SampleSheetError);
+    expect(() => readTableBytes(new Uint8Array([0x50, 0x4b, ...new Array(40).fill(7)]))).toThrow(TABLE_FILE_UNREADABLE_MESSAGE);
+  });
+
+  // I5: a valid workbook (header `Inducer`, one row) padded with 52 MiB of whitespace between its rows. It is under
+  // 10 MB, but inflates past the server's cap, so the server refuses it; the preview must refuse it alike, not count it.
+  it('refuses a workbook that inflates past the server’s cap as too large to read, as the server does (shared fixture)', async () => {
+    const bytes = fixture('over-inflation-cap.xlsx');
+    expect(bytes.byteLength).toBeLessThan(10 * 1024 * 1024);
+    expect(() => readTableBytes(bytes)).toThrow(new SampleSheetError(TABLE_FILE_TOO_LARGE_TO_READ_MESSAGE));
+    await expect(checkTableFile(fileOf('padded.xlsx', bytes), [])).rejects.toThrow(TABLE_FILE_TOO_LARGE_TO_READ_MESSAGE);
   });
 
   it('reads the shared fixtures exactly as the server does', () => {
@@ -265,6 +278,11 @@ describe('readTableBytes', () => {
     expect(readTableBytes(fixture('error-cells.xlsx'))).toEqual({ header: ['#N/A', 'Inducer'], rowCount: 1 });
   });
 
+  // m6: SheetJS gives #SPILL! and #CALC! no value, only text. A1 `#SPILL!`, B1 `Inducer`; A2 `#CALC!` only; B3 `IPTG`.
+  it('reads #SPILL! and #CALC! cells as their error text and counts a row holding only one, as the server does (shared fixture)', () => {
+    expect(readTableBytes(fixture('spill-cells.xlsx'))).toEqual({ header: ['#SPILL!', 'Inducer'], rowCount: 2 });
+  });
+
   it('refuses a CSV with an unterminated quote as unreadable, as the server does', () => {
     const text = (t: string) => readTableBytes(new TextEncoder().encode(t));
     expect(() => text('Inducer,"Concentration\nIPTG,1\n')).toThrow(TABLE_FILE_UNREADABLE_MESSAGE);
@@ -280,7 +298,9 @@ describe('readTableBytes', () => {
       'samples-with-banner.xlsx': 'a0447dc38ae4007ab9f03885c10b42f872743ddb17139b3fbee2306699a815fd',
       'numeric-header.xlsx': '6ea2cb9ee9f6255f3279026643fa30e3c6d124e20931d2084ebc8516027ad660',
       'last-column-rows.xlsx': '90fc23353c38dd7cf67a57c95d92acfb0bfb124352b2433d9cd43a598816af0f',
-      'error-cells.xlsx': '8cc104c8d7385a9d475f55e195bc8537a0fe427f4b9c87d6ab4feadc5e73489b'
+      'error-cells.xlsx': '8cc104c8d7385a9d475f55e195bc8537a0fe427f4b9c87d6ab4feadc5e73489b',
+      'spill-cells.xlsx': '375bb52a27337d4f62b270bbc06834cb50fcafa8c67ca997686ab1b10a4a5bcd',
+      'over-inflation-cap.xlsx': '4de5d8bc255713bae604f57c630712e89c32b715fee1b83c815019a05726c2e2'
     };
     for (const [name, hash] of Object.entries(expected)) expect(createHash('sha256').update(fixture(name)).digest('hex')).toBe(hash);
   });
