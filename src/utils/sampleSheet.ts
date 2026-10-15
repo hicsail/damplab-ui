@@ -155,9 +155,6 @@ export const checkTableFile = async (file: File, expected: readonly string[]): P
   return rowCount;
 };
 
-/** The count alone, with no column check. Kept for callers that have no columns to check against. */
-export const countSampleSheetFile = (file: File): Promise<number> => checkTableFile(file, []);
-
 /** The template a customer downloads for a Table defined by columns: one sheet, one header row, nothing else. */
 export const buildTableTemplate = (columns: readonly string[]): Uint8Array => {
   const workbook = XLSX.utils.book_new();

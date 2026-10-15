@@ -3,7 +3,7 @@ import { Alert, Box, Button, Chip, CircularProgress, List, ListItem, ListItemTex
 import { useMutation } from '@apollo/client';
 import { CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS, REPLACE_SAMPLE_SHEET } from '../gql/mutations';
 import { formatSaveError } from '../utils/gqlError';
-import { countSampleSheetFile, SAMPLE_SHEET_ACCEPT, sampleCountLabel, SampleSheetError } from '../utils/sampleSheet';
+import { checkTableFile, SAMPLE_SHEET_ACCEPT, sampleCountLabel, SampleSheetError } from '../utils/sampleSheet';
 import type { SampleSheetSlot } from './JobWorkflowCards';
 
 interface Props {
@@ -16,9 +16,10 @@ interface Props {
 }
 
 /**
- * The samples spreadsheets on a job, on both the customer's and the lab's
+ * The Tables on a job, on both the customer's and the lab's
  * view. Either side can upload a new version here at any point until the job
- * is closed; the new file is counted in this browser and stored with its count.
+ * is closed; the browser's count of the new file is a preview, and the server
+ * stores its own.
  */
 /**
  * The replace flow, shared by the section below and the inline button on a
@@ -38,7 +39,9 @@ export function useSampleSheetUpload(jobId: string, onChanged: () => Promise<unk
     setError(null);
     setBusyKey(slotKey);
     try {
-      const sampleCount = await countSampleSheetFile(file);
+      // A preview of the server's check, made before anything is uploaded: the
+      // server reads the stored file itself and its count is the one that is kept.
+      const sampleCount = await checkTableFile(file, slot.columns);
       const contentType = file.type || 'application/octet-stream';
 
       const { data } = await createUploadUrls({
@@ -96,9 +99,10 @@ export function SampleSheetReplaceButton({ jobId, slot, onChanged }: { jobId: st
 }
 
 /**
- * The samples spreadsheets on a job, on both the customer's and the lab's
+ * The Tables on a job, on both the customer's and the lab's
  * view. Either side can upload a new version here at any point until the job
- * is closed; the new file is counted in this browser and stored with its count.
+ * is closed; the browser's count of the new file is a preview, and the server
+ * stores its own.
  */
 export default function SampleSheetSection({ jobId, slots, canEdit, onChanged }: Props) {
   const { upload, busyKey, error, clearError } = useSampleSheetUpload(jobId, onChanged);
@@ -107,7 +111,7 @@ export default function SampleSheetSection({ jobId, slots, canEdit, onChanged }:
 
   return (
     <Box sx={{ mb: 2 }}>
-      <Typography variant='subtitle2' sx={{ mb: 1 }}>Samples Spreadsheets</Typography>
+      <Typography variant='subtitle2' sx={{ mb: 1 }}>Tables</Typography>
       {error && (
         <Alert severity='error' sx={{ mb: 1 }} onClose={clearError}>{error}</Alert>
       )}
@@ -119,7 +123,7 @@ export default function SampleSheetSection({ jobId, slots, canEdit, onChanged }:
             <ListItem
               key={slotKey}
               sx={{ pl: 0 }}
-              secondaryAction={canEdit ? <UploadButton slot={slot} busy={busy} onPick={(file) => void upload(slot, file)} /> : undefined}
+              secondaryAction={canEdit && slot.setUp ? <UploadButton slot={slot} busy={busy} onPick={(file) => void upload(slot, file)} /> : undefined}
             >
               <ListItemText
                 primary={

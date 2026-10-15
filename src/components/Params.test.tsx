@@ -212,6 +212,24 @@ describe('Params — a Table parameter with no template', () => {
     expect(markup).toContain('value="S1"');
     expect(markup).not.toContain('<table');
   });
+
+  it('renders a Table with columns as a file field — never the inline grid — under either stored string (rule 4)', () => {
+    for (const type of ['table', 'sampleSheet']) {
+      const tableData = { columns: [{ header: 'Inducer', field: 'inducer' }], rows: [{ id: 1, inducer: 'IPTG' }] };
+      const defs = [{ id: 'grid', name: 'Plate layout', type, tableData }];
+      const formData = [{ id: 'grid', nodeId: 'n1', name: 'Plate layout', type, options: null, paramType: 'input', value: null, required: false, tableData }];
+      const markup = renderToStaticMarkup(
+        <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+          <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData } } as any} />
+        </CanvasContext.Provider>
+      );
+      expect(text(markup)).toContain('Plate layout');
+      expect(text(markup)).toContain('Download template');
+      expect(markup).toContain('accept=".xlsx,.csv"');
+      expect(markup).not.toContain('<table');
+      expect(text(markup)).not.toContain('IPTG');
+    }
+  });
 });
 
 describe('Params — how a Table answer is seeded (table-upload rules 13a, 30)', () => {
