@@ -106,6 +106,8 @@ const parseCsv = (text: string): string[][] => {
       cell = '';
     } else cell += ch;
   }
+  // A quote that never closes: the server refuses it as unreadable, so the preview does too.
+  if (quoted) throw new SampleSheetError(TABLE_FILE_UNREADABLE_MESSAGE);
   if (cell !== '' || row.length > 0) {
     row.push(cell);
     rows.push(row);
@@ -139,7 +141,8 @@ export const readTableBytes = (data: ArrayBuffer | Uint8Array): TableFileContent
   const sheetName = workbook.SheetNames.find((_name, index) => (sheetMeta[index]?.Hidden ?? 0) === 0) ?? workbook.SheetNames[0];
   const worksheet = sheetName ? workbook.Sheets[sheetName] : undefined;
   if (!worksheet) throw new SampleSheetError(TABLE_FILE_NO_SHEETS_MESSAGE);
-  return readTableRows(XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, raw: false, defval: '' }));
+  // Cells by their value's text, as the server's exceljs reads them (`cell.text`), not as a display format renders them: 7 formatted `000` is `7` in both.
+  return readTableRows(XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1, raw: true, defval: '' }));
 };
 
 /**

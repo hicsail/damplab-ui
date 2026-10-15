@@ -222,6 +222,7 @@ describe('readTableBytes', () => {
 
   it('keeps CSV cells as plain text, never as numbers or dates', () => {
     expect(readTableBytes(new TextEncoder().encode('1/2/2020,007\nx,y\n'))).toEqual({ header: ['1/2/2020', '007'], rowCount: 1 });
+    expect(readTableBytes(new TextEncoder().encode('2024-01-05,007,1.50\nx,y,z\n')).header).toEqual(['2024-01-05', '007', '1.50']);
   });
 
   it('refuses bytes that are neither a workbook nor text (rule 21)', () => {
@@ -242,12 +243,25 @@ describe('readTableBytes', () => {
     expect(readTableBytes(fixture('template-with-banner.xlsx')).rowCount).toBe(1);
   });
 
+  // M1: both readers agree on a numeric header cell and on an unterminated quote.
+  it('reads numeric .xlsx header cells as their value’s text, as the server does (shared fixture)', () => {
+    expect(readTableBytes(fixture('numeric-header.xlsx'))).toEqual({ header: ['Sample ID', '2024', '7', '1.5'], rowCount: 2 });
+  });
+
+  it('refuses a CSV with an unterminated quote as unreadable, as the server does', () => {
+    const text = (t: string) => readTableBytes(new TextEncoder().encode(t));
+    expect(() => text('Inducer,"Concentration\nIPTG,1\n')).toThrow(TABLE_FILE_UNREADABLE_MESSAGE);
+    expect(() => text('Inducer,"Concentration\nIPTG,1\n')).toThrow(SampleSheetError);
+    expect(text('Inducer,"Concentration"\nIPTG,1\n').header).toEqual(['Inducer', 'Concentration']);
+  });
+
   it('keeps the fixtures byte-identical to the backend copy (pinned hashes)', () => {
     const expected: Record<string, string> = {
       'samples-96.xlsx': '65f9e17b5e998608381f5979a4a96021ca8440227fc92d38b17426c931f90bfc',
       'samples-with-gaps.csv': '4b2fd83ec9429a8704a4243db216a0834d402386df7e532aece603315e4dcc70',
       'template-with-banner.xlsx': 'd86034e74901ca53b82d59b0d657f6c14a0395531bc2f1759bffcbc51371211a',
-      'samples-with-banner.xlsx': 'a0447dc38ae4007ab9f03885c10b42f872743ddb17139b3fbee2306699a815fd'
+      'samples-with-banner.xlsx': 'a0447dc38ae4007ab9f03885c10b42f872743ddb17139b3fbee2306699a815fd',
+      'numeric-header.xlsx': '6ea2cb9ee9f6255f3279026643fa30e3c6d124e20931d2084ebc8516027ad660'
     };
     for (const [name, hash] of Object.entries(expected)) expect(createHash('sha256').update(fixture(name)).digest('hex')).toBe(hash);
   });
