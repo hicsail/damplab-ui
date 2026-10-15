@@ -31,6 +31,7 @@ import AppNavDrawer from "./AppNavDrawer";
 import LoadCanvasButton from "./LoadCanvasButton";
 import SaveCanvasButton from "./SaveCanvasButton";
 import NotificationBell from "./NotificationBell";
+import { withoutStalePendingFiles } from "../utils/canvasJobSubmission";
 import "../styles/resubmit.css";
 
 export default function HeaderBar() {
@@ -146,7 +147,8 @@ export default function HeaderBar() {
       // Attempt to load file, load empty object if nothing found
       let file = JSON.parse(localStorage.getItem(canvasName) || "{}");
 
-      if (file.nodes) setNodes(file.nodes);
+      // A saved canvas keeps a picked file's name but never the file: clear those answers so the form asks again.
+      if (file.nodes) setNodes(withoutStalePendingFiles(file.nodes));
       if (file.edges) setEdges(file.edges);
     },
     [setNodes, setEdges],

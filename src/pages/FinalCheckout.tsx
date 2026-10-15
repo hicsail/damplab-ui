@@ -167,20 +167,25 @@ const handleSubmitJob = async () => {
       getAccessToken: () => userContext.userProps?.getAccessToken() ?? Promise.resolve(undefined),
     });
 
-    setSnackbarState({
-      open: true,
-      message: 'Job submitted successfully!',
-      severity: 'success',
-    });
+    setSnackbarState(
+      created.failedAttachments
+        ? {
+            open: true,
+            message: `Job submitted, but these attachments did not upload: ${created.failedAttachments.join(', ')}. Add them again from the job page.`,
+            severity: 'warning',
+          }
+        : { open: true, message: 'Job submitted successfully!', severity: 'success' }
+    );
 
     val.setNodes([]);
     val.setEdges([]);
     localStorage.removeItem(CANVAS_AUTOSAVE_KEY);
     localStorage.setItem("CurrentCanvas", "");
 
+    // Long enough to read the attachment warning when there is one.
     setTimeout(() => {
       navigate(`/client_view/${created.id}`);
-    }, 1000);
+    }, created.failedAttachments ? 6000 : 1000);
   } catch (error) {
     console.error('Job submission failed:', error);
     setSnackbarState({

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CREATE_JOB, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS } from '../gql/mutations';
+import { ADD_JOB_ATTACHMENTS, CREATE_JOB, CREATE_JOB_ATTACHMENT_UPLOAD_URLS, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS } from '../gql/mutations';
 import { submitCanvasJob, PendingParamFile, withoutStalePendingFiles } from './canvasJobSubmission';
 
 const service = { id: 'svc', parameters: [{ id: 'vector', type: 'file' }] };
@@ -179,7 +179,7 @@ describe('a picked file that lost its file (the canvas was restored after a relo
 
   it('is refused at submission, naming the file and the operation, before anything is created', async () => {
     const { client, jobInputs } = makeClient(async () => ({ data: { createWorkflowParameterUploadUrls: [] } }));
-    await expect(submit(client, stale())).rejects.toThrow('The file “Master.xlsx” on “Gibson Assembly” needs to be picked again: files are not kept when the page reloads.');
+    await expect(submit(client, stale())).rejects.toThrow('The file “Master.xlsx” on “Gibson Assembly” needs to be picked again: a saved or reloaded canvas does not keep its files.');
     await expect(submit(client, [stale()])).rejects.toThrow('needs to be picked again');
     expect(jobInputs).toEqual([]);
   });
@@ -191,5 +191,55 @@ describe('a picked file that lost its file (the canvas was restored after a relo
     expect(cleaned[1].data.formData[0].value).toHaveLength(1);
     expect(cleaned[1].data.formData[0].value[0].file).toBeInstanceOf(File);
     expect(cleaned[2]).toBe(nodes[2]);
+  });
+});
+
+// Attachments are uploaded after the job exists, so a failure cannot undo the job — but it must be reported, and an
+// attachment is registered on the job only once its file is really stored.
+describe('job attachments', () => {
+  beforeEach(() => vi.stubGlobal('localStorage', { setItem: () => {} }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const fileOf = (name: string) => new File(['x'], name, { type: 'text/plain' });
+  const clientFor = (slots: Array<{ filename: string; size: number }>) => {
+    const registered: any[] = [];
+    const mutate = vi.fn(async ({ mutation, variables }: any) => {
+      if (mutation === CREATE_JOB) return { data: { createJob: { id: 'job1', jobId: 'J-1' } } };
+      if (mutation === CREATE_JOB_ATTACHMENT_UPLOAD_URLS)
+        return { data: { createJobAttachmentUploadUrls: slots.map((s) => ({ ...s, uploadUrl: `https://s3/${s.filename}`, key: `job-attachments/${s.filename}`, contentType: 'text/plain' })) } };
+      if (mutation === ADD_JOB_ATTACHMENTS) registered.push(...variables.attachments);
+      return { data: {} };
+    });
+    return { client: { mutate } as any, registered };
+  };
+  const submitWith = (client: any, attachments: File[]) =>
+    submitCanvasJob(client, {
+      workflows: [[node('')]], edges: [], nodes: [], jobName: 'Demo', institute: 'BU', notes: '', clientDisplayName: 'Demo',
+      attachments, getAccessToken: async () => 'token',
+    });
+
+  it('registers every attachment that uploaded, and reports none failed', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+    const { client, registered } = clientFor([{ filename: 'a.txt', size: 1 }]);
+    const result = await submitWith(client, [fileOf('a.txt')]);
+    expect(registered.map((a) => a.filename)).toEqual(['a.txt']);
+    expect(result.failedAttachments).toBeUndefined();
+  });
+
+  it('reports — and never registers — an attachment whose upload failed or that got no upload slot of its own', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: !url.endsWith('b.txt') })));
+    // The server renamed "c d.txt", so that slot matches no picked file: it must not be registered without a file.
+    const { client, registered } = clientFor([{ filename: 'a.txt', size: 1 }, { filename: 'b.txt', size: 1 }, { filename: 'c_d.txt', size: 1 }]);
+    const result = await submitWith(client, [fileOf('a.txt'), fileOf('b.txt'), fileOf('c d.txt')]);
+    expect(registered.map((a) => a.filename)).toEqual(['a.txt']);
+    expect(result).toMatchObject({ id: 'job1', failedAttachments: ['b.txt', 'c d.txt'] });
+  });
+
+  it('reports every attachment when they could not be registered on the job', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+    const { client } = clientFor([{ filename: 'a.txt', size: 1 }]);
+    const original = client.mutate;
+    client.mutate = vi.fn(async (args: any) => (args.mutation === ADD_JOB_ATTACHMENTS ? Promise.reject(new Error('down')) : original(args)));
+    expect((await submitWith(client, [fileOf('a.txt')])).failedAttachments).toEqual(['a.txt']);
   });
 });

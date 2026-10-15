@@ -135,6 +135,10 @@ export default function StaffJobSubmit() {
 
       setLastSubmittedJob(created);
       setSuccessDialogOpen(true);
+      if (created.failedAttachments) {
+        setSnackbarMessage(`Job submitted, but these attachments did not upload: ${created.failedAttachments.join(', ')}. Add them again from the job page.`);
+        setSnackbarOpen(true);
+      }
       setAttachments([]);
       setFormData({
         jobName: '',
