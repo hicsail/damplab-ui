@@ -26,8 +26,6 @@ const TYPE_LABEL: Record<string, string> = {
 };
 /** What a `type` cell may also say for a Table: the stored string it had before the two types were merged, and that type's old label. */
 const TABLE_CELL_ALIASES = new Set(['samplesheet', 'sample upload']);
-/** Types whose template is set in the editor. A Table is defined here, by the columns in its `options` cell. */
-const TEMPLATE_TYPES = new Set(['file']);
 /** The download's in-cell dropdown for the `type` column. */
 export const TYPE_CHOICES: readonly string[] = ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload'];
 
@@ -180,7 +178,6 @@ function applyCells(
       } else {
         delete next.display;
       }
-      if (TEMPLATE_TYPES.has(parsed.type)) warnings.push(`Set the ${TYPE_LABEL[parsed.type]} template in the editor.`);
     }
   }
   // A parameter stored as a Table keeps the string it is stored with — `table` or `sampleSheet` —

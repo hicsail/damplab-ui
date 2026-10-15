@@ -161,9 +161,9 @@ describe('Parameter List — creates (rules 16, 17)', () => {
     expect(plan(['parameterSet', 'parameter'], [['A; B', 'pH']]).rows[0].errors).toEqual(['A parameter set name cannot contain “;”.']);
   });
 
-  it('says a File Upload template is set in the editor — and says no such thing for a Table', () => {
+  it('warns about no template for a File Upload or a Table — neither has one to set in the editor', () => {
     const file = plan(['parameterSet', 'parameter', 'type'], [['Buffers', 'Protocol', 'File Upload']]);
-    expect(file.rows[0]).toMatchObject({ action: 'create', warnings: ['Set the File Upload template in the editor.'] });
+    expect(file.rows[0]).toMatchObject({ action: 'create', errors: [], warnings: [] });
     const table = plan(['parameterSet', 'parameter', 'type', 'options'], [['Buffers', 'Plate map', 'Table', 'Inducer; Concentration']]);
     expect(table.rows[0]).toMatchObject({ action: 'create', errors: [], warnings: [] });
   });
