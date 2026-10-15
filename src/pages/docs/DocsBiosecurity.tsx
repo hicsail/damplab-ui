@@ -75,7 +75,7 @@ const grid = (cols: { sm?: number; md?: number; lg?: number }) => ({
 
 const PIPELINE = [
   { label: "Job submitted", caption: "workflow with DNA sequences in its forms" },
-  { label: "Sequences extracted", caption: "from the fields of operations that use them" },
+  { label: "Seqs extracted", caption: "from the fields of operations that use them" },
   { label: "Homology screen", caption: "Aclid, with SecureDNA as backup" },
   { label: "Customer verification", caption: "Aclid's hosted flow, linked to the screen" },
   { label: "Staff review", caption: "results on the job page decide next steps" },
@@ -159,21 +159,6 @@ const PROVIDER_MODES: { mode: string; behaviour: string }[] = [
   },
 ];
 
-const VISIBILITY: { who: string; sees: string }[] = [
-  {
-    who: "DAMP Lab staff",
-    sees: "The full record: each screen's status, which provider answered, and — for SecureDNA — the organism a hit most likely comes from, its type (virus, toxin, bacterium or fungus), the matching region of the submitted sequence, and whether the match is to a wild-type sequence.",
-  },
-  {
-    who: "The customer",
-    sees: "Whether their identity verification has been submitted, and a link to complete it. Homology verdicts and the lab's decision are removed from the customer's view on the server, not just hidden on screen.",
-  },
-  {
-    who: "Screening providers",
-    sees: "The DNA sequences and a job reference such as damplab-job-<id>. Canvas does not send the customer's name or contact details with a sequence screen; the customer enters their own details directly into Aclid's verification flow.",
-  },
-];
-
 const LOOKING_AHEAD: { title: string; body: React.ReactNode }[] = [
   {
     title: "Design metadata",
@@ -210,25 +195,24 @@ const LOOKING_AHEAD: { title: string; body: React.ReactNode }[] = [
   },
 ];
 
-const GLOSSARY: { term: string; meaning: string }[] = [
-  { term: "Sequence of concern", meaning: "A DNA, RNA or protein sequence associated with a regulated pathogen or toxin, or one that could contribute to a dangerous function." },
-  { term: "Homology screening", meaning: "Comparing a submitted sequence with databases of sequences of concern to find close matches." },
-  { term: "Regulated agent", meaning: "A pathogen or toxin on a government control list, such as the US Federal Select Agent Program list." },
-  { term: "Customer screening (KYC)", meaning: "“Know your customer”: confirming that the person placing an order is who they say they are and has a legitimate reason to place it." },
-  { term: "Wild type", meaning: "The form of a sequence as it occurs in nature, as opposed to a modified or engineered variant." },
-  { term: "Nucleotide", meaning: "A single letter of DNA or RNA: A, C, G and T (or U in RNA)." },
-  { term: "Provenance", meaning: "Where a design came from: who or what produced it, with which tools, and how it has changed since." },
-];
+// const GLOSSARY: { term: string; meaning: string }[] = [
+//   { term: "Sequence of concern", meaning: "A DNA, RNA or protein sequence associated with a regulated pathogen or toxin, or one that could contribute to a dangerous function." },
+//   { term: "Homology screening", meaning: "Comparing a submitted sequence with databases of sequences of concern to find close matches." },
+//   { term: "Regulated agent", meaning: "A pathogen or toxin on a government control list, such as the US Federal Select Agent Program list." },
+//   { term: "Customer screening (KYC)", meaning: "“Know your customer”: confirming that the person placing an order is who they say they are and has a legitimate reason to place it." },
+//   { term: "Wild type", meaning: "The form of a sequence as it occurs in nature, as opposed to a modified or engineered variant." },
+//   { term: "Nucleotide", meaning: "A single letter of DNA or RNA: A, C, G and T (or U in RNA)." },
+//   { term: "Provenance", meaning: "Where a design came from: who or what produced it, with which tools, and how it has changed since." },
+// ];
 
 const CONTENTS = [
   { id: "why", label: "Why screen" },
   { id: "overview", label: "How it fits together" },
   { id: "sequences", label: "Sequence screening" },
   { id: "customers", label: "Customer screening" },
-  { id: "results", label: "Results and who sees them" },
-  { id: "status", label: "Current status" },
+  { id: "results", label: "Screening results" },
   { id: "ahead", label: "Looking ahead" },
-  { id: "glossary", label: "Glossary" },
+  // { id: "glossary", label: "Glossary" },
 ];
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -238,7 +222,9 @@ export default function DocsBiosecurity() {
     <>
       <DocsPageHeader
         slug="biosecurity"
-        lead="Before the DAMP Lab builds DNA for anyone, it checks two things: what is being made, and who is asking for it. Canvas runs both checks through specialist screening services and puts the results in front of lab staff. This page explains how."
+        lead="Before the DAMP Lab builds biological constructs, it checks two things: what is being made, and who is asking for it. 
+        Canvas runs both checks through specialist screening services and puts the results in front of lab staff. This page explains how.
+        (Standard screening procedures are in place, with additional, more advanced screening mechanisms in progress.)"
       />
 
       <DocsOnThisPage items={CONTENTS} />
@@ -246,21 +232,17 @@ export default function DocsBiosecurity() {
       <DocsSection
         id="why"
         title="Why screen"
-        intro="Synthetic biology lets almost anyone order custom DNA. Nearly all of it is harmless, but a sequence that encodes part of a dangerous pathogen or toxin can be ordered just as easily as one that does not."
+        intro="Synthetic biology lets almost anyone order custom DNA. 
+        Nearly all of it is harmless, but a sequence that encodes part of a dangerous pathogen or toxin could also be requested.
+        In addition to existing Whitehouse guidelines on nucleic acid synthesis, there is pending legislation in the US (and internationally) that will require such screening for synthesis providers."
       >
-        <Prose>
-          DNA synthesis companies have long screened orders for this reason. A biofoundry such as the DAMP Lab goes a step
-          further than a synthesis company: it does not only make DNA, it assembles it into constructs and puts it into
-          living cells. The same responsibility applies, and Canvas — where every order to the lab begins — is where the
-          checks happen.
-        </Prose>
         <Box sx={grid({ md: 2 })}>
-          <Card title="What is being made" status="today">
-            <strong>Sequence screening.</strong> The DNA sequences in an order are compared against databases of known
+          <Card title="Homology-based Sequence screening">
+            The DNA sequences in an order are compared against databases of known
             sequences of concern.
           </Card>
-          <Card title="Who is asking" status="today">
-            <strong>Customer screening.</strong> The person placing the order verifies their identity with a screening
+          <Card title="Customer screening">
+            The person placing the order verifies their identity with a screening
             provider, and the result is linked to the order.
           </Card>
         </Box>
@@ -273,31 +255,24 @@ export default function DocsBiosecurity() {
       >
         <PipelineDiagram />
         <Typography sx={{ mt: 2, maxWidth: 760, color: "text.secondary", fontSize: 14.5 }}>
-          Two providers do the screening.{" "}
-          <Link href="https://www.aclid.bio/" target="_blank" rel="noopener">
+          The primary screening provider used by Canvas is <Link href="https://www.aclid.bio/" target="_blank" rel="noopener">
             Aclid
-          </Link>{" "}
-          is a biosecurity platform that screens sequences against regulated pathogens and toxins and runs customer
+          </Link>{", "} 
+          a biosecurity platform that screens sequences against regulated pathogens and toxins and runs customer
           verification.{" "}
-          <Link href="https://securedna.org/" target="_blank" rel="noopener">
-            SecureDNA
-          </Link>{" "}
-          is a free, cryptographic screening system: it compares short fragments of a sequence against a database of
-          hazards in a way that keeps both the order and the database private, and it signs its answers so they can be
-          verified later.
+          Additional screening services are also being integrated (such as SecureDNA as a homology screening fallback).
         </Typography>
       </DocsSection>
 
       <DocsSection
         id="sequences"
         title="Sequence screening"
-        status="today"
         intro="Homology screening asks whether any part of a submitted sequence closely matches a known sequence of concern. It is the established foundation of DNA synthesis screening."
       >
         <SubHeading>What gets screened</SubHeading>
         <Prose>
           A Canvas workflow is made of operations, each with its own form. Canvas knows which form fields hold DNA, and
-          collects the sequences from those fields across every workflow in the job:
+          collects the sequences from those fields across relevant operations such as:
         </Prose>
         <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, maxWidth: 760, mb: 2.5 }}>
           <Table size="small" aria-label="Operations whose sequences are screened">
@@ -319,50 +294,23 @@ export default function DocsBiosecurity() {
             </TableBody>
           </Table>
         </TableContainer>
-        <Prose>
-          Each value is cleaned up (spaces and line breaks removed, letters uppercased) and kept only if it actually looks
-          like DNA: at least 20 characters long, and almost entirely the nucleotide letters A, C, G, T, U or N. Notes,
-          names and other text typed into the same field are not sent. Each sequence is labelled with the workflow, step
-          and field it came from, so a hit can be traced back to exactly where it was entered.
-        </Prose>
-        <Prose>
-          Sequences provided only as attached files — a plasmid map, for example — are not yet read out of the file and
-          screened from a job. Lab staff can screen such files separately with the screening tool described below.
-        </Prose>
 
         <SubHeading>How the providers are used</SubHeading>
         <Prose>
-          Canvas can run either provider, or both. By default Aclid is the primary screen, with SecureDNA as a fallback.
+          Each sequence is labelled with the workflow, step and field it came from, so a hit can be traced back to exactly where it was entered.
         </Prose>
-        <Box sx={grid({ md: 3 })}>
-          {PROVIDER_MODES.map((m) => (
-            <Card key={m.mode} title={m.mode}>
-              {m.behaviour}
-            </Card>
-          ))}
-        </Box>
         <Prose>
           <Box component="span" sx={{ display: "block", mt: 2.5 }}>
             Aclid screens asynchronously: Canvas starts a screen and then checks back every few seconds until the answer is
             ready. If Aclid takes longer than Canvas is willing to wait, the screen is not lost — Canvas keeps its reference
-            and fetches the result again later. SecureDNA answers in a single request. Neither step holds up the client: a
-            screen runs in the background after the job is saved.
+            and fetches the result again later. 
           </Box>
-        </Prose>
-
-        <SubHeading>A screening tool for staff</SubHeading>
-        <Prose>
-          Separately from jobs, lab staff have a sequence screener in Canvas. It accepts the common sequence file formats —
-          FASTA, GenBank, SnapGene, ApE and plain sequence files — parses out every sequence, and screens them as a batch
-          through SecureDNA. Each batch is kept, along with SecureDNA's signed response, so a past result can be looked up
-          and checked.
         </Prose>
       </DocsSection>
 
       <DocsSection
         id="customers"
         title="Customer screening"
-        status="today"
         intro="A sequence screen says nothing about who placed the order. Customer screening — often called “know your customer”, or KYC — covers that half, through Aclid."
       >
         <Prose>
@@ -372,7 +320,7 @@ export default function DocsBiosecurity() {
           finishes, they are brought back to their job, and Canvas fetches the outcome from Aclid.
         </Prose>
         <Prose>
-          The verification itself, and the personal information it collects, stay with Aclid. Canvas stores only the
+          The verification itself, and the information it collects, stay with Aclid. Canvas stores only the
           outcome: whether verification was submitted, and whether the customer was approved, rejected, or not required to
           verify.
         </Prose>
@@ -402,8 +350,9 @@ export default function DocsBiosecurity() {
 
       <DocsSection
         id="results"
-        title="Results and who sees them"
-        intro="Every screen ends in one of four states. On the job page, staff see each screen separately and an overall status that is the most cautious of them."
+        title="Screening results"
+        intro="Every screen ends in one of four states. 
+        On the job page, staff see each screen separately and an overall status that is the most cautious of them (any failed result makes the entire screen Failed)."
       >
         <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, maxWidth: 760, mb: 2.5 }}>
           <Table size="small" aria-label="Screening result states">
@@ -420,47 +369,16 @@ export default function DocsBiosecurity() {
           </Table>
         </TableContainer>
         <Prose>
-          The overall status takes the worst of the individual results: any Failed makes it Failed, otherwise any In
-          progress makes it In progress. Checking back with Aclid later can only make a result more cautious: if Aclid now
-          reports an order as controlled, it is marked Failed, but a refreshed pass never clears an earlier Failed.
-        </Prose>
-        <Prose>
           Screening informs a decision; it does not make one. A Failed result is put in front of DAMP Lab staff, who decide
           with the customer what happens next. Canvas does not cancel or release work on its own.
+          Results are generally visible only to lab staff who can then decide what how to handle the job or what to communicate to the customer.
         </Prose>
-
-        <SubHeading>Who sees what</SubHeading>
-        <Box sx={grid({ md: 3 })}>
-          {VISIBILITY.map((v) => (
-            <Card key={v.who} title={v.who}>
-              {v.sees}
-            </Card>
-          ))}
-        </Box>
-      </DocsSection>
-
-      <DocsSection
-        id="status"
-        title="Current status"
-        intro="Biosecurity in Canvas is under active development, and some of it is switched off while that work continues."
-      >
-        <Box sx={grid({ md: 2 })}>
-          <Card title="Screening on submission is paused">
-            Canvas is built to screen a job automatically as soon as it is submitted or resubmitted. That is switched off
-            for now. Lab staff run the screen from the job page instead, and wait for its result there.
-          </Card>
-          <Card title="Hidden from customers for now">
-            The biosecurity panel on the customer's job page is hidden while screening is paused. Staff can still send a
-            customer their verification link directly.
-          </Card>
-        </Box>
       </DocsSection>
 
       <DocsSection
         id="ahead"
         title="Looking ahead"
-        status="planned"
-        intro="Homology and customer screening are the two checks in place today. The job page already has room for three more, each answering a question homology alone cannot. None of them is built yet."
+        intro="Three more layers of screening that are currently planned and/or in progress:"
       >
         <Box sx={grid({ md: 3 })}>
           {LOOKING_AHEAD.map((item) => (
@@ -474,7 +392,7 @@ export default function DocsBiosecurity() {
           where it came from, and who is asking for it.
         </Typography>
       </DocsSection>
-
+{/* 
       <DocsSection id="glossary" title="Glossary">
         <Box component="dl" sx={{ m: 0, ...grid({ md: 2 }), gap: 1.5 }}>
           {GLOSSARY.map((g) => (
@@ -488,7 +406,7 @@ export default function DocsBiosecurity() {
             </Box>
           ))}
         </Box>
-      </DocsSection>
+      </DocsSection> */}
 
       <Typography sx={{ fontSize: 13, color: "text.secondary", borderTop: "1px solid", borderColor: "divider", pt: 2 }}>
         Last reviewed October 2026.

@@ -44,13 +44,13 @@ const LIFECYCLE = [
     body: "Lab staff review the job, ask for changes if needed, and turn it into a statement of work — the scope, timeline and price — which the client and the lab both sign.",
   },
   {
-    title: "Run",
-    body: "Technicians carry out the work, following the linked protocols step by step, while the client follows progress and comments on the job page.",
-  },
-  {
     title: "Invoice",
     body: "Canvas produces the invoice from the agreed statement of work, priced for the client's customer category.",
   },
+  {
+    title: "Run",
+    body: "Technicians carry out the work, following the linked protocols step by step, while the client follows progress and comments on the job page.",
+  }
 ];
 
 // ─── What is in Canvas ──────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ const CAPABILITIES: { icon: React.ReactNode; title: string; body: React.ReactNod
   },
   {
     icon: <AutoAwesomeOutlinedIcon />,
-    title: "AI assistants",
+    title: "AI assistants (WIP)",
     body: "An assistant on the canvas helps design workflows from a description, another answers questions about lab status, and incoming bug reports are sorted automatically.",
   },
   {
@@ -134,19 +134,19 @@ const ROLES: { role: string; who: string; does: string }[] = [
     does: "Design and submit jobs, sign statements of work, follow progress, pay invoices.",
   },
   {
+    role: "Equipment user",
+    who: "Trained exernal users of the lab's instruments",
+    does: "Book and use equipment directly, without ordering a full service.",
+  },
+  {
     role: "Technician",
-    who: "Lab members carrying out the work",
+    who: "DAMP Lab staff carrying out the work",
     does: "Work through jobs at the bench, following protocols and recording progress.",
   },
   {
     role: "Administrator",
-    who: "DAMP Lab staff",
+    who: "DAMP Lab staff managing the lab",
     does: "Review jobs, write statements of work, manage customers and pricing, edit the catalog, schedule and monitor the lab.",
-  },
-  {
-    role: "Equipment user",
-    who: "Trained users of the lab's instruments",
-    does: "Book and use equipment directly, without ordering a full service.",
   },
 ];
 
@@ -313,6 +313,11 @@ export default function DocsAbout() {
             </Typography>
           </li>
         </Box>
+        <br />
+        <Typography>
+          If you're interested in learning more or running your own instance of Canvas, 
+          please contact us: <a href="https://www.damplab.org/contact">https://www.damplab.org/contact</a>.
+        </Typography>
       </DocsSection>
 
       <Typography sx={{ fontSize: 13, color: "text.secondary", borderTop: "1px solid", borderColor: "divider", pt: 2 }}>
