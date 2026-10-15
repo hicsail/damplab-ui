@@ -185,7 +185,7 @@ describe('readTableBytes', () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Ignore'], ['x1'], ['x2']]), 'Hidden');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Inducer'], ['IPTG']]), 'Table');
-    workbook.Workbook = { Sheets: [{ Hidden: 1 }, { Hidden: 0 }] } as any;
+    workbook.Workbook = { Sheets: [{ Hidden: 1 }, { Hidden: 0 }] };
     const bytes = new Uint8Array(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }));
     expect(readTableBytes(bytes)).toEqual({ header: ['Inducer'], rowCount: 1 });
   });
@@ -196,6 +196,32 @@ describe('readTableBytes', () => {
     const contents = readTableBytes(bytes);
     expect(contents).toEqual({ header: ['Inducer', 'Concentration'], rowCount: 1 });
     expect(missingColumns(contents.header, ['Inducer', 'Concentration'])).toEqual([]);
+  });
+
+  // The server's exceljs reads CSV on commas only; these pin the same outcomes byte for byte.
+  it('reads CSV on commas only, as the server does', () => {
+    const text = (t: string) => readTableBytes(new TextEncoder().encode(t));
+    expect(text('Sample ID;Volume\nS1;10\n')).toEqual({ header: ['Sample ID;Volume'], rowCount: 1 });
+    expect(text('Sample ID\tVolume\nS1\t10\n')).toEqual({ header: ['Sample ID\tVolume'], rowCount: 1 });
+    expect(text('Sample ID|Volume\nS1|10\n')).toEqual({ header: ['Sample ID|Volume'], rowCount: 1 });
+    expect(text('sep=,\nA,B\n1,2')).toEqual({ header: ['sep='], rowCount: 2 });
+    expect(text('{\\rtf1 hello,world\n')).toEqual({ header: ['{\\rtf1 hello', 'world'], rowCount: 0 });
+  });
+
+  it('honours quotes: a quoted comma, a doubled quote and a quoted newline stay in one cell', () => {
+    const text = (t: string) => readTableBytes(new TextEncoder().encode(t));
+    expect(text('"A, one","B ""q"""\nx,y\n')).toEqual({ header: ['A, one', 'B "q"'], rowCount: 1 });
+    expect(text('A,B\n"line1\nline2",y\nz,w\n')).toEqual({ header: ['A', 'B'], rowCount: 2 });
+  });
+
+  it('accepts \\r\\n, \\n and bare \\r line ends', () => {
+    const text = (t: string) => readTableBytes(new TextEncoder().encode(t));
+    expect(text('A,B\r1,2\r3,4\r')).toEqual({ header: ['A', 'B'], rowCount: 2 });
+    expect(text('A,B\r\n1,2\r\n3,4\r\n')).toEqual({ header: ['A', 'B'], rowCount: 2 });
+  });
+
+  it('keeps CSV cells as plain text, never as numbers or dates', () => {
+    expect(readTableBytes(new TextEncoder().encode('1/2/2020,007\nx,y\n'))).toEqual({ header: ['1/2/2020', '007'], rowCount: 1 });
   });
 
   it('refuses bytes that are neither a workbook nor text (rule 21)', () => {

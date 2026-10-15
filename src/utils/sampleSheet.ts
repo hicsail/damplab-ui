@@ -51,7 +51,7 @@ export interface TableFileContents {
   rowCount: number;
 }
 
-const cellText = (value: unknown): string => (value === null || value === undefined ? '' : String(value).replace(/^\uFEFF/, '').trim());
+const cellText = (value: unknown): string => (value === null || value === undefined ? '' : String(value).trim());
 const rowHasContent = (row: ReadonlyArray<unknown> | undefined): boolean => (row ?? []).some((cell) => cellText(cell) !== '');
 
 /** Per cell rather than by the sheet's range, because a workbook styled down to row 500 reports those rows as part of the sheet. */
@@ -76,6 +76,44 @@ export const missingColumns = (header: readonly string[], expected: readonly str
 const isZip = (bytes: Uint8Array): boolean => bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b;
 
 /**
+ * CSV the way the server reads it: commas only (no sniffing of `;`, tabs or a
+ * `sep=` line), double quotes with `""` as an escaped quote, quoted cells may
+ * hold newlines, and `\r\n`, `\n` or a bare `\r` end a line. Cells stay text.
+ */
+const parseCsv = (text: string): string[][] => {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (quoted) {
+      if (ch !== '"') cell += ch;
+      else if (body[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else quoted = false;
+    } else if (ch === '"' && cell === '') quoted = true;
+    else if (ch === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && body[i + 1] === '\n') i++;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+    } else cell += ch;
+  }
+  if (cell !== '' || row.length > 0) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows;
+};
+
+/**
  * The header row and row count of a file held in memory, by what its bytes
  * are: `PK` magic is a workbook; anything else is CSV text, unless it holds a
  * NUL byte, which no text file does (that turns away `.xls`, PDFs and images).
@@ -94,11 +132,7 @@ export const readTableBytes = (data: ArrayBuffer | Uint8Array): TableFileContent
     }
   } else {
     if (bytes.includes(0)) throw new SampleSheetError(TABLE_FILE_UNREADABLE_MESSAGE);
-    try {
-      workbook = XLSX.read(new TextDecoder().decode(bytes), { type: 'string' });
-    } catch {
-      throw new SampleSheetError(TABLE_FILE_UNREADABLE_MESSAGE);
-    }
+    return readTableRows(parseCsv(new TextDecoder().decode(bytes)));
   }
   const sheetMeta = workbook.Workbook?.Sheets ?? [];
   // The first *visible* sheet, as the server reads it; a sheet with no recorded visibility is visible.
