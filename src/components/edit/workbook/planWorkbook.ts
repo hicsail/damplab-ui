@@ -149,6 +149,16 @@ export function previewOrder(rows: ReadonlyArray<PlanRow>, blocked: Readonly<Rec
 }
 
 /** Creates, updates and hides that could be applied but are not ticked — counted so a skipped write is never invisible. */
+/**
+ * The header tick-box on one sheet: if any applicable row is unticked, tick
+ * them all; once all are ticked, untick them all. Returns the override patch.
+ */
+export function toggleAllTicks(rows: ReadonlyArray<PlanRow>, ticked: ReadonlySet<string>): Record<string, boolean> {
+  const applicable = rows.filter(isApplicable);
+  const value = applicable.some((row) => !ticked.has(row.key));
+  return Object.fromEntries(applicable.map((row) => [row.key, value]));
+}
+
 export function untickedCounts(rows: ReadonlyArray<PlanRow>, ticked: ReadonlySet<string>): { create: number; update: number; hide: number } {
   const counts = { create: 0, update: 0, hide: 0 };
   for (const row of rows) {

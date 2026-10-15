@@ -5,7 +5,7 @@ import { useContext, useMemo, useState } from 'react';
 import { UserContext } from '../../../contexts/UserContext';
 import { formatGqlError } from '../../../utils/gqlError';
 import { ApplySummary, applyWorkbook, stoppedSummary } from './applyWorkbook';
-import { countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, survivingOverrides, tickedKeys, unmetNeeds, untickedCounts } from './planWorkbook';
+import { countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, survivingOverrides, tickedKeys, toggleAllTicks, unmetNeeds, untickedCounts } from './planWorkbook';
 import { CatalogSnapshot, isApplicable, PlanRow, RawWorkbook, SHEET_TITLES, SheetKey } from './types';
 import { apolloWorkbookMutator, loadCatalogSnapshot } from './workbookCatalog';
 
@@ -90,7 +90,22 @@ export function WorkbookUploadPreview({ raw, catalog: openedWith, fileName, allo
 
   const columns: GridColDef<PlanRow>[] = [
     {
-      field: 'include', headerName: '', width: 50, sortable: false,
+      field: 'include', headerName: '', width: 50, sortable: false, disableColumnMenu: true,
+      // Ticks every unticked row on this sheet; once all are ticked, unticks them all.
+      renderHeader: () => {
+        const applicable = (current?.rows ?? []).filter(isApplicable);
+        const tickedHere = applicable.filter((row) => ticked.has(row.key)).length;
+        return (
+          <Checkbox
+            size='small'
+            disabled={importing || applicable.length === 0}
+            checked={applicable.length > 0 && tickedHere === applicable.length}
+            indeterminate={tickedHere > 0 && tickedHere < applicable.length}
+            onChange={() => setOverrides((prev) => ({ ...prev, ...toggleAllTicks(current?.rows ?? [], ticked) }))}
+            inputProps={{ 'aria-label': 'Tick or untick every row on this sheet' }}
+          />
+        );
+      },
       renderCell: (p) => (
         <Checkbox
           size='small'
