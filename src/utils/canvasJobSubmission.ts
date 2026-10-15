@@ -100,7 +100,7 @@ export type SubmitCanvasJobInput = {
 export async function submitCanvasJob(
   client: ApolloClient<object>,
   input: SubmitCanvasJobInput
-): Promise<{ id: string; jobId?: string }> {
+): Promise<{ id: string; jobId?: string; failedAttachments?: string[] }> {
   const {
     workflows,
     edges,
@@ -173,7 +173,7 @@ export async function submitCanvasJob(
           // Never save a placeholder as the answer: the job would have no file to download.
           const stale = (Array.isArray(entry.value) ? entry.value : [entry.value]).find(isStalePendingFile);
           if (stale) {
-            throw new Error(`The file “${stale.filename || 'file'}” on “${node.data?.label ?? 'an operation'}” needs to be picked again: files are not kept when the page reloads.`);
+            throw new Error(`The file “${stale.filename || 'file'}” on “${node.data?.label ?? 'an operation'}” needs to be picked again: a saved or reloaded canvas does not keep its files.`);
           }
           if (Array.isArray(entry.value)) {
             const tokens = entry.value
@@ -347,7 +347,11 @@ export async function submitCanvasJob(
     console.warn('Failed to save local graph snapshot:', e);
   }
 
+  // Attachments go up after the job exists, so a failure cannot undo the job: each one that is not stored is reported
+  // back by name, and only an attachment whose file really uploaded is registered on the job.
+  const failedAttachments: string[] = [];
   if (attachments.length > 0) {
+    const uploaded: any[] = [];
     try {
       const filesForRequest = attachments.map((file) => ({
         filename: file.name,
@@ -368,28 +372,35 @@ export async function submitCanvasJob(
         },
       });
 
-      const attachmentUploads = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
+      const attachmentUploads: any[] = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
+      const unclaimed = [...attachments];
+      const slots = attachmentUploads.map((u) => {
+        const at = unclaimed.findIndex((f) => f.name === u.filename && f.size === u.size);
+        return { u, file: at >= 0 ? unclaimed.splice(at, 1)[0] : undefined };
+      });
+      // A picked file no slot matches was never uploaded.
+      failedAttachments.push(...unclaimed.map((f) => f.name));
 
       await Promise.all(
-        attachmentUploads.map(async (u: any) => {
-          const file = attachments.find((f) => f.name === u.filename && f.size === u.size);
-          if (!file) {
-            return;
-          }
-          const resp = await fetch(u.uploadUrl, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': u.contentType || 'application/octet-stream',
-            },
-            body: file,
-          });
-          if (!resp.ok) {
-            throw new Error(`Failed to upload attachment ${u.filename}`);
+        slots.map(async ({ u, file }) => {
+          if (!file) return;
+          try {
+            const resp = await fetch(u.uploadUrl, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': u.contentType || 'application/octet-stream',
+              },
+              body: file,
+            });
+            if (resp.ok) uploaded.push(u);
+            else failedAttachments.push(file.name);
+          } catch {
+            failedAttachments.push(file.name);
           }
         })
       );
 
-      const attachmentInputs = attachmentUploads.map((u: any) => ({
+      const attachmentInputs = uploaded.map((u: any) => ({
         filename: u.filename,
         key: u.key,
         contentType: u.contentType,
@@ -412,8 +423,9 @@ export async function submitCanvasJob(
       }
     } catch (e) {
       console.warn('Job created, but attachments failed to upload/register:', e);
+      for (const file of attachments) if (!failedAttachments.includes(file.name)) failedAttachments.push(file.name);
     }
   }
 
-  return { id: createdId, jobId: createdJobId ?? undefined };
+  return { id: createdId, jobId: createdJobId ?? undefined, ...(failedAttachments.length > 0 ? { failedAttachments: attachments.map((f) => f.name).filter((name) => failedAttachments.includes(name)) } : {}) };
 }
