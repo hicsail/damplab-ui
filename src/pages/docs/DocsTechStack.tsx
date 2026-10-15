@@ -22,7 +22,7 @@ import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import SettingsSuggestOutlinedIcon from "@mui/icons-material/SettingsSuggestOutlined";
 import StorageIcon from "@mui/icons-material/Storage";
 import WebIcon from "@mui/icons-material/Web";
-import { DocsPageHeader, DocsSection, STATUS_LEGEND, StatusChip, type DocsStatus } from "../../components/docs/DocsParts";
+import { DocsOnThisPage, DocsPageHeader, DocsSection, STATUS_LEGEND, StatusChip, type DocsStatus } from "../../components/docs/DocsParts";
 import { docsPage } from "./docsPages";
 
 /**
@@ -531,32 +531,7 @@ export default function DocsTechStack() {
         lead="A plain-language tour of the software that makes up DAMPLab Canvas and the cloud computers it runs on: the setup in use today, and the one proposed for the Programmable Cloud Laboratories (PCL) program."
       />
 
-      <Box component="nav" aria-label="On this page" sx={{ mb: 5 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "text.secondary", mb: 1 }}>On this page</Typography>
-        <Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "flex", flexWrap: "wrap", gap: 1 }}>
-          {CONTENTS.map((c) => (
-            <Box component="li" key={c.id}>
-              <Link
-                href={`#${c.id}`}
-                underline="none"
-                sx={{
-                  display: "inline-block",
-                  fontSize: 13.5,
-                  px: 1.25,
-                  py: 0.5,
-                  borderRadius: 5,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  color: "text.primary",
-                  "&:hover": { borderColor: "#8fb5ba", bgcolor: "#e8f1f2" },
-                }}
-              >
-                {c.label}
-              </Link>
-            </Box>
-          ))}
-        </Box>
-      </Box>
+      <DocsOnThisPage items={CONTENTS} />
 
       <DocsSection id="at-a-glance" title="At a glance">
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" }, mb: 3 }}>

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link as RouterLink } from "react-router";
-import { Box, Button, Chip, Paper, Typography } from "@mui/material";
+import { Box, Button, Chip, Link, Paper, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import { DOCS_INDEX_PATH, docsPage, type DocsPageSlug } from "../../pages/docs/docsPages";
@@ -70,6 +70,38 @@ export const STATUS_LEGEND: { status: DocsStatus; meaning: string }[] = [
 export function StatusChip({ status }: { status: DocsStatus }) {
   const { label, sx } = STATUS_STYLE[status];
   return <Chip size="small" label={label} sx={{ fontWeight: 600, height: 22, ...sx }} />;
+}
+
+/** "On this page" jump links to a page's `DocsSection` anchors. */
+export function DocsOnThisPage({ items }: { items: readonly { id: string; label: string }[] }) {
+  return (
+    <Box component="nav" aria-label="On this page" sx={{ mb: 5 }}>
+      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "text.secondary", mb: 1 }}>On this page</Typography>
+      <Box component="ul" sx={{ listStyle: "none", p: 0, m: 0, display: "flex", flexWrap: "wrap", gap: 1 }}>
+        {items.map((c) => (
+          <Box component="li" key={c.id}>
+            <Link
+              href={`#${c.id}`}
+              underline="none"
+              sx={{
+                display: "inline-block",
+                fontSize: 13.5,
+                px: 1.25,
+                py: 0.5,
+                borderRadius: 5,
+                border: "1px solid",
+                borderColor: "divider",
+                color: "text.primary",
+                "&:hover": { borderColor: "#8fb5ba", bgcolor: "#e8f1f2" },
+              }}
+            >
+              {c.label}
+            </Link>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
 }
 
 /** A top-level section of a docs page, with an anchor so it can be linked to. */
