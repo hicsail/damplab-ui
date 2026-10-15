@@ -51,6 +51,7 @@ import {
 import {
   CREATE_SOW_FOR_JOB,
   MUTATE_JOB_STATE,
+  REOPEN_JOB,
   RERUN_JOB_HOMOLOGY_SCREENING,
   START_JOB_CUSTOMER_VERIFICATION,
   WITHDRAW_JOB_FROM_CUSTOMER,
@@ -318,6 +319,8 @@ export default function TechnicianView() {
 
   const [changeJobStateMutation, { loading: closingJob }] =
     useMutation(MUTATE_JOB_STATE);
+  const [reopenJobMutation, { loading: reopeningJob }] =
+    useMutation(REOPEN_JOB);
   const [rerunJobHomologyScreening, { loading: rerunningScreening }] =
     useMutation(RERUN_JOB_HOMOLOGY_SCREENING);
   const [
@@ -398,7 +401,24 @@ export default function TechnicianView() {
       await refreshJobPage();
     } catch (e) {
       console.error("Failed to close job:", e);
-      window.alert("Could not close the job. Please try again.");
+      window.alert(formatGqlError(e, "Could not close the job. Please try again."));
+    }
+  };
+
+  const handleReopenJob = async () => {
+    if (!id) return;
+    // null when cancelled; an empty reason is fine.
+    const note = window.prompt(
+      "Reopen this job? It goes back to the state it was in before it was closed. Its Statement of Work, invoices and files stay exactly as they are.\n\nReason (optional):",
+      "",
+    );
+    if (note === null) return;
+    try {
+      await reopenJobMutation({ variables: { jobId: id, note: note.trim() || null } });
+      await refreshJobPage();
+    } catch (e) {
+      console.error("Failed to reopen job:", e);
+      window.alert(formatGqlError(e, "Could not reopen the job. Please try again."));
     }
   };
 
@@ -915,24 +935,28 @@ export default function TechnicianView() {
             >
               History
             </Button>
-            <Button
-              variant="outlined"
-              color="warning"
-              onClick={handleCloseJob}
-              disabled={
-                !jobData ||
-                jobState === "CLOSED" ||
-                jobState === "CANCELLED" ||
-                closingJob
-              }
-              sx={{ textTransform: "none" }}
-            >
-              {jobState === "CLOSED"
-                ? "Job closed"
-                : closingJob
-                  ? "Closing…"
-                  : "Close job"}
-            </Button>
+            {jobState === "CLOSED" ? (
+              // The server gates reopenJob on jobs:view-all; the button follows it.
+              can(PERMISSIONS.JobsViewAll) && <Button
+                variant="outlined"
+                onClick={handleReopenJob}
+                disabled={!jobData || reopeningJob}
+                title="Return this closed job to the state it was in before it was closed"
+                sx={{ textTransform: "none" }}
+              >
+                {reopeningJob ? "Reopening…" : "Reopen job"}
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={handleCloseJob}
+                disabled={!jobData || jobState === "CANCELLED" || closingJob}
+                sx={{ textTransform: "none" }}
+              >
+                {closingJob ? "Closing…" : "Close job"}
+              </Button>
+            )}
           </Box>
           <Typography sx={{ fontSize: 13 }}>
             {submissionLine(submitter, jobTime.slice(0, 16).replace("T", " "))}
