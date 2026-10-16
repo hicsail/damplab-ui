@@ -267,6 +267,19 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     onFormDataChange?.();
   }, [formik.values]);
 
+  /** A parameter's description stays visible; a problem with its answer is added under it, never in its place. */
+  const helperFor = (param: any): React.ReactNode => {
+    const error = formik.errors[param.id] ? String(formik.errors[param.id]) : null;
+    const description = param.description ? param.description : null;
+    if (!error || !description) return error ?? description;
+    return (
+      <>
+        <Box component="span" sx={{ display: "block", color: "text.secondary" }}>{description}</Box>
+        {error}
+      </>
+    );
+  };
+
   /** The "Please specify" field, directly under a control whose answer selects "Other". */
   const renderOtherText = (param: any) => {
     if (!selectsOther(param, formik.values[param.id])) return null;
@@ -375,7 +388,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                       ))}
                     </FormGroup>
                     <FormHelperText>
-                      {formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
+                      {helperFor(param)}
                     </FormHelperText>
                     {renderOtherText(param)}
                   </FormControl>
@@ -410,9 +423,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             size: "small",
                             sx: { width: "26ch" },
                             error: Boolean(formik.errors[param.id]),
-                            helperText: formik.errors[param.id]
-                              ? String(formik.errors[param.id])
-                              : (param.description ? param.description : null),
+                            helperText: helperFor(param),
                           },
                         }}
                       />
@@ -536,9 +547,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                       ))}
                     </Select>
                     <FormHelperText>
-                      {formik.errors[param.id]
-                        ? String(formik.errors[param.id])
-                        : (param.description ? param.description : null)}
+                      {helperFor(param)}
                     </FormHelperText>
                   </FormControl>
                   {renderOtherText(param)}
@@ -699,7 +708,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             <TextField
                               multiline={param.name === "Additional Notes"}
                               error={idx === 0 && Boolean(formik.errors[param.id])}
-                              helperText={idx === 0 ? (formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)) : null}
+                              helperText={idx === 0 ? helperFor(param) : null}
                               size="small"
                               label={idx === 0 ? param.name : undefined}
                               type={param.type}
@@ -765,7 +774,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                       onBlur={formik.handleBlur}
                       sx={{ mt: 3, width: "26ch" }}
                       error={Boolean(formik.errors[param.id])}
-                      helperText={formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
+                      helperText={helperFor(param)}
                       InputLabelProps={{ shrink: true }}
                       InputProps={{ readOnly }}
                       inputProps={param.isPriceMultiplier === true && param.type === 'number' ? { min: 1, step: 1 } : undefined}

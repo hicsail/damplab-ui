@@ -6,7 +6,7 @@ import { CanvasContext } from '../contexts/Canvas';
 
 // There is no DOM here, so effects never run on their own. Params' effects are collected so a test can run them,
 // (with the dependency list each was given) and formik's setValues is observed (the real useFormik still supplies the values). Everything else is untouched.
-const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn(), initialValues: [] as any[] }));
+const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn(), initialValues: [] as any[], errors: undefined as Record<string, string> | undefined }));
 vi.mock('react', async (importOriginal) => {
   const actual: any = await importOriginal();
   const useEffect = (effect: () => void, deps?: unknown[]): void => {
@@ -19,7 +19,8 @@ vi.mock('formik', async (importOriginal) => {
   const actual: any = await importOriginal();
   return { ...actual, useFormik: (config: any) => {
       spy.initialValues.push(config.initialValues);
-      return { ...actual.useFormik(config), setValues: spy.setValues };
+      // spy.errors stands in for what validation records once the effects have run.
+      return { ...actual.useFormik(config), setValues: spy.setValues, ...(spy.errors ? { errors: spy.errors } : {}) };
     }
   };
 });
@@ -52,6 +53,27 @@ describe('Params — checkbox list (rule 30)', () => {
     expect(text(markup)).toContain('Other');
     expect((markup.match(/type="checkbox"/g) ?? []).length).toBe(2);
     expect((markup.match(/checked=""/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('Params — a parameter description', () => {
+  const described = (id: string): any => ({ ...entry(id, ''), required: true, description: `How to answer ${id}` });
+  const shown = (): string => text(html([described('kind'), described('cycles'), described('tags')]));
+
+  it('is shown before anything is entered', () => {
+    expect(shown()).toContain('How to answer kind');
+    expect(shown()).toContain('How to answer cycles');
+    expect(shown()).toContain('How to answer tags');
+  });
+
+  it('stays shown while the answer is still required, with the error under it', () => {
+    spy.errors = { kind: 'Required', cycles: 'Required', tags: 'Required' };
+    try {
+      const markup = shown();
+      for (const id of ['kind', 'cycles', 'tags']) expect(markup).toContain(`How to answer ${id} Required`);
+    } finally {
+      spy.errors = undefined;
+    }
   });
 });
 

@@ -4,15 +4,20 @@ import {
   Box,
   Button,
   Divider,
+  IconButton,
   Link,
   List,
   ListItemButton,
   ListItemText,
   Snackbar,
   Stack,
+  Tooltip,
   Typography
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, Link as RouterLink } from 'react-router';
 import { AppContext } from '../contexts/App';
@@ -42,6 +47,8 @@ export default function AdminEditServiceParameters() {
   const [parameters, setParameters] = useState<EditableParameter[]>(() => (service ? withDragKeys(ownParametersOf(service)) : []));
   // The parameters loaded from the server keep their ids: recorded job answers are keyed by them. One added in this session is not locked.
   const [lockedKeys, setLockedKeys] = useState<ReadonlySet<string>>(() => lockedDragKeys(parameters));
+  // The attached sets, in order, held as ids: a set that has not loaded (or failed to) is kept on save.
+  const [setIds, setSetIds] = useState<string[]>(() => (service?.parameterSetIds ?? []).map(String));
   // The list is loaded once; a later refetch of the service never replaces what is being edited.
   const loadedRef = useRef(service !== undefined);
   const isIdLocked = (p: EditableParameter): boolean => lockedKeys.has(p._dragKey);
@@ -58,6 +65,7 @@ export default function AdminEditServiceParameters() {
     const loaded = withDragKeys(ownParametersOf(service));
     setLockedKeys(lockedDragKeys(loaded));
     setParameters(loaded);
+    setSetIds((service.parameterSetIds ?? []).map(String));
   }, [service]);
 
   // The five reserved equipment parameters, shown read-only above the service's
@@ -77,7 +85,18 @@ export default function AdminEditServiceParameters() {
   // Ruling D3: sets→refs is setRefsFrom (utils/serviceParameters.ts), not an inline map.
   const { data: setsData, error: setsError } = useQuery(GET_PARAMETER_SETS, { fetchPolicy: 'cache-and-network' });
   const allSets = useMemo(() => setRefsFrom(setsData, { withParameters: true }), [setsData]);
-  const attachedSetIds = service?.parameterSetIds;
+  const attachedSetIds = setIds;
+  const attachedSets = orderedSetRefs(attachedSetIds, allSets);
+  const moveSet = (id: string, step: -1 | 1) =>
+    setSetIds((ids) => {
+      const from = ids.indexOf(id);
+      const to = from + step;
+      if (from < 0 || to < 0 || to >= ids.length) return ids;
+      const next = [...ids];
+      [next[from], next[to]] = [next[to], next[from]];
+      return next;
+    });
+  const removeSet = (id: string) => setSetIds((ids) => ids.filter((entry) => entry !== id));
   // An operation's own parameter may name a set parameter in its "Show only if" ("Set"."Parameter").
   const conditionContext = useMemo(() => ({ sets: allSets }), [allSets]);
   const setRows = useMemo(
@@ -86,13 +105,41 @@ export default function AdminEditServiceParameters() {
   );
 
   const setParametersFooter =
-    setRows.length > 0 ? (
+    attachedSets.length > 0 ? (
       <>
         <Divider />
-        <Typography variant='subtitle2' sx={{ px: 1, pt: 1, color: 'text.secondary' }}>From parameter sets (read-only)</Typography>
-        {orderedSetRefs(attachedSetIds, allSets).map((set) => (
+        <Typography variant='subtitle2' sx={{ px: 1, pt: 1, color: 'text.secondary' }}>From parameter sets</Typography>
+        <Typography variant='caption' sx={{ px: 1, display: 'block', color: 'text.secondary' }}>
+          Their parameters follow this operation's own, in this order. Edit a set's parameters on its own page.
+        </Typography>
+        {attachedSets.map((set, index) => (
           <Box key={set.id} sx={{ px: 1 }}>
-            <Link component={RouterLink} to={`/edit/parameter-sets/${set.id}`} variant='body2'>{set.name}</Link>
+            <Box display='flex' alignItems='center' gap={0.5}>
+              <Link component={RouterLink} to={`/edit/parameter-sets/${set.id}`} variant='body2' sx={{ flexGrow: 1 }}>{set.name}</Link>
+              {canWrite && (
+                <>
+                  <Tooltip title='Move up'>
+                    <span>
+                      <IconButton size='small' aria-label={`Move ${set.name} up`} disabled={index === 0} onClick={() => moveSet(set.id, -1)}>
+                        <ArrowUpwardIcon fontSize='small' />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title='Move down'>
+                    <span>
+                      <IconButton size='small' aria-label={`Move ${set.name} down`} disabled={index === attachedSets.length - 1} onClick={() => moveSet(set.id, 1)}>
+                        <ArrowDownwardIcon fontSize='small' />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title='Remove from this operation'>
+                    <IconButton size='small' aria-label={`Remove ${set.name}`} onClick={() => removeSet(set.id)}>
+                      <DeleteOutlineIcon fontSize='small' />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+            </Box>
             <List dense disablePadding>
               {setRows.filter((r) => r.setId === set.id).map((r) => (
                 <ListItemButton key={`${set.id}-${r.parameter.id}`} disabled sx={{ pl: 2 }}>
@@ -115,7 +162,7 @@ export default function AdminEditServiceParameters() {
   // would read as "no overlap to worry about" rather than "couldn't check" — so
   // a load failure is only worth mentioning when there is something to show.
   const setsUnavailableWarning =
-    setsError && Array.isArray(attachedSetIds) && attachedSetIds.length > 0
+    setsError && attachedSetIds.length > 0
       ? `Failed to load this operation's parameter sets: ${formatGqlError(setsError)}`
       : null;
 
@@ -153,7 +200,8 @@ export default function AdminEditServiceParameters() {
         variables: {
           service: service.id,
           changes: {
-            parameters: prepared
+            parameters: prepared,
+            parameterSetIds: setIds
           }
         }
       });
