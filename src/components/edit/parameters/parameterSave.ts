@@ -75,6 +75,11 @@ export function prepareParametersForSave(
     if (typeof next.validation === 'string') next.validation = next.validation.trim();
     if (next.type !== 'number' || !next.validation) delete next.validation;
     if (next.type !== 'dropdown' || next.display === undefined || next.display === null) delete next.display;
+    // A checkbox dropdown needs multiple selections; without them it is a plain dropdown.
+    if (next.display === 'multiselect' && next.allowMultipleValues !== true) delete next.display;
+    // Stored trimmed; a blank matrix is not stored.
+    if (typeof next.matrix === 'string') next.matrix = next.matrix.trim();
+    if (!next.matrix) delete next.matrix;
     if (next.rangeValueMin === undefined) delete next.rangeValueMin;
     if (next.rangeValueMax === undefined) delete next.rangeValueMax;
     if (isTableType(next.type)) {

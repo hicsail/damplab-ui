@@ -29,6 +29,8 @@ const options = [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }]
 const parameters = [
   { id: 'tags', name: 'Sample Types', type: 'dropdown', allowMultipleValues: true, display: 'checkboxes', options },
   { id: 'kind', name: 'Kind', type: 'dropdown', options },
+  { id: 'assays', name: 'Assays', type: 'dropdown', allowMultipleValues: true, display: 'multiselect', options },
+  { id: 'plus', name: 'Plus', type: 'dropdown', allowMultipleValues: true, options },
   { id: 'cycles', name: 'Cycles', type: 'number', validation: '>0' }
 ];
 const entry = (id: string, value: unknown): any => {
@@ -53,6 +55,65 @@ describe('Params — checkbox list (rule 30)', () => {
     expect(text(markup)).toContain('Other');
     expect((markup.match(/type="checkbox"/g) ?? []).length).toBe(2);
     expect((markup.match(/checked=""/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('Params — multi-select list', () => {
+  it('renders one list showing every chosen option, not a dropdown per choice', () => {
+    const markup = html([entry('assays', ['bact', 'oth'])]);
+    expect(text(markup)).toContain('Assays');
+    expect(text(markup)).toContain('Bacteria, Other');
+    expect((markup.match(/role="combobox"/g) ?? []).length).toBe(1);
+    expect(markup).not.toContain('Add another value');
+  });
+  it('starts empty from the blank placeholder a new node carries', () => {
+    expect(text(html([entry('assays', [''])]))).not.toContain('Bacteria');
+  });
+});
+
+describe('Params — +1 dropdown', () => {
+  it('a trash before each choice, and one +1 under them all', () => {
+    const markup = html([entry('plus', ['bact', 'oth'])]);
+    expect((markup.match(/aria-label="Remove value"/g) ?? []).length).toBe(2);
+    expect((markup.match(/aria-label="Add another value"/g) ?? []).length).toBe(1);
+    expect(markup.indexOf('Remove value')).toBeLessThan(markup.indexOf('role="combobox"'));
+    expect(markup.lastIndexOf('role="combobox"')).toBeLessThan(markup.indexOf('Add another value'));
+  });
+});
+
+describe('Params — matrix', () => {
+  const dil = (id: string, name: string, assay: string) => ({ id, name, type: 'number', showIf: { parameterId: 'plus', op: 'includes', value: assay }, matrix: 'm;2' });
+  const defs = [{ ...parameters.find((p) => p.id === 'plus')!, matrix: 'm;1' }, dil('bact_dil', 'Bacteria Dilution', 'Bacteria'), dil('oth_dil', 'Other Dilution', 'Other')];
+  const render = (value: string[]) =>
+    renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params
+          activeNode={{
+            id: 'n1',
+            data: {
+              id: 'n1',
+              serviceId: 's1',
+              parameters: defs,
+              formData: [
+                { ...entry('plus', value) },
+                { id: 'bact_dil', nodeId: 'n1', name: 'Bacteria Dilution', type: 'number', paramType: 'input', value: null },
+                { id: 'oth_dil', nodeId: 'n1', name: 'Other Dilution', type: 'number', paramType: 'input', value: null }
+              ]
+            }
+          }}
+        />
+      </CanvasContext.Provider>
+    );
+  it('lays the chosen rows out with their linked cells, in the order chosen', () => {
+    const markup = text(render(['oth', 'bact']));
+    expect(markup.indexOf('Other Dilution')).toBeLessThan(markup.indexOf('Bacteria Dilution'));
+    expect((render(['oth', 'bact']).match(/aria-label="Remove value"/g) ?? []).length).toBe(2);
+  });
+  it('choosing "Other" in column 1 asks to specify it under the matrix', () => {
+    expect(text(render(['oth']))).toContain('Please specify');
+  });
+  it('a cell whose choice is not made is not shown', () => {
+    expect(text(render(['bact']))).not.toContain('Other Dilution');
   });
 });
 

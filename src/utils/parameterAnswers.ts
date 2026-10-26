@@ -68,9 +68,18 @@ export function syncOtherTextEntries(formData: ReadonlyArray<any>, texts: Record
   return out;
 }
 
+/**
+ * A multi-value dropdown's chosen option ids, without the blank placeholder a new node starts with.
+ * A single id saved before the parameter allowed several is read as that one choice.
+ */
+export function chosenOptionIds(values: unknown): string[] {
+  const list = Array.isArray(values) ? values : values === null || values === undefined ? [] : [values];
+  return list.filter((v) => v !== null && v !== undefined && v !== '' && typeof v !== 'object').map(String);
+}
+
 /** A checkbox list's next answer: the ticked option ids, in tick order, without the blank placeholder. */
 export function toggleChecked(values: unknown, optionId: string, checked: boolean): string[] {
-  const current = (Array.isArray(values) ? values : []).filter((v) => v !== null && v !== undefined && v !== '').map(String);
+  const current = chosenOptionIds(Array.isArray(values) ? values : []);
   if (checked) return current.includes(optionId) ? current : [...current, optionId];
   return current.filter((v) => v !== optionId);
 }

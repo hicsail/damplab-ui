@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OperationRowRef } from './operationsWorkbookSheet';
-import { buildOwnerParameters, newSetRowKeys, parameterListExportRows, parseTypeCell, planParameterList, TYPE_CHOICES, typeLabelOf } from './parameterListSheet';
+import { buildOwnerParameters, multipleSelectionLabelOf, newSetRowKeys, parameterListExportRows, parseTypeCell, planParameterList, TYPE_CHOICES, typeLabelOf } from './parameterListSheet';
 import { catalogOf, rawSheet } from './testSupport';
 import { SHEET_COLUMNS } from './types';
 
@@ -23,22 +23,22 @@ describe('Parameter List — download rows (rules 15, 18, 24)', () => {
   it('writes each set parameter once under its set, then each operation’s own parameters', () => {
     expect(parameterListExportRows(catalog)).toEqual([
       COLUMNS,
-      ['volume', 'Buffers', '', 'Volume', 'In µL', 'Y', 'Number', '', '>=1 && <=50', '', 'N', ''],
-      ['sample_type', 'Buffers', '', 'Sample Type', '', 'N', 'Checkboxes', 'Bacteria; Other', '', '', 'Y', ''],
-      ['cycles', '', 'PCR', 'Cycles', '', 'N', 'Number', '', '>0 && integer', '', 'N', '30']
+      ['volume', 'Buffers', '', 'Volume', 'In µL', 'Y', 'Number', '', '>=1 && <=50', '', 'N', '', '', ''],
+      ['sample_type', 'Buffers', '', 'Sample Type', '', 'N', 'Checkboxes', 'Bacteria; Other', '', '', 'Y', '', '', ''],
+      ['cycles', '', 'PCR', 'Cycles', '', 'N', 'Number', '', '>0 && integer', '', 'N', '', '', '30']
     ]);
   });
 
   it('labels types the friendly way, and reads both spellings back', () => {
     expect(typeLabelOf({ type: 'sampleSheet' })).toBe('Table');
     expect(typeLabelOf({ type: 'table' })).toBe('Table');
-    expect(parseTypeCell('Table')).toEqual({ type: 'table', checkboxes: false });
+    expect(parseTypeCell('Table')).toEqual({ type: 'table' });
     expect(typeLabelOf({ type: 'boolean' })).toBe('True/False');
     expect(typeLabelOf({ type: 'date' })).toBe('date');
-    expect(parseTypeCell('sample upload')).toEqual({ type: 'table', checkboxes: false });
-    expect(parseTypeCell('SAMPLESHEET')).toEqual({ type: 'table', checkboxes: false });
-    expect(parseTypeCell('Checkboxes')).toEqual({ type: 'dropdown', checkboxes: true });
-    expect(parseTypeCell('true/false')).toEqual({ type: 'boolean', checkboxes: false });
+    expect(parseTypeCell('sample upload')).toEqual({ type: 'table' });
+    expect(parseTypeCell('SAMPLESHEET')).toEqual({ type: 'table' });
+    expect(parseTypeCell('Checkboxes')).toEqual({ type: 'dropdown', display: 'checkboxes' });
+    expect(parseTypeCell('true/false')).toEqual({ type: 'boolean' });
     expect(parseTypeCell('radio')).toBeNull();
   });
 });
@@ -239,6 +239,25 @@ describe('Parameter List — type, options, validation (rules 18, 19, 22)', () =
     const next = buildOwnerParameters(toDropdown.work.owners[0], new Set([toDropdown.rows[0].key]))[1];
     expect(next.type).toBe('dropdown');
     expect('display' in next).toBe(false);
+  });
+
+  it('multipleSelectionType: Checkbox makes a checkbox dropdown, +1 the default; only on a multi-value Dropdown', () => {
+    const toCheckbox = plan(['parameterSet', 'parameter', 'type', 'options', 'allowMultiple', 'multipleSelectionType'], [['Buffers', 'Assays', 'Dropdown', 'A; B', 'Y', 'Checkbox']]);
+    expect(buildOwnerParameters(toCheckbox.work.owners[0], new Set([toCheckbox.rows[0].key]))[2]).toMatchObject({ type: 'dropdown', display: 'multiselect', allowMultipleValues: true });
+    expect(multipleSelectionLabelOf({ type: 'dropdown', display: 'multiselect', allowMultipleValues: true })).toBe('Checkbox');
+    expect(multipleSelectionLabelOf({ type: 'dropdown', allowMultipleValues: true })).toBe('+1');
+    expect(multipleSelectionLabelOf({ type: 'dropdown', allowMultipleValues: false })).toBe('');
+    const single = plan(['parameterSet', 'parameter', 'type', 'options', 'allowMultiple', 'multipleSelectionType'], [['Buffers', 'Kind2', 'Dropdown', 'A; B', 'N', 'Checkbox']]);
+    expect(single.rows[0].warnings).toEqual(['multipleSelectionType is ignored: only a Dropdown that allows multiple selections has one.']);
+    expect(plan(['parameterSet', 'parameter', 'type', 'options', 'allowMultiple', 'multipleSelectionType'], [['Buffers', 'K3', 'Dropdown', 'A', 'Y', 'tick']]).rows[0].errors)
+      .toEqual(['multipleSelectionType: “tick” must be +1 or Checkbox.']);
+  });
+
+  it('matrix: stored as written, refused when malformed', () => {
+    const placed = plan(['parameterSet', 'parameter', 'type', 'matrix'], [['Buffers', 'AFP Dilution', 'Number', 'matrixA;2']]);
+    expect(buildOwnerParameters(placed.work.owners[0], new Set([placed.rows[0].key]))[2]).toMatchObject({ name: 'AFP Dilution', matrix: 'matrixA;2' });
+    expect(plan(['parameterSet', 'parameter', 'type', 'matrix'], [['Buffers', 'AFP Dilution', 'Number', 'matrixA']]).rows[0].errors)
+      .toEqual(['matrix: Write the matrix as name;column, e.g. matrixA;2 (the column is 1 or more).']);
   });
 
   it('refuses an unknown type, an unparseable validation, and a validation on a non-number', () => {

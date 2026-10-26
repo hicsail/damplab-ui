@@ -38,7 +38,8 @@ import { hasStaffTemplate, isTableType } from '../../../utils/sampleSheetValue';
 import { columnsError, columnsText } from '../../../utils/tableColumns';
 import SampleSheetTemplateField, { SampleSheetTemplateOwner } from '../SampleSheetTemplateField';
 import { createDragKey, EditableParameter, renamePatch } from './parameterSave';
-import { applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
+import { matrixError } from '../../../utils/parameterMatrix';
+import { applyAllowMultiple, applyMultipleSelectionType, applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, multipleSelectionTypeOf, MultipleSelectionType, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
 import { ConditionContext, NO_CONDITION_CONTEXT, SHOW_IF_EXAMPLE, SHOW_IF_HELP, showIfError, showIfText, showIfWarning } from './showIfField';
 
 const TYPE_OPTIONS = [
@@ -334,17 +335,38 @@ export default function ParameterListEditor({
                     disabled={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE}
                     helperText={typeChoiceOf(selectedParameter) === CHECKBOXES_CHOICE ? 'Checkboxes always allow several.' : undefined}
                     value={selectedParameter.allowMultipleValues ? 'yes' : 'no'}
-                    onChange={(event) =>
-                      updateParameter(selectedParameterIndex, {
-                        allowMultipleValues: event.target.value === 'yes'
-                      })
-                    }
+                    onChange={(event) => updateParameter(selectedParameterIndex, applyAllowMultiple(selectedParameter, event.target.value === 'yes'))}
                   >
                     <MenuItem value='yes'>Yes</MenuItem>
                     <MenuItem value='no'>No</MenuItem>
                   </TextField>
                 </Grid>
               )}
+              {multipleSelectionTypeOf(selectedParameter) && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <TextField
+                    select
+                    label='Multiple selection type'
+                    fullWidth
+                    value={multipleSelectionTypeOf(selectedParameter)}
+                    onChange={(event) => updateParameter(selectedParameterIndex, applyMultipleSelectionType(event.target.value as MultipleSelectionType))}
+                  >
+                    <MenuItem value='plusOne'>+1 (a dropdown per choice)</MenuItem>
+                    <MenuItem value='checkbox'>Checkbox dropdown</MenuItem>
+                  </TextField>
+                </Grid>
+              )}
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField
+                  label='Matrix'
+                  fullWidth
+                  placeholder='matrixA;2'
+                  value={selectedParameter.matrix ?? ''}
+                  error={Boolean(matrixError(selectedParameter))}
+                  helperText={matrixError(selectedParameter) ?? 'Optional. Matrix name;column — lays parameters out side by side.'}
+                  onChange={(event) => updateParameter(selectedParameterIndex, { matrix: event.target.value })}
+                />
+              </Grid>
 
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField

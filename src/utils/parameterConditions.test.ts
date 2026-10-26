@@ -67,6 +67,54 @@ const VECTORS: Array<{ name: string; parameters: any[]; formData: unknown; visib
     ],
     visible: ['sample']
   },
+  {
+    name: 'multiselect includes: any chosen option, by name',
+    parameters: [{ ...TAGS, display: 'multiselect' }, target({ parameterId: 'tags', op: 'includes', value: 'yeast' })],
+    formData: [{ id: 'tags', value: ['bact', 'yeast'] }],
+    visible: ['tags', 't']
+  },
+  {
+    name: 'multiselect includes: that option not chosen',
+    parameters: [{ ...TAGS, display: 'multiselect' }, target({ parameterId: 'tags', op: 'includes', value: 'yeast' })],
+    formData: [{ id: 'tags', value: ['bact', 'oth'] }],
+    visible: ['tags']
+  },
+  {
+    name: 'dropdown includes: a name that is an option matches only that option, not a longer one',
+    parameters: [
+      {
+        ...TAGS,
+        options: [
+          { id: 'b12', name: 'B12' },
+          { id: 'ab12', name: 'Active-B12' }
+        ]
+      },
+      target({ parameterId: 'tags', op: 'includes', value: 'b12' })
+    ],
+    formData: [{ id: 'tags', value: ['ab12'] }],
+    visible: ['tags']
+  },
+  {
+    name: 'dropdown includes: the option named exactly is chosen',
+    parameters: [
+      {
+        ...TAGS,
+        options: [
+          { id: 'b12', name: 'B12' },
+          { id: 'ab12', name: 'Active-B12' }
+        ]
+      },
+      target({ parameterId: 'tags', op: 'includes', value: 'b12' })
+    ],
+    formData: [{ id: 'tags', value: ['ab12', 'b12'] }],
+    visible: ['tags', 't']
+  },
+  {
+    name: 'multiselect includes: nothing chosen (the blank placeholder)',
+    parameters: [{ ...TAGS, display: 'multiselect' }, target({ parameterId: 'tags', op: 'includes', value: 'yeast' })],
+    formData: [{ id: 'tags', value: [''] }],
+    visible: ['tags']
+  },
   { name: 'yes/no == false holds for a box never touched', parameters: [HOT, target({ parameterId: 'hot', op: 'eq', value: false })], formData: [], visible: ['hot', 't'] },
   { name: 'yes/no == true', parameters: [HOT, target({ parameterId: 'hot', op: 'eq', value: true })], formData: [{ id: 'hot', value: true }], visible: ['hot', 't'] },
   { name: 'yes/no == true, unticked', parameters: [HOT, target({ parameterId: 'hot', op: 'eq', value: true })], formData: [{ id: 'hot', value: '' }], visible: ['hot'] },

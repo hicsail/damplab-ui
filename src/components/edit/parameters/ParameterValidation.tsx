@@ -1,5 +1,6 @@
 import { GridRowModel } from "@mui/x-data-grid";
 import { validationError } from './parameterTypeChoice';
+import { matrixError } from '../../../utils/parameterMatrix';
 import { isTableType, tableIsSetUp } from '../../../utils/sampleSheetValue';
 
 export interface ParameterValidationError {
@@ -50,6 +51,14 @@ export function validateParameter(row: GridRowModel, options: ParameterValidatio
 
   if (row.display === "checkboxes" && !(row.type === "dropdown" && row.allowMultipleValues === true)) {
     errors.push({ field: "Answer format", errorMsg: "Checkboxes needs “Allow multiple selections” to be Yes." });
+  }
+  if (row.display === "multiselect" && !(row.type === "dropdown" && row.allowMultipleValues === true)) {
+    errors.push({ field: "Answer format", errorMsg: "A checkbox dropdown needs “Allow multiple selections” to be Yes." });
+  }
+
+  const matrixProblem = matrixError(row);
+  if (matrixProblem) {
+    errors.push({ field: "Matrix", errorMsg: matrixProblem });
   }
 
   // A Table needs a column or a staff template, or no upload could be checked against it. Held only when this edit is what leaves it so.

@@ -146,6 +146,8 @@ describe('resolveCondition — what is stored (rule 7)', () => {
     expect(resolved('"Sample Type"!="Yeast cells"')).toEqual({ parameterId: 'sample', op: 'ne', optionIds: ['yeast'] });
     expect(resolved('"Tags" in ("Alpha","beta")')).toEqual({ parameterId: 'tags', op: 'in', optionIds: ['a', 'b'] });
     expect(resolved('"Sample Type".includes("cell")')).toEqual({ parameterId: 'sample', op: 'includes', value: 'cell' });
+    // A multi-value dropdown (Checkboxes or Multi-select list) takes .includes the same way: is an option of that name chosen.
+    expect(resolved('"Tags".includes("Alpha")')).toEqual({ parameterId: 'tags', op: 'includes', value: 'Alpha' });
   });
 
   it('yes/no, number and text keep their value', () => {

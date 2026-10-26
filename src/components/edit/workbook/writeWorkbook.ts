@@ -1,6 +1,6 @@
 import { bundlesExportRows } from './bundlesSheet';
 import { operationsExportRows } from './operationsWorkbookSheet';
-import { parameterListExportRows, TYPE_CHOICES } from './parameterListSheet';
+import { MULTIPLE_SELECTION_CHOICES, parameterListExportRows, TYPE_CHOICES } from './parameterListSheet';
 import { sowSectionsExportRows } from './sowSectionsSheet';
 import { CatalogSnapshot, LISTS_SHEET_TITLE, SHEET_TITLES } from './types';
 
@@ -13,7 +13,7 @@ import { CatalogSnapshot, LISTS_SHEET_TITLE, SHEET_TITLES } from './types';
  * its values inline: Excel caps an inline list at 255 characters, and the list
  * of operation names is far longer.
  */
-export type ListName = 'categories' | 'sets' | 'yesNo' | 'types' | 'operations';
+export type ListName = 'categories' | 'sets' | 'yesNo' | 'types' | 'operations' | 'multipleSelection';
 
 export interface WorkbookSheetData {
   title: string;
@@ -33,7 +33,7 @@ export const WORKBOOK_FILE_NAME = 'damplab-catalog-workbook.xlsx';
 export const SPARE_ROWS = 200;
 
 /** Column order on the Lists sheet. */
-const LIST_ORDER: readonly ListName[] = ['categories', 'sets', 'yesNo', 'types', 'operations'];
+const LIST_ORDER: readonly ListName[] = ['categories', 'sets', 'yesNo', 'types', 'operations', 'multipleSelection'];
 const WIDE_COLUMNS = new Set(['name', 'description', 'text', 'options', 'parameter', 'BundleName', 'Operation', 'serviceCategory', 'validation', 'conditionalDisplayLogic']);
 
 const unique = (values: string[]): string[] => [...new Set(values.map((value) => value.trim()).filter((value) => value !== ''))];
@@ -46,7 +46,7 @@ export function buildWorkbookData(catalog: CatalogSnapshot, options: { includePr
   return {
     sheets: [
       { title: SHEET_TITLES.operations, rows: operations, dropdowns: operationDropdowns },
-      { title: SHEET_TITLES.parameterList, rows: parameterListExportRows(catalog), dropdowns: { required: 'yesNo', type: 'types' } },
+      { title: SHEET_TITLES.parameterList, rows: parameterListExportRows(catalog), dropdowns: { required: 'yesNo', type: 'types', multipleSelectionType: 'multipleSelection' } },
       { title: SHEET_TITLES.bundles, rows: bundlesExportRows(catalog), dropdowns: { Operation: 'operations' } },
       { title: SHEET_TITLES.sowSections, rows: sowSectionsExportRows(catalog), dropdowns: {} }
     ],
@@ -55,7 +55,8 @@ export function buildWorkbookData(catalog: CatalogSnapshot, options: { includePr
       sets: unique(catalog.sets.map((set) => set.name)),
       yesNo: ['Y', 'N'],
       types: [...TYPE_CHOICES],
-      operations: unique(catalog.operations.map((operation) => operation.name))
+      operations: unique(catalog.operations.map((operation) => operation.name)),
+      multipleSelection: [...MULTIPLE_SELECTION_CHOICES]
     }
   };
 }

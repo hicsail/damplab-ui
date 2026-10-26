@@ -34,7 +34,7 @@ export const SHEET_COLUMNS: Record<SheetKey, readonly string[]> = {
     'id', 'serviceCategory', 'name', 'SuggestedPostConnections', 'description', 'unit', 'hiddenFromClients', 'pricingMode',
     'pricingInternal', 'pricingExternalAcademic', 'pricingExternalMarket', 'pricingExternalNoSalary', 'pricingLegacy'
   ],
-  parameterList: ['parameterId', 'parameterSet', 'operation', 'parameter', 'description', 'required', 'type', 'options', 'validation', 'conditionalDisplayLogic', 'allowMultiple', 'defaultValue'],
+  parameterList: ['parameterId', 'parameterSet', 'operation', 'parameter', 'description', 'required', 'type', 'options', 'validation', 'conditionalDisplayLogic', 'allowMultiple', 'multipleSelectionType', 'matrix', 'defaultValue'],
   bundles: ['id', 'BundleName', 'Order', 'Operation', 'icon'],
   sowSections: ['id', 'sectionKey', 'name', 'text', 'order']
 };

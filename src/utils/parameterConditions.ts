@@ -127,6 +127,22 @@ export function comparisonFits(comparison: Comparison, controller: Param): boole
 
 const text = (v: unknown): string => String(v).trim().toLowerCase();
 
+/**
+ * The options a dropdown's `.includes(text)` names: the option called exactly that
+ * (any case) when there is one, otherwise every option whose name contains it — so
+ * `.includes("B12")` does not also catch "Active-B12".
+ */
+export function optionIdsNamedBy(options: unknown, text: string): Set<string> {
+  const list: any[] = Array.isArray(options) ? options.filter((o) => o && o.id !== undefined && o.id !== null) : [];
+  const needle = text.trim().toLowerCase();
+  const nameOf = (o: any): string =>
+    String(o.name ?? '')
+      .trim()
+      .toLowerCase();
+  const exact = list.filter((o) => nameOf(o) === needle);
+  return new Set((exact.length > 0 ? exact : list.filter((o) => nameOf(o).includes(needle))).map((o) => String(o.id)));
+}
+
 function compare(comparison: Comparison, controller: Param, value: unknown): boolean {
   const { op } = comparison;
 
@@ -147,18 +163,8 @@ function compare(comparison: Comparison, controller: Param, value: unknown): boo
     const chosen = answers.map(String);
     if (op === 'includes') {
       if (typeof comparison.value !== 'string') return false;
-      const needle = comparison.value.toLowerCase();
-      const options: any[] = Array.isArray(controller.options) ? controller.options : [];
-      return chosen.some((id) =>
-        options.some(
-          (o) =>
-            o &&
-            String(o.id) === id &&
-            String(o.name ?? '')
-              .toLowerCase()
-              .includes(needle)
-        )
-      );
+      const named = optionIdsNamedBy(controller.options, comparison.value);
+      return chosen.some((id) => named.has(id));
     }
     if (!Array.isArray(comparison.optionIds)) return false;
     const wanted = new Set(comparison.optionIds.map(String));
