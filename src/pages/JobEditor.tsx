@@ -18,6 +18,7 @@ import JobVersionHistory from '../components/JobVersionHistory';
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
 import RightSidebar   from '../components/RightSidebar';
+import ResizableSidePanel from '../components/ResizableSidePanel';
 import { GET_JOB_BY_ID, GET_OWN_JOB_BY_ID } from '../gql/queries';
 import { RESTORE_JOB_VERSION, SAVE_JOB_WORKFLOWS } from '../gql/mutations';
 import { AppContext }    from '../contexts/App';
@@ -685,7 +686,7 @@ export default function JobEditor() {
                             )}
                         </ReactFlow>
 
-                        <div style={{ minWidth: '10%', width: 850, borderLeft: 'solid 1px' }}>
+                        <ResizableSidePanel>
                             {/* A past version's parameters are readable but not editable —
                                 the same treatment CanvasPreview already uses. */}
                             <RightSidebar
@@ -694,7 +695,7 @@ export default function JobEditor() {
                                 sampleSheetUploadable={!readOnly}
                                 customerCategory={job?.customerCategory ?? undefined}
                             />
-                        </div>
+                        </ResizableSidePanel>
 
                     </div>
                 </ReactFlowProvider>

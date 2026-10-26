@@ -373,7 +373,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     const showTrash = !readOnly && matrix.rows.some((row) => row.choice);
     const columns = `${showTrash ? "auto " : ""}repeat(${matrix.columns}, minmax(18ch, 1fr))`;
     return (
-      <Box key={`matrix:${matrix.name}`} sx={{ mt: 3, overflowX: "auto" }}>
+      <Box key={`matrix:${matrix.name}`} sx={{ mt: 2, pt: 1.5, overflowX: "auto" }}>
         <Box
           sx={{
             display: "grid",

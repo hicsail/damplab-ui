@@ -13,6 +13,7 @@ import { addNodesAndEdgesFromServiceIdsAlt }            from '../controllers/Res
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
 import RightSidebar   from '../components/RightSidebar';
+import ResizableSidePanel from '../components/ResizableSidePanel';
 import CanvasAgentChat from '../components/CanvasAgentChat';
 import { GET_JOB_BY_ID }    from '../gql/queries';
 import { MUTATE_JOB_STATE } from '../gql/mutations';
@@ -223,9 +224,9 @@ export default function MainFlow() {
 
                         </ReactFlow>
 
-                        <div style={{ minWidth: '10%', width: 850, borderLeft: 'solid 1px' }}>
+                        <ResizableSidePanel>
                             <RightSidebar />
-                        </div>
+                        </ResizableSidePanel>
                         
                     </div>
                 </ReactFlowProvider>
