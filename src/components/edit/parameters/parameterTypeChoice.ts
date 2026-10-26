@@ -8,6 +8,27 @@ import { effectiveValidation, parseValidation } from '../../../utils/parameterVa
  */
 export const CHECKBOXES_CHOICE = 'checkboxes';
 
+/**
+ * A "Pick from list" that allows multiple selections is answered one of two ways,
+ * its "Multiple selection type": a dropdown per choice added with +1 (no `display`,
+ * the default), or one dropdown in which options are ticked (`display: 'multiselect'`).
+ */
+export type MultipleSelectionType = 'plusOne' | 'checkbox';
+
+export function multipleSelectionTypeOf(parameter: { type?: string; display?: unknown; allowMultipleValues?: unknown }): MultipleSelectionType | null {
+  if (parameter.type !== 'dropdown' || parameter.allowMultipleValues !== true || parameter.display === CHECKBOXES_CHOICE) return null;
+  return parameter.display === 'multiselect' ? 'checkbox' : 'plusOne';
+}
+
+export function applyMultipleSelectionType(choice: MultipleSelectionType): Record<string, unknown> {
+  return { display: choice === 'checkbox' ? 'multiselect' : undefined };
+}
+
+/** "Allow multiple selections?" — turning it off also drops the checkbox-dropdown display, which needs it. */
+export function applyAllowMultiple(parameter: Record<string, any>, allow: boolean): Record<string, unknown> {
+  return !allow && parameter.display === 'multiselect' ? { allowMultipleValues: false, display: undefined } : { allowMultipleValues: allow };
+}
+
 export function typeChoiceOf(parameter: { type?: string; display?: unknown }): string {
   if (parameter.type === 'dropdown' && parameter.display === 'checkboxes') return CHECKBOXES_CHOICE;
   // A stored `sampleSheet` is a Table: there is one entry for both in the type list.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { answerProblems, isCheckboxList, syncOtherTextEntries, toggleChecked, nodeAnswersComplete, requiredProblems } from './parameterAnswers';
+import { answerProblems, chosenOptionIds, isCheckboxList, syncOtherTextEntries, toggleChecked, nodeAnswersComplete, requiredProblems } from './parameterAnswers';
 import { withoutHiddenAnswers } from './parameterConditions';
 
 const options = [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }];
@@ -70,6 +70,12 @@ describe('checkbox list helpers (rule 30)', () => {
     expect(toggleChecked(['bact', 'oth'], 'bact', false)).toEqual(['oth']);
     expect(toggleChecked(['bact'], 'bact', true)).toEqual(['bact']);
     expect(toggleChecked(undefined, 'bact', false)).toEqual([]);
+  });
+  it('reads a multi-select answer as its chosen ids, a single saved id included', () => {
+    expect(chosenOptionIds([''])).toEqual([]);
+    expect(chosenOptionIds(['bact', '', 'oth'])).toEqual(['bact', 'oth']);
+    expect(chosenOptionIds('bact')).toEqual(['bact']);
+    expect(chosenOptionIds(null)).toEqual([]);
   });
   it('is a checkbox list only for a dropdown whose definition says display: checkboxes', () => {
     expect(isCheckboxList(entry('tags', []), parameters[3])).toBe(true);

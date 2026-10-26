@@ -3,6 +3,7 @@ import { effectiveValidation, parseValidation } from '../../../utils/parameterVa
 import { ConditionAst, ConditionScope, conditionText, named, parseCondition, RefAst, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
 import { expectedColumnsOf, hasStaffTemplate, isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
 import { resolveTableColumns } from '../../../utils/tableColumns';
+import { matrixError } from '../../../utils/parameterMatrix';
 import { nearKey, normalizeEol, parseYesNo, sameList, splitList, yesNo } from './cells';
 import { matchRows, rowList } from './matching';
 import { OperationReference, OperationRowRef, ReferenceWarning, resolveOperationName } from './operationsWorkbookSheet';
@@ -26,6 +27,14 @@ const TYPE_LABEL: Record<string, string> = {
 };
 /** What a `type` cell may also say for a Table: the stored string it had before the two types were merged, and that type's old label. */
 const TABLE_CELL_ALIASES = new Set(['samplesheet', 'sample upload']);
+/** The `multipleSelectionType` cell of a Dropdown that allows multiple selections: +1 rows, or one checkbox dropdown. */
+export const MULTIPLE_SELECTION_CHOICES: readonly string[] = ['+1', 'Checkbox'];
+
+export function multipleSelectionLabelOf(parameter: any): string {
+  if (parameter?.type !== 'dropdown' || parameter?.allowMultipleValues !== true || parameter?.display === 'checkboxes') return '';
+  return parameter?.display === 'multiselect' ? 'Checkbox' : '+1';
+}
+
 /** The download's in-cell dropdown for the `type` column. */
 export const TYPE_CHOICES: readonly string[] = ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload'];
 
@@ -38,13 +47,13 @@ export function typeLabelOf(parameter: any): string {
   return TYPE_LABEL[stored] ?? stored;
 }
 
-/** A `type` cell as the stored type; accepts the friendly label and the stored name, any case. */
-export function parseTypeCell(raw: string): { type: string; checkboxes: boolean } | null {
+/** A `type` cell as the stored type; accepts the friendly label and the stored name, any case. `display` is set for Checkboxes. */
+export function parseTypeCell(raw: string): { type: string; display?: 'checkboxes' } | null {
   const key = raw.trim().toLowerCase();
-  if (key === 'checkboxes') return { type: 'dropdown', checkboxes: true };
-  if (TABLE_CELL_ALIASES.has(key)) return { type: TABLE_PARAM_TYPE, checkboxes: false };
+  if (key === 'checkboxes') return { type: 'dropdown', display: 'checkboxes' };
+  if (TABLE_CELL_ALIASES.has(key)) return { type: TABLE_PARAM_TYPE };
   for (const [stored, label] of Object.entries(TYPE_LABEL)) {
-    if (key === label.toLowerCase() || key === stored.toLowerCase()) return { type: stored, checkboxes: false };
+    if (key === label.toLowerCase() || key === stored.toLowerCase()) return { type: stored };
   }
   return null;
 }
@@ -76,6 +85,8 @@ export function parameterCells(parameter: any, owner: { set?: string; operation?
     validation: parameter?.type === 'number' ? effectiveValidation(parameter) : '',
     conditionalDisplayLogic: conditionText(parameter?.showIf, scope),
     allowMultiple: yesNo(parameter?.allowMultipleValues),
+    multipleSelectionType: multipleSelectionLabelOf(parameter),
+    matrix: typeof parameter?.matrix === 'string' ? parameter.matrix.trim() : '',
     defaultValue: normalizeEol(defaultValue)
   };
 }
@@ -108,10 +119,13 @@ function sameCell(column: string, cell: string, current: string): boolean {
     case 'type': {
       const a = parseTypeCell(cell);
       const b = parseTypeCell(current);
-      return a && b ? a.type === b.type && a.checkboxes === b.checkboxes : cell === current;
+      return a && b ? a.type === b.type && a.display === b.display : cell === current;
     }
     case 'validation':
+    case 'matrix':
       return compact(cell) === compact(current);
+    case 'multipleSelectionType':
+      return cell.trim().toLowerCase() === current.toLowerCase();
     case 'conditionalDisplayLogic':
       return sameConditionText(cell, current);
     case 'options':
@@ -172,8 +186,8 @@ function applyCells(
     if (!parsed) errors.push(cell('type') === '' ? 'type cannot be blank.' : `Unknown type “${cell('type')}”.`);
     else {
       next.type = parsed.type;
-      if (parsed.checkboxes) {
-        next.display = 'checkboxes';
+      if (parsed.display) {
+        next.display = parsed.display;
         next.allowMultipleValues = true;
       } else {
         delete next.display;
@@ -196,7 +210,27 @@ function applyCells(
     } else if (!isCheckboxes) next.allowMultipleValues = value;
     else if (value === false && cell('allowMultiple') !== '') warnings.push('Checkboxes always allow multiple; allowMultiple is ignored.');
   }
+  // After the type cell, which clears `display` when it changes.
+  if (has('multipleSelectionType')) {
+    const text = cell('multipleSelectionType').trim().toLowerCase();
+    if (text !== '' && text !== '+1' && text !== 'checkbox') errors.push(`multipleSelectionType: “${cell('multipleSelectionType')}” must be +1 or Checkbox.`);
+    else if (text !== '' && !(next.type === 'dropdown' && next.allowMultipleValues === true && !isCheckboxes)) {
+      warnings.push('multipleSelectionType is ignored: only a Dropdown that allows multiple selections has one.');
+    } else if (text === 'checkbox') next.display = 'multiselect';
+    else if (!isCheckboxes) delete next.display;
+  }
   if (next.type !== 'dropdown') delete next.display;
+  // A checkbox dropdown needs multiple selections; without them it is a plain dropdown.
+  if (next.display === 'multiselect' && next.allowMultipleValues !== true) delete next.display;
+  if (has('matrix')) {
+    const text = cell('matrix').trim();
+    if (text === '') delete next.matrix;
+    else {
+      const problem = matrixError({ ...next, matrix: text });
+      if (problem) errors.push(`matrix: ${problem}`);
+      else next.matrix = text;
+    }
+  }
 
   // A Table's columns are read from the options cell when the cell changed, and
   // also when the row makes the parameter a Table (a create, or a type change):

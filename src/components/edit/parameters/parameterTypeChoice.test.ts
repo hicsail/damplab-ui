@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
+import { applyAllowMultiple, applyMultipleSelectionType, applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, multipleSelectionTypeOf, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
 import { validateParameter } from './ParameterValidation';
 
 describe('the "Checkboxes" answer format (rule 31)', () => {
@@ -20,6 +20,33 @@ describe('the "Checkboxes" answer format (rule 31)', () => {
     expect(typeChoiceOf({ type: 'dropdown' })).toBe('dropdown');
     expect(typeChoiceOf({ type: 'number' })).toBe('number');
     expect(typeChoiceOf({})).toBe('string');
+  });
+});
+
+describe('"Multiple selection type" of a Pick from list that allows several', () => {
+  it('+1 by default, a checkbox dropdown when display is multiselect, none otherwise', () => {
+    expect(multipleSelectionTypeOf({ type: 'dropdown', allowMultipleValues: true })).toBe('plusOne');
+    expect(multipleSelectionTypeOf({ type: 'dropdown', allowMultipleValues: true, display: 'multiselect' })).toBe('checkbox');
+    expect(multipleSelectionTypeOf({ type: 'dropdown', allowMultipleValues: false })).toBeNull();
+    expect(multipleSelectionTypeOf({ type: 'dropdown', allowMultipleValues: true, display: 'checkboxes' })).toBeNull();
+    expect(typeChoiceOf({ type: 'dropdown', display: 'multiselect' })).toBe('dropdown');
+  });
+  it('writes or clears the display, and turning multiple selections off clears it', () => {
+    expect(applyMultipleSelectionType('checkbox')).toEqual({ display: 'multiselect' });
+    expect(applyMultipleSelectionType('plusOne')).toEqual({ display: undefined });
+    expect(applyAllowMultiple({ display: 'multiselect' }, false)).toEqual({ allowMultipleValues: false, display: undefined });
+    expect(applyAllowMultiple({}, true)).toEqual({ allowMultipleValues: true });
+  });
+  it('a checkbox dropdown is refused without multiple selections', () => {
+    const options = [{ id: 'a', name: 'A' }];
+    expect(validateParameter({ name: 'T', type: 'dropdown', display: 'multiselect', allowMultipleValues: false, options })).toContainEqual({
+      field: 'Answer format', errorMsg: 'A checkbox dropdown needs “Allow multiple selections” to be Yes.'
+    });
+    expect(validateParameter({ name: 'T', type: 'dropdown', display: 'multiselect', allowMultipleValues: true, options })).toEqual([]);
+  });
+  it('a malformed matrix is refused', () => {
+    expect(validateParameter({ name: 'T', type: 'string', matrix: 'matrixA' })).toContainEqual({ field: 'Matrix', errorMsg: 'Write the matrix as name;column, e.g. matrixA;2 (the column is 1 or more).' });
+    expect(validateParameter({ name: 'T', type: 'string', matrix: 'matrixA;2' })).toEqual([]);
   });
 });
 

@@ -121,7 +121,7 @@ describe('download formatting (rule 34)', () => {
       serviceCategory: 'categories', hiddenFromClients: 'yesNo',
       parameterSet1: 'sets', parameterSet2: 'sets', parameterSet3: 'sets', parameterSet4: 'sets', parameterSet5: 'sets'
     });
-    expect(data.sheets[1].dropdowns).toEqual({ required: 'yesNo', type: 'types' });
+    expect(data.sheets[1].dropdowns).toEqual({ required: 'yesNo', type: 'types', multipleSelectionType: 'multipleSelection' });
     expect(data.sheets[2].dropdowns).toEqual({ Operation: 'operations' });
     expect(data.sheets[3].dropdowns).toEqual({});
     expect(data.lists).toEqual({
@@ -129,7 +129,8 @@ describe('download formatting (rule 34)', () => {
       sets: ['Buffers', 'Cleanup'],
       yesNo: ['Y', 'N'],
       types: ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload'],
-      operations: ['PCR', 'Gibson Assembly']
+      operations: ['PCR', 'Gibson Assembly'],
+      multipleSelection: ['+1', 'Checkbox']
     });
   });
 

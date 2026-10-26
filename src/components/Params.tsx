@@ -33,9 +33,10 @@ import { isRetiredEquipmentParam, validateEquipmentValues } from "../utils/equip
 import SampleSheetField from "./SampleSheetField";
 import { isTableParam } from "../utils/sampleSheet";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
-import { answerProblems, isCheckboxList, requiredProblems, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
+import { answerProblems, chosenOptionIds, isCheckboxList, requiredProblems, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
 import { errorLabel, isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, otherTextParentId, selectsOther } from "../utils/otherOption";
 import { hiddenParameterIds, resetHiddenValues, withoutHiddenAnswers } from "../utils/parameterConditions";
+import { MatrixLayout, matrixLayouts, plusOneValues } from "../utils/parameterMatrix";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -307,56 +308,114 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     if (otherOptionIdOf(param) !== null && !selectsOther(param, nextValue)) formik.setFieldValue(otherTextEntryId(param.id), "");
   };
 
-  // Re-evaluated on every render, so on every answer change in this step.
-  const hidden = hiddenParameterIds(activeNode?.data?.parameters, formik.values);
-  const shownFormData: any[] = (activeNode?.data?.formData ?? []).filter(
-    (param: any) => !hidden.has(param?.id) && !(isOtherTextEntryId(param?.id) && hidden.has(otherTextParentId(param.id)))
-  );
-  // Over the shown entries only: a set with no visible parameter gets no heading.
-  const setHeadings = parameterSetHeadings(shownFormData, activeNode?.data?.parameters);
+  /** One choice of a +1 dropdown. */
+  const renderPlusOneSelect = (param: any, idx: number, width: string = "26ch") => {
+    const values = plusOneValues(formik.values[param.id]);
+    return (
+      <FormControl size="small" sx={{ width }}>
+        <InputLabel sx={{ backgroundColor: "white" }}>
+          {idx === 0 ? param.name : `${param.name} (${idx + 1})`}
+        </InputLabel>
+        <Select
+          value={values[idx] ?? ""}
+          onChange={(e) => {
+            const next = [...values];
+            next[idx] = e.target.value;
+            formik.setFieldValue(param.id, next);
+            clearOtherTextUnlessSelected(param, next);
+          }}
+          onBlur={formik.handleBlur}
+          readOnly={readOnly}
+        >
+          {(param.options ?? []).map((option: any) => (
+            <MenuItem key={option.id} value={option.id}>
+              {option.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    );
+  };
 
-  return (
-    <div>
-      <Stack spacing={1} sx={{ mb: 1 }}>
-        <Typography variant="h6">Parameters</Typography>
-        <Typography variant="caption" color="text.secondary">
-          Fill required fields first. Optional fields can be updated anytime before checkout.
-        </Typography>
-        {Object.keys(paramErrors).length > 0 ? (
-          <Alert severity="warning" sx={{ py: 0.5 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {Object.keys(paramErrors).length} field(s) still need attention.
-            </Typography>
-            <Box component="ul" sx={{ my: 0.5, pl: 2 }}>
-              {Object.keys(paramErrors).slice(0, 6).map((key: any) => {
-                const name = errorLabel(key, activeNode.data.formData);
-                return (
-                  <li key={key}>
-                    <Typography variant="caption">
-                      {name}: {paramErrors[key]}
-                    </Typography>
-                  </li>
-                );
+  /** Removes one choice of a +1 dropdown; removing the last leaves one empty dropdown. */
+  const removeChoiceButton = (param: any, idx: number) => (
+    <IconButton
+      size="small"
+      onClick={() => {
+        const next = plusOneValues(formik.values[param.id]).filter((_: unknown, i: number) => i !== idx);
+        formik.setFieldValue(param.id, next.length ? next : [""]);
+        clearOtherTextUnlessSelected(param, next);
+      }}
+      aria-label="Remove value"
+    >
+      <DeleteForeverSharp fontSize="small" />
+    </IconButton>
+  );
+
+  const addChoiceButton = (param: any, label?: string) => (
+    <Button
+      size="small"
+      startIcon={<PlusOne fontSize="small" />}
+      onClick={() => formik.setFieldValue(param.id, [...plusOneValues(formik.values[param.id]), ""])}
+      aria-label="Add another value"
+      sx={{ textTransform: "none", mt: 0.5, minWidth: 0 }}
+    >
+      {label ?? ""}
+    </Button>
+  );
+
+  /**
+   * A matrix: a +1 dropdown in column 1 gives a row per choice (with its trash),
+   * and each later column's parameters sit on the row of the choice they belong to.
+   */
+  const renderMatrix = (matrix: MatrixLayout) => {
+    const byId = new Map<string, any>(shownFormData.map((entry: any) => [entry.id, entry]));
+    const showTrash = !readOnly && matrix.rows.some((row) => row.choice);
+    const columns = `${showTrash ? "auto " : ""}repeat(${matrix.columns}, minmax(18ch, 1fr))`;
+    return (
+      <Box key={`matrix:${matrix.name}`} sx={{ mt: 3, overflowX: "auto" }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: columns,
+            columnGap: 1,
+            rowGap: 1.5,
+            alignItems: "start",
+            width: "max-content",
+            "& .MuiFormControl-root, & .MuiTextField-root": { width: "18ch", mt: 0 },
+            "& > div > div": { mt: 0 }
+          }}
+        >
+          {matrix.rows.map((row, rowIndex) => (
+            <React.Fragment key={rowIndex}>
+              {showTrash && <Box>{row.choice ? removeChoiceButton(byId.get(row.choice.paramId), row.choice.entryIndex) : null}</Box>}
+              {row.cells.map((cell, column) => {
+                const param = cell ? byId.get(cell.paramId) : undefined;
+                if (!cell || !param) return <Box key={column} />;
+                const element = cell.entryIndex !== undefined ? renderPlusOneSelect(param, cell.entryIndex, "18ch") : renderField(param);
+                return <Box key={column}>{wrapChanged(param, element)}</Box>;
               })}
-              {Object.keys(paramErrors).length > 6 ? (
-                <Typography variant="caption">...and more</Typography>
-              ) : null}
+            </React.Fragment>
+          ))}
+        </Box>
+        {/* Column 1's +1 dropdowns: their description or error, their "Please specify", and their +1. */}
+        {matrix.adders.map((paramId) => {
+          const param = byId.get(paramId);
+          if (!param) return null;
+          return (
+            <Box key={paramId}>
+              <FormHelperText error={Boolean(formik.errors[param.id])}>{helperFor(param)}</FormHelperText>
+              {renderOtherText(param)}
+              {!readOnly && addChoiceButton(param, matrix.adders.length > 1 ? param.name : undefined)}
             </Box>
-          </Alert>
-        ) : (
-          <Alert severity="success" sx={{ py: 0.5 }}>
-            <Typography variant="body2">All required fields are complete.</Typography>
-          </Alert>
-        )}
-      </Stack>
-      <form onSubmit={formik.handleSubmit}>
-        <Accordion defaultExpanded sx={{ mt: 1 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle2">Parameters</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-        <div className="input-params" style={{ marginLeft: 8 }}>
-          {shownFormData.map((param: any, index: number) => isRetiredEquipmentParam(param) ? null : <React.Fragment key={param.id ?? index}>{setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}{wrapChanged(param, (() => {
+          );
+        })}
+      </Box>
+    );
+  };
+
+  /** One parameter's control, as drawn in the list (and in a matrix cell). */
+  const renderField = (param: any): React.ReactNode => {
             if (param.paramType !== "result") {
               // The "Other" text is drawn under its parameter, never as a field of its own.
               if (isOtherTextEntryId(param.id)) return null;
@@ -554,66 +613,59 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                   </div>
                 );
               }
+              if (param.type === "dropdown" && isMultiValueParam(param) && definitionOf(param)?.display === "multiselect") {
+                // "Multiple selection type: Checkbox": one dropdown in which several options are ticked.
+                const chosen = chosenOptionIds(formik.values[param.id]);
+                const nameOf = (id: string) => (param.options ?? []).find((o: any) => String(o.id) === id)?.name ?? id;
+                return (
+                  <div key={param.id}>
+                    <FormControl size="small" sx={{ mt: 3, width: "26ch" }} error={Boolean(formik.errors[param.id])}>
+                      <InputLabel id={`${param.id}-label`} sx={{ backgroundColor: "white" }}>
+                        {param.name}
+                      </InputLabel>
+                      <Select
+                        multiple
+                        labelId={`${param.id}-label`}
+                        name={param.id}
+                        value={chosen}
+                        renderValue={(ids: string[]) => ids.map(nameOf).join(", ")}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const next = typeof raw === "string" ? raw.split(",") : raw;
+                          formik.setFieldValue(param.id, next);
+                          clearOtherTextUnlessSelected(param, next);
+                        }}
+                        onBlur={formik.handleBlur}
+                        readOnly={readOnly}
+                      >
+                        {(param.options ?? []).map((option: any) => (
+                          <MenuItem key={option.id} value={String(option.id)}>
+                            <Checkbox size="small" checked={chosen.includes(String(option.id))} sx={{ p: 0, mr: 1 }} />
+                            {option.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      <FormHelperText>
+                        {helperFor(param)}
+                      </FormHelperText>
+                    </FormControl>
+                    {renderOtherText(param)}
+                  </div>
+                );
+              }
               if (param.type === "dropdown" && isMultiValueParam(param)) {
-                const values = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [""];
+                // "Multiple selection type: +1": a dropdown per choice, each with its trash, and +1 under them.
+                const values = plusOneValues(formik.values[param.id]);
                 return (
                   <div key={param.id} style={{ marginTop: 12 }}>
-                    <Box display="flex" alignItems="flex-start" gap={0.5} flexWrap="wrap">
-                      <Box>
-                        {values.map((val: string, idx: number) => (
-                          <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
-                            <FormControl size="small" sx={{ width: "26ch" }}>
-                              <InputLabel sx={{ backgroundColor: "white" }}>
-                                {idx === 0 ? param.name : `${param.name} (${idx + 1})`}
-                              </InputLabel>
-                              <Select
-                                value={val ?? ""}
-                                onChange={(e) => {
-                                  const next = [...values];
-                                  next[idx] = e.target.value;
-                                  formik.setFieldValue(param.id, next);
-                                  clearOtherTextUnlessSelected(param, next);
-                                }}
-                                onBlur={formik.handleBlur}
-                                readOnly={readOnly}
-                              >
-                                {param.options?.map((option: any) => (
-                                  <MenuItem key={option.id} value={option.id}>
-                                    {option.name}
-                                  </MenuItem>
-                                )) ?? []}
-                              </Select>
-                              {idx === 0 && param.description && (
-                                <FormHelperText>{param.description}</FormHelperText>
-                              )}
-                            </FormControl>
-                            {idx > 0 && !readOnly && (
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  const next = values.filter((_: any, i: number) => i !== idx);
-                                  formik.setFieldValue(param.id, next.length ? next : [""]);
-                                  clearOtherTextUnlessSelected(param, next);
-                                }}
-                                aria-label="Remove value"
-                              >
-                                <DeleteForeverSharp fontSize="small" />
-                              </IconButton>
-                            )}
-                            {idx === 0 && !readOnly && (
-                              <IconButton
-                                size="small"
-                                onClick={() => formik.setFieldValue(param.id, [...values, ""])}
-                                aria-label="Add another value"
-                                sx={{ p: 0.25, ml: 0.25 }}
-                              >
-                                <PlusOne fontSize="small" />
-                              </IconButton>
-                            )}
-                          </Box>
-                        ))}
+                    {values.map((_: unknown, idx: number) => (
+                      <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
+                        {!readOnly && removeChoiceButton(param, idx)}
+                        {renderPlusOneSelect(param, idx)}
                       </Box>
-                    </Box>
+                    ))}
+                    <FormHelperText error={Boolean(formik.errors[param.id])}>{helperFor(param)}</FormHelperText>
+                    {!readOnly && addChoiceButton(param)}
                     {renderOtherText(param)}
                   </div>
                 );
@@ -784,7 +836,71 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
             } else {
               return null;
             }
-          })())}</React.Fragment>)}
+  };
+
+  // Re-evaluated on every render, so on every answer change in this step.
+  const hidden = hiddenParameterIds(activeNode?.data?.parameters, formik.values);
+  const shownFormData: any[] = (activeNode?.data?.formData ?? []).filter(
+    (param: any) => !hidden.has(param?.id) && !(isOtherTextEntryId(param?.id) && hidden.has(otherTextParentId(param.id)))
+  );
+  // Over the shown entries only: a set with no visible parameter gets no heading.
+  const setHeadings = parameterSetHeadings(shownFormData, activeNode?.data?.parameters);
+  const matrixOf = new Map<string, MatrixLayout>();
+  for (const matrix of matrixLayouts(shownFormData, activeNode?.data?.parameters, formik.values)) for (const id of matrix.memberIds) matrixOf.set(id, matrix);
+
+  return (
+    <div>
+      <Stack spacing={1} sx={{ mb: 1 }}>
+        <Typography variant="h6">Parameters</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Fill required fields first. Optional fields can be updated anytime before checkout.
+        </Typography>
+        {Object.keys(paramErrors).length > 0 ? (
+          <Alert severity="warning" sx={{ py: 0.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {Object.keys(paramErrors).length} field(s) still need attention.
+            </Typography>
+            <Box component="ul" sx={{ my: 0.5, pl: 2 }}>
+              {Object.keys(paramErrors).slice(0, 6).map((key: any) => {
+                const name = errorLabel(key, activeNode.data.formData);
+                return (
+                  <li key={key}>
+                    <Typography variant="caption">
+                      {name}: {paramErrors[key]}
+                    </Typography>
+                  </li>
+                );
+              })}
+              {Object.keys(paramErrors).length > 6 ? (
+                <Typography variant="caption">...and more</Typography>
+              ) : null}
+            </Box>
+          </Alert>
+        ) : (
+          <Alert severity="success" sx={{ py: 0.5 }}>
+            <Typography variant="body2">All required fields are complete.</Typography>
+          </Alert>
+        )}
+      </Stack>
+      <form onSubmit={formik.handleSubmit}>
+        <Accordion defaultExpanded sx={{ mt: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2">Parameters</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+        <div className="input-params" style={{ marginLeft: 8 }}>
+          {shownFormData.map((param: any, index: number) => {
+            if (isRetiredEquipmentParam(param)) return null;
+            // A matrix is drawn where its first shown parameter sits; its other parameters are drawn inside it.
+            const matrix = matrixOf.get(param.id);
+            if (matrix && matrix.memberIds[0] !== param.id) return null;
+            return (
+              <React.Fragment key={param.id ?? index}>
+                {setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}
+                {matrix ? renderMatrix(matrix) : wrapChanged(param, renderField(param))}
+              </React.Fragment>
+            );
+          })}
         </div>
           </AccordionDetails>
         </Accordion>
