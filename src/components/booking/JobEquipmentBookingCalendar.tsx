@@ -4,7 +4,7 @@ import { Alert, Box, Button, Chip, CircularProgress, FormControl, InputLabel, Me
 import { addDays, startOfMonth } from 'date-fns';
 import { GET_INVENTORY_AVAILABILITY, GET_JOB_EQUIPMENT_BOOKING } from '../../gql/queries';
 import { CANCEL_BOOKING, CREATE_JOB_EQUIPMENT_BOOKING, UPDATE_JOB_EQUIPMENT_BOOKING } from '../../gql/mutations';
-import { blockedMessage, bookingStatusLabel, defaultSlotFor, formatBookingWindow, LOCKED_MESSAGES, operationNotBookableMessage } from '../../utils/jobEquipmentBooking';
+import { blockedMessage, bookingSavedNotice, bookingStatusLabel, defaultSlotFor, formatBookingWindow, LOCKED_MESSAGES, operationNotBookableMessage } from '../../utils/jobEquipmentBooking';
 import { formatGqlError, formatSaveError } from '../../utils/gqlError';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import JobEquipmentBookingDialog from './JobEquipmentBookingDialog';
@@ -134,26 +134,24 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
   const submitBooking = async (values: { inventoryItemId: string; startTime: Date; endTime: Date; notes: string; reason?: string }): Promise<void> => {
     setDialogError(null);
     try {
+      let status: string | undefined;
       if (editing) {
-        await updateBooking({
+        const result = await updateBooking({
           variables: { id: editing._id, input: { startTime: values.startTime, endTime: values.endTime, notes: values.notes || undefined, reason: values.reason } }
         });
+        status = result.data?.updateJobEquipmentBooking?.status;
       } else {
-        await createBooking({
+        const result = await createBooking({
           variables: {
             input: { jobId, nodeId: bookingFor.nodeId, inventoryItemId: values.inventoryItemId, startTime: values.startTime, endTime: values.endTime, notes: values.notes || undefined }
           }
         });
+        status = result.data?.createJobEquipmentBooking?.status;
       }
+      const wasEditing = !!editing;
       closeDialog();
-      // A client's booking, or a client's change to one, waits on the lab (server: TENTATIVE).
-      if (!can(PERMISSIONS.JobsViewAll)) {
-        setNotice(
-          editing
-            ? 'Change requested. The new time is held for you until the lab approves it; you will be notified.'
-            : 'Booking requested. The time is held for you until the lab approves it; you will be notified.'
-        );
-      }
+      // The server decides whether this waits on the lab; follow the status it returned.
+      setNotice(bookingSavedNotice(status, wasEditing));
       await reload();
     } catch (error) {
       setDialogError(formatSaveError(error, 'this booking'));
@@ -285,7 +283,7 @@ export default function JobEquipmentBookingCalendar({ jobId, editBookingId, onEd
 
       <JobEquipmentBookingDialog
         open={!!bookingFor || !!editing}
-        requiresApproval={!can(PERMISSIONS.JobsViewAll)}
+        requiresApproval={access?.requiresApproval ?? true}
         operationLabel={dialogOperation?.label}
         jobLabel={jobLabel}
         window={dialogOperation?.window ?? {}}
