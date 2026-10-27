@@ -26,7 +26,7 @@ import {
   newPeriodDragKey,
   sowTotals
 } from './sowTypes';
-import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays } from '../../utils/sowDateUtils';
+import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays, periodDays, periodEndSowDate, periodEndPatch, periodStartEdit, type PeriodStartEvent } from '../../utils/sowDateUtils';
 import { equipmentEstimateNote } from '../../utils/equipmentBilling';
 
 /**
@@ -116,6 +116,22 @@ function SortablePeriodRow({
   onRemove: () => void;
 }): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled });
+  // Start is committed on blur or on a calendar pick, never per keystroke
+  // (FINDINGS F3): an intermediate typed date later than End would otherwise
+  // drag End along. The ref holds the live draft for back-to-back events;
+  // the state re-renders the picker with it.
+  const startDraftRef = React.useRef<Date | null | undefined>(undefined);
+  const [startDraft, setStartDraft] = React.useState<Date | null | undefined>(undefined);
+  const editStart = (event: PeriodStartEvent): void => {
+    const step = periodStartEdit(period, startDraftRef.current, event);
+    startDraftRef.current = step.draft;
+    setStartDraft(step.draft);
+    if (step.patch) onPatch(step.patch);
+  };
+  // Stable picker values: MUI X re-syncs a field's sections whenever `value` is
+  // a different object, which would wipe half-typed digits on any re-render.
+  const startValue = React.useMemo(() => sowDateToPickerValue(period.startDate), [period.startDate]);
+  const endValue = React.useMemo(() => sowDateToPickerValue(periodEndSowDate(period.startDate, period.durationDays)), [period.startDate, period.durationDays]);
   return (
     <Box
       ref={setNodeRef}
@@ -151,23 +167,46 @@ function SortablePeriodRow({
       </Box>
       <DatePicker
         label="Start"
-        value={sowDateToPickerValue(period.startDate)}
+        value={startDraft !== undefined ? startDraft : startValue}
+        disabled={disabled}
+        onChange={(value) => editStart({ type: 'change', value })}
+        onAccept={(value, context) => editStart({ type: 'accept', value, source: context.source })}
+        slotProps={{
+          textField: {
+            size: 'small',
+            sx: { width: 170 },
+            onBlur: (e: React.FocusEvent<HTMLElement>) => {
+              // Moving between the field's own day/month/year sections is not leaving it.
+              if (e.currentTarget.contains(e.relatedTarget)) return;
+              editStart({ type: 'blur' });
+            }
+          }
+        }}
+      />
+      {/* End is a view over the stored day count: start + durationDays − 1. It
+          applies each change at once (plan D8): Start stays put while End is
+          typed, so intermediate Ends lose nothing, and Days updates live. */}
+      <DatePicker
+        label="End"
+        value={endValue}
+        minDate={startValue ?? undefined}
         disabled={disabled}
         slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
         onChange={(d) => {
           if (!d || Number.isNaN(d.getTime())) return;
-          onPatch({ startDate: pickerValueToSowDate(d) });
+          // A typed End before Start is refused: the period does not change.
+          const patch = periodEndPatch(period, pickerValueToSowDate(d));
+          if (patch) onPatch(patch);
         }}
       />
       <TextField
-        label="Duration"
+        label="Days"
         size="small"
-        type="number"
-        sx={{ width: 130 }}
+        sx={{ width: 90 }}
         disabled={disabled}
-        value={period.durationDays}
-        InputProps={{ endAdornment: <InputAdornment position="end">days</InputAdornment> }}
-        onChange={(e) => onPatch({ durationDays: Math.max(0, Number(e.target.value) || 0) })}
+        value={periodDays(period.durationDays)}
+        InputProps={{ readOnly: true }}
+        inputProps={{ 'aria-label': `Period ${index + 1} days` }}
       />
       <TextField
         label="Label"

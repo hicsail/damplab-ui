@@ -161,3 +161,41 @@ export function periodStartPatch(period: { startDate: string; durationDays: numb
   const durationDays = durationFromDates(start, end);
   return { startDate: start, durationDays: durationDays >= 1 ? durationDays : 1 };
 }
+
+/** What the period row's Start picker reports: each change, each accept (and where it came from), and losing focus. */
+export type PeriodStartEvent = { type: 'change'; value: Date | null } | { type: 'accept'; value: Date | null; source: 'field' | 'view' | 'unknown' } | { type: 'blur' };
+
+/**
+ * One step of editing a period's Start (FINDINGS F3).
+ *
+ * MUI X reports every valid intermediate date while a date is typed section
+ * by section. Applying each one would let an intermediate Start later than End
+ * drag End along (behaviour 5), and the End staff set would be lost. So typing
+ * is held as a draft and committed when the field loses focus. A calendar pick
+ * commits at once, through `onAccept` from the view. `onAccept` from the field
+ * is ignored, because MUI X 8.29.3 fires it for each typed date too.
+ *
+ * `draft` is undefined when no edit is in progress. The row shows the draft
+ * while there is one, and otherwise the stored Start.
+ */
+export function periodStartEdit(
+  period: { startDate: string; durationDays: number },
+  draft: Date | null | undefined,
+  event: PeriodStartEvent
+): { draft: Date | null | undefined; patch: { startDate: string; durationDays: number } | null } {
+  const commit = (value: Date | null | undefined): { draft: undefined; patch: { startDate: string; durationDays: number } | null } => {
+    // Unfinished, cleared or unchanged: drop the draft, and the field shows the stored Start again.
+    if (!value || Number.isNaN(value.getTime())) return { draft: undefined, patch: null };
+    const start = pickerValueToSowDate(value);
+    if (durationFromDates(period.startDate, start) === 1) return { draft: undefined, patch: null };
+    return { draft: undefined, patch: periodStartPatch(period, start) };
+  };
+  switch (event.type) {
+    case 'change':
+      return { draft: event.value, patch: null };
+    case 'accept':
+      return event.source === 'view' ? commit(event.value) : { draft, patch: null };
+    case 'blur':
+      return commit(draft);
+  }
+}

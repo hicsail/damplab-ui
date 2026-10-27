@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, formatSOWDate, formatSOWInstant, periodOfPerformanceDays, periodDays, periodEndSowDate, durationFromDates, periodEndPatch, periodStartPatch } from './sowDateUtils';
+import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, formatSOWDate, formatSOWInstant, periodOfPerformanceDays, periodDays, periodEndSowDate, durationFromDates, periodEndPatch, periodStartPatch, periodStartEdit, type PeriodStartEvent } from './sowDateUtils';
 
 /**
  * A SOW period date is stored as UTC midnight but edited in a local-time date
@@ -208,5 +208,96 @@ describe.each([['America/New_York'], ['Pacific/Auckland'], ['UTC']])('period end
 
   it('keeps a legacy 0-day period’s End (= its Start) fixed when Start moves earlier (2, 5)', () => {
     expect(periodStartPatch({ startDate: NOV_2, durationDays: 0 }, '2026-10-31T00:00:00.000Z')).toEqual({ startDate: '2026-10-31T00:00:00.000Z', durationDays: 3 });
+  });
+});
+
+/**
+ * FINDINGS F3. MUI X fires onChange (and, in 8.29.3, onAccept) for every valid
+ * intermediate date while a date is typed section by section. Applied one by
+ * one, an intermediate Start later than End moves End (behaviour 5), and the
+ * End staff set is lost. The Start field therefore holds what is typed as a
+ * draft and commits it on blur, or at once when the calendar accepts a pick.
+ */
+describe.each([['America/New_York'], ['Pacific/Auckland'], ['UTC']])('Start field draft and commit in %s (F3)', (tz) => {
+  beforeAll(() => {
+    process.env.TZ = tz;
+  });
+  afterAll(() => {
+    process.env.TZ = ORIGINAL_TZ;
+  });
+
+  const NOV_2 = '2026-11-02T00:00:00.000Z';
+  const period = { startDate: NOV_2, durationDays: 14 }; // ends Nov 15
+  /** A picker value: the local calendar day, as MUI X hands it back. */
+  const local = (month: number, day: number, year = 2026): Date => new Date(year, month, day);
+
+  /** Feed events through periodStartEdit as the period row does, collecting its patches. */
+  function run(events: PeriodStartEvent[], p = period): { draft: Date | null | undefined; patches: Array<{ startDate: string; durationDays: number }> } {
+    let draft: Date | null | undefined;
+    const patches: Array<{ startDate: string; durationDays: number }> = [];
+    for (const event of events) {
+      const step = periodStartEdit(p, draft, event);
+      draft = step.draft;
+      if (step.patch) patches.push(step.patch);
+    }
+    return { draft, patches };
+  }
+
+  it('typing a Start through a later intermediate date does not move End', () => {
+    // Oct 30 – Nov 15, retyped as Nov 5 by keyboard. Typing the month "11"
+    // first gives Nov 30, which is after End. The day "05" then gives Nov 5.
+    // MUI fires change and accept for each valid date along the way.
+    const oct30 = { startDate: '2026-10-30T00:00:00.000Z', durationDays: 17 }; // ends Nov 15
+    const { patches } = run(
+      [
+        { type: 'change', value: local(10, 30) },
+        { type: 'accept', value: local(10, 30), source: 'unknown' },
+        { type: 'change', value: local(10, 5) },
+        { type: 'accept', value: local(10, 5), source: 'unknown' },
+        { type: 'blur' }
+      ],
+      oct30
+    );
+
+    expect(patches).toEqual([{ startDate: '2026-11-05T00:00:00.000Z', durationDays: 11 }]); // Nov 5 – Nov 15
+    // The bug this replaces: applying each intermediate value carries End to
+    // Nov 30, so the period becomes Nov 5 – Nov 30.
+    expect(periodStartPatch(periodStartPatch(oct30, '2026-11-30T00:00:00.000Z'), '2026-11-05T00:00:00.000Z').durationDays).toBe(26);
+  });
+
+  it('holds typed values as a draft until the field loses focus', () => {
+    const { draft, patches } = run([{ type: 'change', value: local(10, 12) }]);
+    expect(patches).toEqual([]);
+    expect(draft).toEqual(local(10, 12));
+  });
+
+  it('commits a calendar pick at once', () => {
+    const { draft, patches } = run([
+      { type: 'change', value: local(10, 5) },
+      { type: 'accept', value: local(10, 5), source: 'view' }
+    ]);
+    expect(patches).toEqual([{ startDate: '2026-11-05T00:00:00.000Z', durationDays: 11 }]);
+    expect(draft).toBeUndefined();
+  });
+
+  it('does not commit a year chosen in the calendar before the day is accepted', () => {
+    expect(run([{ type: 'change', value: local(10, 2, 2027) }]).patches).toEqual([]);
+  });
+
+  it('still carries End along when a committed Start passes it (5)', () => {
+    expect(run([{ type: 'change', value: local(10, 20) }, { type: 'blur' }]).patches).toEqual([{ startDate: '2026-11-20T00:00:00.000Z', durationDays: 1 }]);
+  });
+
+  it('discards an unfinished or cleared entry on blur, so the field falls back to the stored Start', () => {
+    for (const value of [new Date(Number.NaN), null]) {
+      const { draft, patches } = run([{ type: 'change', value }, { type: 'blur' }]);
+      expect(patches).toEqual([]);
+      expect(draft).toBeUndefined();
+    }
+    expect(run([{ type: 'blur' }]).patches).toEqual([]);
+  });
+
+  it('commits nothing when the typed date is the current Start', () => {
+    expect(run([{ type: 'change', value: local(10, 2) }, { type: 'blur' }]).patches).toEqual([]);
   });
 });
