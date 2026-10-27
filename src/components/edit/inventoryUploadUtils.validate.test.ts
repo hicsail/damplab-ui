@@ -15,6 +15,7 @@ const row = (overrides: Partial<ParsedInventoryRow> = {}): ParsedInventoryRow =>
   dimensionL: '',
   dimensionW: '',
   dimensionH: '',
+  imageUrl: '',
   warnings: [],
   ...overrides
 });

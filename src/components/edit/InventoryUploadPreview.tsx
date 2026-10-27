@@ -134,6 +134,7 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
     { field: 'quantity', headerName: 'Qty', width: 60 },
     { field: 'uniqueId', headerName: 'Unique ID', width: 110 },
     { field: 'modelNumber', headerName: 'Model #', width: 120 },
+    { field: 'imageUrl', headerName: 'Image URL', width: 200 },
     {
       field: 'action',
       headerName: 'Action',
