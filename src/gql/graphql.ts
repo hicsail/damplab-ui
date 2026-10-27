@@ -463,6 +463,15 @@ export type BundleChange = {
   services?: InputMaybe<Array<Scalars['ID']['input']>>;
 };
 
+/** A personal, secret iCalendar subscription URL for every equipment booking. */
+export type CalendarFeed = {
+  __typename?: 'CalendarFeed';
+  /** When this link was created or last reset. */
+  createdAt: Scalars['DateTime']['output'];
+  /** Absolute URL a calendar app subscribes to. Anyone holding it can read item names and times. */
+  url: Scalars['String']['output'];
+};
+
 export type CancelJobInput = {
   jobId: Scalars['ID']['input'];
   operationId: Scalars['String']['input'];
@@ -1691,6 +1700,8 @@ export type Mutation = {
   reorderSowTextPresets: Array<SowTextPreset>;
   /** Job-owner-only. Ask the lab for access to edit this job's workflow. Grants nothing on its own — staff open the editor with reviewJob(REQUEST_EDITS). Allowed until the SOW is signed. */
   requestJobEditAccess: Job;
+  /** Create the caller’s calendar feed link, or replace it; the old link stops working. Requires inventory:schedule. */
+  resetCalendarFeed: CalendarFeed;
   /** Job-owner-only. Complete the currently requested review action and return the job to staff. */
   respondToJobReview: Job;
   /** Restore an earlier version of the workflow graph as a new version. Available to whoever currently holds the job. */
@@ -2506,6 +2517,8 @@ export type Query = {
   /** List all bug reports, optionally filtered by search text and reporter. */
   bugReports: BugReportsResult;
   bundles: Array<Bundle>;
+  /** The caller’s calendar feed link, or null until they have one. Requires inventory:schedule. */
+  calendarFeed?: Maybe<CalendarFeed>;
   /** The services catalog as the caller may see it: their own price, and the full tier table only with internal-fields:read. */
   catalogServices: Array<CatalogServiceView>;
   categories: Array<Category>;
