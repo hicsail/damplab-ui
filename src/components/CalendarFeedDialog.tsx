@@ -16,6 +16,20 @@ export async function loadOrCreateFeed(fetchFeed: () => Promise<FeedLink | null>
   return (await fetchFeed()) ?? (await createFeed());
 }
 
+/**
+ * Run `start` unless a run is already in flight in `ref`; overlapping callers share
+ * one promise, so a close-and-reopen during the first-ever load cannot create twice.
+ * The ref is cleared when the run settles, so a failure can be retried.
+ */
+export function shareInFlight<T>(ref: { current: Promise<T> | null }, start: () => Promise<T>): Promise<T> {
+  if (ref.current) return ref.current;
+  const p = start().finally(() => {
+    if (ref.current === p) ref.current = null;
+  });
+  ref.current = p;
+  return p;
+}
+
 export interface CalendarFeedPanelProps {
   url: string | null;
   loading: boolean;
@@ -86,6 +100,8 @@ export default function CalendarFeedDialog({ open, onClose }: { open: boolean; o
   // StrictMode runs effects twice; without this the first open would create a
   // link and immediately replace it.
   const startedRef = useRef(false);
+  // The load outlives a close; reopening joins it rather than starting a second one.
+  const inFlightRef = useRef<Promise<FeedLink> | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -96,9 +112,11 @@ export default function CalendarFeedDialog({ open, onClose }: { open: boolean; o
     if (startedRef.current) return;
     startedRef.current = true;
     setError(null);
-    loadOrCreateFeed(
-      () => client.query({ query: GET_CALENDAR_FEED, fetchPolicy: 'network-only' }).then((r) => r.data?.calendarFeed ?? null),
-      () => reset().then((r) => r.data.resetCalendarFeed)
+    shareInFlight(inFlightRef, () =>
+      loadOrCreateFeed(
+        () => client.query({ query: GET_CALENDAR_FEED, fetchPolicy: 'network-only' }).then((r) => r.data?.calendarFeed ?? null),
+        () => reset().then((r) => r.data.resetCalendarFeed)
+      )
     )
       .then(setFeed)
       .catch((e) => setError(formatSaveError(e, 'the calendar link')));

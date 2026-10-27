@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { CalendarFeedPanel, CalendarFeedPanelProps, loadOrCreateFeed } from './CalendarFeedDialog';
+import { CalendarFeedPanel, CalendarFeedPanelProps, loadOrCreateFeed, shareInFlight } from './CalendarFeedDialog';
 
 const text = (el: React.ReactElement): string => renderToStaticMarkup(el).replace(/<style[^>]*>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const noop = (): void => undefined;
@@ -47,5 +47,28 @@ describe('loadOrCreateFeed (10)', () => {
     const create = vi.fn(async () => ({ url: 'u2', createdAt: 'c' }));
     expect(await loadOrCreateFeed(async () => null, create)).toEqual({ url: 'u2', createdAt: 'c' });
     expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('shareInFlight (reopen during the first load)', () => {
+  it('overlapping calls share one load, so only one link is created', async () => {
+    const ref: { current: Promise<{ url: string; createdAt: string }> | null } = { current: null };
+    let release: () => void = noop;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const create = vi.fn(async () => ({ url: 'u', createdAt: 'c' }));
+    const start = () => loadOrCreateFeed(async () => { await gate; return null; }, create);
+    const first = shareInFlight(ref, start);
+    const second = shareInFlight(ref, start);
+    release();
+    expect(await first).toEqual(await second);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(ref.current).toBeNull();
+  });
+
+  it('can be retried after a failure', async () => {
+    const ref: { current: Promise<string> | null } = { current: null };
+    await expect(shareInFlight(ref, async () => { throw new Error('x'); })).rejects.toThrow('x');
+    expect(ref.current).toBeNull();
+    expect(await shareInFlight(ref, async () => 'ok')).toBe('ok');
   });
 });
