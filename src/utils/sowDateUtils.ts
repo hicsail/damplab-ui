@@ -162,33 +162,30 @@ export function periodStartPatch(period: { startDate: string; durationDays: numb
   return { startDate: start, durationDays: durationDays >= 1 ? durationDays : 1 };
 }
 
-/** What the period row's Start picker reports: each change, each accept (and where it came from), and losing focus. */
-export type PeriodStartEvent = { type: 'change'; value: Date | null } | { type: 'accept'; value: Date | null; source: 'field' | 'view' | 'unknown' } | { type: 'blur' };
+/** What a period row's date picker reports: each change, each accept (and where it came from), and losing focus. */
+export type PeriodDateEvent = { type: 'change'; value: Date | null } | { type: 'accept'; value: Date | null; source: 'field' | 'view' | 'unknown' } | { type: 'blur' };
+export type PeriodStartEvent = PeriodDateEvent;
 
 /**
- * One step of editing a period's Start (FINDINGS F3).
- *
- * MUI X reports every valid intermediate date while a date is typed section
- * by section. Applying each one would let an intermediate Start later than End
- * drag End along (behaviour 5), and the End staff set would be lost. So typing
- * is held as a draft and committed when the field loses focus. A calendar pick
- * commits at once, through `onAccept` from the view. `onAccept` from the field
- * is ignored, because MUI X 8.29.3 fires it for each typed date too.
+ * The draft-and-commit switch shared by the Start and End pickers. MUI X
+ * reports every valid intermediate date while a date is typed section by
+ * section, so typing is held as a draft and committed when the field loses
+ * focus. A calendar pick commits at once, through `onAccept` from the view.
+ * `onAccept` from the field is ignored, because MUI X 8.29.3 fires it for each
+ * typed date too. `commitRule` turns a finished date into a patch, or null.
  *
  * `draft` is undefined when no edit is in progress. The row shows the draft
- * while there is one, and otherwise the stored Start.
+ * while there is one, and otherwise the stored date.
  */
-export function periodStartEdit(
-  period: { startDate: string; durationDays: number },
+function periodDateEdit<Patch>(
   draft: Date | null | undefined,
-  event: PeriodStartEvent
-): { draft: Date | null | undefined; patch: { startDate: string; durationDays: number } | null } {
-  const commit = (value: Date | null | undefined): { draft: undefined; patch: { startDate: string; durationDays: number } | null } => {
-    // Unfinished, cleared or unchanged: drop the draft, and the field shows the stored Start again.
+  event: PeriodDateEvent,
+  commitRule: (value: Date) => Patch | null
+): { draft: Date | null | undefined; patch: Patch | null } {
+  const commit = (value: Date | null | undefined): { draft: undefined; patch: Patch | null } => {
+    // Unfinished or cleared: drop the draft, and the field shows the stored date again.
     if (!value || Number.isNaN(value.getTime())) return { draft: undefined, patch: null };
-    const start = pickerValueToSowDate(value);
-    if (durationFromDates(period.startDate, start) === 1) return { draft: undefined, patch: null };
-    return { draft: undefined, patch: periodStartPatch(period, start) };
+    return { draft: undefined, patch: commitRule(value) };
   };
   switch (event.type) {
     case 'change':
@@ -198,4 +195,39 @@ export function periodStartEdit(
     case 'blur':
       return commit(draft);
   }
+}
+
+/**
+ * One step of editing a period's Start (FINDINGS F3). Typing an intermediate
+ * Start later than End would drag End along (behaviour 5), so it is drafted.
+ */
+export function periodStartEdit(
+  period: { startDate: string; durationDays: number },
+  draft: Date | null | undefined,
+  event: PeriodDateEvent
+): { draft: Date | null | undefined; patch: { startDate: string; durationDays: number } | null } {
+  return periodDateEdit(draft, event, (value) => {
+    const start = pickerValueToSowDate(value);
+    // Unchanged: no patch.
+    if (durationFromDates(period.startDate, start) === 1) return null;
+    return periodStartPatch(period, start);
+  });
+}
+
+/**
+ * One step of editing a period's End. MUI X 8.29.3 re-syncs a controlled field
+ * to its value when a typed intermediate date is refused, and the later digits
+ * then land in the stored End. So a typed End is drafted too. A commit that is
+ * before Start (refused), unchanged, or cleared gives no patch.
+ */
+export function periodEndEdit(
+  period: { startDate: string; durationDays: number },
+  draft: Date | null | undefined,
+  event: PeriodDateEvent
+): { draft: Date | null | undefined; patch: { durationDays: number } | null } {
+  return periodDateEdit(draft, event, (value) => {
+    const patch = periodEndPatch(period, pickerValueToSowDate(value));
+    if (!patch || patch.durationDays === periodDays(period.durationDays)) return null;
+    return patch;
+  });
 }

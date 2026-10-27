@@ -26,7 +26,7 @@ import {
   newPeriodDragKey,
   sowTotals
 } from './sowTypes';
-import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays, periodDays, periodEndSowDate, periodEndPatch, periodStartEdit, type PeriodStartEvent } from '../../utils/sowDateUtils';
+import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays, periodDays, periodEndSowDate, periodEndEdit, periodStartEdit, type PeriodDateEvent } from '../../utils/sowDateUtils';
 import { equipmentEstimateNote } from '../../utils/equipmentBilling';
 
 /**
@@ -122,10 +122,19 @@ function SortablePeriodRow({
   // the state re-renders the picker with it.
   const startDraftRef = React.useRef<Date | null | undefined>(undefined);
   const [startDraft, setStartDraft] = React.useState<Date | null | undefined>(undefined);
-  const editStart = (event: PeriodStartEvent): void => {
+  const editStart = (event: PeriodDateEvent): void => {
     const step = periodStartEdit(period, startDraftRef.current, event);
     startDraftRef.current = step.draft;
     setStartDraft(step.draft);
+    if (step.patch) onPatch(step.patch);
+  };
+  // End is drafted the same way (see the End picker below).
+  const endDraftRef = React.useRef<Date | null | undefined>(undefined);
+  const [endDraft, setEndDraft] = React.useState<Date | null | undefined>(undefined);
+  const editEnd = (event: PeriodDateEvent): void => {
+    const step = periodEndEdit(period, endDraftRef.current, event);
+    endDraftRef.current = step.draft;
+    setEndDraft(step.draft);
     if (step.patch) onPatch(step.patch);
   };
   // Stable picker values: MUI X re-syncs a field's sections whenever `value` is
@@ -183,20 +192,28 @@ function SortablePeriodRow({
           }
         }}
       />
-      {/* End is a view over the stored day count: start + durationDays − 1. It
-          applies each change at once (plan D8): Start stays put while End is
-          typed, so intermediate Ends lose nothing, and Days updates live. */}
+      {/* End is a view over the stored day count: start + durationDays − 1. Like
+          Start it is drafted while typed and committed on blur or a calendar
+          pick (walkthrough fix 1, revising plan D8): MUI X re-syncs the field
+          to the stored End when an intermediate typed date is refused, and the
+          later digits would land in it. An End before Start is refused at
+          commit: the period does not change. */}
       <DatePicker
         label="End"
-        value={endValue}
+        value={endDraft !== undefined ? endDraft : endValue}
         minDate={startValue ?? undefined}
         disabled={disabled}
-        slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
-        onChange={(d) => {
-          if (!d || Number.isNaN(d.getTime())) return;
-          // A typed End before Start is refused: the period does not change.
-          const patch = periodEndPatch(period, pickerValueToSowDate(d));
-          if (patch) onPatch(patch);
+        onChange={(value) => editEnd({ type: 'change', value })}
+        onAccept={(value, context) => editEnd({ type: 'accept', value, source: context.source })}
+        slotProps={{
+          textField: {
+            size: 'small',
+            sx: { width: 170 },
+            onBlur: (e: React.FocusEvent<HTMLElement>) => {
+              if (e.currentTarget.contains(e.relatedTarget)) return;
+              editEnd({ type: 'blur' });
+            }
+          }
         }}
       />
       <TextField

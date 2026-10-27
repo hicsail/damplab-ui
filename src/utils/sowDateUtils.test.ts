@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, formatSOWDate, formatSOWInstant, periodOfPerformanceDays, periodDays, periodEndSowDate, durationFromDates, periodEndPatch, periodStartPatch, periodStartEdit, type PeriodStartEvent } from './sowDateUtils';
+import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, formatSOWDate, formatSOWInstant, periodOfPerformanceDays, periodDays, periodEndSowDate, durationFromDates, periodEndPatch, periodStartPatch, periodStartEdit, periodEndEdit, type PeriodStartEvent } from './sowDateUtils';
 
 /**
  * A SOW period date is stored as UTC midnight but edited in a local-time date
@@ -299,5 +299,89 @@ describe.each([['America/New_York'], ['Pacific/Auckland'], ['UTC']])('Start fiel
 
   it('commits nothing when the typed date is the current Start', () => {
     expect(run([{ type: 'change', value: local(10, 2) }, { type: 'blur' }]).patches).toEqual([]);
+  });
+});
+
+/**
+ * Walkthrough fix 1. MUI X 8.29.3 re-syncs a controlled field to its value when
+ * a typed intermediate date is refused, so the later digits landed in the
+ * stored End. End is therefore drafted and committed like Start.
+ */
+describe.each([['America/New_York'], ['Pacific/Auckland'], ['UTC']])('End field draft and commit in %s', (tz) => {
+  beforeAll(() => {
+    process.env.TZ = tz;
+  });
+  afterAll(() => {
+    process.env.TZ = ORIGINAL_TZ;
+  });
+
+  const period = { startDate: '2026-11-02T00:00:00.000Z', durationDays: 14 }; // ends Nov 15
+  const local = (month: number, day: number, year = 2026): Date => new Date(year, month, day);
+
+  function run(events: PeriodStartEvent[]): { draft: Date | null | undefined; patches: Array<{ durationDays: number }> } {
+    let draft: Date | null | undefined;
+    const patches: Array<{ durationDays: number }> = [];
+    for (const event of events) {
+      const step = periodEndEdit(period, draft, event);
+      draft = step.draft;
+      if (step.patch) patches.push(step.patch);
+    }
+    return { draft, patches };
+  }
+
+  it('typing an End before Start (month first) then leaving the field changes nothing', () => {
+    const { draft, patches } = run([
+      { type: 'change', value: local(0, 15) },
+      { type: 'change', value: local(9, 15) },
+      { type: 'accept', value: local(9, 15), source: 'unknown' },
+      { type: 'change', value: local(9, 30) },
+      { type: 'accept', value: local(9, 30), source: 'unknown' },
+      { type: 'blur' }
+    ]);
+    expect(patches).toEqual([]);
+    expect(draft).toBeUndefined();
+  });
+
+  it('holds typed values as a draft with no patch until blur', () => {
+    const { draft, patches } = run([{ type: 'change', value: local(10, 20) }]);
+    expect(patches).toEqual([]);
+    expect(draft).toEqual(local(10, 20));
+  });
+
+  it('a later valid typed End then blur gives the right durationDays', () => {
+    const { draft, patches } = run([
+      { type: 'change', value: local(10, 30) },
+      { type: 'accept', value: local(10, 30), source: 'unknown' },
+      { type: 'blur' }
+    ]);
+    expect(patches).toEqual([{ durationDays: 29 }]);
+    expect(draft).toBeUndefined();
+  });
+
+  it('a calendar pick commits at once', () => {
+    const { draft, patches } = run([{ type: 'accept', value: local(10, 20), source: 'view' }]);
+    expect(patches).toEqual([{ durationDays: 19 }]);
+    expect(draft).toBeUndefined();
+  });
+
+  it('a calendar pick before Start is refused and clears the draft', () => {
+    const { draft, patches } = run([{ type: 'accept', value: local(10, 1), source: 'view' }]);
+    expect(patches).toEqual([]);
+    expect(draft).toBeUndefined();
+  });
+
+  it('clearing then blur gives no patch', () => {
+    const { draft, patches } = run([{ type: 'change', value: null }, { type: 'blur' }]);
+    expect(patches).toEqual([]);
+    expect(draft).toBeUndefined();
+  });
+
+  it('typing the current End gives no patch', () => {
+    const { patches } = run([{ type: 'change', value: local(10, 15) }, { type: 'blur' }]);
+    expect(patches).toEqual([]);
+  });
+
+  it('blur with no edit in progress does nothing', () => {
+    expect(run([{ type: 'blur' }])).toEqual({ draft: undefined, patches: [] });
   });
 });
