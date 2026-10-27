@@ -1542,6 +1542,7 @@ const INVENTORY_FIELDS = `
   dimensionL { value unit }
   dimensionW { value unit }
   dimensionH { value unit }
+  imageUrl
 `;
 
 /**
@@ -1560,6 +1561,7 @@ const INVENTORY_INTERNAL_FIELDS = `
   hasServiceContract
   serviceContractExpiration
   lastModifiedBy
+  imageKey
 `;
 
 export const GET_INVENTORY_ITEMS = gql`

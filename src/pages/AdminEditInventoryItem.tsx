@@ -34,6 +34,7 @@ import {
   inventoryDetailsFrom,
   inventoryDetailsToInput
 } from '../components/edit/InventoryDetailFields';
+import InventoryImageUpload from '../components/edit/InventoryImageUpload';
 
 /** One editable row of the placement editor: where the item lives and how many are there. */
 interface PlacementRow {
@@ -64,6 +65,7 @@ export default function AdminEditInventoryItem() {
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
   const [details, setDetails] = useState<InventoryDetails>(EMPTY_INVENTORY_DETAILS);
+  const [imageKey, setImageKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -94,6 +96,7 @@ export default function AdminEditInventoryItem() {
     setRateType(item.rateType === 'PER_UNIT' ? 'PER_UNIT' : 'HOURLY');
     setPricing(pricingToRateForm(item.pricing));
     setDetails(inventoryDetailsFrom(item));
+    setImageKey(item.imageKey ?? null);
   }, [item?.id]);
 
   if (loading && !item) {
@@ -151,7 +154,8 @@ export default function AdminEditInventoryItem() {
             bookable,
             rateType: bookable ? rateType : null,
             pricing: bookable ? ratePricingToInput(pricing) : null,
-            ...inventoryDetailsToInput(details, { clearEmpty: true })
+            ...inventoryDetailsToInput(details, { clearEmpty: true }),
+            imageKey
           }
         }
       });
@@ -268,6 +272,13 @@ export default function AdminEditInventoryItem() {
       </Box>
 
       <TextField label='Description' value={description} onChange={(e) => setDescription(e.target.value)} multiline minRows={3} />
+
+      <InventoryImageUpload
+        itemId={itemId}
+        currentImageUrl={item.imageUrl}
+        currentImageKey={item.imageKey}
+        onImageKeyChange={setImageKey}
+      />
 
       {/* Tags, model/serial, service contract and dimensions all live in
           <InventoryDetailFields /> below — the same editor both forms share. */}
