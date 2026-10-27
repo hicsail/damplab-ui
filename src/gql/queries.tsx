@@ -1488,6 +1488,27 @@ const CUSTOMER_MANAGEMENT_ROW_FIELDS = `
   customerCategory
   isDefaultExternalCustomer
   accessTier
+  profile {
+    userSub
+    canBookWithoutApproval
+    position
+    instrumentType
+    group
+    start
+    end
+    status
+    firstName
+    lastName
+    buId
+    preferredEmail
+    swipeCategory
+    swipeAccess
+    reportsTo
+    sciShieldTrainings
+    rohp
+    affiliations
+    updatedAt
+  }
 `;
 
 export const SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
