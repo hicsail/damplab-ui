@@ -114,3 +114,50 @@ export function periodOfPerformanceDays(periods: { startDate: string | Date; dur
   const end = Math.max(...bounds.map((b) => b.end));
   return Math.round((end - start) / MS_PER_DAY) + 1;
 }
+
+/** A stored calendar day as its UTC-midnight milliseconds — by calendar fields, never by local instant. */
+function utcDayMs(value: string | Date): number {
+  const d = value instanceof Date ? value : new Date(value);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/**
+ * The day count the period editor shows. Never below one: a period always
+ * covers at least its start day, and a legacy stored 0 means a single day — the
+ * generated prose already reads anything ≤ 1 as "a single day".
+ */
+export function periodDays(durationDays: number | null | undefined): number {
+  const n = Math.floor(Number(durationDays));
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+/**
+ * A period's last day, inclusive: start + durationDays − 1, in storage form.
+ * The editor's End picker is a view over the stored day count — the backend
+ * keeps `durationDays` and computes the same end in `periodEndDate`.
+ */
+export function periodEndSowDate(startDate: string | Date, durationDays: number): string {
+  return new Date(utcDayMs(startDate) + (periodDays(durationDays) - 1) * MS_PER_DAY).toISOString();
+}
+
+/** Inclusive day count from start to end: the same day is 1. Zero or less means end is before start. */
+export function durationFromDates(start: string | Date, end: string | Date): number {
+  return Math.round((utcDayMs(end) - utcDayMs(start)) / MS_PER_DAY) + 1;
+}
+
+/** What picking an End writes, or null when that End is before Start — refused, the period stays as it was. */
+export function periodEndPatch(period: { startDate: string }, end: string): { durationDays: number } | null {
+  const durationDays = durationFromDates(period.startDate, end);
+  return durationDays >= 1 ? { durationDays } : null;
+}
+
+/**
+ * What picking a Start writes. The End date the staff member sees stays put
+ * while the new Start is on or before it; past it, End follows Start and the
+ * period becomes one day.
+ */
+export function periodStartPatch(period: { startDate: string; durationDays: number }, start: string): { startDate: string; durationDays: number } {
+  const end = periodEndSowDate(period.startDate, period.durationDays);
+  const durationDays = durationFromDates(start, end);
+  return { startDate: start, durationDays: durationDays >= 1 ? durationDays : 1 };
+}
