@@ -233,3 +233,18 @@ export async function saveRow(before: CustomerRow, after: CustomerRow, calls: Ro
   }
   return { accessRoleMapped };
 }
+
+/**
+ * The STAFF list filter's tiers. The server resolves STAFF from KEYCLOAK_LAB_STAFF_GROUP_NAMES
+ * (default damplab-staff,technician); this copy narrows only search results, which come back
+ * unfiltered. Change both together.
+ */
+const STAFF_TIERS: readonly string[] = [ACCESS_TIERS.Administrator, ACCESS_TIERS.Technician];
+
+/** Search results narrowed by the selected "Show users" category, exactly as the old table did. */
+export function narrowSearchResults(users: CustomerUser[], category: string): CustomerUser[] {
+  if (category === 'ALL') return users;
+  if (category === 'STAFF') return users.filter((u) => STAFF_TIERS.includes(u.accessTier ?? ACCESS_TIERS.Client));
+  if (category === 'EXTERNAL_CUSTOMER_DEFAULT') return users.filter((u) => u.isDefaultExternalCustomer === true);
+  return users.filter((u) => (u.customerCategory ?? '') === category && !u.isDefaultExternalCustomer);
+}

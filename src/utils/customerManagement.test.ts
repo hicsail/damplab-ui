@@ -6,6 +6,7 @@ import {
   PROFILE_TEXT_FIELDS,
   RowSaveError,
   defaultColumnVisibility,
+  narrowSearchResults,
   planRowSave,
   readColumnVisibility,
   rowFromUser,
@@ -151,5 +152,24 @@ describe('saveRow', () => {
     expect(err.failure).toBe(refusal);
     expect(err.saved).toEqual({ pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC' });
     expect(c.updateProfile).not.toHaveBeenCalled();
+  });
+});
+
+describe('narrowSearchResults', () => {
+  const users: any[] = [
+    { id: 'admin', accessTier: 'ADMINISTRATOR' },
+    { id: 'tech', accessTier: 'TECHNICIAN' },
+    { id: 'client', accessTier: null, customerCategory: 'INTERNAL_CUSTOMERS' },
+    { id: 'signup', accessTier: 'CLIENT', customerCategory: 'EXTERNAL_CUSTOMER_MARKET', isDefaultExternalCustomer: true },
+    { id: 'market', accessTier: 'CLIENT', customerCategory: 'EXTERNAL_CUSTOMER_MARKET', isDefaultExternalCustomer: false }
+  ];
+  const ids = (category: string): string[] => narrowSearchResults(users, category).map((u) => u.id);
+
+  it('keeps everyone under All users', () => expect(ids('ALL')).toEqual(['admin', 'tech', 'client', 'signup', 'market']));
+  it('keeps administrators and technicians under Staff', () => expect(ids('STAFF')).toEqual(['admin', 'tech']));
+  it('keeps only legacy sign-ups under Default external', () => expect(ids('EXTERNAL_CUSTOMER_DEFAULT')).toEqual(['signup']));
+  it('keeps a named category, excluding legacy sign-ups that derive to it', () => {
+    expect(ids('EXTERNAL_CUSTOMER_MARKET')).toEqual(['market']);
+    expect(ids('INTERNAL_CUSTOMERS')).toEqual(['client']);
   });
 });

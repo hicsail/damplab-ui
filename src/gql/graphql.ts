@@ -2976,13 +2976,13 @@ export type ReviewJobInput = {
   operationId: Scalars['String']['input'];
 };
 
-/** One access tier an administrator may preview the UI as, with the permissions that tier resolves to. */
 export enum RohpStatus {
   Complete = 'COMPLETE',
   Na = 'NA',
   Need = 'NEED'
 }
 
+/** One access tier an administrator may preview the UI as, with the permissions that tier resolves to. */
 export type RolePreview = {
   __typename?: 'RolePreview';
   /** Human label for the picker. */
