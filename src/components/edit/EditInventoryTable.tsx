@@ -22,6 +22,7 @@ import { FieldPickerDialog } from './FieldPickerDialog';
 import { offeredFields, worksheetFor } from './exportFields';
 import { inventoryExportFields } from './inventoryExport';
 import * as XLSX from 'xlsx';
+import InventoryBatchImageDialog from './InventoryBatchImageDialog';
 
 export interface EditInventoryTableProps {
   searchString?: string;
@@ -55,6 +56,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
   const [previewRows, setPreviewRows] = useState<ParsedInventoryRow[] | null>(null);
   const [uploadFileName, setUploadFileName] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [batchImageOpen, setBatchImageOpen] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [imageUploadTargetId, setImageUploadTargetId] = useState<string | null>(null);
   const [uploadingImageForId, setUploadingImageForId] = useState<string | null>(null);
@@ -362,6 +364,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         {canWrite && (
           <>
             <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Upload inventory</Button>
+            <Button variant='outlined' startIcon={<AddPhotoAlternateIcon />} onClick={() => setBatchImageOpen(true)}>Batch upload images</Button>
             <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history?type=INVENTORY')}>Upload history</Button>
             <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
             <input ref={imageInputRef} type='file' accept='image/jpeg,image/png,image/webp' style={{ display: 'none' }} onChange={handleInlineImageUpload} />
@@ -384,6 +387,18 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
           onComplete={handleUploadComplete}
         />
       )}
+      <InventoryBatchImageDialog
+        open={batchImageOpen}
+        onClose={() => setBatchImageOpen(false)}
+        onComplete={(uploaded, failed) => {
+          setBatchImageOpen(false);
+          refetch();
+          const parts = [];
+          if (uploaded > 0) parts.push(`${uploaded} uploaded`);
+          if (failed > 0) parts.push(`${failed} failed`);
+          setErrorMessage(`Batch image upload complete: ${parts.join(', ')}.`);
+        }}
+      />
       <DataGrid
         rows={filteredRows}
         columns={columns}
