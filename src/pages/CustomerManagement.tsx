@@ -221,6 +221,7 @@ export default function CustomerManagement() {
     const actions: GridColDef<CustomerRow> = {
       field: 'actions',
       type: 'actions',
+      hideable: false, // Save and Cancel live here; hiding the column would strand an edit.
       headerName: 'Actions',
       width: 100,
       getActions: ({ id }) =>
