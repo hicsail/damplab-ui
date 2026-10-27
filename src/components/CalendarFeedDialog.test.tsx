@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { CalendarFeedPanel, CalendarFeedPanelProps, loadOrCreateFeed, shareInFlight } from './CalendarFeedDialog';
+import { CalendarFeedPanel, CalendarFeedPanelProps, createLoadGuard, formatLoadError, loadOrCreateFeed, shareInFlight } from './CalendarFeedDialog';
 
 const text = (el: React.ReactElement): string => renderToStaticMarkup(el).replace(/<style[^>]*>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 const noop = (): void => undefined;
@@ -70,5 +70,28 @@ describe('shareInFlight (reopen during the first load)', () => {
     await expect(shareInFlight(ref, async () => { throw new Error('x'); })).rejects.toThrow('x');
     expect(ref.current).toBeNull();
     expect(await shareInFlight(ref, async () => 'ok')).toBe('ok');
+  });
+});
+
+describe('createLoadGuard (reset during a reopen load)', () => {
+  it('drops a load that began before a reset, keeps one that began after', () => {
+    const g = createLoadGuard();
+    const stale = g.begin();
+    expect(g.isCurrent(stale)).toBe(true);
+    g.invalidate();
+    expect(g.isCurrent(stale)).toBe(false);
+    const fresh = g.begin();
+    expect(g.isCurrent(fresh)).toBe(true);
+  });
+});
+
+describe('formatLoadError', () => {
+  it('reads as a load failure, not a save failure', () => {
+    const out = formatLoadError(new Error('boom'));
+    expect(out).toBe('Could not load the calendar link. boom');
+    expect(out).not.toContain('Save failed');
+  });
+  it('has no trailing space without a detail', () => {
+    expect(formatLoadError(undefined)).toBe('Could not load the calendar link.');
   });
 });

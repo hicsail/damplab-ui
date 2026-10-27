@@ -4,7 +4,7 @@ import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogCont
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { GET_CALENDAR_FEED } from '../gql/queries';
 import { RESET_CALENDAR_FEED } from '../gql/mutations';
-import { formatSaveError } from '../utils/gqlError';
+import { formatGqlError, formatSaveError } from '../utils/gqlError';
 
 export interface FeedLink {
   url: string;
@@ -28,6 +28,30 @@ export function shareInFlight<T>(ref: { current: Promise<T> | null }, start: () 
   });
   ref.current = p;
   return p;
+}
+
+/** Wording for a failed link load; the save-oriented formatter would say "Save failed". */
+export function formatLoadError(e: unknown): string {
+  return `Could not load the calendar link. ${formatGqlError(e, '')}`.trim();
+}
+
+/**
+ * Generation counter for loads: each load takes a token, a reset invalidates every
+ * token issued so far, and a load whose token is no longer current is ignored.
+ */
+export function createLoadGuard(): { begin: () => number; invalidate: () => void; isCurrent: (token: number) => boolean } {
+  let generation = 0;
+  let issued = 0;
+  return {
+    begin: () => {
+      issued += 1;
+      return issued;
+    },
+    invalidate: () => {
+      generation = issued;
+    },
+    isCurrent: (token) => token > generation
+  };
 }
 
 export interface CalendarFeedPanelProps {
@@ -102,6 +126,8 @@ export default function CalendarFeedDialog({ open, onClose }: { open: boolean; o
   const startedRef = useRef(false);
   // The load outlives a close; reopening joins it rather than starting a second one.
   const inFlightRef = useRef<Promise<FeedLink> | null>(null);
+  // A reset that finishes while a reopen load is in flight must not be overwritten by it.
+  const guardRef = useRef(createLoadGuard());
 
   useEffect(() => {
     if (!open) {
@@ -112,14 +138,19 @@ export default function CalendarFeedDialog({ open, onClose }: { open: boolean; o
     if (startedRef.current) return;
     startedRef.current = true;
     setError(null);
+    const token = guardRef.current.begin();
     shareInFlight(inFlightRef, () =>
       loadOrCreateFeed(
         () => client.query({ query: GET_CALENDAR_FEED, fetchPolicy: 'network-only' }).then((r) => r.data?.calendarFeed ?? null),
         () => reset().then((r) => r.data.resetCalendarFeed)
       )
     )
-      .then(setFeed)
-      .catch((e) => setError(formatSaveError(e, 'the calendar link')));
+      .then((f) => {
+        if (guardRef.current.isCurrent(token)) setFeed(f);
+      })
+      .catch((e) => {
+        if (guardRef.current.isCurrent(token)) setError(formatLoadError(e));
+      });
   }, [open, client, reset]);
 
   const onCopy = async () => {
@@ -138,6 +169,7 @@ export default function CalendarFeedDialog({ open, onClose }: { open: boolean; o
     setError(null);
     try {
       const r = await reset();
+      guardRef.current.invalidate();
       setFeed(r.data.resetCalendarFeed);
       setConfirmingReset(false);
     } catch (e) {
