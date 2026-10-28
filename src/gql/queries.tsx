@@ -1472,6 +1472,27 @@ const CUSTOMER_MANAGEMENT_ROW_FIELDS = `
   isDefaultExternalCustomer
   accessTier
   showBiosecurity
+  profile {
+    userSub
+    canBookWithoutApproval
+    position
+    instrumentType
+    group
+    start
+    end
+    status
+    firstName
+    lastName
+    buId
+    preferredEmail
+    swipeCategory
+    swipeAccess
+    reportsTo
+    sciShieldTrainings
+    rohp
+    affiliations
+    updatedAt
+  }
 `;
 
 export const SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT = gql`
@@ -1713,6 +1734,7 @@ export const GET_JOB_EQUIPMENT_BOOKING = gql`
         canBook
         canBlock
         reason
+        requiresApproval
       }
       operations {
         nodeId

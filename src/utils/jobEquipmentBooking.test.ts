@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blockedMessage, bookingsForWeek, bookedHours, defaultSlotFor, formatBookingWindow, isOutsideWindow, LOCKED_MESSAGES, operationNotBookableMessage, spansForDays, spansForWeek } from './jobEquipmentBooking';
-import { awaitingApproval, bookingHistoryLines, bookingStatusColor, bookingStatusLabel, confirmedUsageLabel, declinedReason, isBookingOver, lastApproval, usageTimingWarning } from './jobEquipmentBooking';
+import { awaitingApproval, bookingSavedNotice, bookingHistoryLines, bookingStatusColor, bookingStatusLabel, confirmedUsageLabel, declinedReason, isBookingOver, lastApproval, usageTimingWarning } from './jobEquipmentBooking';
 
 describe('formatBookingWindow', () => {
   it('prints a closed window as a range', () => {
@@ -219,5 +219,18 @@ describe('confirmed usage, history and ended bookings', () => {
     expect(isBookingOver({ kind: 'TIMED', endTime: '2026-01-06T12:00:00Z' }, new Date('2026-01-06T12:00:00Z'))).toBe(true);
     expect(isBookingOver({ kind: 'TIMED', endTime: '2026-01-06T12:00:00Z' }, new Date('2026-01-06T11:59:00Z'))).toBe(false);
     expect(isBookingOver({ kind: 'QUANTITY', endTime: '2026-01-06T12:00:00Z' }, new Date('2027-01-01'))).toBe(false);
+  });
+});
+
+describe('bookingSavedNotice', () => {
+  it('tells the booker a tentative booking or change waits on the lab', () => {
+    expect(bookingSavedNotice('TENTATIVE', false)).toBe('Booking requested. The time is held for you until the lab approves it; you will be notified.');
+    expect(bookingSavedNotice('TENTATIVE', true)).toBe('Change requested. The new time is held for you until the lab approves it; you will be notified.');
+  });
+
+  it('says nothing for a confirmed booking — staff, or a client the lab lets book without approval', () => {
+    expect(bookingSavedNotice('RESERVED', false)).toBeNull();
+    expect(bookingSavedNotice('RESERVED', true)).toBeNull();
+    expect(bookingSavedNotice(undefined, false)).toBeNull();
   });
 });
