@@ -207,7 +207,9 @@ export interface RowSaveCalls {
 export class RowSaveError extends Error {
   constructor(
     readonly failure: unknown,
-    readonly saved: Partial<CustomerRow>
+    readonly saved: Partial<CustomerRow>,
+    /** The tier write's mapping result, when that call succeeded before the failure. */
+    readonly accessRoleMapped: boolean | null = null
   ) {
     super(failure instanceof Error ? failure.message : String(failure));
     this.name = 'RowSaveError';
@@ -241,7 +243,7 @@ export async function saveRow(before: CustomerRow, after: CustomerRow, calls: Ro
       await calls.updateProfile(plan.profile);
     }
   } catch (failure) {
-    throw new RowSaveError(failure, saved);
+    throw new RowSaveError(failure, saved, accessRoleMapped);
   }
   return { accessRoleMapped };
 }

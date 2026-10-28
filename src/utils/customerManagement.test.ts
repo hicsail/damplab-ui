@@ -179,6 +179,26 @@ describe('saveRow', () => {
     expect(c.setShowBiosecurity).not.toHaveBeenCalled();
     expect(c.updateProfile).not.toHaveBeenCalled();
   });
+
+  it('when Biosecurity fails after pricing and tier saved, reports both, skips the profile, and carries the mapping', async () => {
+    const c = calls();
+    c.setShowBiosecurity.mockRejectedValueOnce(new Error('boom'));
+    const after = { ...before, pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC', accessTier: 'TECHNICIAN', showBiosecurity: false, position: 'PI' };
+    const err = await saveRow(before, after, c).catch((e) => e);
+    expect(err).toBeInstanceOf(RowSaveError);
+    expect(err.saved).toEqual({ pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC', accessTier: 'TECHNICIAN' });
+    expect(c.updateProfile).not.toHaveBeenCalled();
+    expect(err.accessRoleMapped).toBe(true);
+  });
+
+  it('keeps an unmapped-role result when a later profile write fails', async () => {
+    const c = calls();
+    c.setTier.mockResolvedValueOnce({ accessRoleMapped: false });
+    c.updateProfile.mockRejectedValueOnce(new Error('boom'));
+    const err = await saveRow(before, { ...before, accessTier: 'TECHNICIAN', position: 'PI' }, c).catch((e) => e);
+    expect(err).toBeInstanceOf(RowSaveError);
+    expect(err.accessRoleMapped).toBe(false);
+  });
 });
 
 describe('narrowSearchResults', () => {

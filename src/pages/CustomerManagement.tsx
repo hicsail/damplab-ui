@@ -141,7 +141,11 @@ export default function CustomerManagement() {
       reload();
       return after;
     } catch (e) {
-      if (e instanceof RowSaveError) savedSoFar.current[after.id] = { ...savedSoFar.current[after.id], ...e.saved };
+      if (e instanceof RowSaveError) {
+        savedSoFar.current[after.id] = { ...savedSoFar.current[after.id], ...e.saved };
+        // The tier write may have succeeded and granted nothing before a later call failed.
+        if (e.accessRoleMapped === false) setUnmappedRoleUser(after.name);
+      }
       throw e;
     }
   };
@@ -153,16 +157,22 @@ export default function CustomerManagement() {
 
   const onRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
     if (params.reason === GridRowEditStopReasons.rowFocusOut) event.defaultMuiPrevented = true;
+    // Escape discards the edit like Cancel does, so it must also drop a partial save's bookkeeping.
+    if (params.reason === GridRowEditStopReasons.escapeKeyDown) discardSavedSoFar(params.id);
+  };
+
+  const discardSavedSoFar = (id: GridRowId): void => {
+    if (savedSoFar.current[String(id)]) {
+      delete savedSoFar.current[String(id)];
+      reload();
+    }
   };
 
   const startEdit = (id: GridRowId): void => setRowModesModel((m) => ({ ...m, [id]: { mode: GridRowModes.Edit } }));
   const save = (id: GridRowId): void => setRowModesModel((m) => ({ ...m, [id]: { mode: GridRowModes.View } }));
   const cancel = (id: GridRowId): void => {
     setRowModesModel((m) => ({ ...m, [id]: { mode: GridRowModes.View, ignoreModifications: true } }));
-    if (savedSoFar.current[String(id)]) {
-      delete savedSoFar.current[String(id)];
-      reload();
-    }
+    discardSavedSoFar(id);
   };
 
   const labelOf = (options: { value: string; label: string }[], value: string): string => options.find((o) => o.value === value)?.label ?? '';
@@ -234,7 +244,7 @@ export default function CustomerManagement() {
             ]
           : [<GridActionsCellItem key="edit" icon={<Edit />} label="Edit" onClick={() => startEdit(id)} color="inherit" />]
     };
-    // Actions first: with 22 columns, a trailing Save would sit off-screen.
+    // Actions first: with 23 columns, a trailing Save would sit off-screen.
     return [actions, ...dataColumns];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowModesModel, ownSubject, reload]);
