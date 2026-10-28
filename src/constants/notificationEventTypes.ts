@@ -73,6 +73,12 @@ export const NOTIFICATION_EVENT_TYPES: readonly NotificationEventTypeDef[] = [
     supportsEmail: true,
   },
   {
+    eventType: "EQUIPMENT_BOOKING_BOOKED",
+    label: "Equipment Booked Without Approval",
+    description: "A client the lab lets book without approval booked or moved equipment time",
+    supportsEmail: false,
+  },
+  {
     eventType: "EQUIPMENT_BOOKING_APPROVED",
     label: "Equipment Booking Approved",
     description: "The lab approved your equipment booking",

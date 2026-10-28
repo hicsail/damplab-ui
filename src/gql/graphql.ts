@@ -904,6 +904,38 @@ export enum CustomerManagementUserListCategory {
   Staff = 'STAFF'
 }
 
+/** Customer Management's stored record for one user. All fields null and the flag false when nothing is stored. */
+export type CustomerProfile = {
+  __typename?: 'CustomerProfile';
+  affiliations?: Maybe<Scalars['String']['output']>;
+  buId?: Maybe<Scalars['String']['output']>;
+  /** When true, this user's job equipment bookings are created RESERVED, with no approval step. */
+  canBookWithoutApproval: Scalars['Boolean']['output'];
+  end?: Maybe<Scalars['String']['output']>;
+  firstName?: Maybe<Scalars['String']['output']>;
+  group?: Maybe<Scalars['String']['output']>;
+  instrumentType?: Maybe<Scalars['String']['output']>;
+  lastName?: Maybe<Scalars['String']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  preferredEmail?: Maybe<Scalars['String']['output']>;
+  reportsTo?: Maybe<Scalars['String']['output']>;
+  rohp?: Maybe<RohpStatus>;
+  sciShieldTrainings?: Maybe<SciShieldTrainings>;
+  start?: Maybe<Scalars['String']['output']>;
+  status?: Maybe<CustomerProfileStatus>;
+  swipeAccess?: Maybe<Scalars['String']['output']>;
+  swipeCategory?: Maybe<SwipeCategory>;
+  updatedAt?: Maybe<Scalars['DateTime']['output']>;
+  updatedBySub?: Maybe<Scalars['String']['output']>;
+  userSub: Scalars['ID']['output'];
+};
+
+export enum CustomerProfileStatus {
+  Active = 'ACTIVE',
+  Inactive = 'INACTIVE',
+  Onboarding = 'ONBOARDING'
+}
+
 /** Services supported by the DampLab */
 export type DampLabService = {
   __typename?: 'DampLabService';
@@ -1562,6 +1594,8 @@ export type KeycloakUserCustomerManagement = {
   /** True when the user's only pricing-group membership is the legacy `external-customer` (the default group new sign-ups land in). Lets staff distinguish a user who has not been explicitly categorized yet from one who is intentionally in External — market. */
   isDefaultExternalCustomer?: Maybe<Scalars['Boolean']['output']>;
   lastName?: Maybe<Scalars['String']['output']>;
+  /** The stored Customer Management record for this user; all fields null when none is stored. */
+  profile: CustomerProfile;
   username?: Maybe<Scalars['String']['output']>;
 };
 
@@ -1729,6 +1763,8 @@ export type Mutation = {
   updateCategory: Category;
   /** Update an existing comment */
   updateComment: Comment;
+  /** Administrator: set a user's stored Customer Management fields. */
+  updateCustomerProfile: CustomerProfile;
   updateInventoryItem: InventoryItem;
   /** Update notification preferences. */
   updateNotificationPreferences: NotificationPreferences;
@@ -2191,6 +2227,12 @@ export type MutationUpdateCategoryArgs = {
 export type MutationUpdateCommentArgs = {
   id: Scalars['ID']['input'];
   input: UpdateCommentInput;
+};
+
+
+export type MutationUpdateCustomerProfileArgs = {
+  input: UpdateCustomerProfileInput;
+  userId: Scalars['ID']['input'];
 };
 
 
@@ -2934,6 +2976,12 @@ export type ReviewJobInput = {
   operationId: Scalars['String']['input'];
 };
 
+export enum RohpStatus {
+  Complete = 'COMPLETE',
+  Na = 'NA',
+  Need = 'NEED'
+}
+
 /** One access tier an administrator may preview the UI as, with the permissions that tier resolves to. */
 export type RolePreview = {
   __typename?: 'RolePreview';
@@ -3280,6 +3328,13 @@ export type SaveWorkflowInput = {
   /** Existing Workflow to reconcile against. Omit for a tree created by this edit. */
   workflowId?: InputMaybe<Scalars['ID']['input']>;
 };
+
+export enum SciShieldTrainings {
+  Certificates = 'CERTIFICATES',
+  Complete = 'COMPLETE',
+  NaBsl1 = 'NA_BSL1',
+  Need = 'NEED'
+}
 
 export type SectionInitialsInput = {
   /** Initials as typed by the signer */
@@ -3697,6 +3752,11 @@ export enum StepMappingStatus {
   Unmapped = 'UNMAPPED'
 }
 
+export enum SwipeCategory {
+  DampPersonnel = 'DAMP_PERSONNEL',
+  DampUser = 'DAMP_USER'
+}
+
 /** Represents an Excel template configuration */
 export type Template = {
   __typename?: 'Template';
@@ -3794,6 +3854,26 @@ export type UpdateCommentInput = {
   content?: InputMaybe<Scalars['String']['input']>;
   /** Updated visibility setting */
   isInternal?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+export type UpdateCustomerProfileInput = {
+  affiliations?: InputMaybe<Scalars['String']['input']>;
+  buId?: InputMaybe<Scalars['String']['input']>;
+  canBookWithoutApproval?: InputMaybe<Scalars['Boolean']['input']>;
+  end?: InputMaybe<Scalars['String']['input']>;
+  firstName?: InputMaybe<Scalars['String']['input']>;
+  group?: InputMaybe<Scalars['String']['input']>;
+  instrumentType?: InputMaybe<Scalars['String']['input']>;
+  lastName?: InputMaybe<Scalars['String']['input']>;
+  position?: InputMaybe<Scalars['String']['input']>;
+  preferredEmail?: InputMaybe<Scalars['String']['input']>;
+  reportsTo?: InputMaybe<Scalars['String']['input']>;
+  rohp?: InputMaybe<RohpStatus>;
+  sciShieldTrainings?: InputMaybe<SciShieldTrainings>;
+  start?: InputMaybe<Scalars['String']['input']>;
+  status?: InputMaybe<CustomerProfileStatus>;
+  swipeAccess?: InputMaybe<Scalars['String']['input']>;
+  swipeCategory?: InputMaybe<SwipeCategory>;
 };
 
 export type UpdateNotificationPreferencesInput = {

@@ -839,6 +839,33 @@ export const SET_USER_SHOW_BIOSECURITY = gql`
   }
 `;
 
+/** Administrator: the stored Customer Management fields. Never touches Keycloak. */
+export const UPDATE_CUSTOMER_PROFILE = gql`
+  mutation UpdateCustomerProfile($userId: ID!, $input: UpdateCustomerProfileInput!) {
+    updateCustomerProfile(userId: $userId, input: $input) {
+      userSub
+      canBookWithoutApproval
+      position
+      instrumentType
+      group
+      start
+      end
+      status
+      firstName
+      lastName
+      buId
+      preferredEmail
+      swipeCategory
+      swipeAccess
+      reportsTo
+      sciShieldTrainings
+      rohp
+      affiliations
+      updatedAt
+    }
+  }
+`;
+
 const BOOKING_RESULT_FIELDS = `
   _id
   inventoryName

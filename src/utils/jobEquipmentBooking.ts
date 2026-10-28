@@ -225,6 +225,18 @@ export function bookingStatusColor(b: BookingStatusLike): 'default' | 'warning' 
 export const awaitingApproval = <T extends { status?: string | null }>(bookings: T[]): T[] => bookings.filter((b) => b.status === 'TENTATIVE');
 
 /**
+ * What the calendar says after a save, from the status the server returned. The
+ * server decides whether a booking waits on the lab (staff, and clients Customer
+ * Management lets book without approval, get RESERVED), so the UI never infers it.
+ */
+export function bookingSavedNotice(status: string | null | undefined, editing: boolean): string | null {
+  if (status !== 'TENTATIVE') return null;
+  return editing
+    ? 'Change requested. The new time is held for you until the lab approves it; you will be notified.'
+    : 'Booking requested. The time is held for you until the lab approves it; you will be notified.';
+}
+
+/**
  * Why recording usage now is premature, or null when the booked time is over.
  * Staff confirm the hours actually used, so a booking still ahead of them (or
  * still running) normally has nothing to confirm yet. A warning, not a block:
