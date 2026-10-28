@@ -1966,6 +1966,15 @@ export const GET_INVENTORY_AVAILABILITY = gql`
   }
 `;
 
+export const GET_CALENDAR_FEED = gql`
+  query CalendarFeed {
+    calendarFeed {
+      url
+      createdAt
+    }
+  }
+`;
+
 export const GET_API_KEYS = gql`
   query ApiKeys {
     apiKeys {

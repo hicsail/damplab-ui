@@ -996,6 +996,15 @@ export const CREATE_API_KEY = gql`
   }
 `;
 
+export const RESET_CALENDAR_FEED = gql`
+  mutation ResetCalendarFeed {
+    resetCalendarFeed {
+      url
+      createdAt
+    }
+  }
+`;
+
 export const REVOKE_API_KEY = gql`
   mutation RevokeApiKey($id: ID!) {
     revokeApiKey(id: $id) {
