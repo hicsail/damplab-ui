@@ -35,6 +35,8 @@ interface Props {
   defaultDetailsOpen?: boolean;
   /** Extra content beside the title, e.g. a document's reference number. */
   titleExtra?: React.ReactNode;
+  /** Makes the status pane a button (the Biosecurity card opens the latest screening run). */
+  onStatusPaneClick?: () => void;
   cardRef?: React.Ref<HTMLDivElement>;
 }
 
@@ -52,6 +54,7 @@ export default function ProcessCard({
   defaultExpanded = false,
   defaultDetailsOpen = false,
   titleExtra,
+  onStatusPaneClick,
   cardRef
 }: Props): React.JSX.Element {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -147,8 +150,22 @@ export default function ProcessCard({
                 gap: 1,
                 minHeight: STATUS_PANE_MIN_HEIGHT,
                 boxSizing: 'border-box',
+                cursor: onStatusPaneClick ? 'pointer' : undefined,
                 ...statusPaneSx
               }}
+              {...(onStatusPaneClick
+                ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    onClick: onStatusPaneClick,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onStatusPaneClick();
+                      }
+                    }
+                  }
+                : {})}
             >
               <Box sx={{ flex: 1, minWidth: 0 }}>{statusPane}</Box>
             </Box>
