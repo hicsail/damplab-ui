@@ -23,9 +23,9 @@ describe('Parameter List — download rows (rules 15, 18, 24)', () => {
   it('writes each set parameter once under its set, then each operation’s own parameters', () => {
     expect(parameterListExportRows(catalog)).toEqual([
       COLUMNS,
-      ['volume', 'Buffers', '', 'Volume', 'In µL', 'Y', 'Number', '', '>=1 && <=50', '', 'N', '', '', ''],
-      ['sample_type', 'Buffers', '', 'Sample Type', '', 'N', 'Checkboxes', 'Bacteria; Other', '', '', 'Y', '', '', ''],
-      ['cycles', '', 'PCR', 'Cycles', '', 'N', 'Number', '', '>0 && integer', '', 'N', '', '', '30']
+      ['volume', 'Buffers', '', 'Volume', 'In µL', 'Y', 'Number', '', '>=1 && <=50', '', 'N', '', '', '', 'N', ''],
+      ['sample_type', 'Buffers', '', 'Sample Type', '', 'N', 'Checkboxes', 'Bacteria; Other', '', '', 'Y', '', '', '', 'N', ''],
+      ['cycles', '', 'PCR', 'Cycles', '', 'N', 'Number', '', '>0 && integer', '', 'N', '', '', '30', 'N', '']
     ]);
   });
 
@@ -563,5 +563,53 @@ describe('Parameter List — Table rows (table-upload rules 3, 8–12, 13a)', ()
     expect(result.rows[0].errors).toEqual([]);
     expect(result.rows[0].warnings).toEqual(['A Table holds one file; allowMultiple is ignored.']);
     expect(nextOf(result).allowMultipleValues).toBe(false);
+  });
+});
+
+describe('Parameter List — screening columns (biosecurity-update behaviour 5)', () => {
+  const plates: any = {
+    id: 'op9', name: 'Plates', parameterSetIds: [],
+    ownParameters: [
+      { id: 'insert', name: 'Insert', type: 'string', screening: true },
+      { id: 'plate', name: 'Plate map', type: 'table', tableData: { columns: [{ header: 'Well', field: 'well' }, { header: 'Insert', field: 'insert' }] }, screening: true, screeningFields: ['Insert', 'Well'] }
+    ]
+  };
+  const cat = catalogOf({ operations: [plates] });
+
+  it('writes screening as Y/N and screeningFields as a “; ” list', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    const at = (row: string[], column: string) => row[header.indexOf(column)];
+    expect(rows.map((r) => [at(r, 'screening'), at(r, 'screeningFields')])).toEqual([['Y', ''], ['Y', 'Insert; Well']]);
+  });
+
+  it('uploaded unchanged, plans no changes', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    const result = plan(header, rows, none, cat);
+    expect(result.rows.map((r) => [r.action, r.errors])).toEqual([['unchanged', []], ['unchanged', []]]);
+  });
+
+  it('turns screening on and off, and sets the columns', () => {
+    const [header, first, second] = parameterListExportRows(cat);
+    const off = [...first];
+    off[header.indexOf('screening')] = 'No';
+    const cols = [...second];
+    cols[header.indexOf('screeningFields')] = 'insert';
+    const result = plan(header, [off, cols], none, cat);
+    expect(result.rows.map((r) => r.action)).toEqual(['update', 'update']);
+    const built = buildOwnerParameters(result.work.owners[0], new Set(result.rows.map((r) => r.key)));
+    expect(built[0]).not.toHaveProperty('screening');
+    expect(built[1].screeningFields).toEqual(['insert']);
+  });
+
+  it('refuses what the editor refuses', () => {
+    // New rows under the default catalog's `Buffers` set, as the matrix test above does.
+    expect(plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Cycles2', 'Number', 'Y']]).rows[0].errors).toEqual(['screening: Only Text and Table parameters can require screening.']);
+    expect(plan(['parameterSet', 'parameter', 'type', 'options', 'screening'], [['Buffers', 'Grid', 'Table', 'Well; Insert', 'Y']]).rows[0].errors).toEqual([
+      'screening: A Table that requires screening needs at least one screening column.'
+    ]);
+    expect(plan(['parameterSet', 'parameter', 'type', 'options', 'screening', 'screeningFields'], [['Buffers', 'Grid', 'Table', 'Well', 'Y', 'Vector']]).rows[0].errors).toEqual([
+      'screening: Screening column “Vector” is not one of this Table\'s columns.'
+    ]);
+    expect(plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Notes2', 'Text', 'maybe']]).rows[0].errors).toEqual(['screening: “maybe” must be Y or N.']);
   });
 });

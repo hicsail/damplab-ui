@@ -46,7 +46,7 @@ export function buildWorkbookData(catalog: CatalogSnapshot, options: { includePr
   return {
     sheets: [
       { title: SHEET_TITLES.operations, rows: operations, dropdowns: operationDropdowns },
-      { title: SHEET_TITLES.parameterList, rows: parameterListExportRows(catalog), dropdowns: { required: 'yesNo', type: 'types', multipleSelectionType: 'multipleSelection' } },
+      { title: SHEET_TITLES.parameterList, rows: parameterListExportRows(catalog), dropdowns: { required: 'yesNo', type: 'types', multipleSelectionType: 'multipleSelection', screening: 'yesNo' } },
       { title: SHEET_TITLES.bundles, rows: bundlesExportRows(catalog), dropdowns: { Operation: 'operations' } },
       { title: SHEET_TITLES.sowSections, rows: sowSectionsExportRows(catalog), dropdowns: {} }
     ],
