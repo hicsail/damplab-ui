@@ -1,7 +1,11 @@
 import {
+  Autocomplete,
   Box,
   Button,
+  Checkbox,
   Chip,
+  FormControlLabel,
+  FormHelperText,
   Grid,
   IconButton,
   List,
@@ -39,6 +43,8 @@ import { columnsError, columnsText } from '../../../utils/tableColumns';
 import SampleSheetTemplateField, { SampleSheetTemplateOwner } from '../SampleSheetTemplateField';
 import { createDragKey, EditableParameter, renamePatch } from './parameterSave';
 import { matrixError } from '../../../utils/parameterMatrix';
+import { isScreenableType } from '../../../utils/parameterValidation';
+import { screeningColumnOptions, screeningFieldError, screeningFieldsOf } from './screeningField';
 import { applyAllowMultiple, applyMultipleSelectionType, applyTypeChoice, applyValidationText, CHECKBOXES_CHOICE, multipleSelectionTypeOf, MultipleSelectionType, typeChoiceOf, validationError, validationText } from './parameterTypeChoice';
 import { ConditionContext, NO_CONDITION_CONTEXT, SHOW_IF_EXAMPLE, SHOW_IF_HELP, showIfError, showIfText, showIfWarning } from './showIfField';
 
@@ -368,6 +374,25 @@ export default function ParameterListEditor({
                 />
               </Grid>
 
+              {isScreenableType(selectedParameter.type) && (
+                <Grid size={{ xs: 12, md: 4 }}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={selectedParameter.screening === true}
+                        onChange={(event) => updateParameter(selectedParameterIndex, { screening: event.target.checked })}
+                      />
+                    }
+                    label='Requires screening'
+                  />
+                  <FormHelperText>
+                    {isTableType(selectedParameter.type)
+                      ? 'Sequences in the chosen columns of an uploaded file are sent to biosecurity screening.'
+                      : 'The answer is a DNA sequence and is sent to biosecurity screening.'}
+                  </FormHelperText>
+                </Grid>
+              )}
+
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
                   label='Fallback price'
@@ -657,6 +682,26 @@ export default function ParameterListEditor({
                       'One column name per line, in order. Customers download a template with these headings, fill in one row per entry and upload it. An upload must carry every column; when this parameter has a price, it is charged once per row.'
                     }
                     onChange={(event) => updateParameter(selectedParameterIndex, { _columnsText: event.target.value })}
+                  />
+                </Grid>
+              )}
+
+              {isTableType(selectedParameter.type) && selectedParameter.screening === true && (
+                <Grid size={12}>
+                  <Autocomplete
+                    multiple
+                    freeSolo
+                    options={screeningColumnOptions(selectedParameter)}
+                    value={screeningFieldsOf(selectedParameter)}
+                    onChange={(_event, value) => updateParameter(selectedParameterIndex, { screeningFields: value.map((field) => String(field)) })}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label='Screening columns'
+                        error={Boolean(screeningFieldError(selectedParameter))}
+                        helperText={screeningFieldError(selectedParameter) ?? 'Every non-empty cell in these columns of an uploaded file is screened as a sequence.'}
+                      />
+                    )}
                   />
                 </Grid>
               )}

@@ -1,6 +1,7 @@
 import { GridRowModel } from "@mui/x-data-grid";
 import { validationError } from './parameterTypeChoice';
 import { matrixError } from '../../../utils/parameterMatrix';
+import { screeningRuleViolation } from '../../../utils/parameterValidation';
 import { isTableType, tableIsSetUp } from '../../../utils/sampleSheetValue';
 
 export interface ParameterValidationError {
@@ -64,6 +65,11 @@ export function validateParameter(row: GridRowModel, options: ParameterValidatio
   // A Table needs a column or a staff template, or no upload could be checked against it. Held only when this edit is what leaves it so.
   if (isTableType(row.type) && !tableIsSetUp(row) && !options.tableUntouched) {
     errors.push({ field: "Columns", errorMsg: "Add at least one column." });
+  }
+
+  const screeningProblem = screeningRuleViolation(row);
+  if (screeningProblem) {
+    errors.push({ field: "Screening columns", errorMsg: screeningProblem });
   }
 
   return errors;

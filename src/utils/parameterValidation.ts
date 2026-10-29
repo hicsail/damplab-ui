@@ -1,3 +1,5 @@
+import { expectedColumnsOf, isTableType } from './sampleSheetValue';
+
 /**
  * A Number parameter's validation: one stored string such as
  * `>0 && <100 && integer`.
@@ -74,4 +76,31 @@ export function effectiveValidation(param: unknown): string {
   if (min !== undefined) parts.push(`>=${min}`);
   if (max !== undefined) parts.push(`<=${max}`);
   return parts.join(' && ');
+}
+
+/** A parameter type that can carry `screening: true`: Text, and a Table under either stored string. */
+export const isScreenableType = (type: unknown): boolean => type === 'string' || isTableType(type);
+
+/**
+ * The screening flag's rules. Mirrors screeningRuleViolation in
+ * damplab-backend/src/services/parameter-validation.ts — same sentences. The server also checks
+ * a template-only Table against its template's header; the editor cannot read the template.
+ */
+export function screeningRuleViolation(param: unknown): string | null {
+  if (!param || typeof param !== 'object') return null;
+  const p = param as { type?: unknown; screening?: unknown; screeningFields?: unknown };
+  const isTable = isTableType(p.type);
+  if (p.screening !== undefined && p.screening !== null && typeof p.screening !== 'boolean') return '“Requires screening” must be true or false.';
+  if (p.screening === true && !isScreenableType(p.type)) return 'Only Text and Table parameters can require screening.';
+  const hasFields = p.screeningFields !== undefined && p.screeningFields !== null;
+  if (hasFields && !isTable) return 'Only a Table has screening columns.';
+  if (hasFields && (!Array.isArray(p.screeningFields) || p.screeningFields.some((field) => typeof field !== 'string'))) return 'Screening columns must be a list of column names.';
+  if (p.screening !== true || !isTable) return null;
+  const fields = ((p.screeningFields as string[] | undefined) ?? []).map((field) => field.trim()).filter((field) => field !== '');
+  if (fields.length === 0) return 'A Table that requires screening needs at least one screening column.';
+  const columns = expectedColumnsOf(param);
+  if (columns.length === 0) return null;
+  const known = new Set(columns.map((column) => column.toLowerCase()));
+  const unknown = fields.find((field) => !known.has(field.toLowerCase()));
+  return unknown ? `Screening column “${unknown}” is not one of this Table's columns.` : null;
 }
