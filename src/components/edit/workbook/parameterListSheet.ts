@@ -271,6 +271,12 @@ function applyCells(
   // Only a create, or a row that touches type or options, is held to this: an unrelated edit to a stored zero-option dropdown goes through.
   if (next.type === 'dropdown' && optionsOf(next).length === 0 && (isNew || has('type') || has('options'))) errors.push('A Dropdown or Checkboxes parameter needs at least one option.');
 
+  // A flagged parameter whose type cell moves it off Text/Table loses the flag, as in the editor (parameterSave.ts).
+  if (has('type') && !has('screening') && !isScreenableType(next.type) && next.screening === true) {
+    delete next.screening;
+    delete next.screeningFields;
+    warnings.push('Requires screening removed: only Text and Table parameters can be screened.');
+  }
   if (has('screening')) {
     const value = parseYesNo(cell('screening'));
     if (value === 'invalid') errors.push(`screening: “${cell('screening')}” must be Y or N.`);

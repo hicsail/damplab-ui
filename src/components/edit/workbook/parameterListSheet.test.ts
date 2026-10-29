@@ -612,4 +612,21 @@ describe('Parameter List — screening columns (biosecurity-update behaviour 5)'
     ]);
     expect(plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Notes2', 'Text', 'maybe']]).rows[0].errors).toEqual(['screening: “maybe” must be Y or N.']);
   });
+
+  it('a flagged Text turned into Number, with no screening column, loses the flag with a warning', () => {
+    const [header, first] = parameterListExportRows(cat);
+    const row = [first[header.indexOf('parameterId')], first[header.indexOf('operation')], first[header.indexOf('parameter')], 'Number'];
+    const result = plan(['parameterId', 'operation', 'parameter', 'type'], [row], none, cat);
+    expect(result.rows[0].errors).toEqual([]);
+    expect(result.rows[0].warnings).toEqual(['Requires screening removed: only Text and Table parameters can be screened.']);
+    const built = buildOwnerParameters(result.work.owners[0], new Set(result.rows.map((r) => r.key)));
+    expect(built[0]).not.toHaveProperty('screening');
+  });
+
+  it('an explicit screening Y on a Number still errors', () => {
+    // A new row, so the cell counts as given; on a stored flagged row an unchanged Y is not a given cell.
+    const result = plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Cycles3', 'Number', 'Y']]);
+    expect(result.rows[0].errors).toEqual(['screening: Only Text and Table parameters can require screening.']);
+    expect(result.rows[0].warnings).toEqual([]);
+  });
 });
