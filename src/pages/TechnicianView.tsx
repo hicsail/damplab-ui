@@ -355,6 +355,7 @@ export default function TechnicianView() {
   const [loadRunBatch, { data: runBatchData, loading: runBatchLoading }] =
     useLazyQuery<{ screeningBatch: ScreeningBatch | null }>(GET_SCREENING_BATCH, { fetchPolicy: "network-only" });
   const [screeningRunModalOpen, setScreeningRunModalOpen] = useState(false);
+  const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   // Mints the customer's hosted verification URL. Staff only ever copy it or
   // open the hosted page for a customer on a call — never the embed.
   const [startJobCustomerVerification, { loading: mintingVerificationLink }] =
@@ -537,6 +538,7 @@ export default function TechnicianView() {
   };
 
   const handleOpenScreeningRun = async (runId: string) => {
+    setRequestedRunId(runId);
     setScreeningRunModalOpen(true);
     const result = await loadScreeningRun({ variables: { id: runId } });
     const batchId = result.data?.screeningRun?.secureDna?.batchId;
@@ -1607,8 +1609,8 @@ export default function TechnicianView() {
         />
         <ScreeningRunDetailsModal
           open={screeningRunModalOpen}
-          run={screeningRunData?.screeningRun ?? null}
-          loading={screeningRunLoading}
+          run={screeningRunData?.screeningRun?.id === requestedRunId ? (screeningRunData?.screeningRun ?? null) : null}
+          loading={screeningRunLoading || (!screeningRunError && screeningRunData?.screeningRun?.id !== requestedRunId)}
           error={screeningRunError ? formatGqlError(screeningRunError, "Could not load the screening run.") : null}
           batch={runBatchData?.screeningBatch ?? null}
           batchLoading={runBatchLoading}

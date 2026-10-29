@@ -159,6 +159,8 @@ export default function ProcessCard({
                     tabIndex: 0,
                     onClick: onStatusPaneClick,
                     onKeyDown: (e: React.KeyboardEvent) => {
+                      // Keys pressed on an inner button (rerun, verify) belong to that button.
+                      if (e.target !== e.currentTarget) return;
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         onStatusPaneClick();

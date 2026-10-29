@@ -58,7 +58,9 @@ interface ContentProps {
 }
 
 /** One screening run: the sequences, Aclid's report, SecureDNA's batch, the raw JSON. */
-export function ScreeningRunDetailsContent({ run, batch, batchLoading = false }: ContentProps): React.JSX.Element {
+export function ScreeningRunDetailsContent({ run, batch: batchProp, batchLoading = false }: ContentProps): React.JSX.Element {
+  // Only ever show the batch that belongs to this run (a stale one from a previously opened run is ignored).
+  const batch = batchProp && run.secureDna?.batchId && batchProp.id === run.secureDna.batchId ? batchProp : null;
   const [openRow, setOpenRow] = useState<string | null>(null);
   const aclid = run.aclid;
   const raw = (aclid?.raw && typeof aclid.raw === 'object' ? aclid.raw : {}) as Record<string, unknown>;

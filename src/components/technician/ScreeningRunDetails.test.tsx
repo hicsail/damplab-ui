@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import ScreeningHistory from './ScreeningHistory';
 import { ScreeningRunDetailsContent } from './ScreeningRunDetailsModal';
 import type { ScreeningRunDetail } from './screeningRunTypes';
+import type { ScreeningBatch } from '../../securedna/types';
 
 const run: ScreeningRunDetail = {
   id: 'r1', jobId: 'j1', trigger: 'RERUN', triggeredBy: 'staff@bu.edu', status: 'FAILED', startedAt: '2026-10-29T16:05:00.000Z', completedAt: '2026-10-29T16:06:00.000Z',
@@ -38,5 +39,19 @@ describe('screening run details (biosecurity-update)', () => {
   it('the history reads “No screenings recorded yet” with no runs, and a dropdown otherwise (behaviour 10)', () => {
     expect(renderToStaticMarkup(<ScreeningHistory runs={[]} onSelect={() => undefined} />)).toContain('No screenings recorded yet');
     expect(renderToStaticMarkup(<ScreeningHistory runs={[run]} onSelect={() => undefined} />)).toContain('Screening history (1)');
+  });
+});
+
+describe('screening run details, stale batch guard', () => {
+  const batchFor = (id: string) => ({ id, batchRunId: 'run-x', region: 'us', synthesisPermission: 'granted', screeningCompletedAt: '2026-10-29T16:05:00.000Z', created_at: '2026-10-29T16:05:00.000Z', sequences: [{ name: 's1', recordId: 'r', order: 0, threats: [{}, {}] }] }) as unknown as ScreeningBatch;
+  const withBatch = { ...run, secureDna: { batchId: 'b1', status: 'PASSED' as const, detail: null } };
+  it('ignores a batch whose id differs from the run’s batchId', () => {
+    const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={withBatch} batch={batchFor('other')} />);
+    expect(html).not.toContain('Batch run id');
+    expect(html).not.toMatch(/align-right[^>]*>2</);
+  });
+  it('uses the batch when the ids match', () => {
+    const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={withBatch} batch={batchFor('b1')} />);
+    expect(html).toContain('Batch run id');
   });
 });
