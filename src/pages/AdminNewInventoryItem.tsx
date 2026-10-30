@@ -1,4 +1,4 @@
-import { useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import {
   Alert,
   Box,
@@ -16,9 +16,10 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { CREATE_INVENTORY_ITEM, GET_STATIONS } from '../gql/queries';
+import { CREATE_INVENTORY_ITEM, GET_STATIONS, UPDATE_INVENTORY_ITEM } from '../gql/queries';
+import { CREATE_INVENTORY_IMAGE_UPLOAD_URL } from '../gql/mutations';
 import { EMPTY_RATE_PRICING, InventoryRateFields, RatePricing, ratePricingToInput } from '../components/edit/InventoryRateFields';
 import { formatSaveError } from '../utils/gqlError';
 import { RequirePermissionOrRedirect } from '../components/PermissionGate';
@@ -31,6 +32,7 @@ import {
   InventoryDetails,
   inventoryDetailsToInput
 } from '../components/edit/InventoryDetailFields';
+import InventoryImageUpload, { uploadStagedImage } from '../components/edit/InventoryImageUpload';
 
 /** One editable row of the placement editor: where the item lives and how many are there. */
 interface PlacementRow {
@@ -57,6 +59,8 @@ function AdminNewInventoryItemForm() {
   const [rateType, setRateType] = useState<'HOURLY' | 'PER_UNIT'>('HOURLY');
   const [pricing, setPricing] = useState<RatePricing>(EMPTY_RATE_PRICING);
   const [details, setDetails] = useState<InventoryDetails>(EMPTY_INVENTORY_DETAILS);
+  const [stagedImageFile, setStagedImageFile] = useState<File | null>(null);
+  const [createUploadUrl] = useMutation(CREATE_INVENTORY_IMAGE_UPLOAD_URL);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -87,7 +91,7 @@ function AdminNewInventoryItemForm() {
       .map((p) => ({ stationId: p.stationId, quantity: parsePlacementQuantity(p.quantity) }));
     try {
       setIsSaving(true);
-      await client.mutate({
+      const result = await client.mutate({
         mutation: CREATE_INVENTORY_ITEM,
         variables: {
           item: {
@@ -103,6 +107,18 @@ function AdminNewInventoryItemForm() {
           }
         }
       });
+
+      // If there's a staged image, upload it now that we have an item ID
+      const newItemId = result.data?.createInventoryItem?.id;
+      if (stagedImageFile && newItemId) {
+        await uploadStagedImage(
+          stagedImageFile,
+          newItemId,
+          createUploadUrl,
+          (vars) => client.mutate({ mutation: UPDATE_INVENTORY_ITEM, ...vars })
+        );
+      }
+
       navigate('/edit');
     } catch (error) {
       console.error('Create inventory item failed:', error);
@@ -214,6 +230,11 @@ function AdminNewInventoryItemForm() {
         multiline
         minRows={3}
         placeholder='Model, capabilities, notes…'
+      />
+
+      <InventoryImageUpload
+        onImageKeyChange={() => {/* key set after create via uploadStagedImage */}}
+        onFileStaged={setStagedImageFile}
       />
 
       {/* Tags, model/serial, service contract and dimensions all live in

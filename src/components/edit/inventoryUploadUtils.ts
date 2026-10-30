@@ -23,6 +23,7 @@ export interface ParsedInventoryRow {
   dimensionL: string;
   dimensionW: string;
   dimensionH: string;
+  imageUrl: string;
   /** Warnings to show in the preview (e.g. unknown type, station not found). */
   warnings: string[];
 }
@@ -71,7 +72,9 @@ const HEADER_MAP: Record<string, keyof ParsedInventoryRow> = {
   servicecontractexpirationdate: 'serviceContractExpiration',
   lm: 'dimensionL',
   wm: 'dimensionW',
-  hm: 'dimensionH'
+  hm: 'dimensionH',
+  imageurl: 'imageUrl',
+  image: 'imageUrl'
 };
 
 export function headerFieldFor(header: unknown): keyof ParsedInventoryRow | undefined {
@@ -176,6 +179,7 @@ export function parseInventoryRows(data: unknown[][]): {
       dimensionL: cellStr(raw, indices.dimensionL),
       dimensionW: cellStr(raw, indices.dimensionW),
       dimensionH: cellStr(raw, indices.dimensionH),
+      imageUrl: cellStr(raw, indices.imageUrl),
       warnings
     };
 
@@ -333,7 +337,8 @@ export const UPLOAD_COLUMNS = [
   { key: 'modelNumber', label: 'Model #' },
   { key: 'serialNumber', label: 'Serial #' },
   { key: 'hasServiceContract', label: 'Service Contract' },
-  { key: 'dimensions', label: 'Dimensions (L/W/H)' }
+  { key: 'dimensions', label: 'Dimensions (L/W/H)' },
+  { key: 'imageUrl', label: 'Image URL' }
 ] as const;
 
 export type UploadColumnKey = (typeof UPLOAD_COLUMNS)[number]['key'];
@@ -363,6 +368,9 @@ export function buildCreateInput(row: ParsedInventoryRow, selectedColumns?: Set<
     input.dimensionL = parseDimension(row.dimensionL);
     input.dimensionW = parseDimension(row.dimensionW);
     input.dimensionH = parseDimension(row.dimensionH);
+  }
+  if (include('imageUrl') && row.imageUrl) {
+    input.imageKey = row.imageUrl;
   }
 
   return input;
@@ -398,6 +406,9 @@ export function buildUpdateChanges(
     changes.dimensionL = parseDimension(row.dimensionL) ?? null;
     changes.dimensionW = parseDimension(row.dimensionW) ?? null;
     changes.dimensionH = parseDimension(row.dimensionH) ?? null;
+  }
+  if (include('imageUrl')) {
+    changes.imageKey = row.imageUrl || null;
   }
 
   return changes;
