@@ -144,3 +144,14 @@ export function secureDnaHitCounts(batch: Pick<ScreeningBatch, 'sequences'> | nu
   }
   return counts;
 }
+
+/**
+ * Whether the run modal should still spin. A run that resolved `null` (no error) is loaded: the
+ * modal says "No screening run found." Data for a different run than the one requested is stale.
+ */
+export function screeningRunIsLoading(args: { loading: boolean; hasError: boolean; data: { screeningRun: { id: string } | null } | undefined; requestedId: string | null }): boolean {
+  if (args.loading) return true;
+  if (args.hasError) return false;
+  if (!args.data) return true;
+  return args.data.screeningRun !== null && args.data.screeningRun.id !== args.requestedId;
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   aclidFindingRows, DETAILS_NOT_AVAILABLE_TEXT, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
-  screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
+  screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
 const run = { id: 'r1', jobId: 'j1', trigger: 'RERUN', triggeredBy: 'staff@bu.edu', status: 'PASSED', startedAt: '2026-10-29T16:05:00.000Z', completedAt: null, sequenceCount: 192, skippedCount: 2, detail: null } as const;
@@ -68,5 +68,16 @@ describe('screening run view helpers', () => {
     expect(counts.get('a')).toBe(2);
     expect(counts.get('b')).toBe(0);
     expect(secureDnaHitCounts(null).size).toBe(0);
+  });
+});
+
+describe('screeningRunIsLoading (F13)', () => {
+  it('spins until the requested run arrives, but treats a loaded null as loaded', () => {
+    expect(screeningRunIsLoading({ loading: true, hasError: false, data: undefined, requestedId: 'r1' })).toBe(true);
+    expect(screeningRunIsLoading({ loading: false, hasError: false, data: undefined, requestedId: 'r1' })).toBe(true);
+    expect(screeningRunIsLoading({ loading: false, hasError: false, data: { screeningRun: { id: 'r0' } }, requestedId: 'r1' })).toBe(true);
+    expect(screeningRunIsLoading({ loading: false, hasError: false, data: { screeningRun: { id: 'r1' } }, requestedId: 'r1' })).toBe(false);
+    expect(screeningRunIsLoading({ loading: false, hasError: false, data: { screeningRun: null }, requestedId: 'r1' })).toBe(false);
+    expect(screeningRunIsLoading({ loading: false, hasError: true, data: undefined, requestedId: 'r1' })).toBe(false);
   });
 });

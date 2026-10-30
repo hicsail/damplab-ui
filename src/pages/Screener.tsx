@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { Grid } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -7,14 +7,30 @@ import { useQuery } from '@apollo/client/index.js';
 
 import SecureDNAScreeningTable from '../components/SecureDNAScreeningTable';
 import UploadAndScreenSequences from '../components/UploadAndScreenSequences';
+import { UserContext } from '../contexts/UserContext';
 import { GET_SCREENING_BATCHES } from '../securedna/SequencesQueries';
 
 function Screener() {
   const [openUploadAndScreen, setOpenUploadAndScreen] = useState(false);
 
-  const { data, loading, error, refetch } = useQuery(GET_SCREENING_BATCHES);
+  // Off for staff an admin has hidden Biosecurity from; the server refuses them too.
+  const userContext = useContext(UserContext);
+  const hidden = userContext.userProps?.showBiosecurity === false;
+
+  const { data, loading, error, refetch } = useQuery(GET_SCREENING_BATCHES, { skip: hidden });
 
   const handleRefresh = () => refetch();
+
+  if (hidden) {
+    return (
+      <Box sx={{ mt: 2, ml: 3 }}>
+        <Typography variant="h5" component="h5" gutterBottom>
+          Screener
+        </Typography>
+        <Typography variant="body1">The Screener is not available for this account.</Typography>
+      </Box>
+    );
+  }
 
   return (
     <>

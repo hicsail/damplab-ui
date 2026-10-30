@@ -65,6 +65,8 @@ export interface HomeMenuUser {
   permissions?: string[];
   permissionsLoaded?: boolean;
   isDamplabStaff?: boolean;
+  /** The per-account Biosecurity switch; absent reads as on, as everywhere else. */
+  showBiosecurity?: boolean;
 }
 
 export interface HomeMenuItemDef {
@@ -194,7 +196,9 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
         id: "screener",
         label: "Screener",
         to: "/screener",
-        visible: needs(PERMISSIONS.JobsViewAll),
+        // Server twin: createSequencesBatch / screenSequencesBatch / screeningBatches refuse staff
+        // whose showBiosecurity is off.
+        visible: (user) => canFor(user, PERMISSIONS.JobsViewAll) && user.showBiosecurity !== false,
       },
     ],
   },

@@ -905,6 +905,7 @@ export default function Tracking() {
         {showBiosecurity && (
           <ProcessCard
             title="Biosecurity"
+            details={null}
             defaultExpanded={verification.canVerify}
             customerBadge={null}
             staffBadge={null}

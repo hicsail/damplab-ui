@@ -158,6 +158,7 @@ import { GET_SCREENING_BATCH } from "../securedna/SequencesQueries";
 import ScreeningHistory from "../components/technician/ScreeningHistory";
 import ScreeningRunDetailsModal from "../components/technician/ScreeningRunDetailsModal";
 import type { ScreeningRunDetail, ScreeningRunSummary } from "../components/technician/screeningRunTypes";
+import { screeningRunIsLoading } from "../components/technician/screeningRunView";
 import type { ScreeningBatch } from "../securedna/types";
 
 const stripTypename = (value: unknown): unknown => {
@@ -1610,7 +1611,7 @@ export default function TechnicianView() {
         <ScreeningRunDetailsModal
           open={screeningRunModalOpen}
           run={screeningRunData?.screeningRun?.id === requestedRunId ? (screeningRunData?.screeningRun ?? null) : null}
-          loading={screeningRunLoading || (!screeningRunError && screeningRunData?.screeningRun?.id !== requestedRunId)}
+          loading={screeningRunIsLoading({ loading: screeningRunLoading, hasError: !!screeningRunError, data: screeningRunData, requestedId: requestedRunId })}
           error={screeningRunError ? formatGqlError(screeningRunError, "Could not load the screening run.") : null}
           batch={runBatchData?.screeningBatch ?? null}
           batchLoading={runBatchLoading}
