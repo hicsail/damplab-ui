@@ -60,7 +60,6 @@ import './root.css';
 import { CircularProgress } from "@mui/material";
 import { ThemeProvider } from '@mui/material/styles';
 import theme from './styles/themes';
-import { withoutStalePendingFiles } from './utils/canvasJobSubmission';
 
 const CANVAS_AUTOSAVE_KEY = "canvas:autosave";
 
@@ -122,8 +121,8 @@ export default function Root() {
       const savedNodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
       const savedEdges = Array.isArray(parsed?.edges) ? parsed.edges : [];
       if (savedNodes.length > 0 || savedEdges.length > 0) {
-        // A picked file does not survive the reload: clear its placeholder so the form asks for it again.
-        setNodes(withoutStalePendingFiles(savedNodes) as any);
+        // A picked file does not survive the reload: its placeholder stays, and the canvas and checkout ask for it again.
+        setNodes(savedNodes as any);
         setEdges(savedEdges as any);
       }
     } catch (error) {

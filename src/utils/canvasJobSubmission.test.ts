@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ADD_JOB_ATTACHMENTS, CREATE_JOB, CREATE_JOB_ATTACHMENT_UPLOAD_URLS, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS } from '../gql/mutations';
-import { submitCanvasJob, PendingParamFile, withoutStalePendingFiles } from './canvasJobSubmission';
+import { submitCanvasJob, PendingParamFile } from './canvasJobSubmission';
 
 const service = { id: 'svc', parameters: [{ id: 'vector', type: 'file' }] };
 
@@ -179,18 +179,44 @@ describe('a picked file that lost its file (the canvas was restored after a relo
 
   it('is refused at submission, naming the file and the operation, before anything is created', async () => {
     const { client, jobInputs } = makeClient(async () => ({ data: { createWorkflowParameterUploadUrls: [] } }));
-    await expect(submit(client, stale())).rejects.toThrow('The file “Master.xlsx” on “Gibson Assembly” needs to be picked again: a saved or reloaded canvas does not keep its files.');
-    await expect(submit(client, [stale()])).rejects.toThrow('needs to be picked again');
+    await expect(submit(client, stale())).rejects.toThrow('“Master.xlsx” (File on Gibson Assembly)');
+    await expect(submit(client, [stale()])).rejects.toThrow('cannot be submitted until these files are uploaded');
     expect(jobInputs).toEqual([]);
   });
+});
 
-  it('is cleared from a restored canvas, so the form asks for the file again', () => {
-    const nodes = [node(stale()), { ...node([pending('keep.fa'), stale()]), id: 'n2' }, { ...node('kept text'), id: 'n3' }];
-    const cleaned: any[] = withoutStalePendingFiles(nodes);
-    expect(cleaned[0].data.formData[0].value).toBeNull();
-    expect(cleaned[1].data.formData[0].value).toHaveLength(1);
-    expect(cleaned[1].data.formData[0].value[0].file).toBeInstanceOf(File);
-    expect(cleaned[2]).toBe(nodes[2]);
+describe('a required file with no file', () => {
+  const requiredNode = (value: unknown, type = 'file') => ({
+    id: 'n1',
+    data: { label: 'Gibson Assembly', parameters: [{ id: 'vector', name: 'Vector', type, required: true, tableData: { columns: [{ header: 'Name' }] } }], formData: [{ id: 'vector', name: 'Vector', type, required: true, value }] },
+  });
+  const submitNode = (client: any, n: any) =>
+    submitCanvasJob(client, { workflows: [[n]], edges: [], nodes: [], jobName: 'Demo', institute: 'BU', notes: '', clientDisplayName: 'Demo', attachments: [], getAccessToken: async () => 'token' });
+
+  it.each([[null, 'file'], [[], 'file'], ['', 'file'], [null, 'table']])('refuses %j on a %s parameter before anything is created', async (value, type) => {
+    const { client, jobInputs } = makeClient(async () => ({ data: { createWorkflowParameterUploadUrls: [] } }));
+    await expect(submitNode(client, requiredNode(value, type))).rejects.toThrow('Vector on Gibson Assembly (required, no file uploaded)');
+    expect(client.mutate).not.toHaveBeenCalled();
+    expect(jobInputs).toEqual([]);
+  });
+});
+
+describe('a file picked on a catalog parameter with no id', () => {
+  beforeEach(() => vi.stubGlobal('localStorage', { setItem: () => {} }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is uploaded, not sent as a placeholder', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+    const { client, jobInputs } = makeClient(async () => ({
+      data: { createWorkflowParameterUploadUrls: [{ clientToken: '', filename: 'a.fa', uploadUrl: 'https://s3/a', key: 'workflow-parameters/u/a.fa', contentType: 'text/plain', size: 4 }] },
+    }));
+    client.mutate.mockImplementationOnce(async ({ variables }: any) => ({
+      data: { createWorkflowParameterUploadUrls: [{ clientToken: variables.files[0].clientToken, filename: 'a.fa', uploadUrl: 'https://s3/a', key: 'workflow-parameters/u/a.fa', contentType: 'text/plain', size: 4 }] },
+    }));
+    const idless = { id: 'n1', data: { label: 'Op', parameters: [{ name: 'Vector', type: 'file' }], formData: [{ id: 'random', name: 'Vector', type: 'file', value: pending('a.fa') }] } };
+    await submitCanvasJob(client, { workflows: [[idless]], edges: [], nodes: [], jobName: 'Demo', institute: 'BU', notes: '', clientDisplayName: 'Demo', attachments: [], getAccessToken: async () => 'token' });
+    const stored = jobInputs[0].workflows[0].nodes[0].formData.find((e: any) => e.id === 'random');
+    expect(JSON.parse(stored.value).key).toBe('workflow-parameters/u/a.fa');
   });
 });
 
