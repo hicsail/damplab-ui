@@ -43,6 +43,22 @@ describe('screening run details (biosecurity-update)', () => {
   });
 });
 
+describe('screening run details, customer leg (behaviour 11)', () => {
+  it("shows the customer leg's status, verdict and each check", () => {
+    const customer = { status: 'NEEDS_REVIEW' as const, requesterId: 'r', verdict: 'needs_review', decisionStatus: 'awaiting', checks: [{ group: 'person', state: 'issue', finding: 'Watchlist hit' }], counts: null, detail: null };
+    const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, customer }} batch={null} />);
+    for (const t of ['Customer', 'Needs review', 'Watchlist hit']) expect(html).toContain(t);
+  });
+  it('says Not run when the run has no leg', () => {
+    const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, customer: null }} batch={null} />);
+    expect(html).toContain('Not run');
+  });
+  it('lists unscreened notes', () => {
+    const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, unscreenedNotes: ['a.csv was not uploaded'] }} batch={null} />);
+    expect(html).toContain('a.csv was not uploaded');
+  });
+});
+
 describe('screening run details, stale batch guard', () => {
   const batchFor = (id: string) => ({ id, batchRunId: 'run-x', region: 'us', synthesisPermission: 'granted', screeningCompletedAt: '2026-10-29T16:05:00.000Z', created_at: '2026-10-29T16:05:00.000Z', sequences: [{ name: 's1', recordId: 'r', order: 0, threats: [{}, {}] }] }) as unknown as ScreeningBatch;
   const withBatch = { ...run, secureDna: { batchId: 'b1', status: 'PASSED' as const, detail: null } };

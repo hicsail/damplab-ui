@@ -1,6 +1,6 @@
 import React, { Fragment, useState } from 'react';
 import {
-  Accordion, AccordionDetails, AccordionSummary, Box, Button, Chip, CircularProgress, Collapse, IconButton, Modal, Paper, Stack,
+  Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Chip, CircularProgress, Collapse, IconButton, Modal, Paper, Stack,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -9,7 +9,7 @@ import { ScreeningBatchDetailsContent } from '../ScreeningBatchDetailsModal';
 import { biosecurityStatusLabel } from './biosecurityStatus';
 import type { ScreeningRunDetail } from './screeningRunTypes';
 import {
-  aclidFindingRows, DETAILS_NOT_AVAILABLE_TEXT, type FindingRow, materialRows, regulatoryLabel, screeningRunOptionLabel, screeningRunSecondary,
+  aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, type FindingRow, materialRows, regulatoryLabel, screeningRunOptionLabel, screeningRunSecondary,
   secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
@@ -68,6 +68,7 @@ export function ScreeningRunDetailsContent({ run, batch: batchProp, batchLoading
   const hasDetails = !!aclid?.details && typeof aclid.details === 'object';
   const findings = aclidFindingRows(aclid?.findings);
   const materials = materialRows(aclid?.materialSummary);
+  const customer = customerCardView(run);
 
   return (
     <Stack spacing={2}>
@@ -76,6 +77,14 @@ export function ScreeningRunDetailsContent({ run, batch: batchProp, batchLoading
         <Typography variant="body2" color="text.secondary">{screeningRunSecondary(run)}</Typography>
         {run.detail && <Typography variant="body2" sx={{ mt: 0.5 }}>{run.detail}</Typography>}
       </Box>
+
+      {run.unscreenedNotes?.length > 0 && (
+        <Alert severity="warning">
+          {run.unscreenedNotes.map((note) => (
+            <div key={note}>{note}</div>
+          ))}
+        </Alert>
+      )}
 
       <Box>
         <Typography variant="h6">Sequences</Typography>
@@ -246,6 +255,17 @@ export function ScreeningRunDetailsContent({ run, batch: batchProp, batchLoading
             {run.secureDna.batchId && (batchLoading ? <CircularProgress size={20} /> : batch ? <ScreeningBatchDetailsContent batch={batch} /> : null)}
           </Stack>
         )}
+      </Box>
+
+      <Box>
+        <Typography variant="h6">Customer</Typography>
+        <Stack spacing={0.5}>
+          <Typography variant="body2">{customer.statusText}</Typography>
+          {customer.lines.map((line) => (
+            <Typography key={line} variant="body2" color="text.secondary">{line}</Typography>
+          ))}
+          {run.customer?.decisionStatus && <Typography variant="body2">Decision: {run.customer.decisionStatus}</Typography>}
+        </Stack>
       </Box>
     </Stack>
   );

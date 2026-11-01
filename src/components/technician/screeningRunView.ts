@@ -253,3 +253,31 @@ export function screeningsFromRun(job: Parameters<typeof biosecurityFromJob>[0],
   if (!run) return fromJob;
   return { ...fromJob, HOMOLOGY: homologyCardView(run).status, CUSTOMER: customerCardView(run).status };
 }
+
+const STUCK_RUN_MS = 10 * 60 * 1000;
+
+export function screeningButtonLabel(runCount: number, busy: boolean): 'Screening…' | 'Run screening' | 'Rerun screening' {
+  if (busy) return 'Screening…';
+  return runCount === 0 ? 'Run screening' : 'Rerun screening';
+}
+
+/** Refresh re-reads Aclid's customer verdict and screen; worth offering only while one of them is still open. */
+export function showRefreshResults(run: ScreeningRunCard | null): boolean {
+  if (!run) return false;
+  const customer = run.customer?.status;
+  return customer === 'IN_PROGRESS' || customer === 'NEEDS_REVIEW' || run.aclid?.homologyStatus === 'IN_PROGRESS';
+}
+
+/**
+ * Whether the screening button is held. A row left IN_PROGRESS by a server crash frees itself after
+ * ten minutes (the longest real run is about three), so the acceptance gate cannot wedge a job.
+ */
+export function screeningBusy(
+  homology: { status?: string | null; startedAt?: string | null } | null | undefined,
+  rerunning: boolean,
+  nowMs: number
+): boolean {
+  if (rerunning) return true;
+  if (homology?.status !== 'IN_PROGRESS' || !homology.startedAt) return false;
+  return nowMs - Date.parse(homology.startedAt) < STUCK_RUN_MS;
+}

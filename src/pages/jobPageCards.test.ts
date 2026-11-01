@@ -32,7 +32,12 @@ describe('staff job page (behaviours 2, 3)', () => {
   it('keeps the full Biosecurity card for accounts that can see it', () => {
     expect(count(technicianView, 'title="Biosecurity"')).toBe(1);
     expect(technicianView).toContain('showBiosecurity');
-    expect(technicianView).toContain('COPY_VERIFICATION_LINK');
-    expect(technicianView).toContain('BiosecurityScreeningSections');
+    expect(technicianView).toContain('ScreeningResults');
+    expect(technicianView).toContain('ReportingOptionsDialog');
+    expect(technicianView).toMatch(/GET_SCREENING_RUN_CARD[\s\S]{0,200}fetchPolicy: ["']no-cache["']/);
+    expect(technicianView).not.toContain('COPY_VERIFICATION_LINK');
+    expect(technicianView).not.toContain('Open hosted verification');
+    expect(technicianView).not.toContain('openHostedVerification');
+    expect(technicianView).not.toContain('START_JOB_CUSTOMER_VERIFICATION');
   });
 });

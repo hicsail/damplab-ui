@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ScreeningRunCard } from './screeningRunTypes';
 import {
   aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, homologyCardView, screeningsFromRun, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
-  screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
+  screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
 const run = { id: 'r1', jobId: 'j1', trigger: 'RERUN', triggeredBy: 'staff@bu.edu', status: 'PASSED', startedAt: '2026-10-29T16:05:00.000Z', completedAt: null, sequenceCount: 192, skippedCount: 2, detail: null } as const;
@@ -172,5 +172,29 @@ describe('screeningsFromRun', () => {
     const job = { homologyScreening: { status: 'FAILED' }, aclidScreening: { customerStatus: 'IN_PROGRESS' } };
     expect(screeningsFromRun(job, null)).toMatchObject({ HOMOLOGY: 'FAILED', CUSTOMER: 'IN_PROGRESS' });
     expect(screeningsFromRun(job, { ...base, customer: { status: 'NOT_AVAILABLE' } as any })).toMatchObject({ HOMOLOGY: 'PASSED', CUSTOMER: 'UNAVAILABLE' });
+  });
+});
+
+describe('Run / Rerun / Refresh (behaviour 20, Review Focus 5)', () => {
+  it('the button reads Run screening with no run, Rerun screening with one (behaviour 20)', () => {
+    expect(screeningButtonLabel(0, false)).toBe('Run screening');
+    expect(screeningButtonLabel(1, false)).toBe('Rerun screening');
+    expect(screeningButtonLabel(1, true)).toBe('Screening…');
+  });
+  it.each([
+    ['IN_PROGRESS', 'PASSED', true], ['NEEDS_REVIEW', 'PASSED', true], ['PASSED', 'IN_PROGRESS', true],
+    ['PASSED', 'PASSED', false], ['NOT_AVAILABLE', 'PASSED', false], ['UNAVAILABLE', 'PASSED', false]
+  ])('Refresh results: customer %s, Aclid %s → %s', (customer, aclid, shown) => {
+    expect(showRefreshResults({ ...base, customer: { status: customer } as any, aclid: { ...base.aclid!, homologyStatus: aclid as any } })).toBe(shown);
+  });
+  it('no refresh without a run', () => expect(showRefreshResults(null)).toBe(false));
+
+  describe('screeningBusy (Review Focus 5)', () => {
+    const now = Date.parse('2026-11-01T12:00:00Z');
+    it("is busy during this page's own rerun", () => expect(screeningBusy({ status: 'PASSED' }, true, now)).toBe(true));
+    it('is busy while a recent run is in progress', () => expect(screeningBusy({ status: 'IN_PROGRESS', startedAt: '2026-11-01T11:55:00Z' }, false, now)).toBe(true));
+    it('frees the button when a run has sat in progress for over ten minutes', () => expect(screeningBusy({ status: 'IN_PROGRESS', startedAt: '2026-11-01T11:45:00Z' }, false, now)).toBe(false));
+    it('frees the button when there is no start time', () => expect(screeningBusy({ status: 'IN_PROGRESS' }, false, now)).toBe(false));
+    it('is free with no homology row', () => expect(screeningBusy(null, false, now)).toBe(false));
   });
 });

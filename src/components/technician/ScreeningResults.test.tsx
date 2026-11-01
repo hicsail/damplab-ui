@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import ScreeningResults from './ScreeningResults';
+import ReportingOptionsDialog, { REPORTING_OPTIONS_TEXT } from './ReportingOptionsDialog';
 import { BiosecurityDemoStages, type BiosecurityDemoState } from './BiosecurityDemo';
 import type { ScreeningRunCard } from './screeningRunTypes';
 
@@ -38,5 +39,14 @@ describe('ScreeningResults', () => {
     const html = renderToStaticMarkup(<BiosecurityDemoStages demo={demo} />);
     expect(html).toContain('Reporting Guidelines');
     expect(html).toContain('Match to a regulated sequence');
+  });
+});
+
+describe('Reporting options (behaviour 17)', () => {
+  it('the reporting text names nobody and points to the representative', () => {
+    const text = REPORTING_OPTIONS_TEXT.join(' ');
+    expect(text).toContain('biosecurity representative');
+    expect(text).toContain('next steps');
+    expect(() => renderToStaticMarkup(<ReportingOptionsDialog open={false} onClose={() => undefined} />)).not.toThrow();
   });
 });
