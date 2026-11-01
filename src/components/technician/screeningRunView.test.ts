@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { ScreeningRunCard } from './screeningRunTypes';
 import {
-  aclidFindingRows, DETAILS_NOT_AVAILABLE_TEXT, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
+  aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, homologyCardView, screeningsFromRun, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
   screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
@@ -79,5 +80,86 @@ describe('screeningRunIsLoading (F13)', () => {
     expect(screeningRunIsLoading({ loading: false, hasError: false, data: { screeningRun: { id: 'r1' } }, requestedId: 'r1' })).toBe(false);
     expect(screeningRunIsLoading({ loading: false, hasError: false, data: { screeningRun: null }, requestedId: 'r1' })).toBe(false);
     expect(screeningRunIsLoading({ loading: false, hasError: true, data: undefined, requestedId: 'r1' })).toBe(false);
+  });
+});
+
+const base: ScreeningRunCard = {
+  id: 'r1', status: 'PASSED', completedAt: '2026-10-29T16:05:00.000Z', sequenceCount: 2, skippedCount: 0, detail: null, unscreenedNotes: [],
+  sequences: [{ length: 900 }, { length: 100 }],
+  aclid: { screenId: 'scr_1', homologyStatus: 'PASSED', status: 'succeeded', regulatoryStatus: 'not_controlled', findings: null, detail: null },
+  secureDna: null, customer: null
+};
+
+describe('homologyCardView (behaviour 15)', () => {
+  it('passed: count and total bp, then the regulatory status', () => {
+    const v = homologyCardView(base);
+    expect(v).toMatchObject({ status: 'PASSED', statusText: 'Passed' });
+    expect(v.lines).toEqual(['2 sequences · 1,000 bp screened', 'Regulatory status: Not controlled', 'No findings']);
+  });
+  it('failed: lists each finding', () => {
+    const v = homologyCardView({ ...base, status: 'FAILED', aclid: { ...base.aclid!, regulatoryStatus: 'controlled', findings: { us_ccl_export_control: { reason_code: 'toxin', regulatory_status: 'controlled', material: 'Ricin' } } } });
+    expect(v.status).toBe('FAILED');
+    expect(v.lines.join(' ')).toContain('US Commerce Control List');
+    expect(v.lines.join(' ')).toContain('Ricin');
+  });
+  it('zero sequences reads as nothing to screen', () => {
+    expect(homologyCardView({ ...base, status: 'UNAVAILABLE', sequenceCount: 0, sequences: [], aclid: null })).toMatchObject({ status: 'UNAVAILABLE', statusText: 'Nothing to screen' });
+  });
+  it('a slow Aclid screen reads as in progress', () => {
+    expect(homologyCardView({ ...base, status: 'UNAVAILABLE', aclid: { ...base.aclid!, homologyStatus: 'IN_PROGRESS' } })).toMatchObject({ status: 'IN_PROGRESS', statusText: 'In progress' });
+  });
+  it('a run still going reads as in progress', () => {
+    expect(homologyCardView({ ...base, status: 'IN_PROGRESS', completedAt: null }).status).toBe('IN_PROGRESS');
+  });
+  it('no provider verdict reads as unavailable, with the reason', () => {
+    const v = homologyCardView({ ...base, status: 'UNAVAILABLE', detail: 'Aclid unavailable: boom', aclid: null });
+    expect(v).toMatchObject({ status: 'UNAVAILABLE', statusText: 'Unavailable' });
+    expect(v.lines).toContain('Aclid unavailable: boom');
+  });
+  it('unscreened notes appear whatever the status', () => {
+    expect(homologyCardView({ ...base, unscreenedNotes: ['Plate: a.csv was not uploaded'] }).lines).toContain('Plate: a.csv was not uploaded');
+  });
+  it('no run reads as not screened', () => {
+    expect(homologyCardView(null)).toMatchObject({ status: 'UNAVAILABLE', statusText: 'Not screened' });
+  });
+});
+
+describe('customerCardView (behaviour 15)', () => {
+  const leg = (over: object) => ({ ...base, customer: { status: 'PASSED', requesterId: 'r', verdict: 'no_issues_found', decisionStatus: 'awaiting', checks: [], counts: null, detail: null, ...over } }) as ScreeningRunCard;
+  it.each([
+    ['PASSED', 'PASSED', 'Passed'], ['NEEDS_REVIEW', 'FAILED', 'Needs review'], ['FAILED', 'FAILED', 'Failed'], ['IN_PROGRESS', 'IN_PROGRESS', 'In progress'],
+    ['NOT_AVAILABLE', 'UNAVAILABLE', 'Not available'], ['NOT_RUN', 'UNAVAILABLE', 'Not run'], ['UNAVAILABLE', 'UNAVAILABLE', 'Unavailable']
+  ])('%s has tone %s and reads %s', (status, tone, text) => {
+    expect(customerCardView(leg({ status }))).toMatchObject({ status: tone, statusText: text });
+  });
+  it('shows the verdict, then each person and institution check', () => {
+    const v = customerCardView(leg({ checks: [
+      { id: 'person_watchlist', group: 'person', state: 'confirmed', finding: 'No watchlist match' },
+      { id: 'legal_entity', group: 'institution', state: 'issue', finding: 'Entity not found' }
+    ] }));
+    expect(v.lines).toEqual(['Verdict: no issues found', 'Person · Confirmed: No watchlist match', 'Institution · Issue: Entity not found']);
+  });
+  it('tolerates checks that are not an array, and malformed entries', () => {
+    expect(customerCardView(leg({ checks: { x: 1 } })).lines).toEqual(['Verdict: no issues found']);
+    expect(customerCardView(leg({ checks: [null, 'x', {}] })).lines).toEqual(['Verdict: no issues found']);
+  });
+  it('explains Not available and Not run in words', () => {
+    expect(customerCardView(leg({ status: 'NOT_AVAILABLE', verdict: null })).lines).toEqual(['Customer screening is not enabled for this Aclid account. It does not block acceptance.']);
+    expect(customerCardView(leg({ status: 'NOT_RUN', verdict: null })).lines).toEqual(['This run has no Aclid screen to attach it to.']);
+  });
+  it('shows the reason when unavailable', () => {
+    expect(customerCardView(leg({ status: 'UNAVAILABLE', verdict: null, detail: 'Aclid returned 500' })).lines).toContain('Aclid returned 500');
+  });
+  it('a run with no leg, or no run, reads as not run', () => {
+    expect(customerCardView({ ...base, customer: null }).statusText).toBe('Not run');
+    expect(customerCardView(null).statusText).toBe('Not screened');
+  });
+});
+
+describe('screeningsFromRun', () => {
+  it('uses the run when there is one, and the job otherwise', () => {
+    const job = { homologyScreening: { status: 'FAILED' }, aclidScreening: { customerStatus: 'IN_PROGRESS' } };
+    expect(screeningsFromRun(job, null)).toMatchObject({ HOMOLOGY: 'FAILED', CUSTOMER: 'IN_PROGRESS' });
+    expect(screeningsFromRun(job, { ...base, customer: { status: 'NOT_AVAILABLE' } as any })).toMatchObject({ HOMOLOGY: 'PASSED', CUSTOMER: 'UNAVAILABLE' });
   });
 });

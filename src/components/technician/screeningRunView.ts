@@ -1,7 +1,12 @@
 import { formatSOWInstant } from '../../utils/sowDateUtils';
-import { biosecurityStatusLabel } from './biosecurityStatus';
+import {
+  biosecurityFromJob,
+  biosecurityStatusLabel,
+  type BiosecurityScreeningStatus,
+  type BiosecurityScreenings
+} from './biosecurityStatus';
 import { ACLID_FRAMEWORK_LABELS, ACLID_REASON_CODES } from './aclidReasonCodes';
-import type { ScreeningRunSummary } from './screeningRunTypes';
+import type { CustomerScreeningStatus, ScreeningRunCard, ScreeningRunSummary } from './screeningRunTypes';
 import type { ScreeningBatch } from '../../securedna/types';
 
 export const NO_SCREENINGS_TEXT = 'No screenings recorded yet';
@@ -154,4 +159,96 @@ export function screeningRunIsLoading(args: { loading: boolean; hasError: boolea
   if (args.hasError) return false;
   if (!args.data) return true;
   return args.data.screeningRun !== null && args.data.screeningRun.id !== args.requestedId;
+}
+
+export const PLANNED_FEATURE_TEXT = 'Planned feature; implementation pending';
+export const NOT_SCREENED_TEXT = 'Not screened';
+
+export interface ScreeningCardView {
+  status: BiosecurityScreeningStatus;
+  statusText: string;
+  lines: string[];
+}
+
+const HOMOLOGY_TEXT: Record<BiosecurityScreeningStatus, string> = {
+  PASSED: 'Passed',
+  FAILED: 'Failed',
+  IN_PROGRESS: 'In progress',
+  UNAVAILABLE: 'Unavailable'
+};
+
+/** The Homology card for a run: the count, Aclid's regulatory status and findings, SecureDNA's verdict. */
+export function homologyCardView(run: ScreeningRunCard | null): ScreeningCardView {
+  if (!run) return { status: 'UNAVAILABLE', statusText: NOT_SCREENED_TEXT, lines: [] };
+  const notes = run.unscreenedNotes ?? [];
+  if (run.status === 'UNAVAILABLE' && run.sequenceCount === 0 && !run.detail) {
+    return { status: 'UNAVAILABLE', statusText: 'Nothing to screen', lines: [...notes] };
+  }
+  const status: BiosecurityScreeningStatus =
+    run.status === 'UNAVAILABLE' && run.aclid?.homologyStatus === 'IN_PROGRESS' ? 'IN_PROGRESS' : run.status;
+
+  const lines: string[] = [];
+  if ((status === 'PASSED' || status === 'FAILED') && run.sequenceCount > 0) {
+    const bp = run.sequences.reduce((sum, s) => sum + s.length, 0);
+    lines.push(`${run.sequenceCount} ${run.sequenceCount === 1 ? 'sequence' : 'sequences'} · ${bp.toLocaleString('en-US')} bp screened`);
+  }
+  if (run.aclid) {
+    if (run.aclid.regulatoryStatus) lines.push(`Regulatory status: ${regulatoryLabel(run.aclid.regulatoryStatus)}`);
+    const rows = aclidFindingRows(run.aclid.findings);
+    if (rows.length === 0) lines.push('No findings');
+    for (const r of rows) lines.push(`${r.frameworkLabel}: ${r.reasonCode ?? '—'}${r.material ? ` · ${r.material}` : ''}`);
+  }
+  if (run.secureDna) lines.push(`SecureDNA: ${biosecurityStatusLabel(run.secureDna.status)}`);
+  if (status !== 'PASSED' && run.detail) lines.push(run.detail);
+  lines.push(...notes);
+  return { status, statusText: HOMOLOGY_TEXT[status], lines };
+}
+
+const CUSTOMER_VIEW: Record<CustomerScreeningStatus, { tone: BiosecurityScreeningStatus; text: string }> = {
+  PASSED: { tone: 'PASSED', text: 'Passed' },
+  NEEDS_REVIEW: { tone: 'FAILED', text: 'Needs review' },
+  FAILED: { tone: 'FAILED', text: 'Failed' },
+  IN_PROGRESS: { tone: 'IN_PROGRESS', text: 'In progress' },
+  NOT_AVAILABLE: { tone: 'UNAVAILABLE', text: 'Not available' },
+  NOT_RUN: { tone: 'UNAVAILABLE', text: 'Not run' },
+  UNAVAILABLE: { tone: 'UNAVAILABLE', text: 'Unavailable' }
+};
+
+const NOT_AVAILABLE_LINE = 'Customer screening is not enabled for this Aclid account. It does not block acceptance.';
+const NOT_RUN_LINE = 'This run has no Aclid screen to attach it to.';
+const CHECK_STATES: Record<string, string> = { confirmed: 'Confirmed', could_not_confirm: 'Could not confirm', issue: 'Issue', not_run: 'Not run' };
+const CHECK_GROUPS: Record<string, string> = { person: 'Person', institution: 'Institution' };
+
+/** The Customer card for a run: Aclid's verdict, then each person and institution check. */
+export function customerCardView(run: ScreeningRunCard | null): ScreeningCardView {
+  if (!run) return { status: 'UNAVAILABLE', statusText: NOT_SCREENED_TEXT, lines: [] };
+  const leg = run.customer;
+  if (!leg) return { status: 'UNAVAILABLE', statusText: CUSTOMER_VIEW.NOT_RUN.text, lines: [NOT_RUN_LINE] };
+  const { tone, text } = CUSTOMER_VIEW[leg.status] ?? CUSTOMER_VIEW.UNAVAILABLE;
+  const lines: string[] = [];
+  if (leg.status === 'NOT_AVAILABLE') lines.push(NOT_AVAILABLE_LINE);
+  else if (leg.status === 'NOT_RUN') lines.push(NOT_RUN_LINE);
+  else {
+    if (leg.verdict) lines.push(`Verdict: ${leg.verdict.replace(/_/g, ' ')}`);
+    if (Array.isArray(leg.checks)) {
+      for (const c of leg.checks) {
+        if (!isObject(c)) continue;
+        const finding = str(c.finding);
+        if (!finding) continue;
+        const group = str(c.group);
+        const state = str(c.state);
+        const label = [group && (CHECK_GROUPS[group] ?? group), state && (CHECK_STATES[state] ?? state)].filter(Boolean).join(' · ');
+        lines.push(label ? `${label}: ${finding}` : finding);
+      }
+    }
+    if (leg.detail && leg.status !== 'PASSED') lines.push(leg.detail);
+  }
+  return { status: tone, statusText: text, lines };
+}
+
+/** The pane's glance statuses: the run's when there is one, the job's own fields otherwise. */
+export function screeningsFromRun(job: Parameters<typeof biosecurityFromJob>[0], run: ScreeningRunCard | null): BiosecurityScreenings {
+  const fromJob = biosecurityFromJob(job);
+  if (!run) return fromJob;
+  return { ...fromJob, HOMOLOGY: homologyCardView(run).status, CUSTOMER: customerCardView(run).status };
 }
