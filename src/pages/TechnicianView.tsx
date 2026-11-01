@@ -161,7 +161,7 @@ import {
   screeningButtonLabel,
   screeningRunIsLoading,
   screeningsFromRun,
-  isNothingToScreen,
+  paneNothingToScreen,
   NOTHING_TO_SCREEN_TEXT,
   showRefreshResults,
 } from "../components/technician/screeningRunView";
@@ -1281,7 +1281,7 @@ export default function TechnicianView() {
                   : noRuns
                     ? NOT_SCREENED_TEXT
                     : biosecurityComposite === "UNAVAILABLE" &&
-                        isNothingToScreen(newestRun)
+                        paneNothingToScreen(newestRun, acceptance?.state)
                       ? NOTHING_TO_SCREEN_TEXT
                       : biosecurityStatusLabel(biosecurityComposite)
               }

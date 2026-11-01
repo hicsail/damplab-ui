@@ -193,6 +193,17 @@ export function isNothingToScreen(run: ScreeningRunCard | null | undefined): boo
   );
 }
 
+/**
+ * Whether the pane may read "Nothing to screen". The card speaks for homology alone; the pane speaks
+ * for the job, so it needs the server's gate to agree that nothing blocks acceptance.
+ */
+export function paneNothingToScreen(
+  run: ScreeningRunCard | null | undefined,
+  acceptanceState: JobAcceptanceScreening['state'] | null | undefined
+): boolean {
+  return isNothingToScreen(run) && (acceptanceState === 'CLEAR' || acceptanceState === 'NOT_REQUIRED');
+}
+
 /** The Homology card for a run: the count, Aclid's regulatory status and findings, SecureDNA's verdict. */
 export function homologyCardView(run: ScreeningRunCard | null): ScreeningCardView {
   if (!run) return { status: 'UNAVAILABLE', statusText: NOT_SCREENED_TEXT, lines: [] };

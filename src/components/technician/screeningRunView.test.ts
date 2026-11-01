@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ScreeningRunCard } from './screeningRunTypes';
 import {
-  aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, homologyCardView, isNothingToScreen, screeningsFromRun, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
+  aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, homologyCardView, isNothingToScreen, paneNothingToScreen, screeningsFromRun, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
   acceptanceGateView, screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
@@ -123,6 +123,16 @@ describe('homologyCardView (behaviour 15)', () => {
     expect(isNothingToScreen({ ...zero, status: 'PASSED' })).toBe(false);
     expect(isNothingToScreen({ ...zero, sequenceCount: 2 })).toBe(false);
     expect(isNothingToScreen(null)).toBe(false);
+  });
+  it('the pane reads nothing to screen only when the gate is clear too', () => {
+    const zero = { ...base, status: 'UNAVAILABLE' as const, sequenceCount: 0, sequences: [], aclid: null, detail: 'No screenable DNA sequences on this job' };
+    expect(paneNothingToScreen(zero, 'CLEAR')).toBe(true);
+    expect(paneNothingToScreen(zero, 'NOT_REQUIRED')).toBe(true);
+    for (const state of ['NOT_PASSED', 'STALE', 'IN_PROGRESS', 'NOT_RUN'] as const) expect(paneNothingToScreen(zero, state)).toBe(false);
+    expect(paneNothingToScreen(zero, undefined)).toBe(false);
+    expect(paneNothingToScreen(zero, null)).toBe(false);
+    expect(paneNothingToScreen({ ...zero, unscreenedNotes: ['x'] }, 'CLEAR')).toBe(false);
+    expect(paneNothingToScreen(null, 'CLEAR')).toBe(false);
   });
   it('a slow Aclid screen reads as in progress', () => {
     expect(homologyCardView({ ...base, status: 'UNAVAILABLE', aclid: { ...base.aclid!, homologyStatus: 'IN_PROGRESS' } })).toMatchObject({ status: 'IN_PROGRESS', statusText: 'In progress' });
