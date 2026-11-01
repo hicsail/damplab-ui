@@ -193,9 +193,10 @@ export function homologyCardView(run: ScreeningRunCard | null): ScreeningCardVie
     lines.push(`${run.sequenceCount} ${run.sequenceCount === 1 ? 'sequence' : 'sequences'} · ${bp.toLocaleString('en-US')} bp screened`);
   }
   if (run.aclid) {
-    if (run.aclid.regulatoryStatus) lines.push(`Regulatory status: ${regulatoryLabel(run.aclid.regulatoryStatus)}`);
+    const finished = run.aclid.homologyStatus === 'PASSED' || run.aclid.homologyStatus === 'FAILED';
+    if (finished && run.aclid.regulatoryStatus) lines.push(`Regulatory status: ${regulatoryLabel(run.aclid.regulatoryStatus)}`);
     const rows = aclidFindingRows(run.aclid.findings);
-    if (rows.length === 0) lines.push('No findings');
+    if (finished && rows.length === 0) lines.push('No findings');
     for (const r of rows) lines.push(`${r.frameworkLabel}: ${r.reasonCode ?? '—'}${r.material ? ` · ${r.material}` : ''}`);
   }
   if (run.secureDna) lines.push(`SecureDNA: ${biosecurityStatusLabel(run.secureDna.status)}`);

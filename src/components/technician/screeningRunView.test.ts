@@ -108,6 +108,17 @@ describe('homologyCardView (behaviour 15)', () => {
   it('a slow Aclid screen reads as in progress', () => {
     expect(homologyCardView({ ...base, status: 'UNAVAILABLE', aclid: { ...base.aclid!, homologyStatus: 'IN_PROGRESS' } })).toMatchObject({ status: 'IN_PROGRESS', statusText: 'In progress' });
   });
+  it('an unfinished Aclid screen does not read as clear', () => {
+    const v = homologyCardView({ ...base, status: 'UNAVAILABLE', aclid: { ...base.aclid!, homologyStatus: 'IN_PROGRESS', findings: null } });
+    expect(v.lines.join(' ')).not.toContain('No findings');
+    expect(v.lines.join(' ')).not.toContain('Regulatory status');
+  });
+  it('an errored Aclid leg shows no findings or regulatory line, but the reason', () => {
+    const v = homologyCardView({ ...base, status: 'UNAVAILABLE', detail: 'Aclid unavailable: boom', aclid: { ...base.aclid!, homologyStatus: 'UNAVAILABLE', findings: null, detail: 'boom' } });
+    expect(v.lines.join(' ')).not.toContain('No findings');
+    expect(v.lines.join(' ')).not.toContain('Regulatory status');
+    expect(v.lines).toContain('Aclid unavailable: boom');
+  });
   it('a run still going reads as in progress', () => {
     expect(homologyCardView({ ...base, status: 'IN_PROGRESS', completedAt: null }).status).toBe('IN_PROGRESS');
   });
