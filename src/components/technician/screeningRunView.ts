@@ -6,7 +6,7 @@ import {
   type BiosecurityScreenings
 } from './biosecurityStatus';
 import { ACLID_FRAMEWORK_LABELS, ACLID_REASON_CODES } from './aclidReasonCodes';
-import type { CustomerScreeningStatus, ScreeningRunCard, ScreeningRunSummary } from './screeningRunTypes';
+import type { CustomerScreeningStatus, JobAcceptanceScreening, ScreeningRunCard, ScreeningRunSummary } from './screeningRunTypes';
 import type { ScreeningBatch } from '../../securedna/types';
 
 export const NO_SCREENINGS_TEXT = 'No screenings recorded yet';
@@ -280,4 +280,20 @@ export function screeningBusy(
   if (rerunning) return true;
   if (homology?.status !== 'IN_PROGRESS' || !homology.startedAt) return false;
   return nowMs - Date.parse(homology.startedAt) < STUCK_RUN_MS;
+}
+
+/**
+ * The Review modal's Accept gate, the UI twin of the server's. While the answer loads Accept is held;
+ * a failed check leaves it on, because the server refuses an ungated accept regardless.
+ */
+export function acceptanceGateView(args: {
+  data: JobAcceptanceScreening | null | undefined;
+  loading: boolean;
+  hasError: boolean;
+}): { disabled: boolean; note: string | null } {
+  const { data, loading, hasError } = args;
+  if (loading) return { disabled: true, note: 'Checking screening…' };
+  if (hasError || !data) return { disabled: false, note: null };
+  if (data.state === 'CLEAR' || data.state === 'NOT_REQUIRED') return { disabled: false, note: null };
+  return { disabled: true, note: data.message };
 }

@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { Alert, AlertTitle, Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import { styled } from "@mui/system";
 
 import { REVIEW_JOB } from '../gql/mutations';
+import { GET_JOB_ACCEPTANCE_SCREENING } from '../gql/queries';
+import { acceptanceGateView } from './technician/screeningRunView';
+import type { JobAcceptanceScreening } from './technician/screeningRunTypes';
 import { jobReviewLabels, reviewDecisions, type ReviewDecisionValue } from './jobReviewLabels';
 import { buildReviewInput, retryOperationId } from '../utils/jobReview';
 
@@ -41,6 +44,12 @@ export default function JobFeedbackModal(props: any) {
   const operationIdRef = useRef<string | null>(null);
 
   const [reviewJob] = useMutation(REVIEW_JOB);
+
+  // Not skipped for staff without showBiosecurity: they are the ones who need to learn why Accept is off.
+  const { data: acceptanceData, loading: acceptanceLoading, error: acceptanceError } = useQuery<{ jobAcceptanceScreening: JobAcceptanceScreening }>(GET_JOB_ACCEPTANCE_SCREENING, {
+    variables: { jobId: id }, skip: !open || !id, fetchPolicy: 'network-only'
+  });
+  const acceptGate = acceptanceGateView({ data: acceptanceData?.jobAcceptanceScreening, loading: acceptanceLoading, hasError: Boolean(acceptanceError) });
 
   // Reachable from SUBMITTED, CHANGES_REQUESTED and ACCEPTED alike, and the
   // accept option means something different in each — see jobReviewLabels.
@@ -163,7 +172,15 @@ export default function JobFeedbackModal(props: any) {
           <RadioGroup onChange={handleDecisionChange} value={decision} name="feedback-type" aria-label="feedback-type">
             {decisions.map((option) => (
               <React.Fragment key={option.value}>
-                <FormControlLabel control={<Radio disabled={submitting} />} value={option.value} label={option.optionLabel} />
+                <FormControlLabel
+                  control={<Radio disabled={submitting || (option.value === 'accept' && acceptGate.disabled)} />}
+                  value={option.value}
+                  label={option.optionLabel}
+                  disabled={submitting || (option.value === 'accept' && acceptGate.disabled)}
+                />
+                {option.value === 'accept' && acceptGate.note && (
+                  <Alert severity="info" sx={{ ml: 4, mb: 1 }}>{acceptGate.note}</Alert>
+                )}
                 {decision === option.value && (
                   <Box sx={{ ml: 4, mb: 1 }}>
                     {/* Every option's note now appears only once that option is
@@ -216,7 +233,7 @@ export default function JobFeedbackModal(props: any) {
               variant="contained"
               color="primary"
               onClick={handleSubmit}
-              disabled={submitting || !chosen || (chosen.messageRequired && !feedbackMessage.trim())}
+              disabled={submitting || !chosen || (chosen.messageRequired && !feedbackMessage.trim()) || (chosen?.value === 'accept' && acceptGate.disabled)}
             >
               {submitting ? 'Saving…' : (chosen?.buttonLabel ?? 'Submit Decision')}
             </Button>

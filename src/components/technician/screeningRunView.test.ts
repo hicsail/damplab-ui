@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ScreeningRunCard } from './screeningRunTypes';
 import {
   aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, homologyCardView, screeningsFromRun, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
-  screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
+  acceptanceGateView, screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
 const run = { id: 'r1', jobId: 'j1', trigger: 'RERUN', triggeredBy: 'staff@bu.edu', status: 'PASSED', startedAt: '2026-10-29T16:05:00.000Z', completedAt: null, sequenceCount: 192, skippedCount: 2, detail: null } as const;
@@ -196,5 +196,20 @@ describe('Run / Rerun / Refresh (behaviour 20, Review Focus 5)', () => {
     it('frees the button when a run has sat in progress for over ten minutes', () => expect(screeningBusy({ status: 'IN_PROGRESS', startedAt: '2026-11-01T11:45:00Z' }, false, now)).toBe(false));
     it('frees the button when there is no start time', () => expect(screeningBusy({ status: 'IN_PROGRESS' }, false, now)).toBe(false));
     it('is free with no homology row', () => expect(screeningBusy(null, false, now)).toBe(false));
+  });
+});
+
+describe('acceptanceGateView (behaviour 13)', () => {
+  it('holds Accept while the answer is loading', () => {
+    expect(acceptanceGateView({ data: undefined, loading: true, hasError: false })).toEqual({ disabled: true, note: 'Checking screening…' });
+  });
+  it.each(['CLEAR', 'NOT_REQUIRED'] as const)('%s leaves Accept on, with no note', (state) => {
+    expect(acceptanceGateView({ data: { state, message: null }, loading: false, hasError: false })).toEqual({ disabled: false, note: null });
+  });
+  it.each(['NOT_RUN', 'IN_PROGRESS', 'NOT_PASSED', 'STALE'] as const)('%s disables Accept with the server\'s message', (state) => {
+    expect(acceptanceGateView({ data: { state, message: 'Rerun screening.' }, loading: false, hasError: false })).toEqual({ disabled: true, note: 'Rerun screening.' });
+  });
+  it('a failed check leaves Accept on: the server still enforces the gate', () => {
+    expect(acceptanceGateView({ data: undefined, loading: false, hasError: true })).toEqual({ disabled: false, note: null });
   });
 });
