@@ -2508,6 +2508,63 @@ export const GET_SCREENING_RUN = gql`
         status
         detail
       }
+      unscreenedNotes
+      customer {
+        status
+        requesterId
+        verdict
+        decisionStatus
+        checks
+        counts
+        detail
+      }
+    }
+  }
+`;
+
+export const GET_SCREENING_RUN_CARD = gql`
+  query ScreeningRunCard($id: ID!) {
+    screeningRun(id: $id) {
+      id
+      status
+      completedAt
+      sequenceCount
+      skippedCount
+      detail
+      unscreenedNotes
+      sequences {
+        length
+      }
+      aclid {
+        screenId
+        homologyStatus
+        status
+        regulatoryStatus
+        findings
+        detail
+      }
+      secureDna {
+        status
+        detail
+      }
+      customer {
+        status
+        requesterId
+        verdict
+        decisionStatus
+        checks
+        counts
+        detail
+      }
+    }
+  }
+`;
+
+export const GET_JOB_ACCEPTANCE_SCREENING = gql`
+  query JobAcceptanceScreening($jobId: ID!) {
+    jobAcceptanceScreening(jobId: $jobId) {
+      state
+      message
     }
   }
 `;

@@ -49,8 +49,44 @@ export interface ScreeningRunSecureDnaLeg {
   detail: string | null;
 }
 
+export type CustomerScreeningStatus = 'PASSED' | 'NEEDS_REVIEW' | 'FAILED' | 'IN_PROGRESS' | 'NOT_AVAILABLE' | 'NOT_RUN' | 'UNAVAILABLE';
+
+export interface ScreeningRunCustomerLeg {
+  status: CustomerScreeningStatus;
+  requesterId: string | null;
+  verdict: string | null;
+  decisionStatus: string | null;
+  checks: unknown;
+  counts: unknown;
+  detail: string | null;
+}
+
 export interface ScreeningRunDetail extends ScreeningRunSummary {
   sequences: ScreeningRunSequence[];
   aclid: ScreeningRunAclidLeg | null;
   secureDna: ScreeningRunSecureDnaLeg | null;
+  customer: ScreeningRunCustomerLeg | null;
+  unscreenedNotes: string[];
+}
+
+/** What GET_SCREENING_RUN_CARD selects: the newest run's card, without the raw reports. */
+export interface ScreeningRunCard {
+  id: string;
+  status: BiosecurityScreeningStatus;
+  completedAt: string | null;
+  sequenceCount: number;
+  skippedCount: number;
+  detail: string | null;
+  unscreenedNotes: string[];
+  sequences: Array<{ length: number }>;
+  aclid: Pick<ScreeningRunAclidLeg, 'screenId' | 'homologyStatus' | 'status' | 'regulatoryStatus' | 'findings' | 'detail'> | null;
+  secureDna: Pick<ScreeningRunSecureDnaLeg, 'status' | 'detail'> | null;
+  customer: ScreeningRunCustomerLeg | null;
+}
+
+export type JobAcceptanceScreeningState = 'CLEAR' | 'NOT_REQUIRED' | 'NOT_RUN' | 'IN_PROGRESS' | 'NOT_PASSED' | 'STALE';
+
+export interface JobAcceptanceScreening {
+  state: JobAcceptanceScreeningState;
+  message: string | null;
 }

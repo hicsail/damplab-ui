@@ -20,7 +20,8 @@ const run: ScreeningRunDetail = {
     details: { s1: { regulatory_status: 'controlled', findings: null, matches: [{ organism: 'Ricinus communis', gene: 'RCA', function: 'toxin', pident: 98.5, qcov: 100, evalue: 1e-50, pathogenesis: true, housekeeping: false, funsocs: [] }] } },
     raw: { id: 'scr_1', length: 985 }, detail: null
   },
-  secureDna: { batchId: null, status: 'PASSED', detail: null }
+  secureDna: { batchId: null, status: 'PASSED', detail: null },
+  customer: null, unscreenedNotes: []
 };
 
 describe('screening run details (biosecurity-update)', () => {
