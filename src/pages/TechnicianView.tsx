@@ -161,6 +161,8 @@ import {
   screeningButtonLabel,
   screeningRunIsLoading,
   screeningsFromRun,
+  isNothingToScreen,
+  NOTHING_TO_SCREEN_TEXT,
   showRefreshResults,
 } from "../components/technician/screeningRunView";
 import type { ScreeningBatch } from "../securedna/types";
@@ -1278,7 +1280,10 @@ export default function TechnicianView() {
                   ? demoPane.status
                   : noRuns
                     ? NOT_SCREENED_TEXT
-                    : biosecurityStatusLabel(biosecurityComposite)
+                    : biosecurityComposite === "UNAVAILABLE" &&
+                        isNothingToScreen(newestRun)
+                      ? NOTHING_TO_SCREEN_TEXT
+                      : biosecurityStatusLabel(biosecurityComposite)
               }
               description={
                 demoPane

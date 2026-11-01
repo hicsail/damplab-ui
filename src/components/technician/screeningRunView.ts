@@ -177,12 +177,28 @@ const HOMOLOGY_TEXT: Record<BiosecurityScreeningStatus, string> = {
   UNAVAILABLE: 'Unavailable'
 };
 
+export const NOTHING_TO_SCREEN_TEXT = 'Nothing to screen';
+
+/**
+ * A completed run that found no DNA to screen. A run with unscreened notes (a collection threw, a
+ * table could not be read) also has zero sequences, but it blocks, so it is not "nothing to screen".
+ */
+export function isNothingToScreen(run: ScreeningRunCard | null | undefined): boolean {
+  return (
+    !!run &&
+    run.status === 'UNAVAILABLE' &&
+    run.sequenceCount === 0 &&
+    (run.unscreenedNotes ?? []).length === 0 &&
+    run.aclid?.homologyStatus !== 'IN_PROGRESS'
+  );
+}
+
 /** The Homology card for a run: the count, Aclid's regulatory status and findings, SecureDNA's verdict. */
 export function homologyCardView(run: ScreeningRunCard | null): ScreeningCardView {
   if (!run) return { status: 'UNAVAILABLE', statusText: NOT_SCREENED_TEXT, lines: [] };
   const notes = run.unscreenedNotes ?? [];
-  if (run.status === 'UNAVAILABLE' && run.sequenceCount === 0 && !run.detail) {
-    return { status: 'UNAVAILABLE', statusText: 'Nothing to screen', lines: [...notes] };
+  if (isNothingToScreen(run)) {
+    return { status: 'UNAVAILABLE', statusText: NOTHING_TO_SCREEN_TEXT, lines: run.detail ? [run.detail] : [] };
   }
   const status: BiosecurityScreeningStatus =
     run.status === 'UNAVAILABLE' && run.aclid?.homologyStatus === 'IN_PROGRESS' ? 'IN_PROGRESS' : run.status;
