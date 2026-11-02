@@ -58,6 +58,7 @@ import {
   REOPEN_JOB,
   RERUN_JOB_HOMOLOGY_SCREENING,
   REFRESH_JOB_ACLID_SCREENING,
+  START_JOB_CUSTOMER_VERIFICATION,
   WITHDRAW_JOB_FROM_CUSTOMER,
   WITHDRAW_JOB_ACCEPTANCE,
   RESTORE_JOB_VERSION,
@@ -154,6 +155,7 @@ import ScreeningHistory from "../components/technician/ScreeningHistory";
 import ScreeningRunDetailsModal from "../components/technician/ScreeningRunDetailsModal";
 import ScreeningResults from "../components/technician/ScreeningResults";
 import ReportingOptionsDialog from "../components/technician/ReportingOptionsDialog";
+import CopyVerificationLinkButton from "../components/technician/CopyVerificationLinkButton";
 import type { JobAcceptanceScreening, ScreeningRunCard, ScreeningRunDetail, ScreeningRunSummary } from "../components/technician/screeningRunTypes";
 import {
   NOT_SCREENED_TEXT,
@@ -336,6 +338,8 @@ export default function TechnicianView() {
   const [rerunJobHomologyScreening, { loading: rerunningScreening }] =
     useMutation(RERUN_JOB_HOMOLOGY_SCREENING);
   const [refreshJobAclidScreening] = useMutation(REFRESH_JOB_ACLID_SCREENING);
+  // Mints the customer's hosted verification URL for staff to copy. Never the embed, never opened.
+  const [startJobCustomerVerification] = useMutation(START_JOB_CUSTOMER_VERIFICATION);
   const [reportingOptionsOpen, setReportingOptionsOpen] = useState(false);
   const [
     loadScreeningBatch,
@@ -569,6 +573,14 @@ export default function TechnicianView() {
     }
     // A dropped connection does not mean the run stopped (FINDINGS F2), so refresh either way.
     await refreshScreeningSurfaces();
+  };
+
+  const mintCustomerVerificationUrl = async (): Promise<string> => {
+    if (!id) throw new Error("No job to verify.");
+    const result = await startJobCustomerVerification({ variables: { jobId: id } });
+    const url: string | undefined = result.data?.startJobCustomerVerification?.url;
+    if (!url) throw new Error("No verification link was returned.");
+    return url;
   };
 
   const handleRefreshResults = async () => {
@@ -1374,6 +1386,11 @@ export default function TechnicianView() {
                   Refresh results
                 </Button>
               )}
+              <CopyVerificationLinkButton
+                hasScreen={Boolean(aclid?.screenId)}
+                mint={mintCustomerVerificationUrl}
+                sx={railBtnSx}
+              />
               <Button
                 variant="outlined"
                 size="small"
