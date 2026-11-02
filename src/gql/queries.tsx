@@ -2544,6 +2544,7 @@ export const GET_SCREENING_RUN_CARD = gql`
         detail
       }
       secureDna {
+        batchId
         status
         detail
       }

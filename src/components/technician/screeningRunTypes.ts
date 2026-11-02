@@ -80,7 +80,7 @@ export interface ScreeningRunCard {
   unscreenedNotes: string[];
   sequences: Array<{ length: number }>;
   aclid: Pick<ScreeningRunAclidLeg, 'screenId' | 'homologyStatus' | 'status' | 'regulatoryStatus' | 'findings' | 'detail'> | null;
-  secureDna: Pick<ScreeningRunSecureDnaLeg, 'status' | 'detail'> | null;
+  secureDna: Pick<ScreeningRunSecureDnaLeg, 'batchId' | 'status' | 'detail'> | null;
   customer: ScreeningRunCustomerLeg | null;
 }
 

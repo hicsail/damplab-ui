@@ -166,6 +166,7 @@ import {
   paneNothingToScreen,
   NOTHING_TO_SCREEN_TEXT,
   showRefreshResults,
+  homologyDetailsOpenable,
 } from "../components/technician/screeningRunView";
 import type { ScreeningBatch } from "../securedna/types";
 
@@ -849,7 +850,7 @@ export default function TechnicianView() {
     : staffHomologyNote(jobData?.homologyScreening, aclid);
   const homologyBatchId = jobData?.homologyScreening?.batchId as
     string | undefined;
-  const homologyDetailsAvailable = Boolean(homologyBatchId);
+  const homologyDetailsAvailable = homologyDetailsOpenable(homologyBatchId, noRuns);
   // The pane's one line explains the rollup, so homology's note belongs there
   // only when homology is what the rollup is reporting. Otherwise it would
   // read as an explanation of a status it has nothing to do with — "In

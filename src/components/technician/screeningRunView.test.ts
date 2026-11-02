@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ScreeningRunCard } from './screeningRunTypes';
 import {
   aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, homologyCardView, isNothingToScreen, paneNothingToScreen, screeningsFromRun, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
-  acceptanceGateView, aclidResultLegs, paneStatusLabel, staffHomologyNoteFromRun, screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
+  acceptanceGateView, aclidResultLegs, homologyDetailsOpenable, paneStatusLabel, staffHomologyNoteFromRun, screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
 const run = { id: 'r1', jobId: 'j1', trigger: 'RERUN', triggeredBy: 'staff@bu.edu', status: 'PASSED', startedAt: '2026-10-29T16:05:00.000Z', completedAt: null, sequenceCount: 192, skippedCount: 2, detail: null } as const;
@@ -242,6 +242,23 @@ describe('staffHomologyNoteFromRun (M4)', () => {
     expect(note).toContain('cleared by Aclid');
     expect(note).not.toContain('still running');
   });
+  it('credits Aclid only when the run\'s SecureDNA leg is UNAVAILABLE with no batch (W1-M1)', () => {
+    const { note } = staffHomologyNoteFromRun({
+      ...base, status: 'PASSED', sequenceCount: 3,
+      aclid: { ...base.aclid!, homologyStatus: 'PASSED', detail: null },
+      secureDna: { batchId: null, status: 'UNAVAILABLE', detail: 'SecureDNA call failed' }
+    });
+    expect(note).toContain('3 sequences cleared by Aclid');
+    expect(note).not.toContain('SecureDNA and Aclid');
+  });
+  it('credits both when the SecureDNA leg has a batch (W1-M1)', () => {
+    const { note } = staffHomologyNoteFromRun({
+      ...base, status: 'PASSED', sequenceCount: 3,
+      aclid: { ...base.aclid!, homologyStatus: 'PASSED', detail: null },
+      secureDna: { batchId: 'b1', status: 'PASSED', detail: null }
+    });
+    expect(note).toContain('cleared by SecureDNA and Aclid');
+  });
   it('carries a SecureDNA backup sentence from the run', () => {
     const { backup } = staffHomologyNoteFromRun({ ...base, detail: 'SecureDNA backup (after Aclid error)', aclid: { ...base.aclid!, homologyStatus: 'UNAVAILABLE' } });
     expect(backup).toBe('SecureDNA backup (after Aclid error)');
@@ -285,4 +302,10 @@ describe('acceptanceGateView (behaviour 13)', () => {
   it('a failed check leaves Accept on: the server still enforces the gate', () => {
     expect(acceptanceGateView({ data: undefined, loading: false, hasError: true })).toEqual({ disabled: false, note: null });
   });
+});
+
+describe('homologyDetailsOpenable (I2 follow-up)', () => {
+  it('opens the job\'s batch while the runs query has not answered', () => expect(homologyDetailsOpenable('b1', false)).toBe(true));
+  it('opens nothing once the runs query answered with none', () => expect(homologyDetailsOpenable('b1', true)).toBe(false));
+  it('opens nothing without a batch', () => expect(homologyDetailsOpenable(undefined, false)).toBe(false));
 });

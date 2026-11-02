@@ -314,11 +314,19 @@ export function staffHomologyNoteFromRun(run: ScreeningRunCard): { note: string 
       status: homologyCardView(run).status,
       detail: run.detail,
       sequenceCount: run.sequenceCount,
-      // The note only asks whether SecureDNA ran, not for its batch.
-      batchId: run.secureDna ? 'secureDna' : null
+      // SecureDNA is credited only when it returned a batch; a leg that threw stores none.
+      batchId: run.secureDna?.batchId ?? null
     },
     run.aclid ? { screenId: run.aclid.screenId, homologyStatus: run.aclid.homologyStatus, regulatoryStatus: run.aclid.regulatoryStatus, detail: run.aclid.detail } : null
   );
+}
+
+/**
+ * Whether the Homology icon can open the job's SecureDNA batch. Once the runs query has answered
+ * with none, the icon shows Not available and opens nothing; until it answers, the job's batch stands in.
+ */
+export function homologyDetailsOpenable(batchId: string | null | undefined, noRuns: boolean): boolean {
+  return Boolean(batchId) && !noRuns;
 }
 
 const STUCK_RUN_MS = 10 * 60 * 1000;
