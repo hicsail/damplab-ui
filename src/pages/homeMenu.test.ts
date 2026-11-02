@@ -250,13 +250,10 @@ describe('previewing the app as a lower access tier', () => {
   });
 });
 
-describe('Screener entry honours the per-account Biosecurity switch', () => {
-  const screenerShown = (u: HomeMenuUser): boolean => visibleHomeMenu(u).some((section) => section.items.some((item) => item.id === 'screener'));
-
-  it('is shown to staff with the switch on or absent, hidden when it is off', () => {
-    expect(screenerShown(TECHNICIAN)).toBe(true);
-    expect(screenerShown({ ...TECHNICIAN, showBiosecurity: true })).toBe(true);
-    expect(screenerShown({ ...TECHNICIAN, showBiosecurity: false })).toBe(false);
-    expect(screenerShown({ ...CLIENT, showBiosecurity: true })).toBe(false);
+describe('Screener entry follows jobs:view-all alone (biosecurity-tweaks behaviour 17)', () => {
+  const screenerShown = (u: HomeMenuUser): boolean => visibleHomeMenu(u).some((s) => s.items.some((i) => i.id === 'screener'));
+  it('shows Administrators and Technicians, whatever an old account flag says, and nobody else', () => {
+    const legacy = { ...TECHNICIAN, showBiosecurity: false };
+    expect([STAFF, TECHNICIAN, legacy, EQUIPMENT_USER, CLIENT].map(screenerShown)).toEqual([true, true, true, false, false]);
   });
 });

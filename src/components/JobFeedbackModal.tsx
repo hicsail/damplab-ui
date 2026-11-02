@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useContext } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from '@apollo/client';
 import { Alert, AlertTitle, Box, Button, Checkbox, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import { styled } from "@mui/system";
@@ -6,7 +6,7 @@ import { styled } from "@mui/system";
 import { REVIEW_JOB } from '../gql/mutations';
 import { GET_JOB_ACCEPTANCE_SCREENING } from '../gql/queries';
 import { acceptanceGateView, OVERRIDE_SCREENING_LABEL, screeningOverrideOffered } from './technician/screeningRunView';
-import { UserContext } from '../contexts/UserContext';
+import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import type { JobAcceptanceScreening } from './technician/screeningRunTypes';
 import { jobReviewLabels, reviewDecisions, type ReviewDecisionValue } from './jobReviewLabels';
 import { buildReviewInput, retryOperationId } from '../utils/jobReview';
@@ -44,17 +44,16 @@ export default function JobFeedbackModal(props: any) {
   const [submitError,     setSubmitError]     = useState<string | null>(null);
   const [overrideScreening, setOverrideScreening] = useState(false);
   const operationIdRef = useRef<string | null>(null);
-  const userContext = useContext(UserContext);
-  const showBiosecurity = userContext.userProps?.showBiosecurity !== false;
+  const { can } = usePermissions();
 
   const [reviewJob] = useMutation(REVIEW_JOB);
 
-  // Not skipped for staff without showBiosecurity: they are the ones who need to learn why Accept is off.
+  // Not skipped for staff without jobs:view-all: they are the ones who need to learn why Accept is off.
   const { data: acceptanceData, loading: acceptanceLoading, error: acceptanceError } = useQuery<{ jobAcceptanceScreening: JobAcceptanceScreening }>(GET_JOB_ACCEPTANCE_SCREENING, {
     variables: { jobId: id }, skip: !open || !id, fetchPolicy: 'network-only'
   });
   const acceptGate = acceptanceGateView({ data: acceptanceData?.jobAcceptanceScreening, loading: acceptanceLoading, hasError: Boolean(acceptanceError) });
-  const overrideOffered = screeningOverrideOffered({ data: acceptanceData?.jobAcceptanceScreening, loading: acceptanceLoading, showBiosecurity });
+  const overrideOffered = screeningOverrideOffered({ data: acceptanceData?.jobAcceptanceScreening, loading: acceptanceLoading, canScreen: can(PERMISSIONS.JobsViewAll) });
   // Ticking the override is what lets a blocked job be accepted; the server checks the same rule.
   const acceptDisabled = acceptGate.disabled && !(overrideOffered && overrideScreening);
 
