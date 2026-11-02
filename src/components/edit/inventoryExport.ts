@@ -30,6 +30,7 @@ export function inventoryExportFields(stationName: (stationId: string) => string
     { key: 'dimensionL', label: 'L (m)', value: (r) => formatDimension(r.dimensionL) },
     { key: 'dimensionW', label: 'W (m)', value: (r) => formatDimension(r.dimensionW) },
     { key: 'dimensionH', label: 'H (m)', value: (r) => formatDimension(r.dimensionH) },
+    { key: 'imageUrl', label: 'Image URL', width: 40, value: (r) => r.imageKey ?? '' },
     { key: 'description', label: 'Description', width: 40, value: (r) => r.description },
     { key: 'location', label: 'Location', value: (r) => r.location },
     { key: 'bookable', label: 'Bookable', value: (r) => yesNo(r.bookable) },

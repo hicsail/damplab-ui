@@ -1,7 +1,9 @@
-import { useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { DataGrid, GridActionsCellItem, GridColDef, GridRowId, GridRowModesModel, GridSlots } from '@mui/x-data-grid';
-import { Alert, Box, Button, Chip, Snackbar, Stack } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, Snackbar, Stack, Tooltip } from '@mui/material';
 import { Delete, Edit } from '@mui/icons-material';
+import ImageIcon from '@mui/icons-material/Image';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import DownloadIcon from '@mui/icons-material/Download';
 import UploadIcon from '@mui/icons-material/Upload';
 import HistoryIcon from '@mui/icons-material/History';
@@ -10,7 +12,8 @@ import { useNavigate } from 'react-router';
 import { GridToolBar } from './GridToolBar';
 import ConfirmDeleteDialog, { PendingDelete } from './ConfirmDeleteDialog';
 
-import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS, GET_STATIONS } from '../../gql/queries';
+import { DELETE_INVENTORY_ITEM, GET_INVENTORY_ITEMS, GET_STATIONS, UPDATE_INVENTORY_ITEM } from '../../gql/queries';
+import { CREATE_INVENTORY_IMAGE_UPLOAD_URL } from '../../gql/mutations';
 import { PERMISSIONS, usePermissions } from '../../hooks/usePermissions';
 import { formatSaveError } from '../../utils/gqlError';
 import { isExcelFileName, parseInventoryFile, ParsedInventoryRow, UploadSummary } from './inventoryUploadUtils';
@@ -19,6 +22,7 @@ import { FieldPickerDialog } from './FieldPickerDialog';
 import { offeredFields, worksheetFor } from './exportFields';
 import { inventoryExportFields } from './inventoryExport';
 import * as XLSX from 'xlsx';
+import InventoryBatchImageDialog from './InventoryBatchImageDialog';
 
 export interface EditInventoryTableProps {
   searchString?: string;
@@ -52,6 +56,50 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
   const [previewRows, setPreviewRows] = useState<ParsedInventoryRow[] | null>(null);
   const [uploadFileName, setUploadFileName] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [batchImageOpen, setBatchImageOpen] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [imageUploadTargetId, setImageUploadTargetId] = useState<string | null>(null);
+  const [uploadingImageForId, setUploadingImageForId] = useState<string | null>(null);
+  const [createImageUploadUrl] = useMutation(CREATE_INVENTORY_IMAGE_UPLOAD_URL);
+
+  const handleInlineImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !imageUploadTargetId) return;
+
+    const itemId = imageUploadTargetId;
+    setImageUploadTargetId(null);
+    setUploadingImageForId(itemId);
+    try {
+      const result = await createImageUploadUrl({
+        variables: {
+          itemId,
+          file: { filename: file.name, contentType: file.type || 'application/octet-stream', size: file.size }
+        }
+      });
+      const upload = result.data?.createInventoryImageUploadUrl;
+      if (!upload) throw new Error('Failed to get upload URL');
+
+      const response = await fetch(upload.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': upload.contentType },
+        body: file
+      });
+      if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+
+      await client.mutate({
+        mutation: UPDATE_INVENTORY_ITEM,
+        variables: { item: itemId, changes: { imageKey: upload.key } }
+      });
+      await refetch();
+    } catch (e) {
+      console.error('Inline image upload failed:', e);
+      setErrorMessage(formatSaveError(e, 'image upload'));
+    } finally {
+      setUploadingImageForId(null);
+    }
+  };
+
   const exportFields = useMemo(
     () => offeredFields(inventoryExportFields((stationId) => stationMap.get(stationId)), canSeeInternalFields),
     [stationMap, canSeeInternalFields]
@@ -141,6 +189,57 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         <GridActionsCellItem key='edit' icon={<Edit />} label='Edit' onClick={() => navigate(`/edit/inventory/${id}`)} color='inherit' />,
         <GridActionsCellItem key='delete' icon={<Delete />} label='Delete' onClick={() => setPendingDelete({ id, name: rows.find((row: any) => row.id === id)?.name })} color='inherit' />
       ]
+    },
+    {
+      field: 'image',
+      headerName: 'Image',
+      width: 80,
+      sortable: false,
+      filterable: false,
+      renderCell: (params) => {
+        const imageUrl = params.row.imageUrl;
+        const itemId = params.row.id as string;
+        const isUploading = uploadingImageForId === itemId;
+
+        if (isUploading) {
+          return <CircularProgress size={20} />;
+        }
+
+        return (
+          <Stack direction='row' alignItems='center' sx={{ height: '100%' }}>
+            {imageUrl ? (
+              <Tooltip title='Click to replace image'>
+                <IconButton
+                  size='small'
+                  onClick={() => {
+                    setImageUploadTargetId(itemId);
+                    imageInputRef.current?.click();
+                  }}
+                >
+                  <Box
+                    component='img'
+                    src={imageUrl}
+                    alt=''
+                    sx={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 0.5 }}
+                  />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Tooltip title='Upload image'>
+                <IconButton
+                  size='small'
+                  onClick={() => {
+                    setImageUploadTargetId(itemId);
+                    imageInputRef.current?.click();
+                  }}
+                >
+                  <AddPhotoAlternateIcon fontSize='small' color='action' />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+        );
+      }
     },
     { field: 'uniqueId', headerName: 'ID', width: 110 },
     { field: 'name', headerName: 'Name', width: 240, flex: 1 },
@@ -244,7 +343,7 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
   };
 
   /** Row actions are a write affordance; the read tier keeps the table without them. */
-  const WRITE_ONLY_FIELDS = new Set(['actions']);
+  const WRITE_ONLY_FIELDS = new Set(['actions', 'image']);
   /**
    * Internal columns. The server already nulls `serialNumber` for anyone without
    * `internal-fields:read`, so leaving the column in would render a permanently
@@ -265,8 +364,10 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
         {canWrite && (
           <>
             <Button variant='contained' startIcon={<UploadIcon />} onClick={() => fileInputRef.current?.click()}>Upload inventory</Button>
+            <Button variant='outlined' startIcon={<AddPhotoAlternateIcon />} onClick={() => setBatchImageOpen(true)}>Batch upload images</Button>
             <Button variant='outlined' startIcon={<HistoryIcon />} onClick={() => navigate('/edit/inventory/upload-history?type=INVENTORY')}>Upload history</Button>
             <input ref={fileInputRef} type='file' accept='.xlsx,.xls' style={{ display: 'none' }} onChange={handleUploadFile} />
+            <input ref={imageInputRef} type='file' accept='image/jpeg,image/png,image/webp' style={{ display: 'none' }} onChange={handleInlineImageUpload} />
           </>
         )}
       </Box>
@@ -286,6 +387,18 @@ export const EditInventoryTable: React.FC<EditInventoryTableProps> = ({ searchSt
           onComplete={handleUploadComplete}
         />
       )}
+      <InventoryBatchImageDialog
+        open={batchImageOpen}
+        onClose={() => setBatchImageOpen(false)}
+        onComplete={(uploaded, failed) => {
+          setBatchImageOpen(false);
+          refetch();
+          const parts = [];
+          if (uploaded > 0) parts.push(`${uploaded} uploaded`);
+          if (failed > 0) parts.push(`${failed} failed`);
+          setErrorMessage(`Batch image upload complete: ${parts.join(', ')}.`);
+        }}
+      />
       <DataGrid
         rows={filteredRows}
         columns={columns}
