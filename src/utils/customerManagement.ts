@@ -43,7 +43,7 @@ export const PRICING_OPTIONS: Option[] = [
   { value: 'EXTERNAL_CUSTOMER_NO_SALARY', label: 'External — no salary' }
 ];
 
-export type CustomerColumnField = 'name' | 'username' | 'email' | 'pricingCategory' | 'accessTier' | 'showBiosecurity' | 'canBookWithoutApproval' | ProfileField;
+export type CustomerColumnField = 'name' | 'username' | 'email' | 'pricingCategory' | 'accessTier' | 'canBookWithoutApproval' | ProfileField;
 
 export interface CustomerColumnSpec {
   field: CustomerColumnField;
@@ -62,7 +62,6 @@ export const CUSTOMER_COLUMNS: readonly CustomerColumnSpec[] = [
   { field: 'email', headerName: 'Email', kind: 'readonly', defaultVisible: true },
   { field: 'pricingCategory', headerName: 'Pricing category', kind: 'pricing', defaultVisible: true },
   { field: 'accessTier', headerName: 'Access tier', kind: 'tier', defaultVisible: true },
-  { field: 'showBiosecurity', headerName: 'Biosecurity', kind: 'boolean', defaultVisible: true },
   { field: 'canBookWithoutApproval', headerName: 'Can book without approval', kind: 'boolean', defaultVisible: true },
   text('position', 'Position'),
   text('instrumentType', 'Instrument type'),
@@ -132,7 +131,6 @@ export interface CustomerUser {
   customerCategory?: string | null;
   isDefaultExternalCustomer?: boolean | null;
   accessTier?: string | null;
-  showBiosecurity?: boolean | null;
   profile?: ({ canBookWithoutApproval?: boolean | null } & Partial<Record<ProfileField, string | null>>) | null;
 }
 
@@ -149,7 +147,6 @@ export type CustomerRow = {
   pricingCategory: string;
   isDefaultExternalCustomer: boolean;
   accessTier: string;
-  showBiosecurity: boolean;
   canBookWithoutApproval: boolean;
 } & Record<ProfileField, string>;
 
@@ -164,8 +161,6 @@ export function rowFromUser(u: CustomerUser): CustomerRow {
     pricingCategory: u.isDefaultExternalCustomer ? '' : (u.customerCategory ?? ''),
     isDefaultExternalCustomer: u.isDefaultExternalCustomer === true,
     accessTier: u.accessTier ?? ACCESS_TIERS.Client,
-    // Shown unless an admin has hidden it; an absent attribute reads as shown.
-    showBiosecurity: u.showBiosecurity !== false,
     canBookWithoutApproval: u.profile?.canBookWithoutApproval === true
   };
   for (const f of PROFILE_FIELDS) row[f] = u.profile?.[f] ?? '';
@@ -176,7 +171,6 @@ export interface RowSavePlan {
   /** null clears every pricing group. */
   category?: string | null;
   tier?: string;
-  showBiosecurity?: boolean;
   profile?: Record<string, string | boolean | null>;
 }
 
@@ -185,7 +179,6 @@ export function planRowSave(before: CustomerRow, after: CustomerRow): RowSavePla
   const plan: RowSavePlan = {};
   if (after.pricingCategory !== before.pricingCategory) plan.category = after.pricingCategory === '' ? null : after.pricingCategory;
   if (after.accessTier !== before.accessTier) plan.tier = after.accessTier;
-  if (after.showBiosecurity !== before.showBiosecurity) plan.showBiosecurity = after.showBiosecurity;
   const profile: Record<string, string | boolean | null> = {};
   if (after.canBookWithoutApproval !== before.canBookWithoutApproval) profile.canBookWithoutApproval = after.canBookWithoutApproval;
   for (const f of PROFILE_FIELDS) {
@@ -199,7 +192,6 @@ export function planRowSave(before: CustomerRow, after: CustomerRow): RowSavePla
 export interface RowSaveCalls {
   setCategory: (category: string | null) => Promise<unknown>;
   setTier: (tier: string) => Promise<{ accessRoleMapped?: boolean | null } | null | undefined>;
-  setShowBiosecurity: (enabled: boolean) => Promise<unknown>;
   updateProfile: (input: Record<string, string | boolean | null>) => Promise<unknown>;
 }
 
@@ -217,7 +209,7 @@ export class RowSaveError extends Error {
 }
 
 /**
- * Run the planned mutations in order — pricing, access, biosecurity, profile — and stop at the
+ * Run the planned mutations in order — pricing, access, profile — and stop at the
  * first failure. Pricing and access stay separate calls so neither carries the
  * other's value.
  */
@@ -234,10 +226,6 @@ export async function saveRow(before: CustomerRow, after: CustomerRow, calls: Ro
       const result = await calls.setTier(plan.tier);
       accessRoleMapped = result?.accessRoleMapped ?? null;
       saved.accessTier = after.accessTier;
-    }
-    if (plan.showBiosecurity !== undefined) {
-      await calls.setShowBiosecurity(plan.showBiosecurity);
-      saved.showBiosecurity = after.showBiosecurity;
     }
     if (plan.profile) {
       await calls.updateProfile(plan.profile);

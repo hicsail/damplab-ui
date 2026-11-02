@@ -1471,7 +1471,6 @@ const CUSTOMER_MANAGEMENT_ROW_FIELDS = `
   customerCategory
   isDefaultExternalCustomer
   accessTier
-  showBiosecurity
   profile {
     userSub
     canBookWithoutApproval
@@ -2450,7 +2449,7 @@ export const GET_PARAMETER_SET_SAMPLE_SHEET_TEMPLATE_URL = gql`
   }
 `;
 
-/** A job's screening history for the Biosecurity card (biosecurity-update). Staff with showBiosecurity only. */
+/** A job's screening history for the Biosecurity card (biosecurity-update). Staff only. */
 export const GET_JOB_SCREENING_RUNS = gql`
   query JobScreeningRuns($jobId: ID!) {
     jobScreeningRuns(jobId: $jobId) {

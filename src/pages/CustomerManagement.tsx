@@ -20,7 +20,7 @@ import {
 import { Cancel, Edit, Save } from '@mui/icons-material';
 
 import { LIST_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT, SEARCH_KEYCLOAK_USERS_FOR_CUSTOMER_MANAGEMENT } from '../gql/queries';
-import { SET_USER_KEYCLOAK_ACCESS_TIER, SET_USER_KEYCLOAK_CUSTOMER_CATEGORY, SET_USER_SHOW_BIOSECURITY, UPDATE_CUSTOMER_PROFILE } from '../gql/mutations';
+import { SET_USER_KEYCLOAK_ACCESS_TIER, SET_USER_KEYCLOAK_CUSTOMER_CATEGORY, UPDATE_CUSTOMER_PROFILE } from '../gql/mutations';
 import type { UpdateCustomerProfileInput } from '../gql/graphql';
 import { ACCESS_TIER_HINTS, ACCESS_TIER_LABELS, ASSIGNABLE_ACCESS_TIERS } from '../constants/accessTiers';
 import { UserContext } from '../contexts/UserContext';
@@ -96,7 +96,6 @@ export default function CustomerManagement() {
   const [setCategory] = useMutation(SET_USER_KEYCLOAK_CUSTOMER_CATEGORY);
   // A separate mutation from pricing: no request can carry the other axis's value.
   const [setAccessTier] = useMutation(SET_USER_KEYCLOAK_ACCESS_TIER);
-  const [setShowBiosecurity] = useMutation(SET_USER_SHOW_BIOSECURITY);
   const [updateProfile] = useMutation(UPDATE_CUSTOMER_PROFILE);
 
   const isSearching = lastQuery.length >= 2;
@@ -132,7 +131,6 @@ export default function CustomerManagement() {
       const { accessRoleMapped } = await saveRow(before, after, {
         setCategory: (category) => setCategory({ variables: { userId: after.id, category } }),
         setTier: async (tier) => (await setAccessTier({ variables: { userId: after.id, tier } })).data?.setUserKeycloakAccessTier,
-        setShowBiosecurity: (enabled) => setShowBiosecurity({ variables: { userId: after.id, enabled } }),
         updateProfile: (input) => updateProfile({ variables: { userId: after.id, input: input as UpdateCustomerProfileInput } })
       });
       // The group write can succeed and grant nothing, when the realm has no group -> role mapping.
@@ -269,8 +267,6 @@ export default function CustomerManagement() {
         which decides what they may do. Changing one never changes the other. Pricing changes apply in Keycloak
         immediately and existing jobs keep the category stored at submission time; <strong>access changes take effect
         at the user&rsquo;s next sign-in</strong>, because Keycloak does not invalidate tokens already issued.{' '}
-        <strong>Biosecurity</strong> is separate again: shown for everyone until you turn it off. They see the
-        change the next time they load the app.{' '}
         <strong>Can book without approval</strong> lets a client&rsquo;s equipment bookings skip the lab&rsquo;s
         approval; it applies to their next booking.
       </Typography>
