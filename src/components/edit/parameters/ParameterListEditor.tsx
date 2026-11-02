@@ -388,7 +388,9 @@ export default function ParameterListEditor({
                   <FormHelperText>
                     {isTableType(selectedParameter.type)
                       ? 'Sequences in the chosen columns of an uploaded file are sent to biosecurity screening.'
-                      : 'The answer is a DNA sequence and is sent to biosecurity screening.'}
+                      : selectedParameter.type === 'file'
+                        ? 'Every DNA sequence in each uploaded sequence file is sent to biosecurity screening. Files that are not sequence files are refused at upload.'
+                        : 'The answer is a DNA sequence and is sent to biosecurity screening.'}
                   </FormHelperText>
                 </Grid>
               )}

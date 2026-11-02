@@ -603,7 +603,7 @@ describe('Parameter List — screening columns (biosecurity-update behaviour 5)'
 
   it('refuses what the editor refuses', () => {
     // New rows under the default catalog's `Buffers` set, as the matrix test above does.
-    expect(plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Cycles2', 'Number', 'Y']]).rows[0].errors).toEqual(['screening: Only Text and Table parameters can require screening.']);
+    expect(plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Cycles2', 'Number', 'Y']]).rows[0].errors).toEqual(['screening: Only Text, Table and File Upload parameters can require screening.']);
     expect(plan(['parameterSet', 'parameter', 'type', 'options', 'screening'], [['Buffers', 'Grid', 'Table', 'Well; Insert', 'Y']]).rows[0].errors).toEqual([
       'screening: A Table that requires screening needs at least one screening column.'
     ]);
@@ -618,7 +618,7 @@ describe('Parameter List — screening columns (biosecurity-update behaviour 5)'
     const row = [first[header.indexOf('parameterId')], first[header.indexOf('operation')], first[header.indexOf('parameter')], 'Number'];
     const result = plan(['parameterId', 'operation', 'parameter', 'type'], [row], none, cat);
     expect(result.rows[0].errors).toEqual([]);
-    expect(result.rows[0].warnings).toEqual(['Requires screening removed: only Text and Table parameters can be screened.']);
+    expect(result.rows[0].warnings).toEqual(['Requires screening removed: only Text, Table and File Upload parameters can be screened.']);
     const built = buildOwnerParameters(result.work.owners[0], new Set(result.rows.map((r) => r.key)));
     expect(built[0]).not.toHaveProperty('screening');
   });
@@ -626,7 +626,28 @@ describe('Parameter List — screening columns (biosecurity-update behaviour 5)'
   it('an explicit screening Y on a Number still errors', () => {
     // A new row, so the cell counts as given; on a stored flagged row an unchanged Y is not a given cell.
     const result = plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Cycles3', 'Number', 'Y']]);
-    expect(result.rows[0].errors).toEqual(['screening: Only Text and Table parameters can require screening.']);
+    expect(result.rows[0].errors).toEqual(['screening: Only Text, Table and File Upload parameters can require screening.']);
     expect(result.rows[0].warnings).toEqual([]);
+  });
+});
+
+describe('Parameter List — a flagged File Upload (biosecurity-tweaks behaviour 7)', () => {
+  const op: any = { id: 'op10', name: 'Cloning', parameterSetIds: [], ownParameters: [
+    { id: 'insert', name: 'Insert', type: 'string', screening: true },
+    { id: 'seqs', name: 'Sequence files', type: 'file', screening: true }
+  ] };
+  const cat = catalogOf({ operations: [op] });
+  it('writes screening Y and plans no change when uploaded unchanged', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    expect(rows.map((r) => r[header.indexOf('screening')])).toEqual(['Y', 'Y']);
+    expect(plan(header, rows, none, cat).rows.map((r) => [r.action, r.errors])).toEqual([['unchanged', []], ['unchanged', []]]);
+  });
+  it('a flagged Text turned into File Upload keeps the flag, with no warning', () => {
+    const [header, first] = parameterListExportRows(cat);
+    const row = [first[header.indexOf('parameterId')], first[header.indexOf('operation')], first[header.indexOf('parameter')], 'File Upload'];
+    const result = plan(['parameterId', 'operation', 'parameter', 'type'], [row], none, cat);
+    expect(result.rows[0].warnings).toEqual([]);
+    const built = buildOwnerParameters(result.work.owners[0], new Set(result.rows.map((r) => r.key)));
+    expect(built[0]).toMatchObject({ type: 'file', screening: true });
   });
 });

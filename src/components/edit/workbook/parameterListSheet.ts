@@ -275,7 +275,7 @@ function applyCells(
   if (has('type') && !has('screening') && !isScreenableType(next.type) && next.screening === true) {
     delete next.screening;
     delete next.screeningFields;
-    warnings.push('Requires screening removed: only Text and Table parameters can be screened.');
+    warnings.push('Requires screening removed: only Text, Table and File Upload parameters can be screened.');
   }
   if (has('screening')) {
     const value = parseYesNo(cell('screening'));
@@ -296,7 +296,7 @@ function applyCells(
   }
   if (!isScreenableType(next.type) && next.screening === true && !has('screening')) {
     delete next.screening;
-    warnings.push('Requires screening removed: only Text and Table parameters can be screened.');
+    warnings.push('Requires screening removed: only Text, Table and File Upload parameters can be screened.');
   }
 
   const validationCell = has('validation') ? cell('validation') : '';

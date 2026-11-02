@@ -108,7 +108,7 @@ export function prepareParametersForSave(
         next.tableData = { ...(next.tableData ?? {}), columns: resolved.columns };
       }
     }
-    // Screening (biosecurity-update): stored only when on, and only on a Text or a Table; screening
+    // Screening (biosecurity-update): stored only when on, and only on a Text, a Table or a File Upload; screening
     // columns only on a flagged Table, trimmed. A parameter switched to another type loses both
     // rather than failing a rule its editor no longer shows.
     if (next.screening !== true || !isScreenableType(next.type)) delete next.screening;
