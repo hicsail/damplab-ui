@@ -8,7 +8,7 @@ import { CanvasContext } from '../contexts/Canvas';
 
 // There is no DOM here, so effects never run on their own. Params' effects are collected so a test can run them,
 // (with the dependency list each was given) and formik's setValues is observed (the real useFormik still supplies the values). Everything else is untouched.
-const spy = vi.hoisted(() => ({ fileInputs: [] as any[], updaters: [] as Array<(prev: any) => any>, refs: [] as any[], setFieldValue: vi.fn(), effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn(), initialValues: [] as any[], errors: undefined as Record<string, string> | undefined }));
+const spy = vi.hoisted(() => ({ fileInputs: [] as any[], removeButtons: [] as any[], updaters: [] as Array<(prev: any) => any>, refs: [] as any[], setFieldValue: vi.fn(), effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn(), initialValues: [] as any[], errors: undefined as Record<string, string> | undefined }));
 vi.mock('react', async (importOriginal) => {
   const actual: any = await importOriginal();
   const useEffect = (effect: () => void, deps?: unknown[]): void => {
@@ -31,6 +31,7 @@ vi.mock('react/jsx-dev-runtime', async (importOriginal) => {
   const actual: any = await importOriginal();
   return { ...actual, jsxDEV: (type: any, props: any, ...rest: any[]) => {
       if (type === 'input' && props?.type === 'file') spy.fileInputs.push(props);
+      if (props?.['aria-label'] === 'Remove file') spy.removeButtons.push(props);
       return actual.jsxDEV(type, props, ...rest);
     }
   };
@@ -390,6 +391,7 @@ describe('Params — picking files on a File Upload, behaviour (biosecurity-twea
   const fixture = (name: string): File => new File([readFileSync(`test-fixtures/sequence-files/${name}`)], name);
   const pick = (defs: any[], value: unknown, files: File[], nodeId = 'n1'): Promise<void> => {
     spy.fileInputs.length = 0;
+    spy.removeButtons.length = 0;
     spy.updaters.length = 0;
     spy.refs.length = 0;
     spy.setFieldValue.mockClear();
@@ -440,5 +442,26 @@ describe('Params — picking files on a File Upload, behaviour (biosecurity-twea
     await pending;
     expect(spy.setFieldValue).not.toHaveBeenCalled();
     expect(spy.updaters).toHaveLength(0);
+  });
+
+  describe('removing a file clears that parameter\'s stale refusals (M3)', () => {
+    // Replays the updaters in order (stored() merges them, which would hide a deleted key).
+    const replayed = (): any => spy.updaters.reduce((acc: any, u) => u(acc), {});
+    const held = { __kind: 'pending-file', localId: 'held', filename: 'held.fasta' };
+    it('multi: the refusal from the last pick goes when a file is removed', async () => {
+      await pick(flagged, [held], [fixture('notes.txt')]);
+      expect(replayed()['n1:seqs']).toHaveLength(1);
+      spy.removeButtons[0].onClick();
+      expect(replayed()['n1:seqs']).toBeUndefined();
+      expect(spy.setFieldValue).toHaveBeenCalledWith('seqs', []);
+    });
+    it('single: the refusal from the last pick goes when the file is removed', async () => {
+      const single = [{ id: 'seqs', name: 'Sequence files', type: 'file', screening: true }];
+      await pick(single, held, [fixture('notes.txt')]);
+      expect(replayed()['n1:seqs']).toHaveLength(1);
+      spy.removeButtons[0].onClick();
+      expect(replayed()['n1:seqs']).toBeUndefined();
+      expect(spy.setFieldValue).toHaveBeenCalledWith('seqs', null);
+    });
   });
 });

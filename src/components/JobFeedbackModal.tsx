@@ -48,7 +48,8 @@ export default function JobFeedbackModal(props: any) {
 
   const [reviewJob] = useMutation(REVIEW_JOB);
 
-  // Not skipped for staff without jobs:view-all: they are the ones who need to learn why Accept is off.
+  // Always asked when the modal is open: the server's jobs:view-all gate on jobAcceptanceScreening covers every
+  // Administrator and Technician who can open the modal.
   const { data: acceptanceData, loading: acceptanceLoading, error: acceptanceError } = useQuery<{ jobAcceptanceScreening: JobAcceptanceScreening }>(GET_JOB_ACCEPTANCE_SCREENING, {
     variables: { jobId: id }, skip: !open || !id, fetchPolicy: 'network-only'
   });

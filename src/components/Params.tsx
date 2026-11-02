@@ -232,6 +232,13 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
   };
 
   /** Hands the picked files on: at once for an ordinary File Upload, after the sequence check for a flagged one. */
+  /** A removed file leaves its parameter's last-pick refusals behind otherwise: they describe a pick, not the answer. */
+  const clearRefusals = (param: any): void =>
+    setFileRefusals((prev) => {
+      const { [`${activeNode?.id}:${param.id}`]: _gone, ...rest } = prev;
+      return rest;
+    });
+
   const pickFiles = (param: any, selected: PendingParamFile[], apply: (accepted: PendingParamFile[]) => void): void => {
     if (!requiresSequenceCheck(activeNode?.data?.parameters, param.id)) {
       apply(selected);
@@ -740,7 +747,10 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             {!readOnly && (
                               <IconButton
                                 size="small"
-                                onClick={() => formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx))}
+                                onClick={() => {
+                                  clearRefusals(param);
+                                  formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx));
+                                }}
                                 aria-label="Remove file"
                               >
                                 <DeleteForeverSharp fontSize="small" />
@@ -783,7 +793,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                         </FormHelperText>
                         {isPendingParamFile(fileValue) && sequenceCounts[fileValue.localId] !== undefined ? <FormHelperText sx={{ m: 0 }}>{sequenceCountLabel(sequenceCounts[fileValue.localId])}</FormHelperText> : null}
                         {!readOnly && (
-                          <IconButton size="small" onClick={() => formik.setFieldValue(param.id, null)} aria-label="Remove file">
+                          <IconButton size="small" onClick={() => { clearRefusals(param); formik.setFieldValue(param.id, null); }} aria-label="Remove file">
                             <DeleteForeverSharp fontSize="small" />
                           </IconButton>
                         )}
