@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -7,21 +8,39 @@ import { CanvasContext } from '../contexts/Canvas';
 
 // There is no DOM here, so effects never run on their own. Params' effects are collected so a test can run them,
 // (with the dependency list each was given) and formik's setValues is observed (the real useFormik still supplies the values). Everything else is untouched.
-const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn(), initialValues: [] as any[], errors: undefined as Record<string, string> | undefined }));
+const spy = vi.hoisted(() => ({ fileInputs: [] as any[], updaters: [] as Array<(prev: any) => any>, refs: [] as any[], setFieldValue: vi.fn(), effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn(), initialValues: [] as any[], errors: undefined as Record<string, string> | undefined }));
 vi.mock('react', async (importOriginal) => {
   const actual: any = await importOriginal();
   const useEffect = (effect: () => void, deps?: unknown[]): void => {
     spy.effects.push(effect);
     spy.deps.push(deps);
   };
-  return { ...actual, default: { ...actual, useEffect }, useEffect };
+  // Pick-time tests need the setters and refs Params creates, which static rendering never lets a handler reach.
+  const useState = (init: any): any => {
+    const [value] = actual.useState(init);
+    return [value, (next: any) => { if (typeof next === 'function') spy.updaters.push(next); }];
+  };
+  const useRef = (init: any): any => {
+    const ref = actual.useRef(init);
+    spy.refs.push(ref);
+    return ref;
+  };
+  return { ...actual, default: { ...actual, useEffect, useState, useRef }, useEffect, useState, useRef };
+});
+vi.mock('react/jsx-dev-runtime', async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, jsxDEV: (type: any, props: any, ...rest: any[]) => {
+      if (type === 'input' && props?.type === 'file') spy.fileInputs.push(props);
+      return actual.jsxDEV(type, props, ...rest);
+    }
+  };
 });
 vi.mock('formik', async (importOriginal) => {
   const actual: any = await importOriginal();
   return { ...actual, useFormik: (config: any) => {
       spy.initialValues.push(config.initialValues);
       // spy.errors stands in for what validation records once the effects have run.
-      return { ...actual.useFormik(config), setValues: spy.setValues, ...(spy.errors ? { errors: spy.errors } : {}) };
+      return { ...actual.useFormik(config), setValues: spy.setValues, setFieldValue: spy.setFieldValue, ...(spy.errors ? { errors: spy.errors } : {}) };
     }
   };
 });
@@ -352,7 +371,7 @@ describe('Params — sequence check on a flagged File Upload (biosecurity-tweaks
     expect((paramsSource.match(/pickFiles\(param, /g) ?? []).length).toBe(2);
     expect(paramsSource).toContain('requiresSequenceCheck(activeNode?.data?.parameters, param.id)');
     expect(paramsSource).toContain('sequenceCountLabel(');
-    expect(paramsSource).toContain('fileRefusals[param.id]');
+    expect(paramsSource).toContain('refusalsFor(param)');
   });
 
   it('renders a flagged, empty File Upload as its picker with no error text', () => {
@@ -364,5 +383,62 @@ describe('Params — sequence check on a flagged File Upload (biosecurity-tweaks
     );
     expect(text(markup)).toContain('Sequence files');
     expect(markup).not.toContain('Mui-error');
+  });
+});
+
+describe('Params — picking files on a File Upload, behaviour (biosecurity-tweaks)', () => {
+  const fixture = (name: string): File => new File([readFileSync(`test-fixtures/sequence-files/${name}`)], name);
+  const pick = (defs: any[], value: unknown, files: File[], nodeId = 'n1'): Promise<void> => {
+    spy.fileInputs.length = 0;
+    spy.updaters.length = 0;
+    spy.refs.length = 0;
+    spy.setFieldValue.mockClear();
+    renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params activeNode={{ id: nodeId, data: { id: nodeId, serviceId: 's1', parameters: defs, formData: [{ id: 'seqs', nodeId, name: 'Sequence files', type: 'file', paramType: 'input', value, required: false, allowMultipleValues: defs[0].allowMultipleValues }] } } as any} />
+      </CanvasContext.Provider>
+    );
+    const event = { target: { files }, currentTarget: { value: 'picked' } };
+    spy.fileInputs[0].onChange(event);
+    expect(event.currentTarget.value).toBe('');
+    return new Promise((resolve) => setTimeout(resolve, 200));
+  };
+  const flagged = [{ id: 'seqs', name: 'Sequence files', type: 'file', screening: true, allowMultipleValues: true }];
+  const stored = (): any => {
+    const state: any = spy.updaters.reduce((acc, u) => ({ ...acc, ...u(acc) }), {});
+    return state;
+  };
+
+  it('on a flagged param adds the good file of a mixed pick, with its count, and refuses the bad one by name', async () => {
+    await pick(flagged, [], [fixture('two-records.fasta'), fixture('notes.txt')]);
+    expect(spy.setFieldValue).toHaveBeenCalledTimes(1);
+    const [id, value] = spy.setFieldValue.mock.calls[0];
+    expect(id).toBe('seqs');
+    expect(value.map((f: any) => f.filename)).toEqual(['two-records.fasta']);
+    const state = stored();
+    expect(state[value[0].localId]).toBe(2);
+    expect(JSON.stringify(state['n1:seqs'])).toContain('notes.txt');
+  });
+
+  it('on an unflagged param adds a non-sequence file unchanged, with no check', async () => {
+    await pick([{ id: 'seqs', name: 'Sequence files', type: 'file', allowMultipleValues: true }], [], [fixture('notes.txt')]);
+    expect(spy.setFieldValue).toHaveBeenCalledTimes(1);
+    expect(spy.setFieldValue.mock.calls[0][1].map((f: any) => f.filename)).toEqual(['notes.txt']);
+    expect(spy.updaters).toHaveLength(0);
+  });
+
+  it('builds on the answer as it stands when the check resolves, not as it stood at the pick', async () => {
+    const pending = pick(flagged, [], [fixture('two-records.fasta')]);
+    spy.refs[1].current = { seqs: [{ __kind: 'pending-file', localId: 'other', filename: 'other.fasta' }] };
+    await pending;
+    expect(spy.setFieldValue.mock.calls[0][1].map((f: any) => f.filename)).toEqual(['other.fasta', 'two-records.fasta']);
+  });
+
+  it('drops a result that resolves after another node became active', async () => {
+    const pending = pick(flagged, [], [fixture('two-records.fasta'), fixture('notes.txt')]);
+    spy.refs[0].current = 'n2';
+    await pending;
+    expect(spy.setFieldValue).not.toHaveBeenCalled();
+    expect(spy.updaters).toHaveLength(0);
   });
 });

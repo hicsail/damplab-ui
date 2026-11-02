@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { useFormik } from "formik";
 import {
   Accordion,
@@ -95,6 +95,10 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
   // A flagged File Upload checks each picked file for sequences: refusals by parameter, counts by pending file.
   const [fileRefusals, setFileRefusals] = useState<Record<string, string[]>>({});
   const [sequenceCounts, setSequenceCounts] = useState<Record<string, number>>({});
+  const activeNodeIdRef = useRef<string | undefined>(activeNode?.id);
+  activeNodeIdRef.current = activeNode?.id;
+  const latestValues = useRef<Record<string, any>>({});
+  const refusalsFor = (param: any): string[] => fileRefusals[`${activeNode?.id}:${param.id}`] ?? [];
 
   /** Marks one parameter as edited relative to the diff baseline. */
   const wrapChanged = (param: any, element: React.ReactNode): React.ReactNode => {
@@ -233,20 +237,30 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
       apply(selected);
       return;
     }
+    const startedOn = activeNode?.id;
     void checkPickedFiles(selected).then(({ accepted, errors, counts }) => {
-      setFileRefusals((prev) => ({ ...prev, [param.id]: errors }));
+      // The user moved to another node while the check ran: its form is not the one this pick was for.
+      if (activeNodeIdRef.current !== startedOn) return;
+      setFileRefusals((prev) => ({ ...prev, [`${startedOn}:${param.id}`]: errors }));
       setSequenceCounts((prev) => ({ ...prev, ...counts }));
       if (accepted.length > 0) apply(accepted);
     });
   };
 
-  // formik hook init
+  // formik hook init (latestValues follows formik.values, so a pick that resolves late builds on the current answer)
   const formik = useFormik({
     initialValues: initValues(),
     enableReinitialize: true,
     validate: validate,
     onSubmit: () => {},
   });
+  latestValues.current = formik.values;
+
+  /** Writes an answer and records it at once, so a second late write sees it before the next render. */
+  const setAnswer = (id: string, value: any): void => {
+    latestValues.current = { ...latestValues.current, [id]: value };
+    formik.setFieldValue(id, value);
+  };
 
 
   // update values to active node form data and validate
@@ -707,8 +721,9 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                               e.currentTarget.value = "";
                               pickFiles(param, selected, (accepted) => {
                                 // Uploading a lost file again replaces its "needs re-upload" line.
-                                const kept = files.filter((f: any) => !(isStalePendingFile(f) && accepted.some((s) => s.filename === f.filename)));
-                                formik.setFieldValue(param.id, [...kept, ...accepted]);
+                                const current = Array.isArray(latestValues.current[param.id]) ? latestValues.current[param.id] : [];
+                                const kept = current.filter((f: any) => !(isStalePendingFile(f) && accepted.some((s) => s.filename === f.filename)));
+                                setAnswer(param.id, [...kept, ...accepted]);
                               });
                             }}
                           />
@@ -735,8 +750,8 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                           </Box>
                         ))}
                       </Box>
-                      {(fileRefusals[param.id] ?? []).map((message) => (
-                        <FormHelperText error key={message}>{message}</FormHelperText>
+                      {refusalsFor(param).map((message, i) => (
+                        <FormHelperText error key={`${i}:${message}`}>{message}</FormHelperText>
                       ))}
                     </div>
                   );
@@ -755,7 +770,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                           onChange={(e) => {
                             const selected = toPendingFiles(e.target.files);
                             e.currentTarget.value = "";
-                            pickFiles(param, selected.slice(0, 1), (accepted) => formik.setFieldValue(param.id, accepted[0] ?? null));
+                            pickFiles(param, selected.slice(0, 1), (accepted) => setAnswer(param.id, accepted[0] ?? null));
                           }}
                         />
                       </Button>
@@ -775,8 +790,8 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                         {isStalePendingFile(fileValue) ? <FormHelperText error sx={{ m: 0 }}>{FILE_NEEDS_REUPLOAD_MESSAGE}</FormHelperText> : null}
                       </Box>
                     ) : null}
-                    {(fileRefusals[param.id] ?? []).map((message) => (
-                      <FormHelperText error key={message}>{message}</FormHelperText>
+                    {refusalsFor(param).map((message, i) => (
+                      <FormHelperText error key={`${i}:${message}`}>{message}</FormHelperText>
                     ))}
                   </div>
                 );
