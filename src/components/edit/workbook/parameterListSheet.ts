@@ -1,5 +1,5 @@
 import { makeUniqueIds } from '../../../utils/idFromName';
-import { effectiveValidation, parseValidation } from '../../../utils/parameterValidation';
+import { effectiveValidation, isScreenableType, parseValidation, screeningRuleViolation } from '../../../utils/parameterValidation';
 import { ConditionAst, ConditionScope, conditionText, named, parseCondition, RefAst, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
 import { expectedColumnsOf, hasStaffTemplate, isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
 import { resolveTableColumns } from '../../../utils/tableColumns';
@@ -87,7 +87,9 @@ export function parameterCells(parameter: any, owner: { set?: string; operation?
     allowMultiple: yesNo(parameter?.allowMultipleValues),
     multipleSelectionType: multipleSelectionLabelOf(parameter),
     matrix: typeof parameter?.matrix === 'string' ? parameter.matrix.trim() : '',
-    defaultValue: normalizeEol(defaultValue)
+    defaultValue: normalizeEol(defaultValue),
+    screening: yesNo(parameter?.screening),
+    screeningFields: Array.isArray(parameter?.screeningFields) ? parameter.screeningFields.map((field: unknown) => String(field).trim()).filter(Boolean).join('; ') : ''
   };
 }
 
@@ -112,7 +114,8 @@ const compact = (s: string): string => s.replace(/\s+/g, '').toLowerCase();
 function sameCell(column: string, cell: string, current: string): boolean {
   switch (column) {
     case 'required':
-    case 'allowMultiple': {
+    case 'allowMultiple':
+    case 'screening': {
       const a = parseYesNo(cell);
       return a !== 'invalid' && a === parseYesNo(current);
     }
@@ -129,6 +132,7 @@ function sameCell(column: string, cell: string, current: string): boolean {
     case 'conditionalDisplayLogic':
       return sameConditionText(cell, current);
     case 'options':
+    case 'screeningFields':
       return sameList(splitList(cell), splitList(current));
     default:
       return cell === current;
@@ -266,6 +270,34 @@ function applyCells(
   }
   // Only a create, or a row that touches type or options, is held to this: an unrelated edit to a stored zero-option dropdown goes through.
   if (next.type === 'dropdown' && optionsOf(next).length === 0 && (isNew || has('type') || has('options'))) errors.push('A Dropdown or Checkboxes parameter needs at least one option.');
+
+  // A flagged parameter whose type cell moves it off Text/Table loses the flag, as in the editor (parameterSave.ts).
+  if (has('type') && !has('screening') && !isScreenableType(next.type) && next.screening === true) {
+    delete next.screening;
+    delete next.screeningFields;
+    warnings.push('Requires screening removed: only Text and Table parameters can be screened.');
+  }
+  if (has('screening')) {
+    const value = parseYesNo(cell('screening'));
+    if (value === 'invalid') errors.push(`screening: “${cell('screening')}” must be Y or N.`);
+    else if (value) next.screening = true;
+    else delete next.screening;
+  }
+  if (has('screeningFields')) {
+    const fields = splitList(cell('screeningFields'));
+    if (fields.length === 0) delete next.screeningFields;
+    else next.screeningFields = fields;
+  }
+  // Screening columns belong to a flagged Table only — the editor's rule (parameterSave.ts).
+  if (!isTableType(next.type) || next.screening !== true) delete next.screeningFields;
+  if (has('screening') || has('screeningFields') || has('type') || has('options') || isNew) {
+    const problem = next.screening === true || next.screeningFields !== undefined ? screeningRuleViolation(next) : null;
+    if (problem) errors.push(`screening: ${problem}`);
+  }
+  if (!isScreenableType(next.type) && next.screening === true && !has('screening')) {
+    delete next.screening;
+    warnings.push('Requires screening removed: only Text and Table parameters can be screened.');
+  }
 
   const validationCell = has('validation') ? cell('validation') : '';
   if (has('validation') && validationCell !== '') {

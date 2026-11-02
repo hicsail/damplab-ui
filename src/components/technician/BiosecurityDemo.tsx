@@ -8,19 +8,14 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  LinearProgress,
   Typography
 } from '@mui/material';
-import CheckIcon from '@mui/icons-material/Check';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import GavelIcon from '@mui/icons-material/Gavel';
 import VerifiedIcon from '@mui/icons-material/Verified';
-import AclidLogo from '../../assets/logos/aclid.svg';
-import { BiosecurityStatusIcon } from './BiosecurityScreeningSections';
+import ScreeningResultCard, { type ScreeningCardStatus } from './ScreeningResultCard';
 import {
   BIOSECURITY_SCREENING_GROUPS,
   type BiosecurityScreeningKey,
-  type BiosecurityScreeningStatus,
   type BiosecurityScreenings
 } from './biosecurityStatus';
 
@@ -31,7 +26,7 @@ import {
  */
 
 export type DemoMode = 'pass' | 'fail';
-type DemoStageStatus = 'QUEUED' | BiosecurityScreeningStatus;
+type DemoStageStatus = ScreeningCardStatus;
 
 export const DEMO_CUSTOMER_NAME = 'John Doe';
 
@@ -178,40 +173,6 @@ export function demoCustomerVerified(demo: BiosecurityDemoState | null): boolean
   return demo?.stages.CUSTOMER === 'PASSED';
 }
 
-const ACCENT: Record<DemoStageStatus, string> = {
-  QUEUED: 'grey.300',
-  IN_PROGRESS: 'info.main',
-  PASSED: 'success.main',
-  FAILED: 'error.main',
-  UNAVAILABLE: 'grey.300'
-};
-
-const STATUS_TEXT: Record<DemoStageStatus, string> = {
-  QUEUED: 'Queued',
-  IN_PROGRESS: 'Screening…',
-  PASSED: 'Passed',
-  FAILED: 'Failed',
-  UNAVAILABLE: 'Unavailable'
-};
-
-function ProviderMark({ provider }: { provider: StageScript['provider'] }): React.JSX.Element {
-  if (provider === 'aclid') {
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-        <Typography variant="caption" color="text.secondary">
-          Screened by
-        </Typography>
-        <Box component="img" src={AclidLogo} alt="Aclid" sx={{ height: 18, width: 'auto', display: 'block' }} />
-      </Box>
-    );
-  }
-  return (
-    <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-      DAMP Lab
-    </Typography>
-  );
-}
-
 function StageCard({
   stageKey,
   status,
@@ -227,86 +188,32 @@ function StageCard({
   const lines = status === 'FAILED' ? script.failed ?? script.passed : script.passed;
   const finished = status === 'PASSED' || status === 'FAILED';
   return (
-    <Box
-      sx={{
-        border: '1px solid',
-        borderColor: status === 'FAILED' ? 'error.light' : 'divider',
-        borderLeft: '5px solid',
-        borderLeftColor: ACCENT[status],
-        borderRadius: 1.5,
-        p: 2,
-        bgcolor: status === 'FAILED' ? 'rgba(211, 47, 47, 0.04)' : 'background.paper',
-        opacity: status === 'QUEUED' ? 0.6 : 1,
-        transition: 'opacity 300ms, border-color 300ms',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        minWidth: 0
-      }}
-    >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {status === 'QUEUED' ? (
-          <Box sx={{ width: 24, height: 24, borderRadius: '50%', border: '2px dashed', borderColor: 'grey.400', flexShrink: 0 }} />
-        ) : (
-          <BiosecurityStatusIcon status={status} fontSize="medium" />
-        )}
-        <Typography variant="subtitle1" sx={{ fontWeight: 700, flex: 1, minWidth: 0 }}>
-          {script.title}
-        </Typography>
-        <ProviderMark provider={script.provider} />
-      </Box>
-
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 600,
-          color: status === 'FAILED' ? 'error.main' : status === 'PASSED' ? 'success.dark' : 'text.secondary'
-        }}
-      >
-        {STATUS_TEXT[status]}
-      </Typography>
-
-      {stageKey === 'CUSTOMER' && finished && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body1" sx={{ fontWeight: 600 }}>
-            {DEMO_CUSTOMER_NAME}
-          </Typography>
-          <Chip size="small" color="success" icon={<VerifiedIcon />} label="Verified" />
-        </Box>
-      )}
-
-      {status === 'IN_PROGRESS' && (
-        <>
-          <LinearProgress sx={{ borderRadius: 1 }} />
-          <Typography variant="caption" color="text.secondary">
-            {script.running}
-          </Typography>
-        </>
-      )}
-
-      {finished && (
-        <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          {lines.map((line) => (
-            <Box component="li" key={line} sx={{ display: 'flex', gap: 0.75, alignItems: 'flex-start' }}>
-              {status === 'FAILED' ? (
-                <ErrorOutlineIcon sx={{ fontSize: 16, mt: '2px', color: 'error.main' }} />
-              ) : (
-                <CheckIcon sx={{ fontSize: 16, mt: '2px', color: 'success.main' }} />
-              )}
-              <Typography variant="body2">{line}</Typography>
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      {status === 'FAILED' && mode === 'fail' && stageKey === 'HOMOLOGY' && (
-        <Box>
-          <Button size="small" variant="contained" color="error" startIcon={<GavelIcon />} onClick={onReportingGuidelines} sx={{ textTransform: 'none', mt: 0.5 }}>
-            Reporting Guidelines
-          </Button>
-        </Box>
-      )}
-    </Box>
+    <ScreeningResultCard
+      title={script.title}
+      provider={script.provider}
+      status={status}
+      running={script.running}
+      lines={finished ? lines : []}
+      headerExtra={
+        stageKey === 'CUSTOMER' && finished ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body1" sx={{ fontWeight: 600 }}>
+              {DEMO_CUSTOMER_NAME}
+            </Typography>
+            <Chip size="small" color="success" icon={<VerifiedIcon />} label="Verified" />
+          </Box>
+        ) : undefined
+      }
+      footer={
+        status === 'FAILED' && mode === 'fail' && stageKey === 'HOMOLOGY' ? (
+          <Box>
+            <Button size="small" variant="contained" color="error" startIcon={<GavelIcon />} onClick={onReportingGuidelines} sx={{ textTransform: 'none', mt: 0.5 }}>
+              Reporting Guidelines
+            </Button>
+          </Box>
+        ) : undefined
+      }
+    />
   );
 }
 

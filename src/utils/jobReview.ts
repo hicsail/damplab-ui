@@ -7,6 +7,8 @@ export interface ReviewInput {
   jobId: string;
   decision: JobReviewDecision;
   message?: string;
+  /** ACCEPT only: accept whatever screening says. The server allows it to biosecurity staff only. */
+  overrideScreening?: boolean;
 }
 
 export interface ReviewResponseInput {
@@ -66,6 +68,7 @@ interface BuildReviewInputArgs {
   jobId: string;
   decision: JobReviewDecision;
   message?: string | null;
+  overrideScreening?: boolean;
 }
 
 interface BuildReviewResponseInputArgs {
@@ -145,7 +148,8 @@ export function buildReviewInput(args: BuildReviewInputArgs): ReviewInput {
     operationId: requiredId(args.operationId, 'Operation ID'),
     jobId: requiredId(args.jobId, 'Job ID'),
     decision: args.decision,
-    ...(message ? { message } : {})
+    ...(message ? { message } : {}),
+    ...(args.decision === 'ACCEPT' && args.overrideScreening === true ? { overrideScreening: true } : {})
   };
 }
 

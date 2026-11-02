@@ -249,3 +249,14 @@ describe('previewing the app as a lower access tier', () => {
     expect(applyPreview(STAFF as any, ACCESS_TIERS.Technician, {})).toBe(STAFF);
   });
 });
+
+describe('Screener entry honours the per-account Biosecurity switch', () => {
+  const screenerShown = (u: HomeMenuUser): boolean => visibleHomeMenu(u).some((section) => section.items.some((item) => item.id === 'screener'));
+
+  it('is shown to staff with the switch on or absent, hidden when it is off', () => {
+    expect(screenerShown(TECHNICIAN)).toBe(true);
+    expect(screenerShown({ ...TECHNICIAN, showBiosecurity: true })).toBe(true);
+    expect(screenerShown({ ...TECHNICIAN, showBiosecurity: false })).toBe(false);
+    expect(screenerShown({ ...CLIENT, showBiosecurity: true })).toBe(false);
+  });
+});

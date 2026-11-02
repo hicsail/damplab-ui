@@ -2449,3 +2449,123 @@ export const GET_PARAMETER_SET_SAMPLE_SHEET_TEMPLATE_URL = gql`
     parameterSetSampleSheetTemplateUrl(parameterSetId: $parameterSetId, parameterId: $parameterId)
   }
 `;
+
+/** A job's screening history for the Biosecurity card (biosecurity-update). Staff with showBiosecurity only. */
+export const GET_JOB_SCREENING_RUNS = gql`
+  query JobScreeningRuns($jobId: ID!) {
+    jobScreeningRuns(jobId: $jobId) {
+      id
+      jobId
+      trigger
+      triggeredBy
+      status
+      startedAt
+      completedAt
+      sequenceCount
+      skippedCount
+      detail
+    }
+  }
+`;
+
+/** One screening run with the raw Aclid report and per-sequence details. */
+export const GET_SCREENING_RUN = gql`
+  query ScreeningRun($id: ID!) {
+    screeningRun(id: $id) {
+      id
+      jobId
+      trigger
+      triggeredBy
+      status
+      startedAt
+      completedAt
+      sequenceCount
+      skippedCount
+      detail
+      sequences {
+        name
+        label
+        length
+        aclidEligible
+      }
+      aclid {
+        screenId
+        homologyStatus
+        status
+        regulatoryStatus
+        verificationStatus
+        decisionStatus
+        matchCount
+        materialCount
+        findings
+        materialSummary
+        details
+        raw
+        detail
+      }
+      secureDna {
+        batchId
+        status
+        detail
+      }
+      unscreenedNotes
+      customer {
+        status
+        requesterId
+        verdict
+        decisionStatus
+        checks
+        counts
+        detail
+      }
+    }
+  }
+`;
+
+export const GET_SCREENING_RUN_CARD = gql`
+  query ScreeningRunCard($id: ID!) {
+    screeningRun(id: $id) {
+      id
+      status
+      completedAt
+      sequenceCount
+      skippedCount
+      detail
+      unscreenedNotes
+      sequences {
+        length
+      }
+      aclid {
+        screenId
+        homologyStatus
+        status
+        regulatoryStatus
+        findings
+        detail
+      }
+      secureDna {
+        batchId
+        status
+        detail
+      }
+      customer {
+        status
+        requesterId
+        verdict
+        decisionStatus
+        checks
+        counts
+        detail
+      }
+    }
+  }
+`;
+
+export const GET_JOB_ACCEPTANCE_SCREENING = gql`
+  query JobAcceptanceScreening($jobId: ID!) {
+    jobAcceptanceScreening(jobId: $jobId) {
+      state
+      message
+    }
+  }
+`;

@@ -105,9 +105,8 @@ import {
 } from "../utils/technicianProcessStatus";
 
 /**
- * Biosecurity is paused: clients do not see the Biosecurity card. Staff still
- * do. Flip back to true when the feature is finished (and re-enable
- * AUTO_SCREENING_ENABLED in the backend's job-screening.service.ts).
+ * Paused for every client while staff screen by hand. Pairs with AUTO_SCREENING_ENABLED in the
+ * backend's job-screening.service.ts.
  */
 const BIOSECURITY_ENABLED = false;
 
@@ -529,8 +528,8 @@ export default function Tracking() {
     latestCustomerVisibleJobVersion(versions),
   );
 
-  // On unless an admin has hidden it for this account — and off for everyone
-  // while BIOSECURITY_ENABLED is false.
+  // On unless an admin has hidden it for this account (or BIOSECURITY_ENABLED
+  // pauses it for everyone).
   const showBiosecurity =
     BIOSECURITY_ENABLED && userContext.userProps?.showBiosecurity !== false;
   const verification = customerVerificationPresentation(job?.aclidScreening);
@@ -905,6 +904,7 @@ export default function Tracking() {
         {showBiosecurity && (
           <ProcessCard
             title="Biosecurity"
+            details={null}
             defaultExpanded={verification.canVerify}
             customerBadge={null}
             staffBadge={null}
