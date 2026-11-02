@@ -32,12 +32,12 @@ describe('job review GraphQL contracts', () => {
    * asks only whether identity verification was submitted, so a homology
    * failure cannot reach that page.
    */
-  it('requests the homology verdict on the staff job, and only verification submission on the customer job', () => {
+  it('requests the homology verdict on the staff job, and no screening field on the customer job', () => {
     expect(compact(GET_JOB_BY_ID)).toMatch(/homologyScreening \{[^}]*\bstatus\b[^}]*\bdetail\b[^}]*\bbatchId\b[^}]*\}/);
     const customer = compact(GET_OWN_JOB_BY_ID);
     expect(customer).not.toMatch(/\bhomologyScreening\b/);
     expect(customer).not.toMatch(/\bdecisionStatus\b/);
-    expect(customer).toMatch(/aclidScreening \{[^}]*\bscreenId\b[^}]*\bverificationStatus\b[^}]*\bverificationCompletedAt\b[^}]*\}/);
+    expect(customer).not.toMatch(/\baclidScreening\b/);
   });
 
   it('requests review and acceptance facts in both job-detail queries', () => {

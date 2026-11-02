@@ -327,13 +327,6 @@ export const GET_OWN_JOB_BY_ID = gql`
         url
         uploadedAt
       }
-      # Submission only. Homology and the approve/reject decision stay on the
-      # staff query; this page shows whether identity verification was submitted.
-      aclidScreening {
-        screenId
-        verificationStatus
-        verificationCompletedAt
-      }
       sow {
         id
         sowNumber

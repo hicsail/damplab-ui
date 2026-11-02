@@ -10,18 +10,10 @@ describe('client job page (behaviour 1)', () => {
     expect(count(clientView, '<ResultsPanel')).toBe(0);
   });
 
-  it('shows only identity verification, and only when the account flag is on', () => {
-    expect(count(clientView, 'title="Biosecurity"')).toBe(1);
-    expect(clientView).toContain('showBiosecurity');
-    expect(clientView).toContain('customerVerificationPresentation');
-    expect(clientView).toContain('Submitted');
-    expect(clientView).not.toContain('BiosecurityScreeningSections');
-    expect(clientView).toContain('START_JOB_CUSTOMER_VERIFICATION');
-    expect(clientView).toContain('loadAclidWidget');
-    expect(clientView).toContain('showDressedEmbeddedVerification');
-    expect(clientView).toContain('openHostedVerification');
-    expect(clientView).toContain('Verify identity');
-    expect(clientView).toContain('Open Aclid page');
+  it('shows customers no biosecurity at all (biosecurity-tweaks behaviour 17)', () => {
+    expect(count(clientView, 'title="Biosecurity"')).toBe(0);
+    for (const gone of ['BIOSECURITY_ENABLED', 'showBiosecurity', 'START_JOB_CUSTOMER_VERIFICATION', 'REFRESH_JOB_ACLID_SCREENING', 'loadAclidWidget', 'customerVerificationPresentation'])
+      expect(clientView).not.toContain(gone);
   });
 });
 
