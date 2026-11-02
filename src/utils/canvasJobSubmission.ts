@@ -9,6 +9,7 @@ import {
 import { transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
 import { isTableParam } from './sampleSheet';
 import { withoutHiddenAnswers } from './parameterConditions';
+import { missingParamFiles, missingParamFilesMessage } from './missingParamFiles';
 
 export type PendingParamFile = {
   __kind: 'pending-file';
@@ -47,37 +48,6 @@ export const isPendingParamFile = (value: unknown): value is PendingParamFile =>
   (value as PendingParamFile).__kind === 'pending-file' &&
   (value as PendingParamFile).file instanceof File;
 
-/**
- * A picked file whose file is gone: the canvas autosave keeps a placeholder's name and row count, never the file,
- * so after a reload it still looks picked while there is nothing to upload.
- */
-export const isStalePendingFile = (value: unknown): boolean =>
-  !!value && typeof value === 'object' && (value as PendingParamFile).__kind === 'pending-file' && !((value as PendingParamFile).file instanceof File);
-
-/**
- * A restored canvas without its stale placeholders: an answer that was one becomes empty (or drops out of a list),
- * so the form asks for the file again instead of looking done. Nodes with none are returned as they were.
- */
-export function withoutStalePendingFiles<N extends { data?: any }>(nodes: N[]): N[] {
-  return nodes.map((node) => {
-    const formData = node?.data?.formData;
-    if (!Array.isArray(formData)) return node;
-    let changed = false;
-    const cleaned = formData.map((entry: any) => {
-      if (Array.isArray(entry?.value)) {
-        const kept = entry.value.filter((v: unknown) => !isStalePendingFile(v));
-        if (kept.length === entry.value.length) return entry;
-        changed = true;
-        return { ...entry, value: kept };
-      }
-      if (!isStalePendingFile(entry?.value)) return entry;
-      changed = true;
-      return { ...entry, value: null };
-    });
-    return changed ? { ...node, data: { ...node.data, formData: cleaned } } : node;
-  });
-}
-
 export type SubmitCanvasJobInput = {
   workflows: any[];
   edges: Edge[];
@@ -115,6 +85,10 @@ export async function submitCanvasJob(
     attachments,
     getAccessToken,
   } = input;
+
+  // The last stop for every submit path, whatever its page showed: nothing is uploaded or created without its files.
+  const missing = missingParamFiles(workflows.flat());
+  if (missing.length > 0) throw new Error(missingParamFilesMessage(missing));
 
   const token = await getAccessToken();
 
@@ -163,18 +137,15 @@ export async function submitCanvasJob(
         const parameters = Array.isArray(node.data?.parameters) ? node.data.parameters : [];
         // A samples spreadsheet is uploaded exactly like a file parameter; the
         // only difference is the count that rides along in its stored value.
+        // The form entry counts as well as the definition: a catalog parameter with no id gets a random id on its entry,
+        // and a file picked there would otherwise never be uploaded.
         const fileParamIds = new Set(
-          parameters
+          [...parameters, ...(node.data.formData || [])]
             .filter((p: any) => (p?.type === 'file' || isTableParam(p)) && typeof p.id === 'string')
             .map((p: any) => p.id)
         );
         (node.data.formData || []).forEach((entry: any) => {
           if (!fileParamIds.has(entry.id)) return;
-          // Never save a placeholder as the answer: the job would have no file to download.
-          const stale = (Array.isArray(entry.value) ? entry.value : [entry.value]).find(isStalePendingFile);
-          if (stale) {
-            throw new Error(`The file “${stale.filename || 'file'}” on “${node.data?.label ?? 'an operation'}” needs to be picked again: a saved or reloaded canvas does not keep its files.`);
-          }
           if (Array.isArray(entry.value)) {
             const tokens = entry.value
               .filter((v: any) => isPendingParamFile(v))

@@ -6,6 +6,7 @@ import { GET_SAMPLE_SHEET_TEMPLATE_URL } from '../gql/queries';
 import { formatGqlError } from '../utils/gqlError';
 import { buildTableTemplate, checkTableFile, SAMPLE_SHEET_ACCEPT, SampleSheetError, TABLE_FILE_UNREADABLE_MESSAGE, TABLE_NOT_SET_UP_MESSAGE, tableTemplateFilename } from '../utils/sampleSheet';
 import { expectedColumnsOf, hasStaffTemplate, sampleCountLabel, tableFileOf, tableIsSetUp } from '../utils/sampleSheetValue';
+import { FILE_NEEDS_REUPLOAD_MESSAGE, isStalePendingFile } from '../utils/missingParamFiles';
 
 interface Props {
   /**
@@ -78,6 +79,7 @@ export default function SampleSheetField({ param, value, serviceId, readOnly, up
   const columns = expectedColumnsOf(param);
   const setUp = tableIsSetUp(param);
   const canPick = !readOnly && uploadable && setUp;
+  const lost = (Array.isArray(value) ? value : [value]).some(isStalePendingFile);
 
   const handlePick = async (file: File | undefined) => {
     if (!file) return;
@@ -116,12 +118,14 @@ export default function SampleSheetField({ param, value, serviceId, readOnly, up
       <FormHelperText sx={{ m: 0 }}>
         {stored.url ? <MuiLink href={stored.url} target='_blank' rel='noopener noreferrer'>{stored.filename}</MuiLink> : stored.filename}
       </FormHelperText>
-      {stored.sampleCount !== undefined && <Chip size='small' label={sampleCountLabel(stored.sampleCount)} />}
-      {canPick && (
+      {stored.sampleCount !== undefined && !lost && <Chip size='small' label={sampleCountLabel(stored.sampleCount)} />}
+      {/* A lost file can always be removed: on a Table no longer set up, that is the only way past it. */}
+      {(canPick || (lost && !readOnly)) && (
         <IconButton size='small' onClick={() => { setError(null); onChange(null); }} aria-label='Remove spreadsheet'>
           <DeleteForeverSharp fontSize='small' />
         </IconButton>
       )}
+      {lost && <FormHelperText error sx={{ m: 0 }}>{FILE_NEEDS_REUPLOAD_MESSAGE}</FormHelperText>}
     </Box>
   ) : null;
 

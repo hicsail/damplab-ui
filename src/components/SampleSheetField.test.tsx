@@ -26,7 +26,7 @@ describe('SampleSheetField — a Table defined by columns (rules 14, 15)', () =>
   });
 
   it('once a file is picked, shows its name, its row count and a remove control', () => {
-    const markup = render(param, { __kind: 'pending-file', filename: 'plate.xlsx', sampleCount: 12 });
+    const markup = render(param, { __kind: 'pending-file', file: new File(['x'], 'plate.xlsx'), filename: 'plate.xlsx', sampleCount: 12 });
     expect(text(markup)).toContain('plate.xlsx');
     expect(text(markup)).toContain('12 rows');
     expect(markup).toContain('aria-label="Remove spreadsheet"');
@@ -69,5 +69,22 @@ describe('SampleSheetField — a Table that has not been set up (rule 16)', () =
     expect(markup).toContain('href="https://s3/old"');
     expect(text(markup)).toContain('4 rows');
     expect(markup).not.toContain('type="file"');
+  });
+});
+
+describe('SampleSheetField — a file lost when the canvas was saved or reloaded', () => {
+  const param = { id: 'plate', name: 'Plate map', type: 'table', tableData: columns };
+  const lost = { __kind: 'pending-file', filename: 'plate.xlsx', sampleCount: 12, file: {} };
+
+  it('names the file, says to upload it again, and shows no row count', () => {
+    const markup = text(render(param, lost));
+    expect(markup).toContain('plate.xlsx');
+    expect(markup).toContain('This file was not saved. Upload it again');
+    expect(markup).not.toContain('12 rows');
+  });
+
+  it('can be removed even from a Table no longer set up', () => {
+    const markup = render({ id: 'plate', name: 'Plate map', type: 'table' }, lost);
+    expect(markup).toContain('aria-label="Remove spreadsheet"');
   });
 });

@@ -22,6 +22,8 @@ import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { getWorkflowsFromGraph } from '../controllers/GraphHelpers';
 import { submitCanvasJob } from '../utils/canvasJobSubmission';
+import { missingParamFiles } from '../utils/missingParamFiles';
+import MissingFilesAlert from '../components/MissingFilesAlert';
 import { formatGqlError } from '../utils/gqlError';
 import { parseEmailList, splitClientEmails, JOB_DESCRIPTION_MAX_LENGTH } from '../utils/jobMembers';
 
@@ -104,11 +106,14 @@ export default function StaffJobSubmit() {
   const clientEmailList = parseEmailList(formData.clientEmails);
   const { clientEmail, memberEmails } = splitClientEmails(clientEmailList.emails);
 
+  const missingFiles = missingParamFiles(workflows.flat());
+
   const isFormValid = () =>
     formData.jobName.trim() !== '' &&
     formData.institute.trim() !== '' &&
     !!clientEmail &&
-    clientEmailList.invalid.length === 0;
+    clientEmailList.invalid.length === 0 &&
+    missingFiles.length === 0;
 
   const handleSubmit = async () => {
     if (!isFormValid() || workflows.length === 0) return;
@@ -222,6 +227,10 @@ export default function StaffJobSubmit() {
       <Alert severity="info" sx={{ mb: 3 }}>
         {workflowCount} workflow{workflowCount === 1 ? '' : 's'}: {serviceLabels.join(', ')}
       </Alert>
+
+      <MissingFilesAlert files={missingFiles} title="Upload these files before you can submit">
+        Go back to the canvas, open each operation and upload its file. Saved and reloaded jobs do not keep their files.
+      </MissingFilesAlert>
 
       <Typography variant="h6" sx={{ mb: 1, fontWeight: 500 }}>
         Job details

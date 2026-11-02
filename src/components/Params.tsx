@@ -32,6 +32,7 @@ import { CanvasContext } from "../contexts/Canvas";
 import { isRetiredEquipmentParam, validateEquipmentValues } from "../utils/equipmentParams";
 import SampleSheetField from "./SampleSheetField";
 import { isTableParam } from "../utils/sampleSheet";
+import { FILE_NEEDS_REUPLOAD_MESSAGE, isStalePendingFile } from "../utils/missingParamFiles";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
 import { answerProblems, chosenOptionIds, isCheckboxList, requiredProblems, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
 import { errorLabel, isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, otherTextParentId, selectsOther } from "../utils/otherOption";
@@ -686,7 +687,9 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             multiple
                             onChange={(e) => {
                               const selected = toPendingFiles(e.target.files);
-                              formik.setFieldValue(param.id, [...files, ...selected]);
+                              // Uploading a lost file again replaces its "needs re-upload" line.
+                              const kept = files.filter((f: any) => !(isStalePendingFile(f) && selected.some((s) => s.filename === f.filename)));
+                              formik.setFieldValue(param.id, [...kept, ...selected]);
                               e.currentTarget.value = "";
                             }}
                           />
@@ -708,6 +711,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                                 <DeleteForeverSharp fontSize="small" />
                               </IconButton>
                             )}
+                            {isStalePendingFile(f) ? <FormHelperText error sx={{ m: 0 }}>{FILE_NEEDS_REUPLOAD_MESSAGE}</FormHelperText> : null}
                           </Box>
                         ))}
                       </Box>
@@ -744,6 +748,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             <DeleteForeverSharp fontSize="small" />
                           </IconButton>
                         )}
+                        {isStalePendingFile(fileValue) ? <FormHelperText error sx={{ m: 0 }}>{FILE_NEEDS_REUPLOAD_MESSAGE}</FormHelperText> : null}
                       </Box>
                     ) : null}
                   </div>

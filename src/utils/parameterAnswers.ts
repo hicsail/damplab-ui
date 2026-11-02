@@ -2,11 +2,13 @@ import { isTableParam, tableIsSetUp } from './sampleSheetValue';
 import { checkValue, effectiveValidation, parseValidation } from './parameterValidation';
 import { isOtherTextEntryId, otherTextEntryId, otherTextFrom, selectsOther } from './otherOption';
 import { withoutHiddenAnswers } from './parameterConditions';
+import { FILE_NEEDS_REUPLOAD_MESSAGE, isStalePendingFile } from './missingParamFiles';
 
 /**
  * What is wrong with a node's answers beyond "required": a number that breaks
- * its parameter's validation, and "Other" selected with no text. Keyed by the
- * formData entry id the message belongs under.
+ * its parameter's validation, "Other" selected with no text, and a file that
+ * was not saved and has to be uploaded again. Keyed by the formData entry id
+ * the message belongs under.
  *
  * `parameters` is the node's parameter definitions (`node.data.parameters`). A
  * form entry copies only a fixed set of fields from its definition — not
@@ -18,6 +20,10 @@ export function answerProblems(formData: ReadonlyArray<any>, parameters: Readonl
   for (const entry of formData ?? []) {
     if (!entry || typeof entry.id !== 'string' || isOtherTextEntryId(entry.id) || entry.paramType === 'result') continue;
     const definition = definitions.get(entry.id);
+
+    if ((Array.isArray(entry.value) ? entry.value : [entry.value]).some(isStalePendingFile)) {
+      problems[entry.id] = FILE_NEEDS_REUPLOAD_MESSAGE;
+    }
 
     if (definition && definition.type === 'number') {
       const parsed = parseValidation(effectiveValidation(definition));
