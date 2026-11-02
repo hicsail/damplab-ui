@@ -161,6 +161,8 @@ import {
   screeningButtonLabel,
   screeningRunIsLoading,
   screeningsFromRun,
+  paneStatusLabel,
+  staffHomologyNoteFromRun,
   paneNothingToScreen,
   NOTHING_TO_SCREEN_TEXT,
   showRefreshResults,
@@ -830,16 +832,21 @@ export default function TechnicianView() {
   // SecureDNA and Aclid run on submission and the job carries their verdicts.
   // The other three are placeholders.
   const aclid = jobData?.aclidScreening ?? null;
-  const biosecurity = screeningsFromRun(jobData, newestRun);
+  // Until the runs query answers, the job's own fields stand in; once it has, no runs means not screened.
+  const hasRuns = screeningRuns.length > 0;
+  const runsLoaded = screeningRunsData !== undefined;
+  const noRuns = runsLoaded && !hasRuns;
+  const biosecurity = screeningsFromRun(jobData, newestRun, noRuns);
   const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
   // Homology's line names the provider that answered: SecureDNA's summary,
   // Aclid's regulatory verdict when it screened, and the SecureDNA-backup
   // sentence when Aclid did not answer. `homologyBackup` is that last
   // sentence alone, for the pane.
-  const { note: homologyNote, backup: homologyBackup } = staffHomologyNote(
-    jobData?.homologyScreening,
-    aclid,
-  );
+  // With a run, the note reads from it: a refresh keeps the run current, while the job's stored
+  // row can still say "Aclid screen still running". The job row is the fallback with no run.
+  const { note: homologyNote, backup: homologyBackup } = newestRun
+    ? staffHomologyNoteFromRun(newestRun)
+    : staffHomologyNote(jobData?.homologyScreening, aclid);
   const homologyBatchId = jobData?.homologyScreening?.batchId as
     string | undefined;
   const homologyDetailsAvailable = Boolean(homologyBatchId);
@@ -858,10 +865,6 @@ export default function TechnicianView() {
     rerunningScreening,
     Date.now(),
   );
-  // Until the runs query answers, the job's own fields stand in; once it has, no runs means not screened.
-  const hasRuns = screeningRuns.length > 0;
-  const runsLoaded = screeningRunsData !== undefined;
-  const noRuns = runsLoaded && !hasRuns;
   const noRunsDescription =
     acceptance?.state === "NOT_RUN" && acceptance.message
       ? acceptance.message
@@ -1283,7 +1286,7 @@ export default function TechnicianView() {
                     : biosecurityComposite === "UNAVAILABLE" &&
                         paneNothingToScreen(newestRun, acceptance?.state)
                       ? NOTHING_TO_SCREEN_TEXT
-                      : biosecurityStatusLabel(biosecurityComposite)
+                      : paneStatusLabel(biosecurityComposite, newestRun)
               }
               description={
                 demoPane

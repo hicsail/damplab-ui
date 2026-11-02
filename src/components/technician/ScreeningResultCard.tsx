@@ -27,7 +27,8 @@ const STATUS_TEXT: Record<ScreeningCardStatus, string> = {
   UNAVAILABLE: 'Unavailable'
 };
 
-function ProviderMark({ provider }: { provider: 'aclid' | 'damplab' }): React.JSX.Element {
+function ProviderMark({ provider }: { provider: 'aclid' | 'damplab' | null }): React.JSX.Element | null {
+  if (provider === null) return null;
   if (provider === 'aclid') {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
@@ -56,7 +57,8 @@ export default function ScreeningResultCard({
   footer
 }: {
   title: string;
-  provider: 'aclid' | 'damplab';
+  /** Whose result the card shows; null shows no mark, for a leg nobody screened. */
+  provider: 'aclid' | 'damplab' | null;
   status: ScreeningCardStatus;
   /** Overrides the status's own wording; an empty string renders no status line. */
   statusText?: string;

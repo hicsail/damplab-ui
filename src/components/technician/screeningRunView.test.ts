@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ScreeningRunCard } from './screeningRunTypes';
 import {
   aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, homologyCardView, isNothingToScreen, paneNothingToScreen, screeningsFromRun, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
-  acceptanceGateView, screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
+  acceptanceGateView, aclidResultLegs, paneStatusLabel, staffHomologyNoteFromRun, screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
 const run = { id: 'r1', jobId: 'j1', trigger: 'RERUN', triggeredBy: 'staff@bu.edu', status: 'PASSED', startedAt: '2026-10-29T16:05:00.000Z', completedAt: null, sequenceCount: 192, skippedCount: 2, detail: null } as const;
@@ -190,8 +190,9 @@ describe('customerCardView (behaviour 15)', () => {
   it('shows the reason when unavailable', () => {
     expect(customerCardView(leg({ status: 'UNAVAILABLE', verdict: null, detail: 'Aclid returned 500' })).lines).toContain('Aclid returned 500');
   });
-  it('a run with no leg, or no run, reads as not run', () => {
-    expect(customerCardView({ ...base, customer: null }).statusText).toBe('Not run');
+  it('a run with no leg says it was not part of the run; the NOT_RUN status keeps "Not run" (M1)', () => {
+    expect(customerCardView({ ...base, customer: null })).toMatchObject({ status: 'UNAVAILABLE', statusText: 'Not part of this run', lines: ['Customer screening was not part of this run.'] });
+    expect(customerCardView(leg({ status: 'NOT_RUN', verdict: null }))).toMatchObject({ statusText: 'Not run', lines: ['This run has no Aclid screen to attach it to.'] });
     expect(customerCardView(null).statusText).toBe('Not screened');
   });
 });
@@ -199,8 +200,51 @@ describe('customerCardView (behaviour 15)', () => {
 describe('screeningsFromRun', () => {
   it('uses the run when there is one, and the job otherwise', () => {
     const job = { homologyScreening: { status: 'FAILED' }, aclidScreening: { customerStatus: 'IN_PROGRESS' } };
+    // The runs query has not answered: the job's own fields stand in.
     expect(screeningsFromRun(job, null)).toMatchObject({ HOMOLOGY: 'FAILED', CUSTOMER: 'IN_PROGRESS' });
+    expect(screeningsFromRun(job, null, false)).toMatchObject({ HOMOLOGY: 'FAILED', CUSTOMER: 'IN_PROGRESS' });
     expect(screeningsFromRun(job, { ...base, customer: { status: 'NOT_AVAILABLE' } as any })).toMatchObject({ HOMOLOGY: 'PASSED', CUSTOMER: 'UNAVAILABLE' });
+  });
+  it('a job whose runs query answered with none reads Homology and Customer as unavailable (I2)', () => {
+    const job = { homologyScreening: { status: 'FAILED' }, aclidScreening: { customerStatus: 'IN_PROGRESS' } };
+    expect(screeningsFromRun(job, null, true)).toMatchObject({ HOMOLOGY: 'UNAVAILABLE', CUSTOMER: 'UNAVAILABLE' });
+  });
+});
+
+describe('paneStatusLabel (F6)', () => {
+  const needsReview = { ...base, customer: { status: 'NEEDS_REVIEW' } as any };
+  it('reads Needs review when the customer leg is the only reason the composite failed', () => {
+    expect(paneStatusLabel('FAILED', needsReview)).toBe('Needs review');
+  });
+  it('still reads Failed when homology failed too, or the customer leg failed outright', () => {
+    expect(paneStatusLabel('FAILED', { ...needsReview, status: 'FAILED', aclid: { ...base.aclid!, homologyStatus: 'FAILED' } })).toBe('Failed');
+    expect(paneStatusLabel('FAILED', { ...base, customer: { status: 'FAILED' } as any })).toBe('Failed');
+  });
+  it('leaves every other composite alone', () => {
+    expect(paneStatusLabel('PASSED', needsReview)).toBe('Passed');
+    expect(paneStatusLabel('FAILED', null)).toBe('Failed');
+  });
+});
+
+describe('aclidResultLegs (M2)', () => {
+  it('credits Aclid with homology only when the run has an Aclid screen, and with customer only when it has a requester', () => {
+    const withCustomer = { ...base, customer: { status: 'PASSED', requesterId: 'r1' } as any };
+    expect(aclidResultLegs(withCustomer)).toEqual({ HOMOLOGY: true, CUSTOMER: true });
+    expect(aclidResultLegs({ ...base, aclid: { ...base.aclid!, screenId: null }, customer: { status: 'NOT_AVAILABLE', requesterId: null } as any })).toEqual({ HOMOLOGY: false, CUSTOMER: false });
+    expect(aclidResultLegs({ ...base, aclid: null, customer: null })).toEqual({ HOMOLOGY: false, CUSTOMER: false });
+    expect(aclidResultLegs(null)).toEqual({ HOMOLOGY: false, CUSTOMER: false });
+  });
+});
+
+describe('staffHomologyNoteFromRun (M4)', () => {
+  it('reads the run, so a lifted run does not repeat the job row\'s stale "still running"', () => {
+    const { note } = staffHomologyNoteFromRun({ ...base, status: 'PASSED', aclid: { ...base.aclid!, homologyStatus: 'PASSED', detail: null } });
+    expect(note).toContain('cleared by Aclid');
+    expect(note).not.toContain('still running');
+  });
+  it('carries a SecureDNA backup sentence from the run', () => {
+    const { backup } = staffHomologyNoteFromRun({ ...base, detail: 'SecureDNA backup (after Aclid error)', aclid: { ...base.aclid!, homologyStatus: 'UNAVAILABLE' } });
+    expect(backup).toBe('SecureDNA backup (after Aclid error)');
   });
 });
 

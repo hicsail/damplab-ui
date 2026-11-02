@@ -20,6 +20,18 @@ describe('ScreeningResults', () => {
     for (const t of ['Homology', 'Customer', '1,000 bp screened', 'Not run']) expect(html).toContain(t);
   });
 
+  it('credits Aclid only on a leg that has an Aclid result (M2)', () => {
+    const count = (html: string): number => html.split('Screened by').length - 1;
+    // Aclid screen, requester present: both cards.
+    expect(count(renderToStaticMarkup(<ScreeningResults run={{ ...run, customer: { ...run.customer!, status: 'PASSED', requesterId: 'r1' } }} />))).toBe(2);
+    // Aclid screen, Customer not available: Homology only.
+    expect(count(renderToStaticMarkup(<ScreeningResults run={run} />))).toBe(1);
+    // SecureDNA only: neither.
+    expect(count(renderToStaticMarkup(<ScreeningResults run={{ ...run, aclid: null }} />))).toBe(0);
+    // No run: "Not screened" credits nobody.
+    expect(count(renderToStaticMarkup(<ScreeningResults run={null} />))).toBe(0);
+  });
+
   it('additional screening is collapsed by default, each block reading the planned text (behaviour 16)', () => {
     const html = renderToStaticMarkup(<ScreeningResults run={run} />);
     expect(html).toContain('aria-expanded="false"');

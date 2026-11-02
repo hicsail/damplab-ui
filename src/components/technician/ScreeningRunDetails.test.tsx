@@ -49,9 +49,9 @@ describe('screening run details, customer leg (behaviour 11)', () => {
     const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, customer }} batch={null} />);
     for (const t of ['Customer', 'Needs review', 'Watchlist hit']) expect(html).toContain(t);
   });
-  it('says Not run when the run has no leg', () => {
+  it('says the customer leg was not part of the run when the run has none (M1)', () => {
     const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, customer: null }} batch={null} />);
-    expect(html).toContain('Not run');
+    expect(html).toContain('Not part of this run');
   });
   it('lists unscreened notes', () => {
     const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, unscreenedNotes: ['a.csv was not uploaded'] }} batch={null} />);
