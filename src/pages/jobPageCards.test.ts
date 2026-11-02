@@ -32,7 +32,14 @@ describe('staff job page (behaviours 2, 3)', () => {
   it('keeps the full Biosecurity card for accounts that can see it', () => {
     expect(count(technicianView, 'title="Biosecurity"')).toBe(1);
     expect(technicianView).toContain('showBiosecurity');
-    expect(technicianView).toContain('COPY_VERIFICATION_LINK');
-    expect(technicianView).toContain('BiosecurityScreeningSections');
+    expect(technicianView).toContain('ScreeningResults');
+    expect(technicianView).toContain('ReportingOptionsDialog');
+    expect(technicianView).toMatch(/GET_SCREENING_RUN_CARD[\s\S]{0,200}fetchPolicy: ["']no-cache["']/);
+    // Behaviour 17's ban on a Copy verification link is lifted (human ruling, wave 3): the button
+    // is its own control, minted by the same mutation; the hosted page is still never opened.
+    expect(technicianView).toContain('CopyVerificationLinkButton');
+    expect(technicianView).not.toContain('Open hosted verification');
+    expect(technicianView).not.toContain('openHostedVerification');
+    expect(technicianView).toContain('START_JOB_CUSTOMER_VERIFICATION');
   });
 });

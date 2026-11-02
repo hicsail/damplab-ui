@@ -20,7 +20,8 @@ const run: ScreeningRunDetail = {
     details: { s1: { regulatory_status: 'controlled', findings: null, matches: [{ organism: 'Ricinus communis', gene: 'RCA', function: 'toxin', pident: 98.5, qcov: 100, evalue: 1e-50, pathogenesis: true, housekeeping: false, funsocs: [] }] } },
     raw: { id: 'scr_1', length: 985 }, detail: null
   },
-  secureDna: { batchId: null, status: 'PASSED', detail: null }
+  secureDna: { batchId: null, status: 'PASSED', detail: null },
+  customer: null, unscreenedNotes: []
 };
 
 describe('screening run details (biosecurity-update)', () => {
@@ -39,6 +40,22 @@ describe('screening run details (biosecurity-update)', () => {
   it('the history reads “No screenings recorded yet” with no runs, and a dropdown otherwise (behaviour 10)', () => {
     expect(renderToStaticMarkup(<ScreeningHistory runs={[]} onSelect={() => undefined} />)).toContain('No screenings recorded yet');
     expect(renderToStaticMarkup(<ScreeningHistory runs={[run]} onSelect={() => undefined} />)).toContain('Screening history (1)');
+  });
+});
+
+describe('screening run details, customer leg (behaviour 11)', () => {
+  it("shows the customer leg's status, verdict and each check", () => {
+    const customer = { status: 'NEEDS_REVIEW' as const, requesterId: 'r', verdict: 'needs_review', decisionStatus: 'awaiting', checks: [{ group: 'person', state: 'issue', finding: 'Watchlist hit' }], counts: null, detail: null };
+    const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, customer }} batch={null} />);
+    for (const t of ['Customer', 'Needs review', 'Watchlist hit']) expect(html).toContain(t);
+  });
+  it('says the customer leg was not part of the run when the run has none (M1)', () => {
+    const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, customer: null }} batch={null} />);
+    expect(html).toContain('Not part of this run');
+  });
+  it('lists unscreened notes', () => {
+    const html = renderToStaticMarkup(<ScreeningRunDetailsContent run={{ ...run, unscreenedNotes: ['a.csv was not uploaded'] }} batch={null} />);
+    expect(html).toContain('a.csv was not uploaded');
   });
 });
 

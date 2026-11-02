@@ -105,11 +105,10 @@ import {
 } from "../utils/technicianProcessStatus";
 
 /**
- * Clients see the Biosecurity card (unless an admin hid it for the account).
- * Set to false to pause it for every client; pause AUTO_SCREENING_ENABLED in
- * the backend's job-screening.service.ts with it.
+ * Paused for every client while staff screen by hand. Pairs with AUTO_SCREENING_ENABLED in the
+ * backend's job-screening.service.ts.
  */
-const BIOSECURITY_ENABLED = true;
+const BIOSECURITY_ENABLED = false;
 
 export default function Tracking() {
   const { id } = useParams();
