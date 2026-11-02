@@ -19,6 +19,20 @@ function isDnaRecord(record: ParsedRecord): boolean {
 }
 
 /**
+ * The one "read for seqparse" step, shared by the job-file check and the Screener so they cannot
+ * drift: lowercases the extension, passes `.dna` bytes as `source`, and rewrites bare `>` FASTA
+ * headers for everything else. Returns seqparse's own records; throws whatever seqparse throws.
+ */
+export function parseSequenceBytes(bytes: ArrayBuffer, filename: string): ReturnType<typeof parseFile> {
+  const fileName = filename.replace(/\.[^./\\]+$/, (e) => e.toLowerCase());
+  const isSnapGene = fileName.endsWith('.dna');
+  const options: { fileName: string; source?: ArrayBuffer } = { fileName };
+  if (isSnapGene) options.source = bytes;
+  const text = new TextDecoder().decode(bytes);
+  return parseFile(isSnapGene ? text : text.replace(/^>[ \t]*$/gm, '> '), options);
+}
+
+/**
  * Browser twin of the backend's `extractSequenceRecords`
  * (`damplab-backend/src/job/sequence-file.util.ts`): reads the sequence records of a picked file,
  * offline and synchronously. Never throws and never fetches (only the named `parseFile` export is
@@ -39,15 +53,9 @@ function isDnaRecord(record: ParsedRecord): boolean {
  * a FASTA record under a bare `>` header, which would let that DNA dodge screening.
  */
 export function sequenceRecordsFrom(bytes: ArrayBuffer, filename: string): SequenceRecords {
-  const fileName = filename.replace(/\.[^./\\]+$/, (e) => e.toLowerCase());
-  const isSnapGene = fileName.endsWith('.dna');
-  const options: { fileName: string; source?: ArrayBuffer } = { fileName };
-  if (isSnapGene) options.source = bytes;
-
   let parsed: ParsedRecord[];
   try {
-    const text = new TextDecoder().decode(bytes);
-    parsed = parseFile(isSnapGene ? text : text.replace(/^>[ \t]*$/gm, '> '), options) as ParsedRecord[];
+    parsed = parseSequenceBytes(bytes, filename) as ParsedRecord[];
   } catch {
     return { error: 'unreadable' };
   }

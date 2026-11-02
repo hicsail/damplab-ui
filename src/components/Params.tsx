@@ -231,7 +231,6 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     }));
   };
 
-  /** Hands the picked files on: at once for an ordinary File Upload, after the sequence check for a flagged one. */
   /** A removed file leaves its parameter's last-pick refusals behind otherwise: they describe a pick, not the answer. */
   const clearRefusals = (param: any): void =>
     setFileRefusals((prev) => {
@@ -239,6 +238,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
       return rest;
     });
 
+  /** Hands the picked files on: at once for an ordinary File Upload, after the sequence check for a flagged one. */
   const pickFiles = (param: any, selected: PendingParamFile[], apply: (accepted: PendingParamFile[]) => void): void => {
     if (!requiresSequenceCheck(activeNode?.data?.parameters, param.id)) {
       apply(selected);

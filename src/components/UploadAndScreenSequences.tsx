@@ -39,8 +39,7 @@ async function parseSequenceFiles(files: File[]): Promise<Sequence[]> {
   for (const file of files) {
     if (!isSequenceFileName(file.name)) continue;
     try {
-      const rows = screenerSequencesFrom(await file.arrayBuffer(), file.name);
-      if (rows) allSequences.push(...rows);
+      allSequences.push(...(await screenerSequencesFrom(await file.arrayBuffer(), file.name)));
     } catch {
       continue;
     }
@@ -207,8 +206,7 @@ function UploadAndScreenSequences({ open, onClose }: UploadAndScreenSequencesPro
     event.target.value = '';
     if (!file) return;
     try {
-      const formattedSequences = screenerSequencesFrom(await file.arrayBuffer(), file.name);
-      if (!formattedSequences) throw new Error('unreadable');
+      const formattedSequences = await screenerSequencesFrom(await file.arrayBuffer(), file.name);
       setSequences((prev) => [...prev, ...formattedSequences]);
       setScreeningCompleted(false);
       setMessage('');
