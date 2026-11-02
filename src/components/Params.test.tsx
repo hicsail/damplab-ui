@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import Params from './Params';
+import paramsSource from './Params.tsx?raw';
 import { CanvasContext } from '../contexts/Canvas';
 
 // There is no DOM here, so effects never run on their own. Params' effects are collected so a test can run them,
@@ -343,5 +344,25 @@ describe('Params — how a Table answer is seeded (table-upload rules 13a, 30)',
     ['a stored file inside an array', [JSON.stringify({ filename: 'old.xlsx', key: 'workflow-parameters/u/old.xlsx', sampleCount: 7 })]]
   ])('seeds %s exactly as it is stored', (_what, value) => {
     expect(seedFor(value)).toEqual(value);
+  });
+});
+
+describe('Params — sequence check on a flagged File Upload (biosecurity-tweaks)', () => {
+  it('routes both file pickers through the check, and shows counts and refusals', () => {
+    expect((paramsSource.match(/pickFiles\(param, /g) ?? []).length).toBe(2);
+    expect(paramsSource).toContain('requiresSequenceCheck(activeNode?.data?.parameters, param.id)');
+    expect(paramsSource).toContain('sequenceCountLabel(');
+    expect(paramsSource).toContain('fileRefusals[param.id]');
+  });
+
+  it('renders a flagged, empty File Upload as its picker with no error text', () => {
+    const defs = [{ id: 'seqs', name: 'Sequence files', type: 'file', screening: true }];
+    const markup = renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData: [{ id: 'seqs', nodeId: 'n1', name: 'Sequence files', type: 'file', paramType: 'input', value: null, required: false }] } } as any} />
+      </CanvasContext.Provider>
+    );
+    expect(text(markup)).toContain('Sequence files');
+    expect(markup).not.toContain('Mui-error');
   });
 });
