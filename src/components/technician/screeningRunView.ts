@@ -372,3 +372,20 @@ export function acceptanceGateView(args: {
   if (data.state === 'CLEAR' || data.state === 'NOT_REQUIRED') return { disabled: false, note: null };
   return { disabled: true, note: data.message };
 }
+
+/** The Review modal's override label; the setup doc quotes it. */
+export const OVERRIDE_SCREENING_LABEL = 'Override screening and accept anyway';
+
+/**
+ * Whether the Review modal offers the screening override: only once the gate has answered that it
+ * blocks, and only to staff who can see biosecurity. The server enforces the same rule.
+ */
+export function screeningOverrideOffered(args: {
+  data: JobAcceptanceScreening | null | undefined;
+  loading: boolean;
+  showBiosecurity: boolean;
+}): boolean {
+  const { data, loading, showBiosecurity } = args;
+  if (!showBiosecurity || loading || !data) return false;
+  return data.state !== 'CLEAR' && data.state !== 'NOT_REQUIRED';
+}

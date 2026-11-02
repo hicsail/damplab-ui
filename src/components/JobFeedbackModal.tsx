@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { useMutation, useQuery } from '@apollo/client';
-import { Alert, AlertTitle, Box, Button, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
+import { Alert, AlertTitle, Box, Button, Checkbox, FormControl, FormControlLabel, Modal, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import { styled } from "@mui/system";
 
 import { REVIEW_JOB } from '../gql/mutations';
 import { GET_JOB_ACCEPTANCE_SCREENING } from '../gql/queries';
-import { acceptanceGateView } from './technician/screeningRunView';
+import { acceptanceGateView, OVERRIDE_SCREENING_LABEL, screeningOverrideOffered } from './technician/screeningRunView';
+import { UserContext } from '../contexts/UserContext';
 import type { JobAcceptanceScreening } from './technician/screeningRunTypes';
 import { jobReviewLabels, reviewDecisions, type ReviewDecisionValue } from './jobReviewLabels';
 import { buildReviewInput, retryOperationId } from '../utils/jobReview';
@@ -41,7 +42,10 @@ export default function JobFeedbackModal(props: any) {
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [submitting,      setSubmitting]      = useState(false);
   const [submitError,     setSubmitError]     = useState<string | null>(null);
+  const [overrideScreening, setOverrideScreening] = useState(false);
   const operationIdRef = useRef<string | null>(null);
+  const userContext = useContext(UserContext);
+  const showBiosecurity = userContext.userProps?.showBiosecurity !== false;
 
   const [reviewJob] = useMutation(REVIEW_JOB);
 
@@ -50,6 +54,9 @@ export default function JobFeedbackModal(props: any) {
     variables: { jobId: id }, skip: !open || !id, fetchPolicy: 'network-only'
   });
   const acceptGate = acceptanceGateView({ data: acceptanceData?.jobAcceptanceScreening, loading: acceptanceLoading, hasError: Boolean(acceptanceError) });
+  const overrideOffered = screeningOverrideOffered({ data: acceptanceData?.jobAcceptanceScreening, loading: acceptanceLoading, showBiosecurity });
+  // Ticking the override is what lets a blocked job be accepted; the server checks the same rule.
+  const acceptDisabled = acceptGate.disabled && !(overrideOffered && overrideScreening);
 
   // Reachable from SUBMITTED, CHANGES_REQUESTED and ACCEPTED alike, and the
   // accept option means something different in each — see jobReviewLabels.
@@ -82,6 +89,7 @@ export default function JobFeedbackModal(props: any) {
     if (open) {
       setDecision('');
       setFeedbackMessage('');
+      setOverrideScreening(false);
       setSubmitError(null);
       setSnapshot({ jobState: jobState ?? null, unseenEdits: customerHasNotSeenEdits === true });
       operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'reopen' });
@@ -95,6 +103,12 @@ export default function JobFeedbackModal(props: any) {
     const value = event.target.value as ReviewDecisionValue;
     operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'edit' });
     setDecision(value);
+  };
+
+  const handleOverrideChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    operationIdRef.current = retryOperationId(operationIdRef.current, { type: 'edit' });
+    setOverrideScreening(event.target.checked);
+    if (!event.target.checked && decision === 'accept') setDecision('');
   };
 
   const handleFeedbackMessageChange = (event: any) => {
@@ -115,7 +129,8 @@ export default function JobFeedbackModal(props: any) {
             operationId: operationIdRef.current,
             jobId: id,
             decision: chosen.decision,
-            message: feedbackMessage
+            message: feedbackMessage,
+            overrideScreening: chosen.decision === 'ACCEPT' && overrideOffered && overrideScreening
           })
         }
       });
@@ -173,13 +188,20 @@ export default function JobFeedbackModal(props: any) {
             {decisions.map((option) => (
               <React.Fragment key={option.value}>
                 <FormControlLabel
-                  control={<Radio disabled={submitting || (option.value === 'accept' && acceptGate.disabled)} />}
+                  control={<Radio disabled={submitting || (option.value === 'accept' && acceptDisabled)} />}
                   value={option.value}
                   label={option.optionLabel}
-                  disabled={submitting || (option.value === 'accept' && acceptGate.disabled)}
+                  disabled={submitting || (option.value === 'accept' && acceptDisabled)}
                 />
                 {option.value === 'accept' && acceptGate.note && (
                   <Alert severity="info" sx={{ ml: 4, mb: 1 }}>{acceptGate.note}</Alert>
+                )}
+                {option.value === 'accept' && overrideOffered && (
+                  <FormControlLabel
+                    sx={{ ml: 4, mb: 1, display: 'flex' }}
+                    control={<Checkbox checked={overrideScreening} onChange={handleOverrideChange} disabled={submitting} />}
+                    label={OVERRIDE_SCREENING_LABEL}
+                  />
                 )}
                 {decision === option.value && (
                   <Box sx={{ ml: 4, mb: 1 }}>
@@ -233,7 +255,7 @@ export default function JobFeedbackModal(props: any) {
               variant="contained"
               color="primary"
               onClick={handleSubmit}
-              disabled={submitting || !chosen || (chosen.messageRequired && !feedbackMessage.trim()) || (chosen?.value === 'accept' && acceptGate.disabled)}
+              disabled={submitting || !chosen || (chosen.messageRequired && !feedbackMessage.trim()) || (chosen?.value === 'accept' && acceptDisabled)}
             >
               {submitting ? 'Saving…' : (chosen?.buttonLabel ?? 'Submit Decision')}
             </Button>

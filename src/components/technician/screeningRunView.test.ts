@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ScreeningRunCard } from './screeningRunTypes';
 import {
   aclidFindingRows, customerCardView, DETAILS_NOT_AVAILABLE_TEXT, homologyCardView, isNothingToScreen, paneNothingToScreen, screeningsFromRun, materialRows, NO_SCREENINGS_TEXT, reasonCodeDescription, regulatoryLabel,
-  acceptanceGateView, aclidResultLegs, homologyDetailsOpenable, paneStatusLabel, staffHomologyNoteFromRun, screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
+  acceptanceGateView, OVERRIDE_SCREENING_LABEL, screeningOverrideOffered, aclidResultLegs, homologyDetailsOpenable, paneStatusLabel, staffHomologyNoteFromRun, screeningBusy, screeningButtonLabel, showRefreshResults, screeningRunIsLoading, screeningRunOptionLabel, screeningRunSecondary, secureDnaHitCounts, sequenceMatchGroup
 } from './screeningRunView';
 
 const run = { id: 'r1', jobId: 'j1', trigger: 'RERUN', triggeredBy: 'staff@bu.edu', status: 'PASSED', startedAt: '2026-10-29T16:05:00.000Z', completedAt: null, sequenceCount: 192, skippedCount: 2, detail: null } as const;
@@ -301,6 +301,23 @@ describe('acceptanceGateView (behaviour 13)', () => {
   });
   it('a failed check leaves Accept on: the server still enforces the gate', () => {
     expect(acceptanceGateView({ data: undefined, loading: false, hasError: true })).toEqual({ disabled: false, note: null });
+  });
+});
+
+describe('screeningOverrideOffered', () => {
+  it('pins the label the setup doc quotes', () => expect(OVERRIDE_SCREENING_LABEL).toBe('Override screening and accept anyway'));
+  it.each(['NOT_RUN', 'IN_PROGRESS', 'NOT_PASSED', 'STALE'] as const)('offers it to biosecurity staff when the gate is %s', (state) => {
+    expect(screeningOverrideOffered({ data: { state, message: 'm' }, loading: false, showBiosecurity: true })).toBe(true);
+  });
+  it.each(['CLEAR', 'NOT_REQUIRED'] as const)('does not offer it when the gate is %s', (state) => {
+    expect(screeningOverrideOffered({ data: { state, message: null }, loading: false, showBiosecurity: true })).toBe(false);
+  });
+  it('never offers it to staff without showBiosecurity', () => {
+    expect(screeningOverrideOffered({ data: { state: 'NOT_RUN', message: 'm' }, loading: false, showBiosecurity: false })).toBe(false);
+  });
+  it('does not offer it while loading or with no answer', () => {
+    expect(screeningOverrideOffered({ data: undefined, loading: true, showBiosecurity: true })).toBe(false);
+    expect(screeningOverrideOffered({ data: undefined, loading: false, showBiosecurity: true })).toBe(false);
   });
 });
 

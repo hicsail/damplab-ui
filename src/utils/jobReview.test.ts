@@ -48,6 +48,16 @@ describe('buildReviewInput', () => {
   });
 });
 
+describe('buildReviewInput screening override', () => {
+  it('sends overrideScreening on an ACCEPT that asks for it', () => {
+    expect(buildReviewInput({ operationId: 'r', jobId: 'j', decision: 'ACCEPT', overrideScreening: true })).toEqual({ operationId: 'r', jobId: 'j', decision: 'ACCEPT', overrideScreening: true });
+  });
+  it('leaves it off when unticked, and never sends it on another decision', () => {
+    expect(buildReviewInput({ operationId: 'r', jobId: 'j', decision: 'ACCEPT', overrideScreening: false })).not.toHaveProperty('overrideScreening');
+    expect(buildReviewInput({ operationId: 'r', jobId: 'j', decision: 'REQUEST_EDITS', message: 'Fix it.', overrideScreening: true })).not.toHaveProperty('overrideScreening');
+  });
+});
+
 describe('buildReviewResponseInput', () => {
   it('uses the explicit action to validate a reply and emits the backend input shape', () => {
     expect(
