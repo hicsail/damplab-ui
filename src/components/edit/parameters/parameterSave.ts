@@ -3,6 +3,7 @@ import { validateParameter } from './ParameterValidation';
 import { conditionFromText } from '../../../utils/parameterConditionText';
 import { expectedColumnsOf, hasStaffTemplate, isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
 import { columnNamesFromText, resolveTableColumns } from '../../../utils/tableColumns';
+import { isScreenableType } from '../../../utils/parameterValidation';
 import { ConditionContext, NO_CONDITION_CONTEXT } from './showIfField';
 
 export interface EditableParameter {
@@ -107,6 +108,12 @@ export function prepareParametersForSave(
         next.tableData = { ...(next.tableData ?? {}), columns: resolved.columns };
       }
     }
+    // Screening (biosecurity-update): stored only when on, and only on a Text or a Table; screening
+    // columns only on a flagged Table, trimmed. A parameter switched to another type loses both
+    // rather than failing a rule its editor no longer shows.
+    if (next.screening !== true || !isScreenableType(next.type)) delete next.screening;
+    if (next.screening !== true || !isTableType(next.type)) delete next.screeningFields;
+    else next.screeningFields = (Array.isArray(next.screeningFields) ? next.screeningFields : []).map((field: unknown) => String(field).trim()).filter(Boolean);
     return next;
   });
 

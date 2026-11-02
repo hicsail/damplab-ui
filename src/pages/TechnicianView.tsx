@@ -42,6 +42,8 @@ import {
   GET_JOB_BALANCE,
   GET_JOB_CHARGES,
   GET_JOB_PAYMENTS,
+  GET_JOB_SCREENING_RUNS,
+  GET_SCREENING_RUN,
 } from "../gql/queries";
 import {
   JobSubmitterSummary,
@@ -153,6 +155,10 @@ import BiosecurityScreeningSections, {
 import { openHostedVerification } from "../aclid/verificationWidget";
 import ScreeningBatchDetailsModal from "../components/ScreeningBatchDetailsModal";
 import { GET_SCREENING_BATCH } from "../securedna/SequencesQueries";
+import ScreeningHistory from "../components/technician/ScreeningHistory";
+import ScreeningRunDetailsModal from "../components/technician/ScreeningRunDetailsModal";
+import type { ScreeningRunDetail, ScreeningRunSummary } from "../components/technician/screeningRunTypes";
+import { screeningRunIsLoading } from "../components/technician/screeningRunView";
 import type { ScreeningBatch } from "../securedna/types";
 
 const stripTypename = (value: unknown): unknown => {
@@ -337,6 +343,20 @@ export default function TechnicianView() {
     },
   );
   const [homologyModalOpen, setHomologyModalOpen] = useState(false);
+  // Screening history (biosecurity-update). Never asked for when the account hides biosecurity:
+  // the server would refuse it (behaviour 9).
+  const { data: screeningRunsData, refetch: refetchScreeningRuns } = useQuery<{ jobScreeningRuns: ScreeningRunSummary[] }>(GET_JOB_SCREENING_RUNS, {
+    variables: { jobId: id },
+    skip: !id || !showBiosecurity,
+    fetchPolicy: "cache-and-network",
+  });
+  const screeningRuns = screeningRunsData?.jobScreeningRuns ?? [];
+  const [loadScreeningRun, { data: screeningRunData, loading: screeningRunLoading, error: screeningRunError }] =
+    useLazyQuery<{ screeningRun: ScreeningRunDetail | null }>(GET_SCREENING_RUN, { fetchPolicy: "network-only" });
+  const [loadRunBatch, { data: runBatchData, loading: runBatchLoading }] =
+    useLazyQuery<{ screeningBatch: ScreeningBatch | null }>(GET_SCREENING_BATCH, { fetchPolicy: "network-only" });
+  const [screeningRunModalOpen, setScreeningRunModalOpen] = useState(false);
+  const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   // Mints the customer's hosted verification URL. Staff only ever copy it or
   // open the hosted page for a customer on a call — never the embed.
   const [startJobCustomerVerification, { loading: mintingVerificationLink }] =
@@ -512,9 +532,18 @@ export default function TechnicianView() {
     try {
       await rerunJobHomologyScreening({ variables: { jobId: id } });
       await refetchJob();
+      if (showBiosecurity) await refetchScreeningRuns();
     } catch (e) {
       window.alert(formatGqlError(e, "Could not run homology screening."));
     }
+  };
+
+  const handleOpenScreeningRun = async (runId: string) => {
+    setRequestedRunId(runId);
+    setScreeningRunModalOpen(true);
+    const result = await loadScreeningRun({ variables: { id: runId } });
+    const batchId = result.data?.screeningRun?.secureDna?.batchId;
+    if (batchId) void loadRunBatch({ variables: { id: batchId } });
   };
 
   const handleHomologyDetails = () => {
@@ -1244,6 +1273,8 @@ export default function TechnicianView() {
         {showBiosecurity && (
         <ProcessCard
           title="Biosecurity"
+          titleExtra={<ScreeningHistory runs={screeningRuns} onSelect={(runId) => void handleOpenScreeningRun(runId)} />}
+          onStatusPaneClick={!demoRun && screeningRuns.length > 0 ? () => void handleOpenScreeningRun(screeningRuns[0].id) : undefined}
           customerBadge={demoCustomer ? "check" : null}
           staffBadge={demoLab ? "check" : null}
           customerLabel={demoCustomer ? DEMO_CUSTOMER_NAME : undefined}
@@ -1306,7 +1337,10 @@ export default function TechnicianView() {
                         <IconButton
                           size="small"
                           aria-label={action.label}
-                          onClick={action.onClick}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            action.onClick();
+                          }}
                           sx={{ p: 0.25 }}
                         >
                           {icon}
@@ -1573,6 +1607,15 @@ export default function TechnicianView() {
               : null
           }
           onClose={() => setHomologyModalOpen(false)}
+        />
+        <ScreeningRunDetailsModal
+          open={screeningRunModalOpen}
+          run={screeningRunData?.screeningRun?.id === requestedRunId ? (screeningRunData?.screeningRun ?? null) : null}
+          loading={screeningRunIsLoading({ loading: screeningRunLoading, hasError: !!screeningRunError, data: screeningRunData, requestedId: requestedRunId })}
+          error={screeningRunError ? formatGqlError(screeningRunError, "Could not load the screening run.") : null}
+          batch={runBatchData?.screeningBatch ?? null}
+          batchLoading={runBatchLoading}
+          onClose={() => setScreeningRunModalOpen(false)}
         />
         <SowEditorModal
           open={sowModalOpen}

@@ -178,6 +178,37 @@ describe('prepareParametersForSave', () => {
     );
     expect(parameters.map((p) => p.id)).toEqual(['buffer_volume', 'buffer_volume_2']);
   });
+
+  describe('screening (biosecurity-update behaviour 4)', () => {
+    it('stores the flag only when on, and screening columns only on a flagged Table, trimmed', () => {
+      const { parameters, errors } = prepareParametersForSave([
+        { _dragKey: 'a', id: 'insert', name: 'Insert', type: 'string', screening: true },
+        { _dragKey: 'b', id: 'notes', name: 'Notes', type: 'string', screening: false },
+        { _dragKey: 'c', id: 'plate', name: 'Plate', type: 'table', _columnsText: 'Well\nInsert', screening: true, screeningFields: [' Insert '] },
+        { _dragKey: 'd', id: 'plate2', name: 'Plate 2', type: 'table', _columnsText: 'Well', screeningFields: ['Well'] }
+      ]);
+      expect(errors).toEqual([]);
+      expect(parameters[0].screening).toBe(true);
+      expect(parameters[1]).not.toHaveProperty('screening');
+      expect(parameters[2]).toMatchObject({ screening: true, screeningFields: ['Insert'] });
+      expect(parameters[3]).not.toHaveProperty('screeningFields');
+    });
+
+    it('drops both keys when the type changed to one that cannot be screened', () => {
+      const { parameters } = prepareParametersForSave([{ _dragKey: 'a', id: 'n', name: 'N', type: 'number', screening: true, screeningFields: ['x'] }]);
+      expect(parameters[0]).not.toHaveProperty('screening');
+      expect(parameters[0]).not.toHaveProperty('screeningFields');
+    });
+
+    it('refuses a flagged Table with no screening columns, or an unknown one', () => {
+      expect(prepareParametersForSave([{ _dragKey: 'c', id: 'p', name: 'Plate', type: 'table', _columnsText: 'Well', screening: true }]).errors).toEqual([
+        'Parameter 1: Screening columns - A Table that requires screening needs at least one screening column.'
+      ]);
+      expect(prepareParametersForSave([{ _dragKey: 'c', id: 'p', name: 'Plate', type: 'table', _columnsText: 'Well', screening: true, screeningFields: ['Insert'] }]).errors).toEqual([
+        'Parameter 1: Screening columns - Screening column “Insert” is not one of this Table\'s columns.'
+      ]);
+    });
+  });
 });
 
 describe('withDragKeys', () => {
