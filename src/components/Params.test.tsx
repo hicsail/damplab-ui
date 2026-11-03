@@ -1,29 +1,57 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import Params from './Params';
+import paramsSource from './Params.tsx?raw';
 import { CanvasContext } from '../contexts/Canvas';
 
 // There is no DOM here, so effects never run on their own. Params' effects are collected so a test can run them,
 // (with the dependency list each was given) and formik's setValues is observed (the real useFormik still supplies the values). Everything else is untouched.
-const spy = vi.hoisted(() => ({ effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn() }));
+const spy = vi.hoisted(() => ({ fileInputs: [] as any[], removeButtons: [] as any[], updaters: [] as Array<(prev: any) => any>, refs: [] as any[], setFieldValue: vi.fn(), effects: [] as Array<() => void>, deps: [] as Array<unknown[] | undefined>, setValues: vi.fn(), initialValues: [] as any[], errors: undefined as Record<string, string> | undefined }));
 vi.mock('react', async (importOriginal) => {
   const actual: any = await importOriginal();
   const useEffect = (effect: () => void, deps?: unknown[]): void => {
     spy.effects.push(effect);
     spy.deps.push(deps);
   };
-  return { ...actual, default: { ...actual, useEffect }, useEffect };
+  // Pick-time tests need the setters and refs Params creates, which static rendering never lets a handler reach.
+  const useState = (init: any): any => {
+    const [value] = actual.useState(init);
+    return [value, (next: any) => { if (typeof next === 'function') spy.updaters.push(next); }];
+  };
+  const useRef = (init: any): any => {
+    const ref = actual.useRef(init);
+    spy.refs.push(ref);
+    return ref;
+  };
+  return { ...actual, default: { ...actual, useEffect, useState, useRef }, useEffect, useState, useRef };
+});
+vi.mock('react/jsx-dev-runtime', async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return { ...actual, jsxDEV: (type: any, props: any, ...rest: any[]) => {
+      if (type === 'input' && props?.type === 'file') spy.fileInputs.push(props);
+      if (props?.['aria-label'] === 'Remove file') spy.removeButtons.push(props);
+      return actual.jsxDEV(type, props, ...rest);
+    }
+  };
 });
 vi.mock('formik', async (importOriginal) => {
   const actual: any = await importOriginal();
-  return { ...actual, useFormik: (config: any) => ({ ...actual.useFormik(config), setValues: spy.setValues }) };
+  return { ...actual, useFormik: (config: any) => {
+      spy.initialValues.push(config.initialValues);
+      // spy.errors stands in for what validation records once the effects have run.
+      return { ...actual.useFormik(config), setValues: spy.setValues, setFieldValue: spy.setFieldValue, ...(spy.errors ? { errors: spy.errors } : {}) };
+    }
+  };
 });
 
 const options = [{ id: 'bact', name: 'Bacteria' }, { id: 'oth', name: 'Other' }];
 const parameters = [
   { id: 'tags', name: 'Sample Types', type: 'dropdown', allowMultipleValues: true, display: 'checkboxes', options },
   { id: 'kind', name: 'Kind', type: 'dropdown', options },
+  { id: 'assays', name: 'Assays', type: 'dropdown', allowMultipleValues: true, display: 'multiselect', options },
+  { id: 'plus', name: 'Plus', type: 'dropdown', allowMultipleValues: true, options },
   { id: 'cycles', name: 'Cycles', type: 'number', validation: '>0' }
 ];
 const entry = (id: string, value: unknown): any => {
@@ -48,6 +76,86 @@ describe('Params — checkbox list (rule 30)', () => {
     expect(text(markup)).toContain('Other');
     expect((markup.match(/type="checkbox"/g) ?? []).length).toBe(2);
     expect((markup.match(/checked=""/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('Params — multi-select list', () => {
+  it('renders one list showing every chosen option, not a dropdown per choice', () => {
+    const markup = html([entry('assays', ['bact', 'oth'])]);
+    expect(text(markup)).toContain('Assays');
+    expect(text(markup)).toContain('Bacteria, Other');
+    expect((markup.match(/role="combobox"/g) ?? []).length).toBe(1);
+    expect(markup).not.toContain('Add another value');
+  });
+  it('starts empty from the blank placeholder a new node carries', () => {
+    expect(text(html([entry('assays', [''])]))).not.toContain('Bacteria');
+  });
+});
+
+describe('Params — +1 dropdown', () => {
+  it('a trash before each choice, and one +1 under them all', () => {
+    const markup = html([entry('plus', ['bact', 'oth'])]);
+    expect((markup.match(/aria-label="Remove value"/g) ?? []).length).toBe(2);
+    expect((markup.match(/aria-label="Add another value"/g) ?? []).length).toBe(1);
+    expect(markup.indexOf('Remove value')).toBeLessThan(markup.indexOf('role="combobox"'));
+    expect(markup.lastIndexOf('role="combobox"')).toBeLessThan(markup.indexOf('Add another value'));
+  });
+});
+
+describe('Params — matrix', () => {
+  const dil = (id: string, name: string, assay: string) => ({ id, name, type: 'number', showIf: { parameterId: 'plus', op: 'includes', value: assay }, matrix: 'm;2' });
+  const defs = [{ ...parameters.find((p) => p.id === 'plus')!, matrix: 'm;1' }, dil('bact_dil', 'Bacteria Dilution', 'Bacteria'), dil('oth_dil', 'Other Dilution', 'Other')];
+  const render = (value: string[]) =>
+    renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params
+          activeNode={{
+            id: 'n1',
+            data: {
+              id: 'n1',
+              serviceId: 's1',
+              parameters: defs,
+              formData: [
+                { ...entry('plus', value) },
+                { id: 'bact_dil', nodeId: 'n1', name: 'Bacteria Dilution', type: 'number', paramType: 'input', value: null },
+                { id: 'oth_dil', nodeId: 'n1', name: 'Other Dilution', type: 'number', paramType: 'input', value: null }
+              ]
+            }
+          }}
+        />
+      </CanvasContext.Provider>
+    );
+  it('lays the chosen rows out with their linked cells, in the order chosen', () => {
+    const markup = text(render(['oth', 'bact']));
+    expect(markup.indexOf('Other Dilution')).toBeLessThan(markup.indexOf('Bacteria Dilution'));
+    expect((render(['oth', 'bact']).match(/aria-label="Remove value"/g) ?? []).length).toBe(2);
+  });
+  it('choosing "Other" in column 1 asks to specify it under the matrix', () => {
+    expect(text(render(['oth']))).toContain('Please specify');
+  });
+  it('a cell whose choice is not made is not shown', () => {
+    expect(text(render(['bact']))).not.toContain('Other Dilution');
+  });
+});
+
+describe('Params — a parameter description', () => {
+  const described = (id: string): any => ({ ...entry(id, ''), required: true, description: `How to answer ${id}` });
+  const shown = (): string => text(html([described('kind'), described('cycles'), described('tags')]));
+
+  it('is shown before anything is entered', () => {
+    expect(shown()).toContain('How to answer kind');
+    expect(shown()).toContain('How to answer cycles');
+    expect(shown()).toContain('How to answer tags');
+  });
+
+  it('stays shown while the answer is still required, with the error under it', () => {
+    spy.errors = { kind: 'Required', cycles: 'Required', tags: 'Required' };
+    try {
+      const markup = shown();
+      for (const id of ['kind', 'cycles', 'tags']) expect(markup).toContain(`How to answer ${id} Required`);
+    } finally {
+      spy.errors = undefined;
+    }
   });
 });
 
@@ -207,5 +315,153 @@ describe('Params — a Table parameter with no template', () => {
     expect(text(markup)).toContain('Sample label');
     expect(markup).toContain('value="S1"');
     expect(markup).not.toContain('<table');
+  });
+
+  it('renders a Table with columns as a file field — never the inline grid — under either stored string (rule 4)', () => {
+    for (const type of ['table', 'sampleSheet']) {
+      const tableData = { columns: [{ header: 'Inducer', field: 'inducer' }], rows: [{ id: 1, inducer: 'IPTG' }] };
+      const defs = [{ id: 'grid', name: 'Plate layout', type, tableData }];
+      const formData = [{ id: 'grid', nodeId: 'n1', name: 'Plate layout', type, options: null, paramType: 'input', value: null, required: false, tableData }];
+      const markup = renderToStaticMarkup(
+        <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+          <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData } } as any} />
+        </CanvasContext.Provider>
+      );
+      expect(text(markup)).toContain('Plate layout');
+      expect(text(markup)).toContain('Download template');
+      expect(markup).toContain('accept=".xlsx,.csv"');
+      expect(markup).not.toContain('<table');
+      expect(text(markup)).not.toContain('IPTG');
+    }
+  });
+});
+
+describe('Params — how a Table answer is seeded (table-upload rules 13a, 30)', () => {
+  const columns = { columns: [{ header: 'Inducer', field: 'inducer' }] };
+  const defs = [{ id: 'plate', name: 'Plate map', type: 'table', tableData: columns, allowMultipleValues: true }];
+  const seedFor = (value: unknown): unknown => {
+    spy.initialValues.length = 0;
+    renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData: [{ id: 'plate', nodeId: 'n1', name: 'Plate map', type: 'table', paramType: 'input', value, required: false, tableData: columns, allowMultipleValues: true }] } } as any} />
+      </CanvasContext.Provider>
+    );
+    return spy.initialValues[0].plate;
+  };
+
+  it('seeds a new Table answer as null, never an empty string or an array', () => {
+    expect(seedFor(null)).toBeNull();
+    expect(seedFor(undefined)).toBeNull();
+  });
+
+  // Review Focus 2: opening a job must not rewrite a Table answer, or its bill moves on the next save.
+  it.each([
+    ['the old empty string', ''],
+    ['old text', 'legacy'],
+    ['an old multi-value array', ['']],
+    ['an old array of two', ['', '']],
+    ['a stored file', { filename: 'old.xlsx', key: 'workflow-parameters/u/old.xlsx', sampleCount: 7 }],
+    ['a stored file inside an array', [JSON.stringify({ filename: 'old.xlsx', key: 'workflow-parameters/u/old.xlsx', sampleCount: 7 })]]
+  ])('seeds %s exactly as it is stored', (_what, value) => {
+    expect(seedFor(value)).toEqual(value);
+  });
+});
+
+describe('Params — sequence check on a flagged File Upload (biosecurity-tweaks)', () => {
+  it('routes both file pickers through the check, and shows counts and refusals', () => {
+    expect((paramsSource.match(/pickFiles\(param, /g) ?? []).length).toBe(2);
+    expect(paramsSource).toContain('requiresSequenceCheck(activeNode?.data?.parameters, param.id)');
+    expect(paramsSource).toContain('sequenceCountLabel(');
+    expect(paramsSource).toContain('refusalsFor(param)');
+  });
+
+  it('renders a flagged, empty File Upload as its picker with no error text', () => {
+    const defs = [{ id: 'seqs', name: 'Sequence files', type: 'file', screening: true }];
+    const markup = renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params activeNode={{ id: 'n1', data: { id: 'n1', serviceId: 's1', parameters: defs, formData: [{ id: 'seqs', nodeId: 'n1', name: 'Sequence files', type: 'file', paramType: 'input', value: null, required: false }] } } as any} />
+      </CanvasContext.Provider>
+    );
+    expect(text(markup)).toContain('Sequence files');
+    expect(markup).not.toContain('Mui-error');
+  });
+});
+
+describe('Params — picking files on a File Upload, behaviour (biosecurity-tweaks)', () => {
+  const fixture = (name: string): File => new File([readFileSync(`test-fixtures/sequence-files/${name}`)], name);
+  const pick = (defs: any[], value: unknown, files: File[], nodeId = 'n1'): Promise<void> => {
+    spy.fileInputs.length = 0;
+    spy.removeButtons.length = 0;
+    spy.updaters.length = 0;
+    spy.refs.length = 0;
+    spy.setFieldValue.mockClear();
+    renderToStaticMarkup(
+      <CanvasContext.Provider value={{ setNodes: () => {} } as any}>
+        <Params activeNode={{ id: nodeId, data: { id: nodeId, serviceId: 's1', parameters: defs, formData: [{ id: 'seqs', nodeId, name: 'Sequence files', type: 'file', paramType: 'input', value, required: false, allowMultipleValues: defs[0].allowMultipleValues }] } } as any} />
+      </CanvasContext.Provider>
+    );
+    const event = { target: { files }, currentTarget: { value: 'picked' } };
+    spy.fileInputs[0].onChange(event);
+    expect(event.currentTarget.value).toBe('');
+    return new Promise((resolve) => setTimeout(resolve, 200));
+  };
+  const flagged = [{ id: 'seqs', name: 'Sequence files', type: 'file', screening: true, allowMultipleValues: true }];
+  const stored = (): any => {
+    const state: any = spy.updaters.reduce((acc, u) => ({ ...acc, ...u(acc) }), {});
+    return state;
+  };
+
+  it('on a flagged param adds the good file of a mixed pick, with its count, and refuses the bad one by name', async () => {
+    await pick(flagged, [], [fixture('two-records.fasta'), fixture('notes.txt')]);
+    expect(spy.setFieldValue).toHaveBeenCalledTimes(1);
+    const [id, value] = spy.setFieldValue.mock.calls[0];
+    expect(id).toBe('seqs');
+    expect(value.map((f: any) => f.filename)).toEqual(['two-records.fasta']);
+    const state = stored();
+    expect(state[value[0].localId]).toBe(2);
+    expect(JSON.stringify(state['n1:seqs'])).toContain('notes.txt');
+  });
+
+  it('on an unflagged param adds a non-sequence file unchanged, with no check', async () => {
+    await pick([{ id: 'seqs', name: 'Sequence files', type: 'file', allowMultipleValues: true }], [], [fixture('notes.txt')]);
+    expect(spy.setFieldValue).toHaveBeenCalledTimes(1);
+    expect(spy.setFieldValue.mock.calls[0][1].map((f: any) => f.filename)).toEqual(['notes.txt']);
+    expect(spy.updaters).toHaveLength(0);
+  });
+
+  it('builds on the answer as it stands when the check resolves, not as it stood at the pick', async () => {
+    const pending = pick(flagged, [], [fixture('two-records.fasta')]);
+    spy.refs[1].current = { seqs: [{ __kind: 'pending-file', localId: 'other', filename: 'other.fasta' }] };
+    await pending;
+    expect(spy.setFieldValue.mock.calls[0][1].map((f: any) => f.filename)).toEqual(['other.fasta', 'two-records.fasta']);
+  });
+
+  it('drops a result that resolves after another node became active', async () => {
+    const pending = pick(flagged, [], [fixture('two-records.fasta'), fixture('notes.txt')]);
+    spy.refs[0].current = 'n2';
+    await pending;
+    expect(spy.setFieldValue).not.toHaveBeenCalled();
+    expect(spy.updaters).toHaveLength(0);
+  });
+
+  describe('removing a file clears that parameter\'s stale refusals (M3)', () => {
+    // Replays the updaters in order (stored() merges them, which would hide a deleted key).
+    const replayed = (): any => spy.updaters.reduce((acc: any, u) => u(acc), {});
+    const held = { __kind: 'pending-file', localId: 'held', filename: 'held.fasta' };
+    it('multi: the refusal from the last pick goes when a file is removed', async () => {
+      await pick(flagged, [held], [fixture('notes.txt')]);
+      expect(replayed()['n1:seqs']).toHaveLength(1);
+      spy.removeButtons[0].onClick();
+      expect(replayed()['n1:seqs']).toBeUndefined();
+      expect(spy.setFieldValue).toHaveBeenCalledWith('seqs', []);
+    });
+    it('single: the refusal from the last pick goes when the file is removed', async () => {
+      const single = [{ id: 'seqs', name: 'Sequence files', type: 'file', screening: true }];
+      await pick(single, held, [fixture('notes.txt')]);
+      expect(replayed()['n1:seqs']).toHaveLength(1);
+      spy.removeButtons[0].onClick();
+      expect(replayed()['n1:seqs']).toBeUndefined();
+      expect(spy.setFieldValue).toHaveBeenCalledWith('seqs', null);
+    });
   });
 });

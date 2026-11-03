@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkValue, effectiveValidation, parseValidation, ruleMessage, ValidationRule } from './parameterValidation';
+import { checkValue, effectiveValidation, isScreenableType, parseValidation, ruleMessage, screeningRuleViolation, ValidationRule } from './parameterValidation';
 
 const rules = (text: string): ValidationRule[] => {
   const parsed = parseValidation(text);
@@ -60,5 +60,32 @@ describe('effectiveValidation (rule 24)', () => {
     expect(effectiveValidation({ rangeValueMax: 3 })).toBe('<=3');
     expect(effectiveValidation({})).toBe('');
     expect(effectiveValidation(null)).toBe('');
+  });
+});
+
+describe('screeningRuleViolation (mirror of damplab-backend parameter-validation.ts)', () => {
+  const table = (over: Record<string, unknown> = {}) => ({ id: 'plate', type: 'table', tableData: { columns: [{ header: 'Well' }, { header: 'Insert' }] }, ...over });
+
+  it('uses the server’s sentences', () => {
+    expect(screeningRuleViolation({ type: 'number', screening: true })).toBe('Only Text, Table and File Upload parameters can require screening.');
+    expect(screeningRuleViolation({ type: 'string', screening: 'yes' })).toBe('“Requires screening” must be true or false.');
+    expect(screeningRuleViolation({ type: 'string', screening: true, screeningFields: ['x'] })).toBe('Only a Table has screening columns.');
+    expect(screeningRuleViolation(table({ screening: true, screeningFields: 'Insert' }))).toBe('Screening columns must be a list of column names.');
+    expect(screeningRuleViolation(table({ screening: true, screeningFields: [] }))).toBe('A Table that requires screening needs at least one screening column.');
+    expect(screeningRuleViolation(table({ screening: true, screeningFields: ['Vector'] }))).toBe('Screening column “Vector” is not one of this Table\'s columns.');
+  });
+
+  it('accepts the good shapes and template-only Tables', () => {
+    expect(screeningRuleViolation({ type: 'string', screening: true })).toBeNull();
+    expect(screeningRuleViolation(table({ screening: true, screeningFields: ['insert'] }))).toBeNull();
+    expect(screeningRuleViolation({ type: 'sampleSheet', templateFile: { key: 'sample-sheet-templates/a.xlsx' }, screening: true, screeningFields: ['Any'] })).toBeNull();
+    expect(screeningRuleViolation({ type: 'number' })).toBeNull();
+    expect(screeningRuleViolation({ type: 'file', screening: true })).toBeNull();
+    expect(screeningRuleViolation({ type: 'file', screening: true, screeningFields: ['x'] })).toBe('Only a Table has screening columns.');
+  });
+
+  it('isScreenableType is Text, File Upload and both Table strings', () => {
+    expect(['string', 'table', 'sampleSheet', 'file'].map(isScreenableType)).toEqual([true, true, true, true]);
+    expect(['number', 'dropdown', 'boolean'].map(isScreenableType)).toEqual([false, false, false]);
   });
 });

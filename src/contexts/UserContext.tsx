@@ -70,7 +70,7 @@ async function fetchPermissions(
   const endpoint = import.meta.env.VITE_BACKEND;
   if (!endpoint) return null;
 
-  const ask = async (withCustomerCategory: boolean): Promise<any | null> => {
+  const ask = async (suffix: string): Promise<any | null> => {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -78,7 +78,7 @@ async function fetchPermissions(
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
-        query: `{ myPermissions { effective asCustomer${includeRoles ? ' roles' : ''}${withCustomerCategory ? ' customerCategory' : ''} } }`,
+        query: `{ myPermissions { effective asCustomer${includeRoles ? ' roles' : ''}${suffix} } }`,
       }),
     });
     if (!res.ok) return null;
@@ -91,11 +91,12 @@ async function fetchPermissions(
   };
 
   try {
-    // `customerCategory` is newer than some deployed backends. Asking for it and
-    // falling back keeps a UI that reaches an older server from losing its
-    // permissions entirely, which is the failure the `roles` field is gated
-    // against above.
-    const permissions = (await ask(true)) ?? (await ask(false));
+    // `customerCategory` is newer than some deployed backends. Asking for it
+    // and falling back keeps a UI that reaches an
+    // older server from losing its permissions entirely.
+    const permissions =
+      (await ask(' customerCategory')) ??
+      (await ask(''));
     if (!permissions) return null;
     return {
       effective: permissions.effective ?? [],

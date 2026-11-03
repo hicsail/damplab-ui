@@ -8,6 +8,7 @@
  * hidden answers itself); this copy is what lets the form, the badge, the price
  * shown on the canvas and every answer display agree with it. Keep the two in step.
  */
+import { tableFileOf, TABLE_PARAM_TYPE } from './sampleSheetValue';
 import { isOtherTextEntryId, otherTextEntryId, otherTextParentId } from './otherOption';
 
 export type ConditionOp = 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'in' | 'includes';
@@ -126,6 +127,22 @@ export function comparisonFits(comparison: Comparison, controller: Param): boole
 
 const text = (v: unknown): string => String(v).trim().toLowerCase();
 
+/**
+ * The options a dropdown's `.includes(text)` names: the option called exactly that
+ * (any case) when there is one, otherwise every option whose name contains it — so
+ * `.includes("B12")` does not also catch "Active-B12".
+ */
+export function optionIdsNamedBy(options: unknown, text: string): Set<string> {
+  const list: any[] = Array.isArray(options) ? options.filter((o) => o && o.id !== undefined && o.id !== null) : [];
+  const needle = text.trim().toLowerCase();
+  const nameOf = (o: any): string =>
+    String(o.name ?? '')
+      .trim()
+      .toLowerCase();
+  const exact = list.filter((o) => nameOf(o) === needle);
+  return new Set((exact.length > 0 ? exact : list.filter((o) => nameOf(o).includes(needle))).map((o) => String(o.id)));
+}
+
 function compare(comparison: Comparison, controller: Param, value: unknown): boolean {
   const { op } = comparison;
 
@@ -146,18 +163,8 @@ function compare(comparison: Comparison, controller: Param, value: unknown): boo
     const chosen = answers.map(String);
     if (op === 'includes') {
       if (typeof comparison.value !== 'string') return false;
-      const needle = comparison.value.toLowerCase();
-      const options: any[] = Array.isArray(controller.options) ? controller.options : [];
-      return chosen.some((id) =>
-        options.some(
-          (o) =>
-            o &&
-            String(o.id) === id &&
-            String(o.name ?? '')
-              .toLowerCase()
-              .includes(needle)
-        )
-      );
+      const named = optionIdsNamedBy(controller.options, comparison.value);
+      return chosen.some((id) => named.has(id));
     }
     if (!Array.isArray(comparison.optionIds)) return false;
     const wanted = new Set(comparison.optionIds.map(String));
@@ -280,6 +287,12 @@ export function withoutHiddenAnswers<T>(effectiveParameters: unknown, formData: 
 
 /** The value a form field holds before anything is entered — what Params.tsx seeds formik with for an entry with no saved value. */
 function emptyFormValue(entry: Record<string, any>): unknown {
+  // A Table's file field starts as, and is cleared back to, null — never '',
+  // which a priced `table` parameter bills as one. But an answer stored on a
+  // `table` parameter before it took files (the old '', text, an array) is not
+  // a file: it keeps resetting exactly as it always did, so hiding and
+  // re-showing it cannot move its bill. `sampleSheet` is handled, unchanged, below.
+  if (entry.type === TABLE_PARAM_TYPE && (entry.value === null || entry.value === undefined || tableFileOf(entry.value) !== null)) return null;
   const multi = entry.allowMultipleValues === true || Array.isArray(entry.value);
   if (multi) return entry.type === 'file' ? [] : [''];
   if (entry.type === 'file' || entry.type === 'sampleSheet') return null;

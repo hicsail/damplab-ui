@@ -67,6 +67,54 @@ const VECTORS: Array<{ name: string; parameters: any[]; formData: unknown; visib
     ],
     visible: ['sample']
   },
+  {
+    name: 'multiselect includes: any chosen option, by name',
+    parameters: [{ ...TAGS, display: 'multiselect' }, target({ parameterId: 'tags', op: 'includes', value: 'yeast' })],
+    formData: [{ id: 'tags', value: ['bact', 'yeast'] }],
+    visible: ['tags', 't']
+  },
+  {
+    name: 'multiselect includes: that option not chosen',
+    parameters: [{ ...TAGS, display: 'multiselect' }, target({ parameterId: 'tags', op: 'includes', value: 'yeast' })],
+    formData: [{ id: 'tags', value: ['bact', 'oth'] }],
+    visible: ['tags']
+  },
+  {
+    name: 'dropdown includes: a name that is an option matches only that option, not a longer one',
+    parameters: [
+      {
+        ...TAGS,
+        options: [
+          { id: 'b12', name: 'B12' },
+          { id: 'ab12', name: 'Active-B12' }
+        ]
+      },
+      target({ parameterId: 'tags', op: 'includes', value: 'b12' })
+    ],
+    formData: [{ id: 'tags', value: ['ab12'] }],
+    visible: ['tags']
+  },
+  {
+    name: 'dropdown includes: the option named exactly is chosen',
+    parameters: [
+      {
+        ...TAGS,
+        options: [
+          { id: 'b12', name: 'B12' },
+          { id: 'ab12', name: 'Active-B12' }
+        ]
+      },
+      target({ parameterId: 'tags', op: 'includes', value: 'b12' })
+    ],
+    formData: [{ id: 'tags', value: ['ab12', 'b12'] }],
+    visible: ['tags', 't']
+  },
+  {
+    name: 'multiselect includes: nothing chosen (the blank placeholder)',
+    parameters: [{ ...TAGS, display: 'multiselect' }, target({ parameterId: 'tags', op: 'includes', value: 'yeast' })],
+    formData: [{ id: 'tags', value: [''] }],
+    visible: ['tags']
+  },
   { name: 'yes/no == false holds for a box never touched', parameters: [HOT, target({ parameterId: 'hot', op: 'eq', value: false })], formData: [], visible: ['hot', 't'] },
   { name: 'yes/no == true', parameters: [HOT, target({ parameterId: 'hot', op: 'eq', value: true })], formData: [{ id: 'hot', value: true }], visible: ['hot', 't'] },
   { name: 'yes/no == true, unticked', parameters: [HOT, target({ parameterId: 'hot', op: 'eq', value: true })], formData: [{ id: 'hot', value: '' }], visible: ['hot'] },
@@ -311,5 +359,39 @@ describe('comparisonFits', () => {
     expect(comparisonFits({ parameterId: 'cycles', op: 'gt' }, CYCLES)).toBe(false);
     expect(comparisonFits({ parameterId: 'note', op: 'eq', value: 'x' }, NOTE)).toBe(true);
     expect(comparisonFits({ parameterId: 'cycles', op: 'eq', value: 'abc' }, CYCLES)).toBe(true);
+  });
+});
+
+describe('resetHiddenValues — a hidden Table (table-upload R2)', () => {
+  const parameters = [
+    { id: 'kind', name: 'Kind', type: 'dropdown', options: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }] },
+    { id: 'plate', name: 'Plate map', type: 'table', showIf: { parameterId: 'kind', op: 'eq', optionIds: ['a'] } }
+  ];
+  // The node's form entries: `value` is what the entry held when the form opened.
+  const entries = (value: unknown) => [{ id: 'kind', type: 'dropdown', value: 'b' }, { id: 'plate', type: 'table', value }];
+  const picked = { __kind: 'pending-file', filename: 'a.csv', sampleCount: 2 };
+
+  it('clears a file to null, never to the empty string a priced `table` parameter bills as one', () => {
+    expect(resetHiddenValues({ kind: 'b', plate: picked }, entries(null), parameters)).toEqual({ kind: 'b', plate: null });
+    expect(resetHiddenValues({ kind: 'b', plate: picked }, entries(picked), parameters)).toEqual({ kind: 'b', plate: null });
+  });
+
+  it('has nothing to reset on an old empty answer: it stays the empty string', () => {
+    expect(resetHiddenValues({ kind: 'b', plate: '' }, entries(''), parameters)).toBeNull();
+  });
+
+  it('resets old text on a `table` to the empty string, as it always did', () => {
+    expect(resetHiddenValues({ kind: 'b', plate: 'legacy' }, entries('legacy'), parameters)).toEqual({ kind: 'b', plate: '' });
+  });
+
+  it('clears a file wrapped in an array (allowMultipleValues left on a stored Table) to null', () => {
+    const counted = JSON.stringify({ filename: 'a.csv', key: 'workflow-parameters/u/a.csv', sampleCount: 12, countedBy: 'server' });
+    const multi = [parameters[0], { ...parameters[1], allowMultipleValues: true }];
+    const multiEntries = [{ id: 'kind', type: 'dropdown', value: 'b' }, { id: 'plate', type: 'table', allowMultipleValues: true, value: [counted] }];
+    expect(resetHiddenValues({ kind: 'b', plate: [counted] }, multiEntries, multi)).toEqual({ kind: 'b', plate: null });
+  });
+
+  it('leaves an old multi-value array on a `table` as it is', () => {
+    expect(resetHiddenValues({ kind: 'b', plate: [''] }, entries(['']), parameters)).toBeNull();
   });
 });

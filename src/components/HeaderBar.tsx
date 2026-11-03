@@ -146,6 +146,7 @@ export default function HeaderBar() {
       // Attempt to load file, load empty object if nothing found
       let file = JSON.parse(localStorage.getItem(canvasName) || "{}");
 
+      // A saved canvas keeps a picked file's name but never the file: the canvas and checkout ask for it again.
       if (file.nodes) setNodes(file.nodes);
       if (file.edges) setEdges(file.edges);
     },

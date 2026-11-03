@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { useFormik } from "formik";
 import {
   Accordion,
@@ -28,15 +28,17 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import ParamTableOnForm from "./ParamTableOnForm";
 import { CanvasContext } from "../contexts/Canvas";
 import { isRetiredEquipmentParam, validateEquipmentValues } from "../utils/equipmentParams";
 import SampleSheetField from "./SampleSheetField";
-import { isSampleSheetParam } from "../utils/sampleSheet";
+import { isTableParam } from "../utils/sampleSheet";
+import { FILE_NEEDS_REUPLOAD_MESSAGE, isStalePendingFile } from "../utils/missingParamFiles";
 import { parameterSetHeadings } from "../utils/parameterSetGroups";
-import { answerProblems, isCheckboxList, requiredProblems, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
+import { answerProblems, chosenOptionIds, isCheckboxList, requiredProblems, syncOtherTextEntries, toggleChecked } from "../utils/parameterAnswers";
 import { errorLabel, isOtherTextEntryId, OTHER_TEXT_LABEL, otherOptionIdOf, otherTextEntryId, otherTextParentId, selectsOther } from "../utils/otherOption";
 import { hiddenParameterIds, resetHiddenValues, withoutHiddenAnswers } from "../utils/parameterConditions";
+import { checkPickedFiles, requiresSequenceCheck, sequenceCountLabel } from "../utils/sequenceFile";
+import { MatrixLayout, matrixLayouts, plusOneValues } from "../utils/parameterMatrix";
 
 interface ParamFormProps {
   activeNode: any; // Replace 'any' with the appropriate type for activeNode
@@ -90,6 +92,13 @@ const isPendingParamFile = (value: unknown): value is PendingParamFile =>
 
 export default function ({ activeNode, onFormDataChange, changedParamIds, readOnly = false, sampleSheetUploadable = true }: ParamFormProps) {
   const [paramErrors, setParamErrors]: any = useState([]);
+  // A flagged File Upload checks each picked file for sequences: refusals by parameter, counts by pending file.
+  const [fileRefusals, setFileRefusals] = useState<Record<string, string[]>>({});
+  const [sequenceCounts, setSequenceCounts] = useState<Record<string, number>>({});
+  const activeNodeIdRef = useRef<string | undefined>(activeNode?.id);
+  activeNodeIdRef.current = activeNode?.id;
+  const latestValues = useRef<Record<string, any>>({});
+  const refusalsFor = (param: any): string[] => fileRefusals[`${activeNode?.id}:${param.id}`] ?? [];
 
   /** Marks one parameter as edited relative to the diff baseline. */
   const wrapChanged = (param: any, element: React.ReactNode): React.ReactNode => {
@@ -135,6 +144,14 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
         initValues[`resultParamValue${obj.id}`] = obj.resultParamValue
           ? obj.resultParamValue
           : "";
+      } else if (isTableParam(obj)) {
+        // A Table answer is seeded exactly as it is stored — '' stays '', null
+        // stays null, an old array stays that array — so opening the form and
+        // saving it untouched sends back what was there. Pricing reads the
+        // difference: '' on a priced `table` parameter bills once, null bills
+        // nothing. (The old form turned null into '' here.) Picking a file
+        // replaces whatever this is; removing it leaves null.
+        initValues[obj.id] = obj.value ?? null;
       } else if (isMultiValueParam(obj)) {
         if (obj.type === "file") {
           const arr = Array.isArray(obj.value) ? obj.value : obj.value ? [obj.value] : [];
@@ -146,7 +163,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
           : [obj.value ?? ""];
         initValues[obj.id] = arr;
       } else {
-        if (obj.type === "file" || isSampleSheetParam(obj)) {
+        if (obj.type === "file") {
           initValues[obj.id] = obj.value ?? null;
           return;
         }
@@ -185,7 +202,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     // only if" is false for these values) raises no required, validation or
     // "Other" message.
     const shown = withoutHiddenAnswers(activeNode?.data?.parameters, buildUpdatedFormData(values));
-    let errors: any = requiredProblems(shown, values);
+    let errors: any = requiredProblems(shown, values, activeNode?.data?.parameters);
 
     // The reserved equipment parameters carry rules the generic required-field pass
     // cannot express: a date pair that must not invert, and an integer floor.
@@ -214,13 +231,43 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     }));
   };
 
-  // formik hook init
+  /** A removed file leaves its parameter's last-pick refusals behind otherwise: they describe a pick, not the answer. */
+  const clearRefusals = (param: any): void =>
+    setFileRefusals((prev) => {
+      const { [`${activeNode?.id}:${param.id}`]: _gone, ...rest } = prev;
+      return rest;
+    });
+
+  /** Hands the picked files on: at once for an ordinary File Upload, after the sequence check for a flagged one. */
+  const pickFiles = (param: any, selected: PendingParamFile[], apply: (accepted: PendingParamFile[]) => void): void => {
+    if (!requiresSequenceCheck(activeNode?.data?.parameters, param.id)) {
+      apply(selected);
+      return;
+    }
+    const startedOn = activeNode?.id;
+    void checkPickedFiles(selected).then(({ accepted, errors, counts }) => {
+      // The user moved to another node while the check ran: its form is not the one this pick was for.
+      if (activeNodeIdRef.current !== startedOn) return;
+      setFileRefusals((prev) => ({ ...prev, [`${startedOn}:${param.id}`]: errors }));
+      setSequenceCounts((prev) => ({ ...prev, ...counts }));
+      if (accepted.length > 0) apply(accepted);
+    });
+  };
+
+  // formik hook init (latestValues follows formik.values, so a pick that resolves late builds on the current answer)
   const formik = useFormik({
     initialValues: initValues(),
     enableReinitialize: true,
     validate: validate,
     onSubmit: () => {},
   });
+  latestValues.current = formik.values;
+
+  /** Writes an answer and records it at once, so a second late write sees it before the next render. */
+  const setAnswer = (id: string, value: any): void => {
+    latestValues.current = { ...latestValues.current, [id]: value };
+    formik.setFieldValue(id, value);
+  };
 
 
   // update values to active node form data and validate
@@ -260,6 +307,19 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     onFormDataChange?.();
   }, [formik.values]);
 
+  /** A parameter's description stays visible; a problem with its answer is added under it, never in its place. */
+  const helperFor = (param: any): React.ReactNode => {
+    const error = formik.errors[param.id] ? String(formik.errors[param.id]) : null;
+    const description = param.description ? param.description : null;
+    if (!error || !description) return error ?? description;
+    return (
+      <>
+        <Box component="span" sx={{ display: "block", color: "text.secondary" }}>{description}</Box>
+        {error}
+      </>
+    );
+  };
+
   /** The "Please specify" field, directly under a control whose answer selects "Other". */
   const renderOtherText = (param: any) => {
     if (!selectsOther(param, formik.values[param.id])) return null;
@@ -287,56 +347,114 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
     if (otherOptionIdOf(param) !== null && !selectsOther(param, nextValue)) formik.setFieldValue(otherTextEntryId(param.id), "");
   };
 
-  // Re-evaluated on every render, so on every answer change in this step.
-  const hidden = hiddenParameterIds(activeNode?.data?.parameters, formik.values);
-  const shownFormData: any[] = (activeNode?.data?.formData ?? []).filter(
-    (param: any) => !hidden.has(param?.id) && !(isOtherTextEntryId(param?.id) && hidden.has(otherTextParentId(param.id)))
-  );
-  // Over the shown entries only: a set with no visible parameter gets no heading.
-  const setHeadings = parameterSetHeadings(shownFormData, activeNode?.data?.parameters);
+  /** One choice of a +1 dropdown. */
+  const renderPlusOneSelect = (param: any, idx: number, width: string = "26ch") => {
+    const values = plusOneValues(formik.values[param.id]);
+    return (
+      <FormControl size="small" sx={{ width }}>
+        <InputLabel sx={{ backgroundColor: "white" }}>
+          {idx === 0 ? param.name : `${param.name} (${idx + 1})`}
+        </InputLabel>
+        <Select
+          value={values[idx] ?? ""}
+          onChange={(e) => {
+            const next = [...values];
+            next[idx] = e.target.value;
+            formik.setFieldValue(param.id, next);
+            clearOtherTextUnlessSelected(param, next);
+          }}
+          onBlur={formik.handleBlur}
+          readOnly={readOnly}
+        >
+          {(param.options ?? []).map((option: any) => (
+            <MenuItem key={option.id} value={option.id}>
+              {option.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    );
+  };
 
-  return (
-    <div>
-      <Stack spacing={1} sx={{ mb: 1 }}>
-        <Typography variant="h6">Parameters</Typography>
-        <Typography variant="caption" color="text.secondary">
-          Fill required fields first. Optional fields can be updated anytime before checkout.
-        </Typography>
-        {Object.keys(paramErrors).length > 0 ? (
-          <Alert severity="warning" sx={{ py: 0.5 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              {Object.keys(paramErrors).length} field(s) still need attention.
-            </Typography>
-            <Box component="ul" sx={{ my: 0.5, pl: 2 }}>
-              {Object.keys(paramErrors).slice(0, 6).map((key: any) => {
-                const name = errorLabel(key, activeNode.data.formData);
-                return (
-                  <li key={key}>
-                    <Typography variant="caption">
-                      {name}: {paramErrors[key]}
-                    </Typography>
-                  </li>
-                );
+  /** Removes one choice of a +1 dropdown; removing the last leaves one empty dropdown. */
+  const removeChoiceButton = (param: any, idx: number) => (
+    <IconButton
+      size="small"
+      onClick={() => {
+        const next = plusOneValues(formik.values[param.id]).filter((_: unknown, i: number) => i !== idx);
+        formik.setFieldValue(param.id, next.length ? next : [""]);
+        clearOtherTextUnlessSelected(param, next);
+      }}
+      aria-label="Remove value"
+    >
+      <DeleteForeverSharp fontSize="small" />
+    </IconButton>
+  );
+
+  const addChoiceButton = (param: any, label?: string) => (
+    <Button
+      size="small"
+      startIcon={<PlusOne fontSize="small" />}
+      onClick={() => formik.setFieldValue(param.id, [...plusOneValues(formik.values[param.id]), ""])}
+      aria-label="Add another value"
+      sx={{ textTransform: "none", mt: 0.5, minWidth: 0 }}
+    >
+      {label ?? ""}
+    </Button>
+  );
+
+  /**
+   * A matrix: a +1 dropdown in column 1 gives a row per choice (with its trash),
+   * and each later column's parameters sit on the row of the choice they belong to.
+   */
+  const renderMatrix = (matrix: MatrixLayout) => {
+    const byId = new Map<string, any>(shownFormData.map((entry: any) => [entry.id, entry]));
+    const showTrash = !readOnly && matrix.rows.some((row) => row.choice);
+    const columns = `${showTrash ? "auto " : ""}repeat(${matrix.columns}, minmax(18ch, 1fr))`;
+    return (
+      <Box key={`matrix:${matrix.name}`} sx={{ mt: 2, pt: 1.5, overflowX: "auto" }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: columns,
+            columnGap: 1,
+            rowGap: 1.5,
+            alignItems: "start",
+            width: "max-content",
+            "& .MuiFormControl-root, & .MuiTextField-root": { width: "18ch", mt: 0 },
+            "& > div > div": { mt: 0 }
+          }}
+        >
+          {matrix.rows.map((row, rowIndex) => (
+            <React.Fragment key={rowIndex}>
+              {showTrash && <Box>{row.choice ? removeChoiceButton(byId.get(row.choice.paramId), row.choice.entryIndex) : null}</Box>}
+              {row.cells.map((cell, column) => {
+                const param = cell ? byId.get(cell.paramId) : undefined;
+                if (!cell || !param) return <Box key={column} />;
+                const element = cell.entryIndex !== undefined ? renderPlusOneSelect(param, cell.entryIndex, "18ch") : renderField(param);
+                return <Box key={column}>{wrapChanged(param, element)}</Box>;
               })}
-              {Object.keys(paramErrors).length > 6 ? (
-                <Typography variant="caption">...and more</Typography>
-              ) : null}
+            </React.Fragment>
+          ))}
+        </Box>
+        {/* Column 1's +1 dropdowns: their description or error, their "Please specify", and their +1. */}
+        {matrix.adders.map((paramId) => {
+          const param = byId.get(paramId);
+          if (!param) return null;
+          return (
+            <Box key={paramId}>
+              <FormHelperText error={Boolean(formik.errors[param.id])}>{helperFor(param)}</FormHelperText>
+              {renderOtherText(param)}
+              {!readOnly && addChoiceButton(param, matrix.adders.length > 1 ? param.name : undefined)}
             </Box>
-          </Alert>
-        ) : (
-          <Alert severity="success" sx={{ py: 0.5 }}>
-            <Typography variant="body2">All required fields are complete.</Typography>
-          </Alert>
-        )}
-      </Stack>
-      <form onSubmit={formik.handleSubmit}>
-        <Accordion defaultExpanded sx={{ mt: 1 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle2">Parameters</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-        <div className="input-params" style={{ marginLeft: 8 }}>
-          {shownFormData.map((param: any, index: number) => isRetiredEquipmentParam(param) ? null : <React.Fragment key={param.id ?? index}>{setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}{wrapChanged(param, (() => {
+          );
+        })}
+      </Box>
+    );
+  };
+
+  /** One parameter's control, as drawn in the list (and in a matrix cell). */
+  const renderField = (param: any): React.ReactNode => {
             if (param.paramType !== "result") {
               // The "Other" text is drawn under its parameter, never as a field of its own.
               if (isOtherTextEntryId(param.id)) return null;
@@ -368,7 +486,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                       ))}
                     </FormGroup>
                     <FormHelperText>
-                      {formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
+                      {helperFor(param)}
                     </FormHelperText>
                     {renderOtherText(param)}
                   </FormControl>
@@ -403,9 +521,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             size: "small",
                             sx: { width: "26ch" },
                             error: Boolean(formik.errors[param.id]),
-                            helperText: formik.errors[param.id]
-                              ? String(formik.errors[param.id])
-                              : (param.description ? param.description : null),
+                            helperText: helperFor(param),
                           },
                         }}
                       />
@@ -433,25 +549,23 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                   </div>
                 );
               }
-              if (param.type === "table") {
-                const { columns, rows } = param.tableData ?? {};
-                if (!Array.isArray(columns) || !Array.isArray(rows)) {
-                  return (
-                    <div key={param.id}>
-                      <Typography sx={{ mt: 3 }}>{param.name}</Typography>
-                      <FormHelperText>This table has not been set up yet.</FormHelperText>
-                      {param.description ? <FormHelperText>{param.description}</FormHelperText> : null}
-                    </div>
-                  );
-                }
+              if (isTableParam(param)) {
+                // Before every multi-value branch: a Table holds one file whatever
+                // allowMultipleValues says. The form entry carries only the fields
+                // generateFormDataFromParams copies; the columns and a legacy staff
+                // template are read from the service's parameter definition, which
+                // is the effective list (parameters from a Parameter Set included).
+                const paramDef = (activeNode?.data?.parameters ?? []).find((p: any) => p?.id === param.id);
                 return (
-                  <div key={param.id}>
-                    <ParamTableOnForm
-                      title={param.name}
-                      columns={columns}
-                      rows={rows}
-                    />
-                  </div>
+                  <SampleSheetField
+                    key={param.id}
+                    param={{ ...param, tableData: paramDef?.tableData ?? param.tableData, templateFile: paramDef?.templateFile }}
+                    value={formik.values[param.id]}
+                    serviceId={activeNode?.data?.serviceId}
+                    readOnly={readOnly}
+                    uploadable={sampleSheetUploadable}
+                    onChange={(next) => formik.setFieldValue(param.id, next)}
+                  />
                 );
               }
               if (param.type === "dropdown" && !isMultiValueParam(param)) {
@@ -531,94 +645,68 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                       ))}
                     </Select>
                     <FormHelperText>
-                      {formik.errors[param.id]
-                        ? String(formik.errors[param.id])
-                        : (param.description ? param.description : null)}
+                      {helperFor(param)}
                     </FormHelperText>
                   </FormControl>
                   {renderOtherText(param)}
                   </div>
                 );
               }
-              if (param.type === "dropdown" && isMultiValueParam(param)) {
-                const values = Array.isArray(formik.values[param.id]) ? formik.values[param.id] : [""];
+              if (param.type === "dropdown" && isMultiValueParam(param) && definitionOf(param)?.display === "multiselect") {
+                // "Multiple selection type: Checkbox": one dropdown in which several options are ticked.
+                const chosen = chosenOptionIds(formik.values[param.id]);
+                const nameOf = (id: string) => (param.options ?? []).find((o: any) => String(o.id) === id)?.name ?? id;
                 return (
-                  <div key={param.id} style={{ marginTop: 12 }}>
-                    <Box display="flex" alignItems="flex-start" gap={0.5} flexWrap="wrap">
-                      <Box>
-                        {values.map((val: string, idx: number) => (
-                          <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
-                            <FormControl size="small" sx={{ width: "26ch" }}>
-                              <InputLabel sx={{ backgroundColor: "white" }}>
-                                {idx === 0 ? param.name : `${param.name} (${idx + 1})`}
-                              </InputLabel>
-                              <Select
-                                value={val ?? ""}
-                                onChange={(e) => {
-                                  const next = [...values];
-                                  next[idx] = e.target.value;
-                                  formik.setFieldValue(param.id, next);
-                                  clearOtherTextUnlessSelected(param, next);
-                                }}
-                                onBlur={formik.handleBlur}
-                                readOnly={readOnly}
-                              >
-                                {param.options?.map((option: any) => (
-                                  <MenuItem key={option.id} value={option.id}>
-                                    {option.name}
-                                  </MenuItem>
-                                )) ?? []}
-                              </Select>
-                              {idx === 0 && param.description && (
-                                <FormHelperText>{param.description}</FormHelperText>
-                              )}
-                            </FormControl>
-                            {idx > 0 && !readOnly && (
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  const next = values.filter((_: any, i: number) => i !== idx);
-                                  formik.setFieldValue(param.id, next.length ? next : [""]);
-                                  clearOtherTextUnlessSelected(param, next);
-                                }}
-                                aria-label="Remove value"
-                              >
-                                <DeleteForeverSharp fontSize="small" />
-                              </IconButton>
-                            )}
-                            {idx === 0 && !readOnly && (
-                              <IconButton
-                                size="small"
-                                onClick={() => formik.setFieldValue(param.id, [...values, ""])}
-                                aria-label="Add another value"
-                                sx={{ p: 0.25, ml: 0.25 }}
-                              >
-                                <PlusOne fontSize="small" />
-                              </IconButton>
-                            )}
-                          </Box>
+                  <div key={param.id}>
+                    <FormControl size="small" sx={{ mt: 3, width: "26ch" }} error={Boolean(formik.errors[param.id])}>
+                      <InputLabel id={`${param.id}-label`} sx={{ backgroundColor: "white" }}>
+                        {param.name}
+                      </InputLabel>
+                      <Select
+                        multiple
+                        labelId={`${param.id}-label`}
+                        name={param.id}
+                        value={chosen}
+                        renderValue={(ids: string[]) => ids.map(nameOf).join(", ")}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const next = typeof raw === "string" ? raw.split(",") : raw;
+                          formik.setFieldValue(param.id, next);
+                          clearOtherTextUnlessSelected(param, next);
+                        }}
+                        onBlur={formik.handleBlur}
+                        readOnly={readOnly}
+                      >
+                        {(param.options ?? []).map((option: any) => (
+                          <MenuItem key={option.id} value={String(option.id)}>
+                            <Checkbox size="small" checked={chosen.includes(String(option.id))} sx={{ p: 0, mr: 1 }} />
+                            {option.name}
+                          </MenuItem>
                         ))}
-                      </Box>
-                    </Box>
+                      </Select>
+                      <FormHelperText>
+                        {helperFor(param)}
+                      </FormHelperText>
+                    </FormControl>
                     {renderOtherText(param)}
                   </div>
                 );
               }
-              if (isSampleSheetParam(param)) {
-                // The form entry carries only the fields generateFormDataFromParams
-                // copies; the template reference lives on the service's parameter
-                // definition, which the node keeps alongside.
-                const paramDef = (activeNode?.data?.parameters ?? []).find((p: any) => p?.id === param.id);
+              if (param.type === "dropdown" && isMultiValueParam(param)) {
+                // "Multiple selection type: +1": a dropdown per choice, each with its trash, and +1 under them.
+                const values = plusOneValues(formik.values[param.id]);
                 return (
-                  <SampleSheetField
-                    key={param.id}
-                    param={paramDef?.templateFile ? { ...param, templateFile: paramDef.templateFile } : param}
-                    value={formik.values[param.id]}
-                    serviceId={activeNode?.data?.serviceId}
-                    readOnly={readOnly}
-                    uploadable={sampleSheetUploadable}
-                    onChange={(next) => formik.setFieldValue(param.id, next)}
-                  />
+                  <div key={param.id} style={{ marginTop: 12 }}>
+                    {values.map((_: unknown, idx: number) => (
+                      <Box key={idx} display="flex" alignItems="center" gap={0.5} sx={{ mt: idx > 0 ? 1 : 0 }}>
+                        {!readOnly && removeChoiceButton(param, idx)}
+                        {renderPlusOneSelect(param, idx)}
+                      </Box>
+                    ))}
+                    <FormHelperText error={Boolean(formik.errors[param.id])}>{helperFor(param)}</FormHelperText>
+                    {!readOnly && addChoiceButton(param)}
+                    {renderOtherText(param)}
+                  </div>
                 );
               }
               if (param.type === "file") {
@@ -637,8 +725,13 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             multiple
                             onChange={(e) => {
                               const selected = toPendingFiles(e.target.files);
-                              formik.setFieldValue(param.id, [...files, ...selected]);
                               e.currentTarget.value = "";
+                              pickFiles(param, selected, (accepted) => {
+                                // Uploading a lost file again replaces its "needs re-upload" line.
+                                const current = Array.isArray(latestValues.current[param.id]) ? latestValues.current[param.id] : [];
+                                const kept = current.filter((f: any) => !(isStalePendingFile(f) && accepted.some((s) => s.filename === f.filename)));
+                                setAnswer(param.id, [...kept, ...accepted]);
+                              });
                             }}
                           />
                         </Button>
@@ -650,18 +743,26 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             <FormHelperText sx={{ m: 0 }}>
                               {isPendingParamFile(f) ? f.filename : "Uploaded file"}
                             </FormHelperText>
+                            {isPendingParamFile(f) && sequenceCounts[f.localId] !== undefined ? <FormHelperText sx={{ m: 0 }}>{sequenceCountLabel(sequenceCounts[f.localId])}</FormHelperText> : null}
                             {!readOnly && (
                               <IconButton
                                 size="small"
-                                onClick={() => formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx))}
+                                onClick={() => {
+                                  clearRefusals(param);
+                                  formik.setFieldValue(param.id, files.filter((_: any, i: number) => i !== idx));
+                                }}
                                 aria-label="Remove file"
                               >
                                 <DeleteForeverSharp fontSize="small" />
                               </IconButton>
                             )}
+                            {isStalePendingFile(f) ? <FormHelperText error sx={{ m: 0 }}>{FILE_NEEDS_REUPLOAD_MESSAGE}</FormHelperText> : null}
                           </Box>
                         ))}
                       </Box>
+                      {refusalsFor(param).map((message, i) => (
+                        <FormHelperText error key={`${i}:${message}`}>{message}</FormHelperText>
+                      ))}
                     </div>
                   );
                 }
@@ -678,8 +779,8 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                           type="file"
                           onChange={(e) => {
                             const selected = toPendingFiles(e.target.files);
-                            formik.setFieldValue(param.id, selected[0] ?? null);
                             e.currentTarget.value = "";
+                            pickFiles(param, selected.slice(0, 1), (accepted) => setAnswer(param.id, accepted[0] ?? null));
                           }}
                         />
                       </Button>
@@ -690,13 +791,18 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                         <FormHelperText sx={{ m: 0 }}>
                           {isPendingParamFile(fileValue) ? fileValue.filename : "Uploaded file"}
                         </FormHelperText>
+                        {isPendingParamFile(fileValue) && sequenceCounts[fileValue.localId] !== undefined ? <FormHelperText sx={{ m: 0 }}>{sequenceCountLabel(sequenceCounts[fileValue.localId])}</FormHelperText> : null}
                         {!readOnly && (
-                          <IconButton size="small" onClick={() => formik.setFieldValue(param.id, null)} aria-label="Remove file">
+                          <IconButton size="small" onClick={() => { clearRefusals(param); formik.setFieldValue(param.id, null); }} aria-label="Remove file">
                             <DeleteForeverSharp fontSize="small" />
                           </IconButton>
                         )}
+                        {isStalePendingFile(fileValue) ? <FormHelperText error sx={{ m: 0 }}>{FILE_NEEDS_REUPLOAD_MESSAGE}</FormHelperText> : null}
                       </Box>
                     ) : null}
+                    {refusalsFor(param).map((message, i) => (
+                      <FormHelperText error key={`${i}:${message}`}>{message}</FormHelperText>
+                    ))}
                   </div>
                 );
               }
@@ -711,7 +817,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                             <TextField
                               multiline={param.name === "Additional Notes"}
                               error={idx === 0 && Boolean(formik.errors[param.id])}
-                              helperText={idx === 0 ? (formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)) : null}
+                              helperText={idx === 0 ? helperFor(param) : null}
                               size="small"
                               label={idx === 0 ? param.name : undefined}
                               type={param.type}
@@ -777,7 +883,7 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
                       onBlur={formik.handleBlur}
                       sx={{ mt: 3, width: "26ch" }}
                       error={Boolean(formik.errors[param.id])}
-                      helperText={formik.errors[param.id] ? String(formik.errors[param.id]) : (param.description ? param.description : null)}
+                      helperText={helperFor(param)}
                       InputLabelProps={{ shrink: true }}
                       InputProps={{ readOnly }}
                       inputProps={param.isPriceMultiplier === true && param.type === 'number' ? { min: 1, step: 1 } : undefined}
@@ -787,7 +893,71 @@ export default function ({ activeNode, onFormDataChange, changedParamIds, readOn
             } else {
               return null;
             }
-          })())}</React.Fragment>)}
+  };
+
+  // Re-evaluated on every render, so on every answer change in this step.
+  const hidden = hiddenParameterIds(activeNode?.data?.parameters, formik.values);
+  const shownFormData: any[] = (activeNode?.data?.formData ?? []).filter(
+    (param: any) => !hidden.has(param?.id) && !(isOtherTextEntryId(param?.id) && hidden.has(otherTextParentId(param.id)))
+  );
+  // Over the shown entries only: a set with no visible parameter gets no heading.
+  const setHeadings = parameterSetHeadings(shownFormData, activeNode?.data?.parameters);
+  const matrixOf = new Map<string, MatrixLayout>();
+  for (const matrix of matrixLayouts(shownFormData, activeNode?.data?.parameters, formik.values)) for (const id of matrix.memberIds) matrixOf.set(id, matrix);
+
+  return (
+    <div>
+      <Stack spacing={1} sx={{ mb: 1 }}>
+        <Typography variant="h6">Parameters</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Fill required fields first. Optional fields can be updated anytime before checkout.
+        </Typography>
+        {Object.keys(paramErrors).length > 0 ? (
+          <Alert severity="warning" sx={{ py: 0.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {Object.keys(paramErrors).length} field(s) still need attention.
+            </Typography>
+            <Box component="ul" sx={{ my: 0.5, pl: 2 }}>
+              {Object.keys(paramErrors).slice(0, 6).map((key: any) => {
+                const name = errorLabel(key, activeNode.data.formData);
+                return (
+                  <li key={key}>
+                    <Typography variant="caption">
+                      {name}: {paramErrors[key]}
+                    </Typography>
+                  </li>
+                );
+              })}
+              {Object.keys(paramErrors).length > 6 ? (
+                <Typography variant="caption">...and more</Typography>
+              ) : null}
+            </Box>
+          </Alert>
+        ) : (
+          <Alert severity="success" sx={{ py: 0.5 }}>
+            <Typography variant="body2">All required fields are complete.</Typography>
+          </Alert>
+        )}
+      </Stack>
+      <form onSubmit={formik.handleSubmit}>
+        <Accordion defaultExpanded sx={{ mt: 1 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2">Parameters</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+        <div className="input-params" style={{ marginLeft: 8 }}>
+          {shownFormData.map((param: any, index: number) => {
+            if (isRetiredEquipmentParam(param)) return null;
+            // A matrix is drawn where its first shown parameter sits; its other parameters are drawn inside it.
+            const matrix = matrixOf.get(param.id);
+            if (matrix && matrix.memberIds[0] !== param.id) return null;
+            return (
+              <React.Fragment key={param.id ?? index}>
+                {setHeadings[index] && (<Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 2 }}>{setHeadings[index]}</Typography>)}
+                {matrix ? renderMatrix(matrix) : wrapChanged(param, renderField(param))}
+              </React.Fragment>
+            );
+          })}
         </div>
           </AccordionDetails>
         </Accordion>

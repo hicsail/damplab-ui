@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import JobWorkflowCards, { formatParameterValue, getParameterFiles, getSampleSheets } from './JobWorkflowCards';
+import JobWorkflowCards, { formatParameterValue, getParameterFiles, getSampleSheets, sampleSheetSlot } from './JobWorkflowCards';
 
 const text = (el: React.ReactElement): string => renderToStaticMarkup(el).replace(/<style[^>]*>[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
@@ -101,5 +101,30 @@ describe('JobWorkflowCards — hidden parameters (show-only-if rule 21)', () => 
   it('getSampleSheets offers no slot for a hidden samples-spreadsheet parameter', () => {
     expect(getSampleSheets(workflowsFor('bact')).map((s) => s.parameterId)).toEqual(['sheet']);
     expect(getSampleSheets(workflowsFor('yeast'))).toEqual([]);
+  });
+});
+
+describe('sampleSheetSlot — what the job page needs to check a replacement (rules 16, 17, 32)', () => {
+  const node = { _id: 'db1', id: 'n1', label: 'Induce' };
+
+  it('carries the expected columns and whether the Table can be answered, for either stored string', () => {
+    const table = { id: 'plate', name: 'Plate map', type: 'table', tableData: { columns: [{ header: 'Inducer', field: 'inducer' }] } };
+    expect(sampleSheetSlot(node, table, null)).toMatchObject({ nodeDbId: 'db1', parameterId: 'plate', columns: ['Inducer'], setUp: true });
+    const legacy = { id: 'sheet', name: 'Samples', type: 'sampleSheet', templateFile: { key: 'sample-sheet-templates/a.xlsx' } };
+    expect(sampleSheetSlot(node, legacy, JSON.stringify({ filename: 'a.xlsx', sampleCount: 3 }))).toMatchObject({ columns: [], setUp: true, filename: 'a.xlsx', sampleCount: 3 });
+  });
+
+  it('is not set up with neither, and the old empty answer is no file', () => {
+    expect(sampleSheetSlot(node, { id: 'plate', name: 'Plate map', type: 'table' }, '')).toMatchObject({ columns: [], setUp: false, filename: undefined });
+  });
+
+  it('reads the file of a Table whose answer is stored as a one-element array (a stored Table that still carries allowMultipleValues)', () => {
+    const multi = { id: 'plate', name: 'Plate map', type: 'table', allowMultipleValues: true, tableData: { columns: [{ header: 'A', field: 'a' }] } };
+    expect(sampleSheetSlot(node, multi, [JSON.stringify({ filename: 'plate.xlsx', sampleCount: 12, countedBy: 'server' })])).toMatchObject({ filename: 'plate.xlsx', sampleCount: 12 });
+  });
+
+  it('getSampleSheets lists a slot for a parameter stored as "table"', () => {
+    const workflows = [{ nodes: [{ ...node, service: { parameters: [{ id: 'plate', name: 'Plate map', type: 'table', tableData: { columns: [{ header: 'A', field: 'a' }] } }] }, formData: [{ id: 'plate', value: null }] }] }];
+    expect(getSampleSheets(workflows).map((s) => s.parameterId)).toEqual(['plate']);
   });
 });

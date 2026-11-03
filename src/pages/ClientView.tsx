@@ -782,8 +782,6 @@ export default function Tracking() {
           />
         </div>
 
-        {/* Biosecurity and Results are staff-only for now (UI-only hide; staff send the verification link from their card). */}
-
         {/* Always rendered, like the staff page's SOW card: "the lab has not
                     sent you one" is a status, and a card that appears out of nowhere
                     partway through a job is harder to follow than one that changes

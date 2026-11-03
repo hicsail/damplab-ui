@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import clientView from './ClientView.tsx?raw';
 import technicianView from './TechnicianView.tsx?raw';
+import screener from './Screener.tsx?raw';
 
 const count = (source: string, needle: string): number => source.split(needle).length - 1;
 
@@ -9,21 +10,33 @@ describe('client job page (behaviour 1)', () => {
     expect(count(clientView, '<ResultsPanel')).toBe(0);
   });
 
-  it('renders no Biosecurity card and no identity-verification entry point', () => {
+  it('shows customers no biosecurity at all (biosecurity-tweaks behaviour 17)', () => {
     expect(count(clientView, 'title="Biosecurity"')).toBe(0);
-    expect(clientView).not.toContain('BiosecurityScreeningSections');
-    expect(clientView).not.toContain('START_JOB_CUSTOMER_VERIFICATION');
-    expect(clientView).not.toContain('Verify identity');
+    for (const gone of ['BIOSECURITY_ENABLED', 'showBiosecurity', 'START_JOB_CUSTOMER_VERIFICATION', 'REFRESH_JOB_ACLID_SCREENING', 'loadAclidWidget', 'customerVerificationPresentation'])
+      expect(clientView).not.toContain(gone);
   });
 });
 
 describe('staff job page (behaviours 2, 3)', () => {
+  it('Screener has no per-account switch', () => expect(screener).not.toContain('showBiosecurity'));
+
   it('renders exactly one Results card', () => {
     expect(count(technicianView, '<ResultsPanel')).toBe(1);
   });
 
-  it('keeps the Biosecurity card and its Copy verification link action', () => {
+  it('keeps the full Biosecurity card for accounts that can see it', () => {
     expect(count(technicianView, 'title="Biosecurity"')).toBe(1);
-    expect(technicianView).toContain('COPY_VERIFICATION_LINK');
+    expect(technicianView).toContain('showBiosecurity');
+    expect(technicianView).toMatch(/showBiosecurity = can\(PERMISSIONS\.JobsViewAll\)/);
+    expect(technicianView).not.toContain('userProps?.showBiosecurity');
+    expect(technicianView).toContain('ScreeningResults');
+    expect(technicianView).toContain('ReportingOptionsDialog');
+    expect(technicianView).toMatch(/GET_SCREENING_RUN_CARD[\s\S]{0,200}fetchPolicy: ["']no-cache["']/);
+    // Behaviour 17's ban on a Copy verification link is lifted (human ruling, wave 3): the button
+    // is its own control, minted by the same mutation; the hosted page is still never opened.
+    expect(technicianView).toContain('CopyVerificationLinkButton');
+    expect(technicianView).not.toContain('Open hosted verification');
+    expect(technicianView).not.toContain('openHostedVerification');
+    expect(technicianView).toContain('START_JOB_CUSTOMER_VERIFICATION');
   });
 });

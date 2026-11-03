@@ -1,12 +1,20 @@
 import { GridRowModel } from "@mui/x-data-grid";
 import { validationError } from './parameterTypeChoice';
+import { matrixError } from '../../../utils/parameterMatrix';
+import { screeningRuleViolation } from '../../../utils/parameterValidation';
+import { isTableType, tableIsSetUp } from '../../../utils/sampleSheetValue';
 
 export interface ParameterValidationError {
   field: string;
   errorMsg: string;
 }
 
-export function validateParameter(row: GridRowModel): ParameterValidationError[] {
+export interface ParameterValidationOptions {
+  /** A Table loaded from the server that this edit did not change: rule 12 does not hold it, so an unrelated edit to its catalog still saves. */
+  tableUntouched?: boolean;
+}
+
+export function validateParameter(row: GridRowModel, options: ParameterValidationOptions = {}): ParameterValidationError[] {
   let errors: ParameterValidationError[] = [];
 
   // Name is required
@@ -44,6 +52,24 @@ export function validateParameter(row: GridRowModel): ParameterValidationError[]
 
   if (row.display === "checkboxes" && !(row.type === "dropdown" && row.allowMultipleValues === true)) {
     errors.push({ field: "Answer format", errorMsg: "Checkboxes needs “Allow multiple selections” to be Yes." });
+  }
+  if (row.display === "multiselect" && !(row.type === "dropdown" && row.allowMultipleValues === true)) {
+    errors.push({ field: "Answer format", errorMsg: "A checkbox dropdown needs “Allow multiple selections” to be Yes." });
+  }
+
+  const matrixProblem = matrixError(row);
+  if (matrixProblem) {
+    errors.push({ field: "Matrix", errorMsg: matrixProblem });
+  }
+
+  // A Table needs a column or a staff template, or no upload could be checked against it. Held only when this edit is what leaves it so.
+  if (isTableType(row.type) && !tableIsSetUp(row) && !options.tableUntouched) {
+    errors.push({ field: "Columns", errorMsg: "Add at least one column." });
+  }
+
+  const screeningProblem = screeningRuleViolation(row);
+  if (screeningProblem) {
+    errors.push({ field: "Screening columns", errorMsg: screeningProblem });
   }
 
   return errors;

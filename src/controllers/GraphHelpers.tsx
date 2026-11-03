@@ -45,13 +45,14 @@ export const isValidConnection = (services: any, nodes: any, sourceId: any, targ
     return false;   
 }
 
-export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, service: any, setNodes: any, setEdges: any, sourcePosition: any, setActiveComponentId: any) => {
+/** `placeBefore`: put the new node above `sourceId` and link it *into* that node (a "Suggested before" operation). */
+export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, service: any, setNodes: any, setEdges: any, sourcePosition: any, setActiveComponentId: any, placeBefore = false) => {
     if (!service) {
         console.warn('Skipping undefined service while adding node to canvas');
         return sourceId;
     }
     
-    const position = { x: sourcePosition?.x ?? 0, y: (sourcePosition?.y ?? 0) + 150 };
+    const position = { x: sourcePosition?.x ?? 0, y: (sourcePosition?.y ?? 0) + (placeBefore ? -150 : 150) };
     const nodeId = Math.random().toString(36).substring(2, 9);  // Sufficient variance?
     const { formData, parameters } = buildNodeParameters(service, nodeId);
 
@@ -82,8 +83,8 @@ export const addNodeToCanvasWithEdge = (services: any[], sourceId: string, servi
     if (sourceId !== 'source'){
         const newEdge = {
             id           : Math.random().toString(36).substring(2, 9),
-            source       : sourceId,
-            target       : nodeId,
+            source       : placeBefore ? nodeId : sourceId,
+            target       : placeBefore ? sourceId : nodeId,
             animated     : true,
             arrowHeadType: 'arrowclosed',
             labelStyle   : { fill: '#f6ab6c', fontWeight: 700 },

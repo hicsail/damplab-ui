@@ -8,6 +8,7 @@ import {
   biosecurityStatusLabel,
   compositeBiosecurityStatus,
   customerDetail,
+  customerVerificationPresentation,
   homologyBackupSentence,
   homologyDetail,
   homologyStatusFrom,
@@ -336,5 +337,27 @@ describe('staffHomologyNote', () => {
       { screenId: 'scr_3', regulatoryStatus: 'not_controlled' }
     );
     expect(result.note).toBe('1 sequence cleared by Aclid · Aclid regulatory status: not controlled');
+  });
+});
+
+describe('customerVerificationPresentation', () => {
+  it('offers the button only while verification has not been submitted', () => {
+    expect(customerVerificationPresentation(null)).toEqual({ label: 'Not submitted', canVerify: true });
+    expect(customerVerificationPresentation({ screenId: 's', verificationStatus: 'not_submitted' })).toEqual({
+      label: 'Not submitted',
+      canVerify: true
+    });
+    expect(customerVerificationPresentation({ screenId: 's', verificationStatus: 'partially_submitted' })).toEqual({
+      label: 'Not submitted',
+      canVerify: true
+    });
+    expect(customerVerificationPresentation({ screenId: 's', verificationStatus: 'submitted' })).toEqual({
+      label: 'Submitted',
+      canVerify: false
+    });
+    expect(customerVerificationPresentation({ screenId: 's', verificationStatus: 'not_required' })).toEqual({
+      label: 'Not required',
+      canVerify: false
+    });
   });
 });

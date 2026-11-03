@@ -62,3 +62,46 @@ describe('samples spreadsheet pricing (twin of the backend branch)', () => {
     expect(calculateParameterCostWithCategory(parameters, [{ id: 'samples', value: JSON.stringify({ filename: 'a.xlsx' }) }], undefined)).toBe(0);
   });
 });
+
+describe('a counted Table file bills per row under either stored string (R2a — twin of the backend)', () => {
+  const paramsOf = (type: string, extra: Record<string, unknown> = {}) => [{ id: 'samples', name: 'Samples', type, price: 3, ...extra }];
+  const counted = (sampleCount: number) => JSON.stringify({ filename: 'samples.xlsx', key: 'workflow-parameters/u/x', sampleCount, countedBy: 'server' });
+  const picked = (sampleCount: number) => ({ __kind: 'pending-file', filename: 'a.csv', sampleCount });
+  const price = (parameters: unknown, value: unknown) => calculateParameterCostWithCategory(parameters, [{ id: 'samples', value }], undefined);
+
+  it.each(['table', 'sampleSheet'])('%s: a file the server counted bills price × rows; zero rows bills nothing', (type) => {
+    expect(price(paramsOf(type), counted(12))).toBe(36);
+    expect(price(paramsOf(type), { ...JSON.parse(counted(12)), url: 'https://s3/x' })).toBe(36);
+    expect(price(paramsOf(type), counted(0))).toBe(0);
+  });
+
+  it.each(['table', 'sampleSheet'])('%s: a file just picked on the canvas previews price × rows', (type) => {
+    expect(price(paramsOf(type), picked(4))).toBe(12);
+  });
+
+  it.each(['table', 'sampleSheet'])('%s: a new answer with no file bills nothing', (type) => {
+    expect(price(paramsOf(type), null)).toBe(0);
+  });
+
+  it.each(['table', 'sampleSheet'])('%s with allowMultipleValues: the rows of the counted files are summed', (type) => {
+    const multi = paramsOf(type, { allowMultipleValues: true });
+    expect(price(multi, counted(12))).toBe(36);
+    expect(price(multi, [counted(12), counted(3)])).toBe(45);
+  });
+
+  it.each(['table', 'sampleSheet'])('%s flagged as a priced multiplier still bills the counted rows', (type) => {
+    expect(price(paramsOf(type, { isPriceMultiplier: true }), counted(12))).toBe(36);
+  });
+
+  it('an unpriced Table bills nothing', () => {
+    expect(price([{ id: 'samples', name: 'Samples', type: 'table' }], counted(12))).toBe(0);
+  });
+
+  // The other half of R2a is tablePriceCharacterization.test.ts: a value the
+  // server did not count prices exactly as before. One case repeated here.
+  it('the same file without the server’s mark keeps its old price: × 1 on a `table`, × its stored count on a `sampleSheet`', () => {
+    const unmarked = JSON.stringify({ filename: 'samples.xlsx', key: 'workflow-parameters/u/x', sampleCount: 12 });
+    expect(price(paramsOf('table'), unmarked)).toBe(3);
+    expect(price(paramsOf('sampleSheet'), unmarked)).toBe(36);
+  });
+});

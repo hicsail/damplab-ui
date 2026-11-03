@@ -18,6 +18,7 @@ import { EQUIPMENT_SIDEBAR_CAPTION, hasEquipmentParams, orderEquipmentFirst } fr
 import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { useShowHiddenOperations } from '../hooks/useShowHiddenOperations';
 import { visibleAllowedConnections } from '../utils/paletteVisibility';
+import { suggestedBefore } from '../utils/suggestedConnections';
 
 import { RecState } from '../types/Types';
 
@@ -59,6 +60,10 @@ export default function ContextTestComponent(props: SidebarProps) {
     // equipment-use ones behind job:equipment-use too — filter before offering
     // them as one-click "Allowed Connections", not just in the palette.
     const allowedConnections          = visibleAllowedConnections(activeNode?.data.allowedConnections ?? [], services, { mayUseEquipment, showHidden });
+    // Derived from the other operations' suggested next lists. One click adds it above this node, linked into it.
+    const suggestedBeforeServices     = activeNode
+        ? visibleAllowedConnections(suggestedBefore(String(activeNode.data.serviceId ?? ''), services), services, { mayUseEquipment, showHidden })
+        : [];
     const [openToast,  setOpenToast]  = useState(false);
     const [open,       setOpen]       = useState(false);
     const [, setPricingTick]          = useState(0);
@@ -453,7 +458,7 @@ export default function ContextTestComponent(props: SidebarProps) {
                     {
                         // return header with text Allowed Connections if allowedConnections list is not empty
                         activeNode && allowedConnections.length > 0
-                        ? <Typography variant="h6" sx={{ mt: 2 }}>Allowed Connections</Typography>
+                        ? <Typography variant="h6" sx={{ mt: 2 }}>Suggested next</Typography>
                         : null
                     }
                     {
@@ -472,6 +477,27 @@ export default function ContextTestComponent(props: SidebarProps) {
                                 />
                             )
                         })) 
+                        : null
+                    }
+                    {
+                        activeNode && suggestedBeforeServices.length > 0
+                        ? (
+                            <>
+                                <Typography variant="h6" sx={{ mt: 2 }}>Suggested before</Typography>
+                                {suggestedBeforeServices.map((service: any) => (
+                                    <NodeButton
+                                        key                  = {service.id}
+                                        node                 = {service}
+                                        sourceId             = {val.activeComponentId}
+                                        setNodes             = {val.setNodes}
+                                        setEdges             = {val.setEdges}
+                                        sourcePosition       = {activeNode.position}
+                                        setActiveComponentId = {val.setActiveComponentId}
+                                        placeBefore
+                                    />
+                                ))}
+                            </>
+                        )
                         : null
                     }
                 </div>

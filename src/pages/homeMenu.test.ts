@@ -249,3 +249,11 @@ describe('previewing the app as a lower access tier', () => {
     expect(applyPreview(STAFF as any, ACCESS_TIERS.Technician, {})).toBe(STAFF);
   });
 });
+
+describe('Screener entry follows jobs:view-all alone (biosecurity-tweaks behaviour 17)', () => {
+  const screenerShown = (u: HomeMenuUser): boolean => visibleHomeMenu(u).some((s) => s.items.some((i) => i.id === 'screener'));
+  it('shows Administrators and Technicians, whatever an old account flag says, and nobody else', () => {
+    const legacy = { ...TECHNICIAN, showBiosecurity: false };
+    expect([STAFF, TECHNICIAN, legacy, EQUIPMENT_USER, CLIENT].map(screenerShown)).toEqual([true, true, true, false, false]);
+  });
+});

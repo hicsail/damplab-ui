@@ -327,30 +327,6 @@ export const GET_OWN_JOB_BY_ID = gql`
         url
         uploadedAt
       }
-      # Kept identical to GET_JOB_BY_ID's block: the customer card composites
-      # Homology with the other rows, so an absent status reads Unavailable and
-      # lets the card say Passed on a job whose homology failed.
-      homologyScreening {
-        status
-        startedAt
-        completedAt
-        sequenceCount
-        detail
-        batchId
-      }
-      aclidScreening {
-        screenId
-        homologyStatus
-        customerStatus
-        regulatoryStatus
-        verificationStatus
-        decisionStatus
-        verificationCompletedAt
-        sequenceCount
-        startedAt
-        completedAt
-        detail
-      }
       sow {
         id
         sowNumber
@@ -2463,5 +2439,125 @@ export const GET_SAMPLE_SHEET_TEMPLATE_URL = gql`
 export const GET_PARAMETER_SET_SAMPLE_SHEET_TEMPLATE_URL = gql`
   query ParameterSetSampleSheetTemplateUrl($parameterSetId: ID!, $parameterId: String!) {
     parameterSetSampleSheetTemplateUrl(parameterSetId: $parameterSetId, parameterId: $parameterId)
+  }
+`;
+
+/** A job's screening history for the Biosecurity card (biosecurity-update). Staff only. */
+export const GET_JOB_SCREENING_RUNS = gql`
+  query JobScreeningRuns($jobId: ID!) {
+    jobScreeningRuns(jobId: $jobId) {
+      id
+      jobId
+      trigger
+      triggeredBy
+      status
+      startedAt
+      completedAt
+      sequenceCount
+      skippedCount
+      detail
+    }
+  }
+`;
+
+/** One screening run with the raw Aclid report and per-sequence details. */
+export const GET_SCREENING_RUN = gql`
+  query ScreeningRun($id: ID!) {
+    screeningRun(id: $id) {
+      id
+      jobId
+      trigger
+      triggeredBy
+      status
+      startedAt
+      completedAt
+      sequenceCount
+      skippedCount
+      detail
+      sequences {
+        name
+        label
+        length
+        aclidEligible
+      }
+      aclid {
+        screenId
+        homologyStatus
+        status
+        regulatoryStatus
+        verificationStatus
+        decisionStatus
+        matchCount
+        materialCount
+        findings
+        materialSummary
+        details
+        raw
+        detail
+      }
+      secureDna {
+        batchId
+        status
+        detail
+      }
+      unscreenedNotes
+      customer {
+        status
+        requesterId
+        verdict
+        decisionStatus
+        checks
+        counts
+        detail
+      }
+    }
+  }
+`;
+
+export const GET_SCREENING_RUN_CARD = gql`
+  query ScreeningRunCard($id: ID!) {
+    screeningRun(id: $id) {
+      id
+      status
+      completedAt
+      sequenceCount
+      skippedCount
+      detail
+      unscreenedNotes
+      sequences {
+        length
+      }
+      aclid {
+        screenId
+        homologyStatus
+        status
+        regulatoryStatus
+        findings
+        detail
+      }
+      secureDna {
+        batchId
+        status
+        detail
+      }
+      customer {
+        status
+        requesterId
+        verdict
+        decisionStatus
+        checks
+        counts
+        detail
+      }
+    }
+  }
+`;
+
+export const GET_JOB_ACCEPTANCE_SCREENING = gql`
+  query JobAcceptanceScreening($jobId: ID!) {
+    jobAcceptanceScreening(jobId: $jobId) {
+      state
+      message
+    }
   }
 `;

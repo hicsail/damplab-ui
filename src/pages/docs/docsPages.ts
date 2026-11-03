@@ -32,8 +32,8 @@ export const DOCS_PAGES: readonly DocsPageDef[] = [
     title: "About DAMPLab Canvas",
     navLabel: "About Canvas",
     summary:
-      "What Canvas is and who it is for, video walkthroughs from the PCL program, and how Canvas compares with other laboratory tools.",
-    ready: false,
+      "What Canvas is and who it is for, how a job moves from design to invoice, and what the platform can do.",
+    ready: true,
   },
   {
     slug: "tech-stack",
@@ -50,7 +50,7 @@ export const DOCS_PAGES: readonly DocsPageDef[] = [
     title: "Biosecurity",
     navLabel: "Biosecurity",
     summary: "How DNA sequences are screened and customers are verified before laboratory work begins.",
-    ready: false,
+    ready: true,
   },
   {
     slug: "resources",

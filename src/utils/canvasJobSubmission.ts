@@ -7,8 +7,9 @@ import {
   CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS,
 } from '../gql/mutations';
 import { transformEdgesToGQL, transformNodesToGQL } from '../controllers/GraphHelpers';
-import { isSampleSheetParam } from './sampleSheet';
+import { isTableParam } from './sampleSheet';
 import { withoutHiddenAnswers } from './parameterConditions';
+import { missingParamFiles, missingParamFilesMessage } from './missingParamFiles';
 
 export type PendingParamFile = {
   __kind: 'pending-file';
@@ -69,7 +70,7 @@ export type SubmitCanvasJobInput = {
 export async function submitCanvasJob(
   client: ApolloClient<object>,
   input: SubmitCanvasJobInput
-): Promise<{ id: string; jobId?: string }> {
+): Promise<{ id: string; jobId?: string; failedAttachments?: string[] }> {
   const {
     workflows,
     edges,
@@ -84,6 +85,10 @@ export async function submitCanvasJob(
     attachments,
     getAccessToken,
   } = input;
+
+  // The last stop for every submit path, whatever its page showed: nothing is uploaded or created without its files.
+  const missing = missingParamFiles(workflows.flat());
+  if (missing.length > 0) throw new Error(missingParamFilesMessage(missing));
 
   const token = await getAccessToken();
 
@@ -132,9 +137,11 @@ export async function submitCanvasJob(
         const parameters = Array.isArray(node.data?.parameters) ? node.data.parameters : [];
         // A samples spreadsheet is uploaded exactly like a file parameter; the
         // only difference is the count that rides along in its stored value.
+        // The form entry counts as well as the definition: a catalog parameter with no id gets a random id on its entry,
+        // and a file picked there would otherwise never be uploaded.
         const fileParamIds = new Set(
-          parameters
-            .filter((p: any) => (p?.type === 'file' || isSampleSheetParam(p)) && typeof p.id === 'string')
+          [...parameters, ...(node.data.formData || [])]
+            .filter((p: any) => (p?.type === 'file' || isTableParam(p)) && typeof p.id === 'string')
             .map((p: any) => p.id)
         );
         (node.data.formData || []).forEach((entry: any) => {
@@ -311,7 +318,11 @@ export async function submitCanvasJob(
     console.warn('Failed to save local graph snapshot:', e);
   }
 
+  // Attachments go up after the job exists, so a failure cannot undo the job: each one that is not stored is reported
+  // back by name, and only an attachment whose file really uploaded is registered on the job.
+  const failedAttachments: string[] = [];
   if (attachments.length > 0) {
+    const uploaded: any[] = [];
     try {
       const filesForRequest = attachments.map((file) => ({
         filename: file.name,
@@ -332,28 +343,35 @@ export async function submitCanvasJob(
         },
       });
 
-      const attachmentUploads = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
+      const attachmentUploads: any[] = uploadUrlResult.data?.createJobAttachmentUploadUrls ?? [];
+      const unclaimed = [...attachments];
+      const slots = attachmentUploads.map((u) => {
+        const at = unclaimed.findIndex((f) => f.name === u.filename && f.size === u.size);
+        return { u, file: at >= 0 ? unclaimed.splice(at, 1)[0] : undefined };
+      });
+      // A picked file no slot matches was never uploaded.
+      failedAttachments.push(...unclaimed.map((f) => f.name));
 
       await Promise.all(
-        attachmentUploads.map(async (u: any) => {
-          const file = attachments.find((f) => f.name === u.filename && f.size === u.size);
-          if (!file) {
-            return;
-          }
-          const resp = await fetch(u.uploadUrl, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': u.contentType || 'application/octet-stream',
-            },
-            body: file,
-          });
-          if (!resp.ok) {
-            throw new Error(`Failed to upload attachment ${u.filename}`);
+        slots.map(async ({ u, file }) => {
+          if (!file) return;
+          try {
+            const resp = await fetch(u.uploadUrl, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': u.contentType || 'application/octet-stream',
+              },
+              body: file,
+            });
+            if (resp.ok) uploaded.push(u);
+            else failedAttachments.push(file.name);
+          } catch {
+            failedAttachments.push(file.name);
           }
         })
       );
 
-      const attachmentInputs = attachmentUploads.map((u: any) => ({
+      const attachmentInputs = uploaded.map((u: any) => ({
         filename: u.filename,
         key: u.key,
         contentType: u.contentType,
@@ -376,8 +394,9 @@ export async function submitCanvasJob(
       }
     } catch (e) {
       console.warn('Job created, but attachments failed to upload/register:', e);
+      for (const file of attachments) if (!failedAttachments.includes(file.name)) failedAttachments.push(file.name);
     }
   }
 
-  return { id: createdId, jobId: createdJobId ?? undefined };
+  return { id: createdId, jobId: createdJobId ?? undefined, ...(failedAttachments.length > 0 ? { failedAttachments: attachments.map((f) => f.name).filter((name) => failedAttachments.includes(name)) } : {}) };
 }

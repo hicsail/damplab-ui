@@ -1,6 +1,9 @@
 import { makeUniqueIds } from '../../../utils/idFromName';
-import { effectiveValidation, parseValidation } from '../../../utils/parameterValidation';
+import { effectiveValidation, isScreenableType, parseValidation, screeningRuleViolation } from '../../../utils/parameterValidation';
 import { ConditionAst, ConditionScope, conditionText, named, parseCondition, RefAst, resolveCondition, sameConditionText } from '../../../utils/parameterConditionText';
+import { expectedColumnsOf, hasStaffTemplate, isTableType, TABLE_PARAM_TYPE } from '../../../utils/sampleSheetValue';
+import { resolveTableColumns } from '../../../utils/tableColumns';
+import { matrixError } from '../../../utils/parameterMatrix';
 import { nearKey, normalizeEol, parseYesNo, sameList, splitList, yesNo } from './cells';
 import { matchRows, rowList } from './matching';
 import { OperationReference, OperationRowRef, ReferenceWarning, resolveOperationName } from './operationsWorkbookSheet';
@@ -20,28 +23,37 @@ const TYPE_LABEL: Record<string, string> = {
   dropdown: 'Dropdown',
   boolean: 'True/False',
   table: 'Table',
-  file: 'File Upload',
-  sampleSheet: 'Sample Upload'
+  file: 'File Upload'
 };
-/** Types whose template (table layout, blank file, blank samples sheet) is set in the editor. */
-const TEMPLATE_TYPES = new Set(['table', 'file', 'sampleSheet']);
+/** What a `type` cell may also say for a Table: the stored string it had before the two types were merged, and that type's old label. */
+const TABLE_CELL_ALIASES = new Set(['samplesheet', 'sample upload']);
+/** The `multipleSelectionType` cell of a Dropdown that allows multiple selections: +1 rows, or one checkbox dropdown. */
+export const MULTIPLE_SELECTION_CHOICES: readonly string[] = ['+1', 'Checkbox'];
+
+export function multipleSelectionLabelOf(parameter: any): string {
+  if (parameter?.type !== 'dropdown' || parameter?.allowMultipleValues !== true || parameter?.display === 'checkboxes') return '';
+  return parameter?.display === 'multiselect' ? 'Checkbox' : '+1';
+}
+
 /** The download's in-cell dropdown for the `type` column. */
-export const TYPE_CHOICES: readonly string[] = ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload', 'Sample Upload'];
+export const TYPE_CHOICES: readonly string[] = ['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload'];
 
 const OWNER_COLUMNS = new Set(['parameterId', 'parameterSet', 'operation']);
 
 export function typeLabelOf(parameter: any): string {
   if (parameter?.type === 'dropdown' && parameter?.display === 'checkboxes') return 'Checkboxes';
-  const stored = String(parameter?.type ?? '');
+  // Both stored strings are one type: the download writes Table for either, so the alias alone is never a change.
+  const stored = isTableType(parameter?.type) ? TABLE_PARAM_TYPE : String(parameter?.type ?? '');
   return TYPE_LABEL[stored] ?? stored;
 }
 
-/** A `type` cell as the stored type; accepts the friendly label and the stored name, any case. */
-export function parseTypeCell(raw: string): { type: string; checkboxes: boolean } | null {
+/** A `type` cell as the stored type; accepts the friendly label and the stored name, any case. `display` is set for Checkboxes. */
+export function parseTypeCell(raw: string): { type: string; display?: 'checkboxes' } | null {
   const key = raw.trim().toLowerCase();
-  if (key === 'checkboxes') return { type: 'dropdown', checkboxes: true };
+  if (key === 'checkboxes') return { type: 'dropdown', display: 'checkboxes' };
+  if (TABLE_CELL_ALIASES.has(key)) return { type: TABLE_PARAM_TYPE };
   for (const [stored, label] of Object.entries(TYPE_LABEL)) {
-    if (key === label.toLowerCase() || key === stored.toLowerCase()) return { type: stored, checkboxes: false };
+    if (key === label.toLowerCase() || key === stored.toLowerCase()) return { type: stored };
   }
   return null;
 }
@@ -68,11 +80,16 @@ export function parameterCells(parameter: any, owner: { set?: string; operation?
     description: normalizeEol(parameter?.description).trim(),
     required: yesNo(parameter?.required),
     type: typeLabelOf(parameter),
-    options: optionsOf(parameter).map(optionName).join('; '),
+    // A Table's options cell is its expected columns; a dropdown's is its option names.
+    options: isTableType(parameter?.type) ? expectedColumnsOf(parameter).join('; ') : optionsOf(parameter).map(optionName).join('; '),
     validation: parameter?.type === 'number' ? effectiveValidation(parameter) : '',
     conditionalDisplayLogic: conditionText(parameter?.showIf, scope),
     allowMultiple: yesNo(parameter?.allowMultipleValues),
-    defaultValue: normalizeEol(defaultValue)
+    multipleSelectionType: multipleSelectionLabelOf(parameter),
+    matrix: typeof parameter?.matrix === 'string' ? parameter.matrix.trim() : '',
+    defaultValue: normalizeEol(defaultValue),
+    screening: yesNo(parameter?.screening),
+    screeningFields: Array.isArray(parameter?.screeningFields) ? parameter.screeningFields.map((field: unknown) => String(field).trim()).filter(Boolean).join('; ') : ''
   };
 }
 
@@ -97,20 +114,25 @@ const compact = (s: string): string => s.replace(/\s+/g, '').toLowerCase();
 function sameCell(column: string, cell: string, current: string): boolean {
   switch (column) {
     case 'required':
-    case 'allowMultiple': {
+    case 'allowMultiple':
+    case 'screening': {
       const a = parseYesNo(cell);
       return a !== 'invalid' && a === parseYesNo(current);
     }
     case 'type': {
       const a = parseTypeCell(cell);
       const b = parseTypeCell(current);
-      return a && b ? a.type === b.type && a.checkboxes === b.checkboxes : cell === current;
+      return a && b ? a.type === b.type && a.display === b.display : cell === current;
     }
     case 'validation':
+    case 'matrix':
       return compact(cell) === compact(current);
+    case 'multipleSelectionType':
+      return cell.trim().toLowerCase() === current.toLowerCase();
     case 'conditionalDisplayLogic':
       return sameConditionText(cell, current);
     case 'options':
+    case 'screeningFields':
       return sameList(splitList(cell), splitList(current));
     default:
       return cell === current;
@@ -168,25 +190,68 @@ function applyCells(
     if (!parsed) errors.push(cell('type') === '' ? 'type cannot be blank.' : `Unknown type “${cell('type')}”.`);
     else {
       next.type = parsed.type;
-      if (parsed.checkboxes) {
-        next.display = 'checkboxes';
+      if (parsed.display) {
+        next.display = parsed.display;
         next.allowMultipleValues = true;
       } else {
         delete next.display;
       }
-      if (TEMPLATE_TYPES.has(parsed.type)) warnings.push(`Set the ${TYPE_LABEL[parsed.type]} template in the editor.`);
     }
   }
+  // A parameter stored as a Table keeps the string it is stored with — `table` or `sampleSheet` —
+  // whichever alias the cell uses: pricing reads the string, so rewriting it would move the price
+  // of jobs that already answered the parameter. Only a parameter that was not a Table becomes `table`.
+  if (isTableType(base.type) && isTableType(next.type)) next.type = base.type;
+  const isTable = isTableType(next.type);
+  // Another type turned into a Table holds one file. A stored Table keeps its flag, for the same reason.
+  if (isTable && !isTableType(base.type)) next.allowMultipleValues = false;
   const isCheckboxes = next.type === 'dropdown' && next.display === 'checkboxes';
   if (has('allowMultiple')) {
     const value = parseYesNo(cell('allowMultiple'));
     if (value === 'invalid') errors.push(`allowMultiple: “${cell('allowMultiple')}” must be Y or N.`);
-    else if (!isCheckboxes) next.allowMultipleValues = value;
+    else if (isTable) {
+      if (value === true) warnings.push('A Table holds one file; allowMultiple is ignored.');
+    } else if (!isCheckboxes) next.allowMultipleValues = value;
     else if (value === false && cell('allowMultiple') !== '') warnings.push('Checkboxes always allow multiple; allowMultiple is ignored.');
   }
+  // After the type cell, which clears `display` when it changes.
+  if (has('multipleSelectionType')) {
+    const text = cell('multipleSelectionType').trim().toLowerCase();
+    if (text !== '' && text !== '+1' && text !== 'checkbox') errors.push(`multipleSelectionType: “${cell('multipleSelectionType')}” must be +1 or Checkbox.`);
+    else if (text !== '' && !(next.type === 'dropdown' && next.allowMultipleValues === true && !isCheckboxes)) {
+      warnings.push('multipleSelectionType is ignored: only a Dropdown that allows multiple selections has one.');
+    } else if (text === 'checkbox') next.display = 'multiselect';
+    else if (!isCheckboxes) delete next.display;
+  }
   if (next.type !== 'dropdown') delete next.display;
+  // A checkbox dropdown needs multiple selections; without them it is a plain dropdown.
+  if (next.display === 'multiselect' && next.allowMultipleValues !== true) delete next.display;
+  if (has('matrix')) {
+    const text = cell('matrix').trim();
+    if (text === '') delete next.matrix;
+    else {
+      const problem = matrixError({ ...next, matrix: text });
+      if (problem) errors.push(`matrix: ${problem}`);
+      else next.matrix = text;
+    }
+  }
 
-  if (has('options')) {
+  // A Table's columns are read from the options cell when the cell changed, and
+  // also when the row makes the parameter a Table (a create, or a type change):
+  // there the cell may be the same text the parameter had as dropdown options.
+  if (isTable && (has('options') || has('type') || isNew)) {
+    const storedColumns: any[] = Array.isArray(base.tableData?.columns) ? base.tableData.columns : [];
+    const text = cell('options');
+    if (storedColumns.some((column) => String(column?.header ?? '').includes(';'))) {
+      if (has('options')) warnings.push('An existing column name contains “;”, so its columns can only be edited in the editor; the options cell is ignored.');
+    } else if (text !== '') {
+      // A blank cell means "not edited", as for every other workbook cell: the columns stay as stored.
+      const resolved = resolveTableColumns(splitList(text), storedColumns);
+      errors.push(...resolved.errors);
+      // tableData.rows, and anything else stored there, is left exactly as it is.
+      next.tableData = { ...(base.tableData ?? {}), columns: resolved.columns };
+    }
+  } else if (!isTable && has('options')) {
     const stored = optionsOf(base);
     if (next.type !== 'dropdown') {
       if (cell('options') !== '') warnings.push(`options ignored: ${typeLabelOf(next)} parameters have none.`);
@@ -199,8 +264,40 @@ function applyCells(
       warnings.push(...resolved.warnings);
     }
   }
+  // Only a create, or a row that touches type or options, is held to this: an unrelated edit to a stored Table that has neither goes through.
+  if (isTable && expectedColumnsOf(next).length === 0 && !hasStaffTemplate(next) && (isNew || has('type') || has('options'))) {
+    errors.push('A Table needs at least one column: list them in options, separated by “;”.');
+  }
   // Only a create, or a row that touches type or options, is held to this: an unrelated edit to a stored zero-option dropdown goes through.
   if (next.type === 'dropdown' && optionsOf(next).length === 0 && (isNew || has('type') || has('options'))) errors.push('A Dropdown or Checkboxes parameter needs at least one option.');
+
+  // A flagged parameter whose type cell moves it off Text/Table loses the flag, as in the editor (parameterSave.ts).
+  if (has('type') && !has('screening') && !isScreenableType(next.type) && next.screening === true) {
+    delete next.screening;
+    delete next.screeningFields;
+    warnings.push('Requires screening removed: only Text, Table and File Upload parameters can be screened.');
+  }
+  if (has('screening')) {
+    const value = parseYesNo(cell('screening'));
+    if (value === 'invalid') errors.push(`screening: “${cell('screening')}” must be Y or N.`);
+    else if (value) next.screening = true;
+    else delete next.screening;
+  }
+  if (has('screeningFields')) {
+    const fields = splitList(cell('screeningFields'));
+    if (fields.length === 0) delete next.screeningFields;
+    else next.screeningFields = fields;
+  }
+  // Screening columns belong to a flagged Table only — the editor's rule (parameterSave.ts).
+  if (!isTableType(next.type) || next.screening !== true) delete next.screeningFields;
+  if (has('screening') || has('screeningFields') || has('type') || has('options') || isNew) {
+    const problem = next.screening === true || next.screeningFields !== undefined ? screeningRuleViolation(next) : null;
+    if (problem) errors.push(`screening: ${problem}`);
+  }
+  if (!isScreenableType(next.type) && next.screening === true && !has('screening')) {
+    delete next.screening;
+    warnings.push('Requires screening removed: only Text, Table and File Upload parameters can be screened.');
+  }
 
   const validationCell = has('validation') ? cell('validation') : '';
   if (has('validation') && validationCell !== '') {

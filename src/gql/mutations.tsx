@@ -307,6 +307,16 @@ export const MUTATE_JOB_STATE = gql`
   }
 `;
 
+/** Staff only. Returns a closed job to the state it was closed from; its SOW, invoices and files are untouched. */
+export const REOPEN_JOB = gql`
+  mutation ReopenJob($jobId: ID!, $note: String) {
+    reopenJob(jobId: $jobId, note: $note) {
+      id
+      state
+    }
+  }
+`;
+
 export const RERUN_JOB_HOMOLOGY_SCREENING = gql`
   mutation RerunJobHomologyScreening($jobId: ID!) {
     rerunJobHomologyScreening(jobId: $jobId) {
@@ -333,8 +343,7 @@ export const REFRESH_JOB_ACLID_SCREENING = gql`
   mutation RefreshJobAclidScreening($jobId: ID!) {
     refreshJobAclidScreening(jobId: $jobId) {
       id
-      homologyScreening { status startedAt completedAt sequenceCount detail batchId }
-      aclidScreening { screenId homologyStatus customerStatus regulatoryStatus verificationStatus decisionStatus detail sequenceCount }
+      aclidScreening { screenId verificationStatus verificationCompletedAt }
     }
   }
 `;

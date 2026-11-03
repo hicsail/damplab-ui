@@ -44,10 +44,10 @@ export default () => {
   // A plain client does not get them on the palette, nor a bundle that would put
   // one on the canvas. Server-side twin: `assertMaySubmitEquipmentUse` in
   // createJob refuses the submission if one arrives anyway (a loaded JSON, say).
-  // Hidden operations follow the same rule — filtered here unless the viewer has
-  // catalog-editor:read and has turned the "show hidden" toggle on; the server
-  // twin is `assertMaySubmitHiddenServices`, and `catalogServices` filters them
-  // for clients regardless.
+  // Retired operations are filtered here unless the viewer has
+  // catalog-editor:read and has turned the "show hidden" toggle on. Hiding
+  // them does not block submit: a job that already contains one still goes
+  // through. `catalogServices` filters them for clients regardless.
   const mayUseEquipment = can(PERMISSIONS.JobEquipmentUse);
   const { canSeeHidden, showHidden, setShowHidden } = useShowHiddenOperations();
   const services = useMemo(

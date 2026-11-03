@@ -13,7 +13,10 @@ import { addNodesAndEdgesFromServiceIdsAlt }            from '../controllers/Res
 import Sidebar        from '../components/Sidebar';
 import CustomDemoNode from '../components/CanvasNode';
 import RightSidebar   from '../components/RightSidebar';
+import ResizableSidePanel from '../components/ResizableSidePanel';
 import CanvasAgentChat from '../components/CanvasAgentChat';
+import MissingFilesAlert from '../components/MissingFilesAlert';
+import { missingParamFiles } from '../utils/missingParamFiles';
 import { GET_JOB_BY_ID }    from '../gql/queries';
 import { MUTATE_JOB_STATE } from '../gql/mutations';
 import { AppContext }    from '../contexts/App';
@@ -170,6 +173,13 @@ export default function MainFlow() {
     return (
         <>
             <div style={{ height: '100vh' }}>
+                {/* Only files that were lost: a required file not picked yet is what the node's own badge is for. */}
+                <MissingFilesAlert
+                    files={missingParamFiles(nodes).filter((file) => file.filename)}
+                    title='These files were not saved and must be uploaded again'
+                >
+                    Saved and reloaded jobs do not keep their files. Open each operation and upload its file again. This job cannot be submitted until you do.
+                </MissingFilesAlert>
                 <ReactFlowProvider>
                     <div className="reactflow-wrapper" style={{ height: '85vh', display: 'flex' }} ref={reactFlowWrapper}>
                         
@@ -223,9 +233,9 @@ export default function MainFlow() {
 
                         </ReactFlow>
 
-                        <div style={{ minWidth: '10%', width: 850, borderLeft: 'solid 1px' }}>
+                        <ResizableSidePanel>
                             <RightSidebar />
-                        </div>
+                        </ResizableSidePanel>
                         
                     </div>
                 </ReactFlowProvider>

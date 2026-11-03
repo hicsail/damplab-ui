@@ -8,6 +8,7 @@ import {
   FormControl,
   FormControlLabel,
   FormHelperText,
+  Link,
   IconButton,
   InputLabel,
   ListItemText,
@@ -28,7 +29,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useContext, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link as RouterLink, useNavigate, useParams } from 'react-router';
 import { CREATE_SERVICE, GET_ACTIVE_INVENTORY_ITEMS, GET_PARAMETER_SETS, UPDATE_SERVICE } from '../gql/queries';
 import { AppContext } from '../contexts/App';
 import { DeliverablesEditor } from '../components/edit/DeliverablesEditor';
@@ -37,6 +38,7 @@ import { PERMISSIONS, usePermissions } from '../hooks/usePermissions';
 import { formatGqlError, formatSaveError } from '../utils/gqlError';
 import { EQUIPMENT_USE_NEEDS_BOOKABLE_MESSAGE } from '../utils/equipmentParams';
 import { idsFromSetRefs, setRefsForIds, setRefsFrom } from '../utils/serviceParameters';
+import { suggestedBefore } from '../utils/suggestedConnections';
 
 const MENU_PROPS = {
   PaperProps: {
@@ -118,6 +120,12 @@ export default function AdminEditService() {
         .filter((s: any) => String(s.id) !== String(serviceId))
         .map((s: any) => ({ id: String(s.id), name: String(s.name) })),
     [services, serviceId]
+  );
+
+  // Derived from every other operation's suggested next operations; read-only here.
+  const suggestedBeforeOps = useMemo(
+    () => (isNew ? [] : suggestedBefore(String(serviceId), services as any[]).map((s: any) => ({ id: String(s.id), name: String(s.name) }))),
+    [isNew, serviceId, services]
   );
 
   useEffect(() => {
@@ -632,14 +640,14 @@ export default function AdminEditService() {
       />
 
       <FormControl>
-        <InputLabel id="edit-service-connections-label">Can be combined with</InputLabel>
+        <InputLabel id="edit-service-connections-label">Suggested next operations</InputLabel>
         <Select
           labelId="edit-service-connections-label"
           multiple
           value={allowedConnectionIds}
-          label="Can be combined with"
+          label="Suggested next operations"
           onChange={(event) => setAllowedConnectionIds(event.target.value as string[])}
-          input={<OutlinedInput label="Can be combined with" />}
+          input={<OutlinedInput label="Suggested next operations" />}
           renderValue={(selected) => {
             const selectedIds = selected as string[];
             return availableServices
@@ -656,6 +664,23 @@ export default function AdminEditService() {
             </MenuItem>
           ))}
         </Select>
+        <FormHelperText>
+          Suggestions only — any connection is still allowed on the canvas.{' '}
+          {isNew ? null : (
+            <>
+              Suggested before:{' '}
+              {suggestedBeforeOps.length === 0
+                ? 'none'
+                : suggestedBeforeOps.map((op, index) => (
+                    <span key={op.id}>
+                      {index > 0 && ', '}
+                      <Link component={RouterLink} to={`/edit/services/${op.id}`}>{op.name}</Link>
+                    </span>
+                  ))}{' '}
+              (set on those operations).
+            </>
+          )}
+        </FormHelperText>
       </FormControl>
 
       <FormControl>

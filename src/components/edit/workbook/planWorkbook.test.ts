@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allRows, countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, survivingOverrides, tickedKeys, unmetNeeds, untickedCounts } from './planWorkbook';
+import { allRows, countsFor, planWorkbook, plansMatch, previewOrder, sheetPlans, survivingOverrides, tickedKeys, toggleAllTicks, unmetNeeds, untickedCounts } from './planWorkbook';
 import { catalogOf, rawSheet } from './testSupport';
 import { PlanRow, RawWorkbook } from './types';
 
@@ -53,6 +53,15 @@ describe('ticks, dependencies and counts (rule 8)', () => {
     expect([...tickedKeys(plan, {})].sort()).toEqual(['bundles:2', 'operations:2', 'parameterList:2', 'parameterList:3', 'sowSections:2']);
     expect(tickedKeys(plan, { 'operations:3': true }).has('operations:3')).toBe(false);
     expect(tickedKeys(plan, { 'sowSections:2': false }).has('sowSections:2')).toBe(false);
+  });
+
+  it('the header tick-box ticks every unticked row, then unticks them all', () => {
+    const rows = allRows(plan);
+    const some = tickedKeys(plan, { 'sowSections:2': false, 'bundles:2': false });
+    const ticked = tickedKeys(plan, toggleAllTicks(rows, some));
+    expect([...ticked].sort()).toEqual([...tickedKeys(plan, {})].sort());
+    expect(tickedKeys(plan, toggleAllTicks(rows, ticked)).size).toBe(0);
+    expect(Object.keys(toggleAllTicks(rows, ticked))).not.toContain('operations:3');
   });
 
   it('nothing is blocked while everything is ticked', () => {

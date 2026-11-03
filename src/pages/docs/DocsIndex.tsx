@@ -60,8 +60,8 @@ export default function DocsIndex() {
 
       <Box sx={{ mt: 6, pt: 3, borderTop: "1px solid", borderColor: "divider", display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", justifyContent: "space-between" }}>
         <Typography color="text.secondary" sx={{ maxWidth: 680, fontSize: 14 }}>
-          Canvas is built by the Software &amp; Application Innovation Lab (SAIL) at Boston University's Hariri Institute
-          for Computing, for the DAMP Lab, as part of the NSF-funded Programmable Cloud Laboratories (PCL) program.
+          Canvas is built for the DAMP Lab by the Software &amp; Application Innovation Lab (SAIL) at Boston University's Hariri Institute
+          for Computing along with Lattice Automation, as part of the NSF-funded Programmable Cloud Laboratories (PCL) program.
         </Typography>
         <Button component={RouterLink} to="/canvas" variant="contained" sx={{ textTransform: "none" }}>
           Open Canvas

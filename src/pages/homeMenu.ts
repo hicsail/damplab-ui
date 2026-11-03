@@ -194,6 +194,7 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
         id: "screener",
         label: "Screener",
         to: "/screener",
+        // Server twin: every screening operation is jobs:view-all.
         visible: needs(PERMISSIONS.JobsViewAll),
       },
     ],

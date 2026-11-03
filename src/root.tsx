@@ -121,6 +121,7 @@ export default function Root() {
       const savedNodes = Array.isArray(parsed?.nodes) ? parsed.nodes : [];
       const savedEdges = Array.isArray(parsed?.edges) ? parsed.edges : [];
       if (savedNodes.length > 0 || savedEdges.length > 0) {
+        // A picked file does not survive the reload: its placeholder stays, and the canvas and checkout ask for it again.
         setNodes(savedNodes as any);
         setEdges(savedEdges as any);
       }

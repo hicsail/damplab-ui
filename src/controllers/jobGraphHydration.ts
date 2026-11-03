@@ -2,7 +2,7 @@ import { generateFormDataFromParams, createNodeObject, serviceAllowsMultipleRuns
 import { getWorkflowsFromGraph } from './GraphHelpers';
 import { NodeParameter } from '../types/CanvasTypes';
 import { EQUIPMENT_BOOKERS_PARAM_ID, EQUIPMENT_PARAM_IDS, RUN_COUNT_PARAM_ID } from '../utils/servicePricing';
-import { isSampleSheetParam } from '../utils/sampleSheetValue';
+import { isTableParam } from '../utils/sampleSheetValue';
 import { applyNodeChanges, NodeChange } from 'reactflow';
 import { syncOtherTextEntries } from '../utils/parameterAnswers';
 import { isOtherTextEntryId } from '../utils/otherOption';
@@ -629,7 +629,7 @@ export const overlayLiveSampleSheetsOnCanvas = (nodes: any[], liveWorkflows: any
   if (!liveById.size) return nodes;
   return nodes.map((node: any) => {
     const live = liveById.get(node?.id);
-    const sheetIds = new Set((Array.isArray(live?.service?.parameters) ? live.service.parameters : []).filter((p: any) => isSampleSheetParam(p)).map((p: any) => p.id));
+    const sheetIds = new Set((Array.isArray(live?.service?.parameters) ? live.service.parameters : []).filter((p: any) => isTableParam(p)).map((p: any) => p.id));
     if (!sheetIds.size) return node;
     const liveValues = new Map((Array.isArray(live.formData) ? live.formData : []).filter((e: any) => sheetIds.has(e?.id)).map((e: any) => [e.id, e.value]));
     return {

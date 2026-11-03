@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OperationRowRef } from './operationsWorkbookSheet';
-import { buildOwnerParameters, newSetRowKeys, parameterListExportRows, parseTypeCell, planParameterList, typeLabelOf } from './parameterListSheet';
+import { buildOwnerParameters, multipleSelectionLabelOf, newSetRowKeys, parameterListExportRows, parseTypeCell, planParameterList, TYPE_CHOICES, typeLabelOf } from './parameterListSheet';
 import { catalogOf, rawSheet } from './testSupport';
 import { SHEET_COLUMNS } from './types';
 
@@ -23,20 +23,22 @@ describe('Parameter List — download rows (rules 15, 18, 24)', () => {
   it('writes each set parameter once under its set, then each operation’s own parameters', () => {
     expect(parameterListExportRows(catalog)).toEqual([
       COLUMNS,
-      ['volume', 'Buffers', '', 'Volume', 'In µL', 'Y', 'Number', '', '>=1 && <=50', '', 'N', ''],
-      ['sample_type', 'Buffers', '', 'Sample Type', '', 'N', 'Checkboxes', 'Bacteria; Other', '', '', 'Y', ''],
-      ['cycles', '', 'PCR', 'Cycles', '', 'N', 'Number', '', '>0 && integer', '', 'N', '30']
+      ['volume', 'Buffers', '', 'Volume', 'In µL', 'Y', 'Number', '', '>=1 && <=50', '', 'N', '', '', '', 'N', ''],
+      ['sample_type', 'Buffers', '', 'Sample Type', '', 'N', 'Checkboxes', 'Bacteria; Other', '', '', 'Y', '', '', '', 'N', ''],
+      ['cycles', '', 'PCR', 'Cycles', '', 'N', 'Number', '', '>0 && integer', '', 'N', '', '', '30', 'N', '']
     ]);
   });
 
   it('labels types the friendly way, and reads both spellings back', () => {
-    expect(typeLabelOf({ type: 'sampleSheet' })).toBe('Sample Upload');
+    expect(typeLabelOf({ type: 'sampleSheet' })).toBe('Table');
+    expect(typeLabelOf({ type: 'table' })).toBe('Table');
+    expect(parseTypeCell('Table')).toEqual({ type: 'table' });
     expect(typeLabelOf({ type: 'boolean' })).toBe('True/False');
     expect(typeLabelOf({ type: 'date' })).toBe('date');
-    expect(parseTypeCell('sample upload')).toEqual({ type: 'sampleSheet', checkboxes: false });
-    expect(parseTypeCell('SAMPLESHEET')).toEqual({ type: 'sampleSheet', checkboxes: false });
-    expect(parseTypeCell('Checkboxes')).toEqual({ type: 'dropdown', checkboxes: true });
-    expect(parseTypeCell('true/false')).toEqual({ type: 'boolean', checkboxes: false });
+    expect(parseTypeCell('sample upload')).toEqual({ type: 'table' });
+    expect(parseTypeCell('SAMPLESHEET')).toEqual({ type: 'table' });
+    expect(parseTypeCell('Checkboxes')).toEqual({ type: 'dropdown', display: 'checkboxes' });
+    expect(parseTypeCell('true/false')).toEqual({ type: 'boolean' });
     expect(parseTypeCell('radio')).toBeNull();
   });
 });
@@ -159,9 +161,11 @@ describe('Parameter List — creates (rules 16, 17)', () => {
     expect(plan(['parameterSet', 'parameter'], [['A; B', 'pH']]).rows[0].errors).toEqual(['A parameter set name cannot contain “;”.']);
   });
 
-  it('says a Table / File Upload / Sample Upload template is set in the editor', () => {
-    const result = plan(['parameterSet', 'parameter', 'type'], [['Buffers', 'Plate map', 'Sample Upload']]);
-    expect(result.rows[0]).toMatchObject({ action: 'create', warnings: ['Set the Sample Upload template in the editor.'] });
+  it('warns about no template for a File Upload or a Table — neither has one to set in the editor', () => {
+    const file = plan(['parameterSet', 'parameter', 'type'], [['Buffers', 'Protocol', 'File Upload']]);
+    expect(file.rows[0]).toMatchObject({ action: 'create', errors: [], warnings: [] });
+    const table = plan(['parameterSet', 'parameter', 'type', 'options'], [['Buffers', 'Plate map', 'Table', 'Inducer; Concentration']]);
+    expect(table.rows[0]).toMatchObject({ action: 'create', errors: [], warnings: [] });
   });
 });
 
@@ -235,6 +239,25 @@ describe('Parameter List — type, options, validation (rules 18, 19, 22)', () =
     const next = buildOwnerParameters(toDropdown.work.owners[0], new Set([toDropdown.rows[0].key]))[1];
     expect(next.type).toBe('dropdown');
     expect('display' in next).toBe(false);
+  });
+
+  it('multipleSelectionType: Checkbox makes a checkbox dropdown, +1 the default; only on a multi-value Dropdown', () => {
+    const toCheckbox = plan(['parameterSet', 'parameter', 'type', 'options', 'allowMultiple', 'multipleSelectionType'], [['Buffers', 'Assays', 'Dropdown', 'A; B', 'Y', 'Checkbox']]);
+    expect(buildOwnerParameters(toCheckbox.work.owners[0], new Set([toCheckbox.rows[0].key]))[2]).toMatchObject({ type: 'dropdown', display: 'multiselect', allowMultipleValues: true });
+    expect(multipleSelectionLabelOf({ type: 'dropdown', display: 'multiselect', allowMultipleValues: true })).toBe('Checkbox');
+    expect(multipleSelectionLabelOf({ type: 'dropdown', allowMultipleValues: true })).toBe('+1');
+    expect(multipleSelectionLabelOf({ type: 'dropdown', allowMultipleValues: false })).toBe('');
+    const single = plan(['parameterSet', 'parameter', 'type', 'options', 'allowMultiple', 'multipleSelectionType'], [['Buffers', 'Kind2', 'Dropdown', 'A; B', 'N', 'Checkbox']]);
+    expect(single.rows[0].warnings).toEqual(['multipleSelectionType is ignored: only a Dropdown that allows multiple selections has one.']);
+    expect(plan(['parameterSet', 'parameter', 'type', 'options', 'allowMultiple', 'multipleSelectionType'], [['Buffers', 'K3', 'Dropdown', 'A', 'Y', 'tick']]).rows[0].errors)
+      .toEqual(['multipleSelectionType: “tick” must be +1 or Checkbox.']);
+  });
+
+  it('matrix: stored as written, refused when malformed', () => {
+    const placed = plan(['parameterSet', 'parameter', 'type', 'matrix'], [['Buffers', 'AFP Dilution', 'Number', 'matrixA;2']]);
+    expect(buildOwnerParameters(placed.work.owners[0], new Set([placed.rows[0].key]))[2]).toMatchObject({ name: 'AFP Dilution', matrix: 'matrixA;2' });
+    expect(plan(['parameterSet', 'parameter', 'type', 'matrix'], [['Buffers', 'AFP Dilution', 'Number', 'matrixA']]).rows[0].errors)
+      .toEqual(['matrix: Write the matrix as name;column, e.g. matrixA;2 (the column is 1 or more).']);
   });
 
   it('refuses an unknown type, an unparseable validation, and a validation on a non-number', () => {
@@ -406,5 +429,225 @@ describe('Parameter List — conditionalDisplayLogic (show-only-if rules 24–28
     const result = plan(['parameterId', 'parameterSet', 'parameter', 'description', 'conditionalDisplayLogic'], [['a', 'S', 'A', 'New text', '"<missing>"=="x"']], none, orphan);
     expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['description'], errors: [] });
     expect(buildOwnerParameters(result.work.owners[0], new Set([result.rows[0].key]))[0].showIf).toEqual({ parameterId: 'gone', op: 'eq', value: 'x' });
+  });
+});
+
+describe('Parameter List — Table rows (table-upload rules 3, 8–12, 13a)', () => {
+  const columns = [{ header: 'Inducer', field: 'col_a' }, { header: 'Concentration', field: 'concentration' }];
+  const plates = {
+    id: 'set2',
+    name: 'Plates',
+    parameters: [
+      { id: 'plate', name: 'Plate map', type: 'table', tableData: { columns, rows: [{ id: 1, col_a: 'x' }] } },
+      { id: 'sheet', name: 'Samples', type: 'sampleSheet', templateFile: { key: 'sample-sheet-templates/a.xlsx', filename: 'blank.xlsx' } },
+      { id: 'legacy', name: 'Legacy list', type: 'sampleSheet', tableData: { columns: [{ header: 'Sample ID', field: 'sample_id' }] } },
+      { id: 'odd', name: 'Odd', type: 'table', tableData: { columns: [{ header: 'Dose; mM', field: 'dose' }, { header: 'Well', field: 'well' }] } },
+      { id: 'bare', name: 'Bare', type: 'table' }
+    ]
+  };
+  const cat = catalogOf({ sets: [plates], operations: [] });
+  const HEAD = ['parameterId', 'parameterSet', 'parameter', 'type', 'options'];
+  const planPlates = (rows: string[][], head: string[] = HEAD) => plan(head, rows, none, cat);
+  const nextOf = (result: any, rowKey = 'parameterList:2'): any => result.work.owners[0].entries.find((e: any) => e.rowKey === rowKey)?.next;
+
+  it('offers one Table choice in the type dropdown (rule 3)', () => {
+    expect(TYPE_CHOICES).toEqual(['Text', 'Number', 'Dropdown', 'Checkboxes', 'True/False', 'Table', 'File Upload']);
+  });
+
+  it('downloads Table for both stored strings, with the columns in options joined by "; " (rules 3, 9)', () => {
+    const rows = parameterListExportRows(cat);
+    const cell = (id: string, column: string): string => rows.find((r) => r[0] === id)![COLUMNS.indexOf(column)];
+    expect(cell('plate', 'type')).toBe('Table');
+    expect(cell('sheet', 'type')).toBe('Table');
+    expect(cell('plate', 'options')).toBe('Inducer; Concentration');
+    expect(cell('sheet', 'options')).toBe('');
+    expect(cell('legacy', 'options')).toBe('Sample ID');
+  });
+
+  it('a download uploaded unchanged plans zero changes, rows stored as sampleSheet included (rule 9)', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    const result = plan(header, rows, none, cat);
+    expect(result.rows.map((r) => r.action)).toEqual(['unchanged', 'unchanged', 'unchanged', 'unchanged', 'unchanged']);
+    expect(result.work.owners.every((o: any) => o.entries.length === 0)).toBe(true);
+  });
+
+  it('creates a Table from a semicolon-separated column list, trimmed and in order (rule 8)', () => {
+    const result = planPlates([['', 'Plates', 'Doses', 'Table', '  Inducer ;Concentration;  Location ; ']]);
+    expect(result.rows[0]).toMatchObject({ action: 'create', errors: [], warnings: [] });
+    expect(nextOf(result)).toMatchObject({
+      type: 'table',
+      tableData: { columns: [{ header: 'Inducer', field: 'inducer' }, { header: 'Concentration', field: 'concentration' }, { header: 'Location', field: 'location' }] }
+    });
+  });
+
+  it('reads “Sample Upload” in the type cell as a Table (rule 3)', () => {
+    const result = planPlates([['', 'Plates', 'Doses', 'Sample Upload', 'Inducer']]);
+    expect(result.rows[0]).toMatchObject({ action: 'create', errors: [] });
+    expect(nextOf(result).type).toBe('table');
+  });
+
+  it('updates the columns of an existing Table: kept columns keep their field, rows are left as stored', () => {
+    const result = planPlates([['plate', 'Plates', 'Plate map', 'Table', 'Location; inducer']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['options'], errors: [], warnings: [] });
+    expect(nextOf(result).tableData).toEqual({ columns: [{ header: 'Location', field: 'location' }, { header: 'inducer', field: 'col_a' }], rows: [{ id: 1, col_a: 'x' }] });
+  });
+
+  it('a reordered column list is a change', () => {
+    expect(planPlates([['plate', 'Plates', 'Plate map', 'Table', 'Concentration; Inducer']]).rows[0].action).toBe('update');
+  });
+
+  it('a blank options cell on an existing Table leaves its columns as stored (rule 11)', () => {
+    const blank = planPlates([['plate', 'Plates', 'Plate map', 'Table', '']]);
+    expect(blank.rows[0]).toMatchObject({ action: 'unchanged', errors: [] });
+    const renamed = planPlates([['plate', 'Plates', 'Plate layout', 'Table', '']]);
+    expect(renamed.rows[0]).toMatchObject({ action: 'update', errors: [] });
+    expect(nextOf(renamed).tableData.columns).toEqual(columns);
+  });
+
+  it('ignores the options cell when a stored column name contains ";", with the option-name warning (rule 10)', () => {
+    const result = planPlates([['odd', 'Plates', 'Odd', 'Table', 'Dose; Well; Extra']]);
+    expect(result.rows[0].errors).toEqual([]);
+    expect(result.rows[0].warnings).toEqual(['An existing column name contains “;”, so its columns can only be edited in the editor; the options cell is ignored.']);
+    expect(result.rows[0].action).toBe('unchanged');
+  });
+
+  it('refuses two column names equal ignoring case', () => {
+    expect(planPlates([['', 'Plates', 'Doses', 'Table', 'Inducer; inducer']]).rows[0]).toMatchObject({ action: 'skip', errors: ['Column “inducer” is listed twice.'] });
+  });
+
+  it('refuses a new Table with no columns (rule 12)', () => {
+    const MESSAGE = 'A Table needs at least one column: list them in options, separated by “;”.';
+    expect(planPlates([['', 'Plates', 'Doses', 'Table', '']]).rows[0]).toMatchObject({ action: 'skip', errors: [MESSAGE] });
+    expect(planPlates([['', 'Plates', 'Doses', 'Table']], ['parameterId', 'parameterSet', 'parameter', 'type']).rows[0].errors).toEqual([MESSAGE]);
+  });
+
+  it('refuses turning another type into a Table without columns, and takes them from options when given', () => {
+    const noColumns = plan(['parameterId', 'parameterSet', 'parameter', 'type'], [['volume', 'Buffers', 'Volume', 'Table']]);
+    expect(noColumns.rows[0].errors).toEqual(['A Table needs at least one column: list them in options, separated by “;”.']);
+    const withColumns = plan(['parameterId', 'parameterSet', 'parameter', 'type', 'options'], [['volume', 'Buffers', 'Volume', 'Table', 'Well; Volume']]);
+    expect(withColumns.rows[0]).toMatchObject({ action: 'update', errors: [] });
+    expect(withColumns.work.owners[0].entries[0].next).toMatchObject({ type: 'table', tableData: { columns: [{ header: 'Well', field: 'well' }, { header: 'Volume', field: 'volume' }] } });
+  });
+
+  it('an unrelated edit to a stored Table that has no columns and no template still goes through (rule 12)', () => {
+    const result = planPlates([['bare', 'Plates', 'Bare renamed', 'Table', '']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', errors: [] });
+  });
+
+  it('a row that changes a stored sampleSheet keeps it `sampleSheet`, and keeps its template (R2b)', () => {
+    const result = planPlates([['sheet', 'Plates', 'Samples renamed', 'Table', '']]);
+    expect(result.rows[0]).toMatchObject({ action: 'update', changed: ['parameter'], errors: [] });
+    expect(nextOf(result)).toMatchObject({ type: 'sampleSheet', name: 'Samples renamed', templateFile: { key: 'sample-sheet-templates/a.xlsx', filename: 'blank.xlsx' } });
+  });
+
+  it('keeps the stored string whichever alias the type cell uses', () => {
+    const viaOldLabel = planPlates([['sheet', 'Plates', 'Samples renamed', 'Sample Upload', '']]);
+    expect(nextOf(viaOldLabel).type).toBe('sampleSheet');
+    const tableViaOldLabel = planPlates([['plate', 'Plates', 'Plate layout', 'Sample Upload', '']]);
+    expect(nextOf(tableViaOldLabel).type).toBe('table');
+  });
+
+  it('leaves a stored Table’s allowMultipleValues as it is, whatever the cell says (R2c)', () => {
+    const multiCat = catalogOf({
+      sets: [{ id: 'set3', name: 'Multi', parameters: [{ id: 'many', name: 'Many', type: 'sampleSheet', allowMultipleValues: true, templateFile: { key: 'sample-sheet-templates/a.xlsx' } }] }],
+      operations: []
+    });
+    const result = plan(['parameterId', 'parameterSet', 'parameter', 'type', 'allowMultiple'], [['many', 'Multi', 'Many renamed', 'Table', 'N']], none, multiCat);
+    expect(result.rows[0].errors).toEqual([]);
+    expect(result.work.owners[0].entries[0].next).toMatchObject({ type: 'sampleSheet', name: 'Many renamed', allowMultipleValues: true });
+  });
+
+  it('never says options are ignored, and never sets allowMultiple, for a Table (rules 8, 13a)', () => {
+    const head = ['parameterId', 'parameterSet', 'parameter', 'type', 'options', 'allowMultiple'];
+    const result = planPlates([['', 'Plates', 'Doses', 'Table', 'Inducer', 'Y']], head);
+    expect(result.rows[0].errors).toEqual([]);
+    expect(result.rows[0].warnings).toEqual(['A Table holds one file; allowMultiple is ignored.']);
+    expect(nextOf(result).allowMultipleValues).toBe(false);
+  });
+});
+
+describe('Parameter List — screening columns (biosecurity-update behaviour 5)', () => {
+  const plates: any = {
+    id: 'op9', name: 'Plates', parameterSetIds: [],
+    ownParameters: [
+      { id: 'insert', name: 'Insert', type: 'string', screening: true },
+      { id: 'plate', name: 'Plate map', type: 'table', tableData: { columns: [{ header: 'Well', field: 'well' }, { header: 'Insert', field: 'insert' }] }, screening: true, screeningFields: ['Insert', 'Well'] }
+    ]
+  };
+  const cat = catalogOf({ operations: [plates] });
+
+  it('writes screening as Y/N and screeningFields as a “; ” list', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    const at = (row: string[], column: string) => row[header.indexOf(column)];
+    expect(rows.map((r) => [at(r, 'screening'), at(r, 'screeningFields')])).toEqual([['Y', ''], ['Y', 'Insert; Well']]);
+  });
+
+  it('uploaded unchanged, plans no changes', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    const result = plan(header, rows, none, cat);
+    expect(result.rows.map((r) => [r.action, r.errors])).toEqual([['unchanged', []], ['unchanged', []]]);
+  });
+
+  it('turns screening on and off, and sets the columns', () => {
+    const [header, first, second] = parameterListExportRows(cat);
+    const off = [...first];
+    off[header.indexOf('screening')] = 'No';
+    const cols = [...second];
+    cols[header.indexOf('screeningFields')] = 'insert';
+    const result = plan(header, [off, cols], none, cat);
+    expect(result.rows.map((r) => r.action)).toEqual(['update', 'update']);
+    const built = buildOwnerParameters(result.work.owners[0], new Set(result.rows.map((r) => r.key)));
+    expect(built[0]).not.toHaveProperty('screening');
+    expect(built[1].screeningFields).toEqual(['insert']);
+  });
+
+  it('refuses what the editor refuses', () => {
+    // New rows under the default catalog's `Buffers` set, as the matrix test above does.
+    expect(plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Cycles2', 'Number', 'Y']]).rows[0].errors).toEqual(['screening: Only Text, Table and File Upload parameters can require screening.']);
+    expect(plan(['parameterSet', 'parameter', 'type', 'options', 'screening'], [['Buffers', 'Grid', 'Table', 'Well; Insert', 'Y']]).rows[0].errors).toEqual([
+      'screening: A Table that requires screening needs at least one screening column.'
+    ]);
+    expect(plan(['parameterSet', 'parameter', 'type', 'options', 'screening', 'screeningFields'], [['Buffers', 'Grid', 'Table', 'Well', 'Y', 'Vector']]).rows[0].errors).toEqual([
+      'screening: Screening column “Vector” is not one of this Table\'s columns.'
+    ]);
+    expect(plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Notes2', 'Text', 'maybe']]).rows[0].errors).toEqual(['screening: “maybe” must be Y or N.']);
+  });
+
+  it('a flagged Text turned into Number, with no screening column, loses the flag with a warning', () => {
+    const [header, first] = parameterListExportRows(cat);
+    const row = [first[header.indexOf('parameterId')], first[header.indexOf('operation')], first[header.indexOf('parameter')], 'Number'];
+    const result = plan(['parameterId', 'operation', 'parameter', 'type'], [row], none, cat);
+    expect(result.rows[0].errors).toEqual([]);
+    expect(result.rows[0].warnings).toEqual(['Requires screening removed: only Text, Table and File Upload parameters can be screened.']);
+    const built = buildOwnerParameters(result.work.owners[0], new Set(result.rows.map((r) => r.key)));
+    expect(built[0]).not.toHaveProperty('screening');
+  });
+
+  it('an explicit screening Y on a Number still errors', () => {
+    // A new row, so the cell counts as given; on a stored flagged row an unchanged Y is not a given cell.
+    const result = plan(['parameterSet', 'parameter', 'type', 'screening'], [['Buffers', 'Cycles3', 'Number', 'Y']]);
+    expect(result.rows[0].errors).toEqual(['screening: Only Text, Table and File Upload parameters can require screening.']);
+    expect(result.rows[0].warnings).toEqual([]);
+  });
+});
+
+describe('Parameter List — a flagged File Upload (biosecurity-tweaks behaviour 7)', () => {
+  const op: any = { id: 'op10', name: 'Cloning', parameterSetIds: [], ownParameters: [
+    { id: 'insert', name: 'Insert', type: 'string', screening: true },
+    { id: 'seqs', name: 'Sequence files', type: 'file', screening: true }
+  ] };
+  const cat = catalogOf({ operations: [op] });
+  it('writes screening Y and plans no change when uploaded unchanged', () => {
+    const [header, ...rows] = parameterListExportRows(cat);
+    expect(rows.map((r) => r[header.indexOf('screening')])).toEqual(['Y', 'Y']);
+    expect(plan(header, rows, none, cat).rows.map((r) => [r.action, r.errors])).toEqual([['unchanged', []], ['unchanged', []]]);
+  });
+  it('a flagged Text turned into File Upload keeps the flag, with no warning', () => {
+    const [header, first] = parameterListExportRows(cat);
+    const row = [first[header.indexOf('parameterId')], first[header.indexOf('operation')], first[header.indexOf('parameter')], 'File Upload'];
+    const result = plan(['parameterId', 'operation', 'parameter', 'type'], [row], none, cat);
+    expect(result.rows[0].warnings).toEqual([]);
+    const built = buildOwnerParameters(result.work.owners[0], new Set(result.rows.map((r) => r.key)));
+    expect(built[0]).toMatchObject({ type: 'file', screening: true });
   });
 });

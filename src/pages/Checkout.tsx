@@ -41,6 +41,8 @@ import { getWorkflowsFromGraph } from "../controllers/GraphHelpers";
 import { calculateServiceCost } from "../utils/servicePricing";
 import { isOtherTextEntryId, otherLabel, otherTextEntryId, otherTextFrom } from '../utils/otherOption';
 import { withoutHiddenAnswers } from '../utils/parameterConditions';
+import { missingParamFiles } from '../utils/missingParamFiles';
+import MissingFilesAlert from '../components/MissingFilesAlert';
 
 
 import { PausePresentationRounded } from "@mui/icons-material";
@@ -112,6 +114,7 @@ export default function Checkout() {
   const rawWorkflows = getWorkflowsFromGraph(val.nodes, val.edges) || [];
 
   const [workflows, setWorkflows] = useState<WorkflowNode[][]>(rawWorkflows);
+  const missingFiles = missingParamFiles(workflows.flat());
 
   useEffect(() => {
     if (workflows && workflows.length > 0) {
@@ -719,11 +722,15 @@ export default function Checkout() {
           *Provisional. The lab reviews every request, and your final pricing is set in the Statement of Work you&apos;ll be asked to approve before any work begins.
         </Alert>
 
+        <MissingFilesAlert files={missingFiles} title="Upload these files before you can check out">
+          Select Edit Job, open each operation and upload its file. Saved and reloaded jobs do not keep their files.
+        </MissingFilesAlert>
+
         <Button
           variant="contained"
           color="primary"
           onClick={handleFinalCheckout}
-          disabled={workflows.length === 0}
+          disabled={workflows.length === 0 || missingFiles.length > 0}
           sx={{
             width: '100%'
           }}

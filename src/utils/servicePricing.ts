@@ -61,7 +61,7 @@ export const resolveParameterName = (entry: any, paramDef?: any): string | undef
   (entry?.id === RUN_COUNT_PARAM_ID ? RUN_COUNT_PARAM_NAME : undefined) ||
   (typeof entry?.id === 'string' ? EQUIPMENT_PARAM_NAMES[entry.id] : undefined);
 import type { CustomerCategory } from './customerCategory';
-import { isSampleSheetParam, sampleCountFromValue } from './sampleSheetValue';
+import { countedRows, isTableParam, SAMPLE_SHEET_PARAM_TYPE, sampleCountFromValue } from './sampleSheetValue';
 import { withoutHiddenAnswers } from './parameterConditions';
 export type { CustomerCategory };
 
@@ -325,9 +325,23 @@ export const calculateParameterCostWithCategory = (
     const unitPrice = resolveCategoryPrice(param, customerCategory);
     if (unitPrice === undefined) continue;
 
+    // New with table-upload: a Table file the server counted — or one just
+    // picked on the canvas, whose count is the browser's preview of that — is
+    // priced per row, under either stored type string. No answer stored before
+    // table-upload is either, so everything below this block still prices every
+    // older answer exactly as it always did. Mirrors the same branch in the
+    // backend's service-pricing.util.ts, which is the source of truth.
+    if (isTableParam(param)) {
+      const rows = countedRows(entry.value);
+      if (rows !== undefined) {
+        total += unitPrice * rows;
+        continue;
+      }
+    }
+
     // A samples spreadsheet bills per row — the count stored with the file.
     // Mirrors the sampleSheet branch in the backend's service-pricing.util.ts.
-    if (isSampleSheetParam(param)) {
+    if (param.type === SAMPLE_SHEET_PARAM_TYPE) {
       const count = sampleCountFromValue(entry.value);
       if (count === undefined || count === 0) continue;
       total += unitPrice * count;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ACLID_WIDGET_SRC, customerJobPath, loadAclidWidget, openHostedVerification, WIDGET_LOAD_TIMEOUT_MS } from './verificationWidget';
+import { ACLID_OVERLAY_Z_INDEX, ACLID_WIDGET_SRC, customerJobPath, dressAclidOverlay, loadAclidWidget, openHostedVerification, showDressedEmbeddedVerification, WIDGET_LOAD_TIMEOUT_MS } from './verificationWidget';
 
 type MockScript = HTMLScriptElement & {
   _listeners: Record<string, Array<() => void>>;
@@ -153,5 +153,75 @@ describe('verificationWidget', () => {
 
     open.mockReturnValue(null);
     expect(openHostedVerification('https://verify.aclid.bio/x')).toBeNull();
+  });
+});
+
+describe('dressAclidOverlay', () => {
+  function styleTarget() {
+    const props = new Map<string, string>();
+    return {
+      props,
+      style: { setProperty: (prop: string, value: string) => props.set(prop, value) },
+    };
+  }
+
+  it('pins the widget panel over the header and adds a close control', () => {
+    const overlayStyle = styleTarget();
+    const iframeStyle = styleTarget();
+    const closeStyle = styleTarget();
+    const close = {
+      type: '',
+      dataset: {} as DOMStringMap,
+      textContent: '',
+      style: closeStyle.style,
+      setAttribute: vi.fn(),
+      addEventListener: vi.fn(),
+    };
+    const overlay = {
+      ...overlayStyle,
+      querySelector: () => null,
+      prepend: vi.fn(),
+      remove: vi.fn(),
+    };
+    const iframe = {
+      src: 'https://verify.aclid.bio/?access_token=abc',
+      getAttribute: (name: string) => (name === 'src' ? iframe.src : null),
+      parentElement: overlay,
+      style: iframeStyle.style,
+    };
+    const doc = {
+      body: { style: { overflow: 'hidden' } },
+      querySelectorAll: () => [iframe],
+      createElement: () => close,
+    };
+
+    dressAclidOverlay(iframe.src, doc as never);
+
+    expect(overlayStyle.props.get('position')).toBe('fixed');
+    expect(overlayStyle.props.get('z-index')).toBe(String(ACLID_OVERLAY_Z_INDEX));
+    expect(iframeStyle.props.get('border-radius')).toBe('12px');
+    expect(overlay.prepend).toHaveBeenCalledWith(close);
+    const onClick = close.addEventListener.mock.calls.find((call) => call[0] === 'click')?.[1] as () => void;
+    onClick();
+    expect(doc.body.style.overflow).toBe('');
+    expect(overlay.remove).toHaveBeenCalled();
+  });
+
+  it('showDressedEmbeddedVerification opens the widget before restyling', () => {
+    const showEmbeddedVerification = vi.fn();
+    vi.stubGlobal('document', {
+      querySelectorAll: () => [],
+      createElement: () => ({}),
+      body: { style: { overflow: '' } },
+    });
+
+    showDressedEmbeddedVerification(
+      { showEmbeddedVerification },
+      { verificationUrl: 'https://verify.aclid.bio/?access_token=abc' },
+    );
+
+    expect(showEmbeddedVerification).toHaveBeenCalledWith({
+      verificationUrl: 'https://verify.aclid.bio/?access_token=abc',
+    });
   });
 });

@@ -24,12 +24,12 @@ describe('Operations — download rows (rules 11, 13)', () => {
     expect(setColumnCount(catalogOf({ operations: [{ ...pcr, parameterSetIds: ['a', 'b', 'c', 'd'] }] }))).toBe(6);
     const [header, first, second] = operationsExportRows(catalog, true);
     expect(header).toEqual([
-      'id', 'serviceCategory', 'name', 'description', 'unit', 'hiddenFromClients', 'pricingMode',
+      'id', 'serviceCategory', 'name', 'SuggestedPostConnections', 'description', 'unit', 'hiddenFromClients', 'pricingMode',
       'pricingInternal', 'pricingExternalAcademic', 'pricingExternalMarket', 'pricingExternalNoSalary', 'pricingLegacy',
       'parameterSet1', 'parameterSet2', 'parameterSet3', 'parameterSet4', 'parameterSet5'
     ]);
-    expect(first).toEqual(['op1', 'Molecular Biology', 'PCR', 'Amplify', 'rxn', 'N', 'SERVICE', 5, 7, 9, 6, 10, 'Buffers', 'Cleanup', '', '', '']);
-    expect(second).toEqual(['op2', '', 'Gibson Assembly', '', '', 'Y', 'PARAMETER', '', '', '', '', '', '', '', '', '', '']);
+    expect(first).toEqual(['op1', 'Molecular Biology', 'PCR', '', 'Amplify', 'rxn', 'N', 'SERVICE', 5, 7, 9, 6, 10, 'Buffers', 'Cleanup', '', '', '']);
+    expect(second).toEqual(['op2', '', 'Gibson Assembly', '', '', '', 'Y', 'PARAMETER', '', '', '', '', '', '', '', '', '', '']);
   });
 
   it('never writes serviceCategoryNumber, and leaves the pricing columns out without internal-fields:read', () => {
@@ -243,13 +243,22 @@ describe('Operations — F16: the category warning belongs to a row that writes 
   });
 });
 
-describe('Operations — M1: hide rows leave out an operation the sheet names, id or not', () => {
-  it('a row without an id creates a second operation of that name, and no stored operation of that name is offered for hiding', () => {
+describe('Operations — hide rows spare only the operations the sheet matches by id', () => {
+  it('a row without an id creates a new operation, and the stored operations of that name are hidden, each saying why', () => {
     const twinA: any = { id: 'tw1', name: 'Twin', parameterSetIds: [], ownParameters: [] };
     const twinB: any = { id: 'tw2', name: 'Twin', parameterSetIds: [], ownParameters: [] };
     const twins = catalogOf({ operations: [twinA, twinB, old] });
     const result = planOperations(rawSheet('operations', ['name'], [['Twin']]), twins, { ...ctx, hideMissing: true });
-    expect(result.rows.map((r) => [r.key, r.action])).toEqual([['operations:2', 'create'], ['hide:op3', 'hide']]);
+    expect(result.rows.map((r) => [r.key, r.action])).toEqual([['operations:2', 'create'], ['hide:tw1', 'hide'], ['hide:tw2', 'hide'], ['hide:op3', 'hide']]);
     expect(result.rows[0]).toMatchObject({ warnings: [SAME_NAME], selectedByDefault: false });
+    const replaced = 'Row 2 creates a new “Twin”; this hides the existing one. Untick to keep it.';
+    // Blocked unless row 2 is created too, so an upload never hides an operation without its replacement.
+    expect(result.rows[1]).toMatchObject({ warnings: [replaced], selectedByDefault: true, needs: [{ what: 'operation “Twin”', anyOf: ['operations:2'] }] });
+    expect(result.rows[3]).toMatchObject({ warnings: [], selectedByDefault: true, needs: [] });
+  });
+
+  it('an operation the sheet matches by id is never hidden', () => {
+    const result = planOperations(rawSheet('operations', ['id', 'name'], [['op3', 'Old method']]), catalogOf({ operations: [old] }), { ...ctx, hideMissing: true });
+    expect(result.rows.filter((r) => r.action === 'hide')).toEqual([]);
   });
 });

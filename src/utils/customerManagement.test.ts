@@ -47,6 +47,7 @@ describe('columns', () => {
     const v = defaultColumnVisibility();
     expect(Object.entries(v).filter(([, on]) => on).map(([f]) => f)).toEqual(['name', 'email', 'pricingCategory', 'accessTier', 'canBookWithoutApproval', 'status']);
     expect(Object.keys(v)).toHaveLength(22);
+    expect(CUSTOMER_COLUMNS.map((c) => c.headerName)).not.toContain('Biosecurity');
   });
 
   it('labels the dropdowns with the human’s exact strings', () => {
@@ -99,6 +100,7 @@ describe('rowFromUser', () => {
     expect(row.status).toBe('');
     expect(row.canBookWithoutApproval).toBe(false);
   });
+
 });
 
 describe('planRowSave', () => {
@@ -152,6 +154,25 @@ describe('saveRow', () => {
     expect(err.failure).toBe(refusal);
     expect(err.saved).toEqual({ pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC' });
     expect(c.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it('when the profile fails after pricing and tier saved, reports both and carries the mapping', async () => {
+    const c = calls();
+    c.updateProfile.mockRejectedValueOnce(new Error('boom'));
+    const after = { ...before, pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC', accessTier: 'TECHNICIAN', position: 'PI' };
+    const err = await saveRow(before, after, c).catch((e) => e);
+    expect(err).toBeInstanceOf(RowSaveError);
+    expect(err.saved).toEqual({ pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC', accessTier: 'TECHNICIAN' });
+    expect(err.accessRoleMapped).toBe(true);
+  });
+
+  it('keeps an unmapped-role result when a later profile write fails', async () => {
+    const c = calls();
+    c.setTier.mockResolvedValueOnce({ accessRoleMapped: false });
+    c.updateProfile.mockRejectedValueOnce(new Error('boom'));
+    const err = await saveRow(before, { ...before, accessTier: 'TECHNICIAN', position: 'PI' }, c).catch((e) => e);
+    expect(err).toBeInstanceOf(RowSaveError);
+    expect(err.accessRoleMapped).toBe(false);
   });
 });
 

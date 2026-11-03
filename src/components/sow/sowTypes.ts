@@ -8,6 +8,7 @@
  */
 
 import { splitContractedLines, sumLineCosts } from '../../utils/servicePricing';
+import { periodDays } from '../../utils/sowDateUtils';
 
 export type SowFieldKind = 'CALCULATED' | 'PROSE' | 'CUSTOM';
 
@@ -328,9 +329,22 @@ export const newPeriodDragKey = (): string =>
  * Give every period a drag key, keeping any it already has — a draft reloaded
  * from localStorage carries its keys, and reissuing them would remount each row
  * for no reason.
+ *
+ * Also the load-time normalisation for the period editor: a legacy stored
+ * `durationDays: 0` becomes 1 (End = Start, one day), which is how the prose
+ * already reads it and what the server's ≥ 1 save check requires. Every load
+ * path — server, local draft, restore — and the dirty-check snapshot pass
+ * through here, so the fix is not mistaken for an edit.
  */
 export function withPeriodDragKeys(inputs: SowVersionInputs): SowVersionInputs {
-  return { ...inputs, periods: (inputs.periods ?? []).map((p) => (p._dragKey ? p : { ...p, _dragKey: newPeriodDragKey() })) };
+  return {
+    ...inputs,
+    periods: (inputs.periods ?? []).map((p) => {
+      const durationDays = periodDays(p.durationDays);
+      const keyed = p._dragKey ? p : { ...p, _dragKey: newPeriodDragKey() };
+      return durationDays === p.durationDays ? keyed : { ...keyed, durationDays };
+    })
+  };
 }
 
 /** Shared labels for job / SOW pricing-category selects and read-only displays. */

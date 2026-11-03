@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CREATE_JOB, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS } from '../gql/mutations';
+import { ADD_JOB_ATTACHMENTS, CREATE_JOB, CREATE_JOB_ATTACHMENT_UPLOAD_URLS, CREATE_WORKFLOW_PARAMETER_UPLOAD_URLS } from '../gql/mutations';
 import { submitCanvasJob, PendingParamFile } from './canvasJobSubmission';
 
 const service = { id: 'svc', parameters: [{ id: 'vector', type: 'file' }] };
@@ -169,5 +169,103 @@ describe('submitCanvasJob — answers to hidden parameters (show-only-if rule 17
     await submitNode(client, 'plasmid');
     expect(jobInputs[0].workflows[0].nodes[0].formData.map((e: any) => e.id)).toEqual(['kind', 'kind__otherText', 'vector', 'notes']);
     expect(presign).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A picked file lives only in browser memory. The canvas autosave keeps its name and row count but not the file, so
+// after a reload the answer looks picked while there is nothing left to upload.
+describe('a picked file that lost its file (the canvas was restored after a reload)', () => {
+  const stale = () => JSON.parse(JSON.stringify(pending('Master.xlsx')));
+
+  it('is refused at submission, naming the file and the operation, before anything is created', async () => {
+    const { client, jobInputs } = makeClient(async () => ({ data: { createWorkflowParameterUploadUrls: [] } }));
+    await expect(submit(client, stale())).rejects.toThrow('“Master.xlsx” (File on Gibson Assembly)');
+    await expect(submit(client, [stale()])).rejects.toThrow('cannot be submitted until these files are uploaded');
+    expect(jobInputs).toEqual([]);
+  });
+});
+
+describe('a required file with no file', () => {
+  const requiredNode = (value: unknown, type = 'file') => ({
+    id: 'n1',
+    data: { label: 'Gibson Assembly', parameters: [{ id: 'vector', name: 'Vector', type, required: true, tableData: { columns: [{ header: 'Name' }] } }], formData: [{ id: 'vector', name: 'Vector', type, required: true, value }] },
+  });
+  const submitNode = (client: any, n: any) =>
+    submitCanvasJob(client, { workflows: [[n]], edges: [], nodes: [], jobName: 'Demo', institute: 'BU', notes: '', clientDisplayName: 'Demo', attachments: [], getAccessToken: async () => 'token' });
+
+  it.each([[null, 'file'], [[], 'file'], ['', 'file'], [null, 'table']])('refuses %j on a %s parameter before anything is created', async (value, type) => {
+    const { client, jobInputs } = makeClient(async () => ({ data: { createWorkflowParameterUploadUrls: [] } }));
+    await expect(submitNode(client, requiredNode(value, type))).rejects.toThrow('Vector on Gibson Assembly (required, no file uploaded)');
+    expect(client.mutate).not.toHaveBeenCalled();
+    expect(jobInputs).toEqual([]);
+  });
+});
+
+describe('a file picked on a catalog parameter with no id', () => {
+  beforeEach(() => vi.stubGlobal('localStorage', { setItem: () => {} }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is uploaded, not sent as a placeholder', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+    const { client, jobInputs } = makeClient(async () => ({
+      data: { createWorkflowParameterUploadUrls: [{ clientToken: '', filename: 'a.fa', uploadUrl: 'https://s3/a', key: 'workflow-parameters/u/a.fa', contentType: 'text/plain', size: 4 }] },
+    }));
+    client.mutate.mockImplementationOnce(async ({ variables }: any) => ({
+      data: { createWorkflowParameterUploadUrls: [{ clientToken: variables.files[0].clientToken, filename: 'a.fa', uploadUrl: 'https://s3/a', key: 'workflow-parameters/u/a.fa', contentType: 'text/plain', size: 4 }] },
+    }));
+    const idless = { id: 'n1', data: { label: 'Op', parameters: [{ name: 'Vector', type: 'file' }], formData: [{ id: 'random', name: 'Vector', type: 'file', value: pending('a.fa') }] } };
+    await submitCanvasJob(client, { workflows: [[idless]], edges: [], nodes: [], jobName: 'Demo', institute: 'BU', notes: '', clientDisplayName: 'Demo', attachments: [], getAccessToken: async () => 'token' });
+    const stored = jobInputs[0].workflows[0].nodes[0].formData.find((e: any) => e.id === 'random');
+    expect(JSON.parse(stored.value).key).toBe('workflow-parameters/u/a.fa');
+  });
+});
+
+// Attachments are uploaded after the job exists, so a failure cannot undo the job — but it must be reported, and an
+// attachment is registered on the job only once its file is really stored.
+describe('job attachments', () => {
+  beforeEach(() => vi.stubGlobal('localStorage', { setItem: () => {} }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  const fileOf = (name: string) => new File(['x'], name, { type: 'text/plain' });
+  const clientFor = (slots: Array<{ filename: string; size: number }>) => {
+    const registered: any[] = [];
+    const mutate = vi.fn(async ({ mutation, variables }: any) => {
+      if (mutation === CREATE_JOB) return { data: { createJob: { id: 'job1', jobId: 'J-1' } } };
+      if (mutation === CREATE_JOB_ATTACHMENT_UPLOAD_URLS)
+        return { data: { createJobAttachmentUploadUrls: slots.map((s) => ({ ...s, uploadUrl: `https://s3/${s.filename}`, key: `job-attachments/${s.filename}`, contentType: 'text/plain' })) } };
+      if (mutation === ADD_JOB_ATTACHMENTS) registered.push(...variables.attachments);
+      return { data: {} };
+    });
+    return { client: { mutate } as any, registered };
+  };
+  const submitWith = (client: any, attachments: File[]) =>
+    submitCanvasJob(client, {
+      workflows: [[node('')]], edges: [], nodes: [], jobName: 'Demo', institute: 'BU', notes: '', clientDisplayName: 'Demo',
+      attachments, getAccessToken: async () => 'token',
+    });
+
+  it('registers every attachment that uploaded, and reports none failed', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+    const { client, registered } = clientFor([{ filename: 'a.txt', size: 1 }]);
+    const result = await submitWith(client, [fileOf('a.txt')]);
+    expect(registered.map((a) => a.filename)).toEqual(['a.txt']);
+    expect(result.failedAttachments).toBeUndefined();
+  });
+
+  it('reports — and never registers — an attachment whose upload failed or that got no upload slot of its own', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: !url.endsWith('b.txt') })));
+    // The server renamed "c d.txt", so that slot matches no picked file: it must not be registered without a file.
+    const { client, registered } = clientFor([{ filename: 'a.txt', size: 1 }, { filename: 'b.txt', size: 1 }, { filename: 'c_d.txt', size: 1 }]);
+    const result = await submitWith(client, [fileOf('a.txt'), fileOf('b.txt'), fileOf('c d.txt')]);
+    expect(registered.map((a) => a.filename)).toEqual(['a.txt']);
+    expect(result).toMatchObject({ id: 'job1', failedAttachments: ['b.txt', 'c d.txt'] });
+  });
+
+  it('reports every attachment when they could not be registered on the job', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+    const { client } = clientFor([{ filename: 'a.txt', size: 1 }]);
+    const original = client.mutate;
+    client.mutate = vi.fn(async (args: any) => (args.mutation === ADD_JOB_ATTACHMENTS ? Promise.reject(new Error('down')) : original(args)));
+    expect((await submitWith(client, [fileOf('a.txt')])).failedAttachments).toEqual(['a.txt']);
   });
 });

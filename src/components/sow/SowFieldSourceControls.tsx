@@ -26,7 +26,7 @@ import {
   newPeriodDragKey,
   sowTotals
 } from './sowTypes';
-import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays } from '../../utils/sowDateUtils';
+import { sowDateToPickerValue, pickerValueToSowDate, todaySowDate, periodOfPerformanceDays, periodDays, periodEndSowDate, periodEndEdit, periodStartEdit, type PeriodDateEvent } from '../../utils/sowDateUtils';
 import { equipmentEstimateNote } from '../../utils/equipmentBilling';
 
 /**
@@ -116,6 +116,31 @@ function SortablePeriodRow({
   onRemove: () => void;
 }): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled });
+  // Start is committed on blur or on a calendar pick, never per keystroke
+  // (FINDINGS F3): an intermediate typed date later than End would otherwise
+  // drag End along. The ref holds the live draft for back-to-back events;
+  // the state re-renders the picker with it.
+  const startDraftRef = React.useRef<Date | null | undefined>(undefined);
+  const [startDraft, setStartDraft] = React.useState<Date | null | undefined>(undefined);
+  const editStart = (event: PeriodDateEvent): void => {
+    const step = periodStartEdit(period, startDraftRef.current, event);
+    startDraftRef.current = step.draft;
+    setStartDraft(step.draft);
+    if (step.patch) onPatch(step.patch);
+  };
+  // End is drafted the same way (see the End picker below).
+  const endDraftRef = React.useRef<Date | null | undefined>(undefined);
+  const [endDraft, setEndDraft] = React.useState<Date | null | undefined>(undefined);
+  const editEnd = (event: PeriodDateEvent): void => {
+    const step = periodEndEdit(period, endDraftRef.current, event);
+    endDraftRef.current = step.draft;
+    setEndDraft(step.draft);
+    if (step.patch) onPatch(step.patch);
+  };
+  // Stable picker values: MUI X re-syncs a field's sections whenever `value` is
+  // a different object, which would wipe half-typed digits on any re-render.
+  const startValue = React.useMemo(() => sowDateToPickerValue(period.startDate), [period.startDate]);
+  const endValue = React.useMemo(() => sowDateToPickerValue(periodEndSowDate(period.startDate, period.durationDays)), [period.startDate, period.durationDays]);
   return (
     <Box
       ref={setNodeRef}
@@ -151,23 +176,54 @@ function SortablePeriodRow({
       </Box>
       <DatePicker
         label="Start"
-        value={sowDateToPickerValue(period.startDate)}
+        value={startDraft !== undefined ? startDraft : startValue}
         disabled={disabled}
-        slotProps={{ textField: { size: 'small', sx: { width: 170 } } }}
-        onChange={(d) => {
-          if (!d || Number.isNaN(d.getTime())) return;
-          onPatch({ startDate: pickerValueToSowDate(d) });
+        onChange={(value) => editStart({ type: 'change', value })}
+        onAccept={(value, context) => editStart({ type: 'accept', value, source: context.source })}
+        slotProps={{
+          textField: {
+            size: 'small',
+            sx: { width: 170 },
+            onBlur: (e: React.FocusEvent<HTMLElement>) => {
+              // Moving between the field's own day/month/year sections is not leaving it.
+              if (e.currentTarget.contains(e.relatedTarget)) return;
+              editStart({ type: 'blur' });
+            }
+          }
+        }}
+      />
+      {/* End is a view over the stored day count: start + durationDays − 1. Like
+          Start it is drafted while typed and committed on blur or a calendar
+          pick (walkthrough fix 1, revising plan D8): MUI X re-syncs the field
+          to the stored End when an intermediate typed date is refused, and the
+          later digits would land in it. An End before Start is refused at
+          commit: the period does not change. */}
+      <DatePicker
+        label="End"
+        value={endDraft !== undefined ? endDraft : endValue}
+        minDate={startValue ?? undefined}
+        disabled={disabled}
+        onChange={(value) => editEnd({ type: 'change', value })}
+        onAccept={(value, context) => editEnd({ type: 'accept', value, source: context.source })}
+        slotProps={{
+          textField: {
+            size: 'small',
+            sx: { width: 170 },
+            onBlur: (e: React.FocusEvent<HTMLElement>) => {
+              if (e.currentTarget.contains(e.relatedTarget)) return;
+              editEnd({ type: 'blur' });
+            }
+          }
         }}
       />
       <TextField
-        label="Duration"
+        label="Days"
         size="small"
-        type="number"
-        sx={{ width: 130 }}
+        sx={{ width: 90 }}
         disabled={disabled}
-        value={period.durationDays}
-        InputProps={{ endAdornment: <InputAdornment position="end">days</InputAdornment> }}
-        onChange={(e) => onPatch({ durationDays: Math.max(0, Number(e.target.value) || 0) })}
+        value={periodDays(period.durationDays)}
+        InputProps={{ readOnly: true }}
+        inputProps={{ 'aria-label': `Period ${index + 1} days` }}
       />
       <TextField
         label="Label"

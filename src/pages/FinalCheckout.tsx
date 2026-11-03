@@ -6,6 +6,8 @@ import { CanvasContext } from "../contexts/Canvas";
 import { useLocation, useNavigate } from 'react-router';
 import { UserContext, UserContextProps } from '../contexts/UserContext';
 import { submitCanvasJob } from '../utils/canvasJobSubmission';
+import { missingParamFiles } from '../utils/missingParamFiles';
+import MissingFilesAlert from '../components/MissingFilesAlert';
 import { formatGqlError } from '../utils/gqlError';
 import { parseEmailList, JOB_DESCRIPTION_MAX_LENGTH } from '../utils/jobMembers';
 import {
@@ -112,6 +114,7 @@ export default function FinalCheckout() {
 
   // Extract workflow information from location state
   const { workflows, workflowCosts, totalCost, serviceDetails } = location.state?.orderSummary || {};
+  const missingFiles = missingParamFiles((workflows ?? []).flat());
 
 
   const members = parseEmailList(formData.memberEmails);
@@ -167,20 +170,25 @@ const handleSubmitJob = async () => {
       getAccessToken: () => userContext.userProps?.getAccessToken() ?? Promise.resolve(undefined),
     });
 
-    setSnackbarState({
-      open: true,
-      message: 'Job submitted successfully!',
-      severity: 'success',
-    });
+    setSnackbarState(
+      created.failedAttachments
+        ? {
+            open: true,
+            message: `Job submitted, but these attachments did not upload: ${created.failedAttachments.join(', ')}. Add them again from the job page.`,
+            severity: 'warning',
+          }
+        : { open: true, message: 'Job submitted successfully!', severity: 'success' }
+    );
 
     val.setNodes([]);
     val.setEdges([]);
     localStorage.removeItem(CANVAS_AUTOSAVE_KEY);
     localStorage.setItem("CurrentCanvas", "");
 
+    // Long enough to read the attachment warning when there is one.
     setTimeout(() => {
       navigate(`/client_view/${created.id}`);
-    }, 1000);
+    }, created.failedAttachments ? 6000 : 1000);
   } catch (error) {
     console.error('Job submission failed:', error);
     setSnackbarState({
@@ -436,12 +444,16 @@ const handleSubmitJob = async () => {
           *Provisional. Once the lab has reviewed your request we&apos;ll send you a Statement of Work with the final pricing and payment details, for you to approve before any work begins.
         </Alert>
 
+        <MissingFilesAlert files={missingFiles} title="Upload these files before you can submit">
+          Go back to the canvas, open each operation and upload its file. Saved and reloaded jobs do not keep their files.
+        </MissingFilesAlert>
+
         <Button
           variant="contained"
           color="primary"
           fullWidth
           onClick={handleSubmitJob}
-          disabled={!isFormValid() || jobLoading}
+          disabled={!isFormValid() || jobLoading || missingFiles.length > 0}
           startIcon={jobLoading ? <CircularProgress size={20} color="inherit" /> : null}
         >
           SUBMIT JOB

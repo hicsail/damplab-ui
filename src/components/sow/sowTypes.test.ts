@@ -27,6 +27,7 @@ import {
   sowStatusLabel,
   sowTotals,
   toInputsPayload,
+  withPeriodDragKeys,
   versionDisplayLabel
 , nextSentVersionLabel} from './sowTypes';
 
@@ -449,5 +450,30 @@ describe('statusColor (behaviour 14)', () => {
     expect(statusColor('FINAL')).toBe('success');
     expect(statusColor('CANCELLED')).toBe('error');
     expect(statusColor(null)).toBe('default');
+  });
+});
+
+describe('withPeriodDragKeys: legacy 0-day periods (behaviour 2)', () => {
+  const base = { projectManager: '', projectLead: '', scopeOfWork: [], deliverables: [], services: [], adjustments: [] } as unknown as SowVersionInputs;
+
+  it('reads a stored 0-day period as one day, so End = Start', () => {
+    const out = withPeriodDragKeys({ ...base, periods: [{ startDate: '2026-11-02T00:00:00.000Z', durationDays: 0 }] });
+    expect(out.periods[0].durationDays).toBe(1);
+    expect(out.periods[0]._dragKey).toBeTruthy();
+  });
+
+  it('keeps a keyed, valid period as the same object, so its row does not remount', () => {
+    const p = { startDate: '2026-11-02T00:00:00.000Z', durationDays: 14, _dragKey: 'k1' };
+    expect(withPeriodDragKeys({ ...base, periods: [p] }).periods[0]).toBe(p);
+  });
+
+  it('keeps an existing drag key while fixing the count', () => {
+    const out = withPeriodDragKeys({ ...base, periods: [{ startDate: '2026-11-02T00:00:00.000Z', durationDays: 0, _dragKey: 'k1' }] });
+    expect(out.periods[0]).toEqual({ startDate: '2026-11-02T00:00:00.000Z', durationDays: 1, _dragKey: 'k1' });
+  });
+
+  it('saves the normalised count, so re-saving an old draft passes the server’s ≥ 1 check', () => {
+    const loaded = withPeriodDragKeys({ ...base, periods: [{ startDate: '2026-11-02T00:00:00.000Z', durationDays: 0 }] });
+    expect((toInputsPayload(loaded).periods as any[])[0].durationDays).toBe(1);
   });
 });

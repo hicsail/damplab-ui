@@ -1,7 +1,7 @@
 import { OperationLike, PRICING_COLUMNS, PricingColumn, tierPrice } from '../operationsSheet';
 import { nearKey, normalizeEol, parseMoney, parseYesNo, sameList, yesNo } from './cells';
 import { matchRows, rowList } from './matching';
-import { CatalogCategory, CatalogOperation, CatalogSnapshot, Need, PlanRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
+import { CatalogCategory, CatalogOperation, CatalogSnapshot, connectionIdsOf, Need, PlanRow, RawSheet, RowAction, rowKey, SHEET_COLUMNS, SheetPlan } from './types';
 
 /**
  * The `Operations` sheet: one row per operation. Its category is the canvas
@@ -12,6 +12,8 @@ import { CatalogCategory, CatalogOperation, CatalogSnapshot, Need, PlanRow, RawS
 export const MIN_SET_COLUMNS = 5;
 const SET_COLUMN = /^parameterSet(\d+)$/;
 const isPricing = (column: string): column is PricingColumn => (PRICING_COLUMNS as readonly string[]).includes(column);
+/** The operations suggested to come after this one (`allowedConnections`), by name, separated by ";". Suggestions only. */
+export const CONNECTIONS_COLUMN = 'SuggestedPostConnections';
 
 /** Rule 13: most sets on any operation, plus two spare, never fewer than five. */
 export function setColumnCount(catalog: CatalogSnapshot): number {
@@ -21,6 +23,13 @@ export function setColumnCount(catalog: CatalogSnapshot): number {
 /** The label of the first canvas category holding the operation; '' when none does. */
 export function categoryLabelOf(operationId: string, categories: ReadonlyArray<CatalogCategory>): string {
   return categories.find((category) => category.serviceIds.includes(operationId))?.label.trim() ?? '';
+}
+
+/** The stored suggestions that still name an operation, in stored order. */
+function connectionsOf(operation: CatalogOperation, catalog: CatalogSnapshot): CatalogOperation[] {
+  return connectionIdsOf(operation)
+    .map((id) => catalog.operations.find((candidate) => candidate.id === id))
+    .filter((candidate): candidate is CatalogOperation => candidate !== undefined);
 }
 
 function setNamesOf(operation: CatalogOperation, catalog: CatalogSnapshot): string[] {
@@ -37,7 +46,10 @@ function operationCells(operation: CatalogOperation, catalog: CatalogSnapshot): 
     description: normalizeEol(operation.description).trim(),
     unit: normalizeEol(operation.unit).trim(),
     hiddenFromClients: yesNo(operation.hiddenFromClients),
-    pricingMode: operation.pricingMode === 'PARAMETER' ? 'PARAMETER' : 'SERVICE'
+    pricingMode: operation.pricingMode === 'PARAMETER' ? 'PARAMETER' : 'SERVICE',
+    [CONNECTIONS_COLUMN]: connectionsOf(operation, catalog)
+      .map((next) => normalizeEol(next.name).trim())
+      .join('; ')
   };
   for (const column of PRICING_COLUMNS) {
     const price = tierPrice(operation, column);
@@ -128,6 +140,15 @@ export interface OperationRowWork {
   setNames?: string[];
   /** Present when the row changes the category: the label to move to, or '' for none. */
   category?: string;
+  /** Present when the row sets the suggested next operations: written after every operation of the upload exists. */
+  connections?: ConnectionRef[];
+}
+
+/** One suggested next operation: an existing operation's id, or the Operations row that creates it. */
+export interface ConnectionRef {
+  name: string;
+  id?: string;
+  rowKey?: string;
 }
 
 export interface OperationsWork {
@@ -212,7 +233,11 @@ export function planOperations(
 ): SheetPlan<OperationsWork> {
   const setColumns = sheet.columns.filter((column) => SET_COLUMN.test(column)).sort((a, b) => Number(SET_COLUMN.exec(a)![1]) - Number(SET_COLUMN.exec(b)![1]));
   const blockedPricing: string[] = ctx.allowPricing ? [] : sheet.columns.filter(isPricing);
-  const fieldColumns = sheet.columns.filter((column) => column !== 'id' && column !== 'serviceCategory' && !SET_COLUMN.test(column) && !blockedPricing.includes(column));
+  const fieldColumns = sheet.columns.filter(
+    (column) => column !== 'id' && column !== 'serviceCategory' && column !== CONNECTIONS_COLUMN && !SET_COLUMN.test(column) && !blockedPricing.includes(column)
+  );
+  const hasConnectionsColumn = sheet.columns.includes(CONNECTIONS_COLUMN);
+  const operationRows = operationRowsByName(sheet);
   const hasCategoryColumn = sheet.columns.includes('serviceCategory');
   const existingSetNames = new Set(catalog.sets.map((set) => set.name.trim()));
 
@@ -235,6 +260,7 @@ export function planOperations(
     const existing = match.existingId !== undefined ? catalog.operations.find((operation) => operation.id === match.existingId) : undefined;
     let action: RowAction = match.action;
     let changed: string[] = [];
+    let untick = false;
 
     if (errors.length === 0) {
       const current = existing ? operationCells(existing, catalog) : undefined;
@@ -323,8 +349,42 @@ export function planOperations(
         }
       }
 
+      // A blank cell leaves the stored suggestions alone, as every other cell does.
+      let connections: ConnectionRef[] | undefined;
+      if (hasConnectionsColumn && cell(CONNECTIONS_COLUMN) !== '') {
+        const names = cell(CONNECTIONS_COLUMN).split(';').map((name) => name.trim()).filter((name) => name !== '');
+        const refs: ConnectionRef[] = [];
+        const seen = new Set<string>();
+        for (const name of names) {
+          if (seen.has(name)) {
+            errors.push(`${CONNECTIONS_COLUMN}: “${name}” is listed twice.`);
+            continue;
+          }
+          seen.add(name);
+          const found = resolveOperationName(name, operationRows, catalog);
+          if ((found.kind === 'existing' || found.kind === 'row') && found.warning) {
+            if (!warnings.includes(found.warning.text)) warnings.push(found.warning.text);
+            untick ||= found.warning.untick;
+          }
+          if (found.kind === 'existing') refs.push({ name, id: found.operation.id });
+          else if (found.kind === 'row') refs.push({ name, rowKey: found.rowKey });
+          else if (found.kind === 'error') errors.push(`${CONNECTIONS_COLUMN}: ${found.message}`);
+          else if (found.count > 1) errors.push(`${CONNECTIONS_COLUMN}: ${found.count} operations are named “${name}”.`);
+          else errors.push(`${CONNECTIONS_COLUMN}: No operation named “${name}”.`);
+        }
+        const current = existing ? connectionsOf(existing, catalog) : [];
+        const same = existing !== undefined && refs.every((ref) => ref.id !== undefined) && sameList(refs.map((ref) => ref.id!), current.map((next) => next.id));
+        if (!same) {
+          if (existing) {
+            changed.push(CONNECTIONS_COLUMN);
+            before.allowedConnections = current.map((next) => next.name.trim());
+          }
+          connections = refs;
+        }
+      }
+
       if (existing && changed.length === 0) action = 'unchanged';
-      else if (errors.length === 0) work.rows[key] = { existingId: existing?.id, name: existing ? existing.name.trim() : cell('name'), fields, before, setNames, category };
+      else if (errors.length === 0) work.rows[key] = { existingId: existing?.id, name: existing ? existing.name.trim() : cell('name'), fields, before, setNames, category, connections };
     }
 
     if (errors.length > 0) action = 'skip';
@@ -332,24 +392,31 @@ export function planOperations(
     rows.push({
       key, sheet: 'operations', rowNumber: raw.rowNumber, label: cell('name') || existing?.name.trim() || cell('id'), action,
       changed: writes ? changed : [], errors, warnings,
-      selectedByDefault: writes && match.selectedByDefault, needs: writes ? needs : []
+      selectedByDefault: writes && match.selectedByDefault && !untick, needs: writes ? needs : []
     });
   });
 
   if (ctx.hideMissing) {
-    // "No sheet row matched" — a matched row with an error still mentions its operation.
-    // A row without an id creates an operation of its own, but its name still mentions every stored operation
-    // of that name: a hand-authored sheet (no ids) must never offer to hide the operations it lists.
+    // "No sheet row matched by id" — a matched row with an error still keeps its operation. Rows are matched by
+    // id only, so a row without an id creates a new operation, and a stored operation of the same name is
+    // hidden like any other the sheet does not match; its hide row says which row replaces it.
     const mentioned = new Set(matches.map((match) => match.existingId).filter((id): id is string => id !== undefined));
+    const replacedBy = new Map<string, number>();
     sheet.rows.forEach((raw) => {
-      if ((raw.cells.id ?? '') !== '' || (raw.cells.name ?? '') === '') return;
-      for (const operation of catalog.operations) if (operation.name.trim() === raw.cells.name) mentioned.add(operation.id);
+      const name = raw.cells.name ?? '';
+      if ((raw.cells.id ?? '') !== '' || name === '' || replacedBy.has(name)) return;
+      replacedBy.set(name, raw.rowNumber);
     });
     for (const operation of catalog.operations) {
       if (mentioned.has(operation.id) || operation.hiddenFromClients === true) continue;
       const key = `hide:${operation.id}`;
-      work.hides[key] = { id: operation.id, name: operation.name.trim() };
-      rows.push({ key, sheet: 'operations', rowNumber: null, label: operation.name.trim(), action: 'hide', changed: ['hiddenFromClients'], errors: [], warnings: [], selectedByDefault: true, needs: [] });
+      const name = operation.name.trim();
+      const by = replacedBy.get(name);
+      const warnings = by === undefined ? [] : [`Row ${by} creates a new “${name}”; this hides the existing one. Untick to keep it.`];
+      // Never hide an operation whose replacement is not created: that would take it away from clients.
+      const needs: Need[] = by === undefined ? [] : [{ what: `operation “${name}”`, anyOf: [rowKey('operations', by)] }];
+      work.hides[key] = { id: operation.id, name };
+      rows.push({ key, sheet: 'operations', rowNumber: null, label: name, action: 'hide', changed: ['hiddenFromClients'], errors: [], warnings, selectedByDefault: true, needs });
     }
   }
 

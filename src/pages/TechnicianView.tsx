@@ -42,6 +42,10 @@ import {
   GET_JOB_BALANCE,
   GET_JOB_CHARGES,
   GET_JOB_PAYMENTS,
+  GET_JOB_SCREENING_RUNS,
+  GET_SCREENING_RUN,
+  GET_SCREENING_RUN_CARD,
+  GET_JOB_ACCEPTANCE_SCREENING,
 } from "../gql/queries";
 import {
   JobSubmitterSummary,
@@ -51,7 +55,9 @@ import {
 import {
   CREATE_SOW_FOR_JOB,
   MUTATE_JOB_STATE,
+  REOPEN_JOB,
   RERUN_JOB_HOMOLOGY_SCREENING,
+  REFRESH_JOB_ACLID_SCREENING,
   START_JOB_CUSTOMER_VERIFICATION,
   WITHDRAW_JOB_FROM_CUSTOMER,
   WITHDRAW_JOB_ACCEPTANCE,
@@ -128,11 +134,9 @@ import {
 import StatusPaneHeader from "../components/technician/StatusPaneHeader";
 import {
   BIOSECURITY_SCREENINGS,
-  biosecurityFromJob,
   biosecurityStatusColor,
   biosecurityStatusLabel,
   compositeBiosecurityStatus,
-  customerDetail,
   staffHomologyNote,
 } from "../components/technician/biosecurityStatus";
 import {
@@ -144,14 +148,28 @@ import {
   DEMO_CUSTOMER_NAME,
   useBiosecurityDemo,
 } from "../components/technician/BiosecurityDemo";
-import BiosecurityScreeningSections, {
-  BiosecurityStatusIcon,
-} from "../components/technician/BiosecurityScreeningSections";
-// Hosted-page opener only. The embed loader is deliberately not imported here:
-// staff must never run the customer's identity verification as themselves.
-import { openHostedVerification } from "../aclid/verificationWidget";
+import { BiosecurityStatusIcon } from "../components/technician/BiosecurityScreeningSections";
 import ScreeningBatchDetailsModal from "../components/ScreeningBatchDetailsModal";
 import { GET_SCREENING_BATCH } from "../securedna/SequencesQueries";
+import ScreeningHistory from "../components/technician/ScreeningHistory";
+import ScreeningRunDetailsModal from "../components/technician/ScreeningRunDetailsModal";
+import ScreeningResults from "../components/technician/ScreeningResults";
+import ReportingOptionsDialog from "../components/technician/ReportingOptionsDialog";
+import CopyVerificationLinkButton from "../components/technician/CopyVerificationLinkButton";
+import type { JobAcceptanceScreening, ScreeningRunCard, ScreeningRunDetail, ScreeningRunSummary } from "../components/technician/screeningRunTypes";
+import {
+  NOT_SCREENED_TEXT,
+  screeningBusy,
+  screeningButtonLabel,
+  screeningRunIsLoading,
+  screeningsFromRun,
+  paneStatusLabel,
+  staffHomologyNoteFromRun,
+  paneNothingToScreen,
+  NOTHING_TO_SCREEN_TEXT,
+  showRefreshResults,
+  homologyDetailsOpenable,
+} from "../components/technician/screeningRunView";
 import type { ScreeningBatch } from "../securedna/types";
 
 const stripTypename = (value: unknown): unknown => {
@@ -179,14 +197,14 @@ const downloadJson = (filename: string, payload: unknown) => {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
-/** The one label for every control that copies the customer's verification link. */
-const COPY_VERIFICATION_LINK = "Copy verification link";
-
 export default function TechnicianView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const apolloClient = useApolloClient();
   const userContext = useContext(UserContext);
+  const { can } = usePermissions();
+  // Biosecurity belongs to jobs:view-all (Administrator and Technician).
+  const showBiosecurity = can(PERMISSIONS.JobsViewAll);
   // The catalogue, for re-attaching parameter definitions to a version snapshot.
   const { services } = useContext(AppContext);
 
@@ -233,7 +251,6 @@ export default function TechnicianView() {
 
   const jobForPeople = data?.jobById;
   const { userProps: viewerProps } = useEffectiveUser();
-  const { can } = usePermissions();
   const viewer = { subject: viewerProps?.subject, email: viewerProps?.idTokenParsed?.email };
   const people = jobPeople(jobForPeople);
   const isMember = viewerIsJobMember(jobForPeople, viewer);
@@ -316,8 +333,14 @@ export default function TechnicianView() {
 
   const [changeJobStateMutation, { loading: closingJob }] =
     useMutation(MUTATE_JOB_STATE);
+  const [reopenJobMutation, { loading: reopeningJob }] =
+    useMutation(REOPEN_JOB);
   const [rerunJobHomologyScreening, { loading: rerunningScreening }] =
     useMutation(RERUN_JOB_HOMOLOGY_SCREENING);
+  const [refreshJobAclidScreening] = useMutation(REFRESH_JOB_ACLID_SCREENING);
+  // Mints the customer's hosted verification URL for staff to copy. Never the embed, never opened.
+  const [startJobCustomerVerification] = useMutation(START_JOB_CUSTOMER_VERIFICATION);
+  const [reportingOptionsOpen, setReportingOptionsOpen] = useState(false);
   const [
     loadScreeningBatch,
     {
@@ -332,10 +355,37 @@ export default function TechnicianView() {
     },
   );
   const [homologyModalOpen, setHomologyModalOpen] = useState(false);
-  // Mints the customer's hosted verification URL. Staff only ever copy it or
-  // open the hosted page for a customer on a call — never the embed.
-  const [startJobCustomerVerification, { loading: mintingVerificationLink }] =
-    useMutation(START_JOB_CUSTOMER_VERIFICATION);
+  // Screening history (biosecurity-update). Never asked for without jobs:view-all:
+  // the server would refuse it (behaviour 9).
+  const { data: screeningRunsData, refetch: refetchScreeningRuns } = useQuery<{ jobScreeningRuns: ScreeningRunSummary[] }>(GET_JOB_SCREENING_RUNS, {
+    variables: { jobId: id },
+    skip: !id || !showBiosecurity,
+    fetchPolicy: "cache-and-network",
+  });
+  const screeningRuns = screeningRunsData?.jobScreeningRuns ?? [];
+  // The staff card's own read of the newest run. Not the modal's lazy query below, which is guarded by
+  // requestedRunId. It stays no-cache: it selects a subset of aclid/secureDna/sequences on the same
+  // ScreeningRun:<id> the modal loads in full, and those embedded objects carry no id, so a cached write
+  // would overwrite the modal's data.
+  const newestRunId = screeningRuns[0]?.id;
+  const { data: newestRunData, refetch: refetchNewestRun } = useQuery<{ screeningRun: ScreeningRunCard | null }>(GET_SCREENING_RUN_CARD, {
+    variables: { id: newestRunId },
+    skip: !newestRunId || !showBiosecurity,
+    fetchPolicy: "no-cache",
+  });
+  const newestRun = newestRunData?.screeningRun?.id === newestRunId ? (newestRunData?.screeningRun ?? null) : null;
+  const { data: acceptanceData, refetch: refetchAcceptance } = useQuery<{ jobAcceptanceScreening: JobAcceptanceScreening }>(GET_JOB_ACCEPTANCE_SCREENING, {
+    variables: { jobId: id },
+    skip: !id || !showBiosecurity,
+    fetchPolicy: "network-only",
+  });
+  const acceptance = acceptanceData?.jobAcceptanceScreening ?? null;
+  const [loadScreeningRun, { data: screeningRunData, loading: screeningRunLoading, error: screeningRunError }] =
+    useLazyQuery<{ screeningRun: ScreeningRunDetail | null }>(GET_SCREENING_RUN, { fetchPolicy: "network-only" });
+  const [loadRunBatch, { data: runBatchData, loading: runBatchLoading }] =
+    useLazyQuery<{ screeningBatch: ScreeningBatch | null }>(GET_SCREENING_BATCH, { fetchPolicy: "network-only" });
+  const [screeningRunModalOpen, setScreeningRunModalOpen] = useState(false);
+  const [requestedRunId, setRequestedRunId] = useState<string | null>(null);
   const [withdrawFromCustomer] = useMutation(WITHDRAW_JOB_FROM_CUSTOMER);
   const [withdrawAcceptance] = useMutation(WITHDRAW_JOB_ACCEPTANCE);
   const [restoreJobVersion] = useMutation(RESTORE_JOB_VERSION);
@@ -396,7 +446,24 @@ export default function TechnicianView() {
       await refreshJobPage();
     } catch (e) {
       console.error("Failed to close job:", e);
-      window.alert("Could not close the job. Please try again.");
+      window.alert(formatGqlError(e, "Could not close the job. Please try again."));
+    }
+  };
+
+  const handleReopenJob = async () => {
+    if (!id) return;
+    // null when cancelled; an empty reason is fine.
+    const note = window.prompt(
+      "Reopen this job? It goes back to the state it was in before it was closed. Its Statement of Work, invoices and files stay exactly as they are.\n\nReason (optional):",
+      "",
+    );
+    if (note === null) return;
+    try {
+      await reopenJobMutation({ variables: { jobId: id, note: note.trim() || null } });
+      await refreshJobPage();
+    } catch (e) {
+      console.error("Failed to reopen job:", e);
+      window.alert(formatGqlError(e, "Could not reopen the job. Please try again."));
     }
   };
 
@@ -467,9 +534,21 @@ export default function TechnicianView() {
     });
   };
 
+  /** The job, its screening history, the newest run's card and the acceptance verdict, together. */
+  const refreshScreeningSurfaces = async () => {
+    await refetchJob();
+    if (!showBiosecurity) return;
+    await Promise.all([
+      refetchScreeningRuns(),
+      newestRunId ? refetchNewestRun() : Promise.resolve(),
+      refetchAcceptance(),
+    ]);
+  };
+
   const refreshJobPage = async () => {
     await Promise.all([
-      refetchJob(),
+      // A job edit can change a flagged value or the customer's details, which turns a run stale.
+      showBiosecurity ? refreshScreeningSurfaces() : refetchJob(),
       refetchSow(),
       refetchInvoices(),
       apolloClient.refetchQueries({
@@ -489,10 +568,37 @@ export default function TechnicianView() {
     if (!id) return;
     try {
       await rerunJobHomologyScreening({ variables: { jobId: id } });
-      await refetchJob();
     } catch (e) {
-      window.alert(formatGqlError(e, "Could not run homology screening."));
+      window.alert(formatGqlError(e, "Could not run screening."));
     }
+    // A dropped connection does not mean the run stopped (FINDINGS F2), so refresh either way.
+    await refreshScreeningSurfaces();
+  };
+
+  const mintCustomerVerificationUrl = async (): Promise<string> => {
+    if (!id) throw new Error("No job to verify.");
+    const result = await startJobCustomerVerification({ variables: { jobId: id } });
+    const url: string | undefined = result.data?.startJobCustomerVerification?.url;
+    if (!url) throw new Error("No verification link was returned.");
+    return url;
+  };
+
+  const handleRefreshResults = async () => {
+    if (!id) return;
+    try {
+      await refreshJobAclidScreening({ variables: { jobId: id } });
+    } catch (e) {
+      window.alert(formatGqlError(e, "Could not refresh results."));
+    }
+    await refreshScreeningSurfaces();
+  };
+
+  const handleOpenScreeningRun = async (runId: string) => {
+    setRequestedRunId(runId);
+    setScreeningRunModalOpen(true);
+    const result = await loadScreeningRun({ variables: { id: runId } });
+    const batchId = result.data?.screeningRun?.secureDna?.batchId;
+    if (batchId) void loadRunBatch({ variables: { id: batchId } });
   };
 
   const handleHomologyDetails = () => {
@@ -500,68 +606,6 @@ export default function TechnicianView() {
     if (!batchId) return;
     setHomologyModalOpen(true);
     void loadScreeningBatch({ variables: { id: batchId } });
-  };
-
-  /**
-   * A fresh hosted verification URL for this job's customer. Minted on every
-   * click rather than cached: the server owns the link's lifetime, and a
-   * stale one copied into an email is worse than a round trip.
-   */
-  const mintCustomerVerificationUrl = async (): Promise<string> => {
-    if (!id) throw new Error("No job to verify.");
-    const result = await startJobCustomerVerification({
-      variables: { jobId: id },
-    });
-    const url: string | undefined =
-      result.data?.startJobCustomerVerification?.url;
-    if (!url) throw new Error("No verification link was returned.");
-    return url;
-  };
-
-  /**
-   * Copy the customer's verification link for staff to send on. The
-   * clipboard is not always available (insecure origin, permission denied,
-   * focus lost while the mutation ran), so the URL is shown for hand-copying
-   * when the write fails rather than silently dropped.
-   */
-  const handleCopyVerificationLink = async () => {
-    // Also reached from the status-pane icon and the details chip, which
-    // stay enabled (a disabled Tooltip child is a MUI warning), so the
-    // re-entry guard lives here rather than on each control.
-    if (mintingVerificationLink) return;
-    let url: string;
-    try {
-      url = await mintCustomerVerificationUrl();
-    } catch (e) {
-      window.alert(formatGqlError(e, "Could not create a verification link."));
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      window.alert(`Copy this verification link for the customer:\n\n${url}`);
-    }
-  };
-
-  /**
-   * Open the hosted verification page in a new tab, for staff walking a
-   * customer through it on a call. Mint and open stay inside this click
-   * handler so the `window.open` still counts as the user's gesture.
-   */
-  const handleOpenHostedVerification = async () => {
-    if (mintingVerificationLink) return;
-    try {
-      const url = await mintCustomerVerificationUrl();
-      // The mint is an await, so the open can land outside the gesture
-      // window and be blocked. Fall back to showing the link.
-      if (!openHostedVerification(url)) {
-        window.alert(
-          `Your browser blocked the new tab. Open this verification link for the customer:\n\n${url}`,
-        );
-      }
-    } catch (e) {
-      window.alert(formatGqlError(e, "Could not open hosted verification."));
-    }
   };
 
   const handleReviewSubmitted = () => refreshJobPage();
@@ -801,20 +845,24 @@ export default function TechnicianView() {
   // SecureDNA and Aclid run on submission and the job carries their verdicts.
   // The other three are placeholders.
   const aclid = jobData?.aclidScreening ?? null;
-  const biosecurity = biosecurityFromJob(jobData);
+  // Until the runs query answers, the job's own fields stand in; once it has, no runs means not screened.
+  const hasRuns = screeningRuns.length > 0;
+  const runsLoaded = screeningRunsData !== undefined;
+  const noRuns = runsLoaded && !hasRuns;
+  const biosecurity = screeningsFromRun(jobData, newestRun, noRuns);
   const biosecurityComposite = compositeBiosecurityStatus(biosecurity);
   // Homology's line names the provider that answered: SecureDNA's summary,
   // Aclid's regulatory verdict when it screened, and the SecureDNA-backup
   // sentence when Aclid did not answer. `homologyBackup` is that last
   // sentence alone, for the pane.
-  const { note: homologyNote, backup: homologyBackup } = staffHomologyNote(
-    jobData?.homologyScreening,
-    aclid,
-  );
-  const customerNote = customerDetail(aclid);
+  // With a run, the note reads from it: a refresh keeps the run current, while the job's stored
+  // row can still say "Aclid screen still running". The job row is the fallback with no run.
+  const { note: homologyNote, backup: homologyBackup } = newestRun
+    ? staffHomologyNoteFromRun(newestRun)
+    : staffHomologyNote(jobData?.homologyScreening, aclid);
   const homologyBatchId = jobData?.homologyScreening?.batchId as
     string | undefined;
-  const homologyDetailsAvailable = Boolean(homologyBatchId);
+  const homologyDetailsAvailable = homologyDetailsOpenable(homologyBatchId, noRuns);
   // The pane's one line explains the rollup, so homology's note belongs there
   // only when homology is what the rollup is reporting. Otherwise it would
   // read as an explanation of a status it has nothing to do with — "In
@@ -825,13 +873,15 @@ export default function TechnicianView() {
     biosecurityComposite === biosecurity.HOMOLOGY
       ? homologyNote
       : homologyBackup;
-  const homologyBusy =
-    biosecurity.HOMOLOGY === "IN_PROGRESS" || rerunningScreening;
-  // Staff can hand the customer their verification link while Aclid has a
-  // screen for this job and has not passed them. Copying is the action; the
-  // embed is the customer's to run on their own page.
-  const customerLinkAvailable =
-    Boolean(aclid?.screenId) && biosecurity.CUSTOMER !== "PASSED";
+  const homologyBusy = screeningBusy(
+    jobData?.homologyScreening,
+    rerunningScreening,
+    Date.now(),
+  );
+  const noRunsDescription =
+    acceptance?.state === "NOT_RUN" && acceptance.message
+      ? acceptance.message
+      : "No screening on record.";
   // Scripted screening for screen recordings; page state only, gone on refresh.
   const biosecurityDemo = useBiosecurityDemo();
   const demoRun = biosecurityDemo.demo;
@@ -913,24 +963,28 @@ export default function TechnicianView() {
             >
               History
             </Button>
-            <Button
-              variant="outlined"
-              color="warning"
-              onClick={handleCloseJob}
-              disabled={
-                !jobData ||
-                jobState === "CLOSED" ||
-                jobState === "CANCELLED" ||
-                closingJob
-              }
-              sx={{ textTransform: "none" }}
-            >
-              {jobState === "CLOSED"
-                ? "Job closed"
-                : closingJob
-                  ? "Closing…"
-                  : "Close job"}
-            </Button>
+            {jobState === "CLOSED" ? (
+              // The server gates reopenJob on jobs:view-all; the button follows it.
+              can(PERMISSIONS.JobsViewAll) && <Button
+                variant="outlined"
+                onClick={handleReopenJob}
+                disabled={!jobData || reopeningJob}
+                title="Return this closed job to the state it was in before it was closed"
+                sx={{ textTransform: "none" }}
+              >
+                {reopeningJob ? "Reopening…" : "Reopen job"}
+              </Button>
+            ) : (
+              <Button
+                variant="outlined"
+                color="warning"
+                onClick={handleCloseJob}
+                disabled={!jobData || jobState === "CANCELLED" || closingJob}
+                sx={{ textTransform: "none" }}
+              >
+                {closingJob ? "Closing…" : "Close job"}
+              </Button>
+            )}
           </Box>
           <Typography sx={{ fontSize: 13 }}>
             {submissionLine(submitter, jobTime.slice(0, 16).replace("T", " "))}
@@ -1215,8 +1269,11 @@ export default function TechnicianView() {
           />
         </div>
 
+        {showBiosecurity && (
         <ProcessCard
           title="Biosecurity"
+          titleExtra={<ScreeningHistory runs={screeningRuns} onSelect={(runId) => void handleOpenScreeningRun(runId)} />}
+          onStatusPaneClick={!demoRun && screeningRuns.length > 0 ? () => void handleOpenScreeningRun(screeningRuns[0].id) : undefined}
           customerBadge={demoCustomer ? "check" : null}
           staffBadge={demoLab ? "check" : null}
           customerLabel={demoCustomer ? DEMO_CUSTOMER_NAME : undefined}
@@ -1227,7 +1284,9 @@ export default function TechnicianView() {
             bgcolor: chipStatusBackground(
               demoPane
                 ? demoPane.color
-                : biosecurityStatusColor(biosecurityComposite),
+                : noRuns
+                  ? "default"
+                  : biosecurityStatusColor(biosecurityComposite),
             ),
           }}
           statusPane={
@@ -1235,19 +1294,27 @@ export default function TechnicianView() {
               status={
                 demoPane
                   ? demoPane.status
-                  : biosecurityStatusLabel(biosecurityComposite)
+                  : noRuns
+                    ? NOT_SCREENED_TEXT
+                    : biosecurityComposite === "UNAVAILABLE" &&
+                        paneNothingToScreen(newestRun, acceptance?.state)
+                      ? NOTHING_TO_SCREEN_TEXT
+                      : paneStatusLabel(biosecurityComposite, newestRun)
               }
               description={
                 demoPane
                   ? demoPane.description
-                  : (paneNote ??
-                    "Rolled up from primary and additional screening.")
+                  : noRuns
+                    ? noRunsDescription
+                    : (acceptance?.message ??
+                      paneNote ??
+                      "Rolled up from primary and additional screening.")
               }
             >
               {/* A glance at the five, in card order. The labels live in
                                 the details below; repeating them here would make the
                                 collapsed card the same list twice. Homology opens the
-                                SecureDNA batch; Customer copies the verification link. */}
+                                SecureDNA batch; Customer opens the newest run's details. */}
               <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap", mt: 1 }}>
                 {BIOSECURITY_SCREENINGS.map((screening) => {
                   const statusLabel = biosecurityStatusLabel(
@@ -1259,10 +1326,11 @@ export default function TechnicianView() {
                           label: "View homology screening details",
                           onClick: handleHomologyDetails,
                         }
-                      : screening.key === "CUSTOMER" && customerLinkAvailable
+                      : screening.key === "CUSTOMER" && hasRuns
                         ? {
-                            label: COPY_VERIFICATION_LINK,
-                            onClick: handleCopyVerificationLink,
+                            label: "View screening run details",
+                            onClick: () =>
+                              void handleOpenScreeningRun(screeningRuns[0].id),
                           }
                         : null;
                   const title = action
@@ -1279,7 +1347,10 @@ export default function TechnicianView() {
                         <IconButton
                           size="small"
                           aria-label={action.label}
-                          onClick={action.onClick}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            action.onClick();
+                          }}
                           sx={{ p: 0.25 }}
                         >
                           {icon}
@@ -1302,7 +1373,31 @@ export default function TechnicianView() {
                 disabled={!id || homologyBusy}
                 onClick={handleRerunHomologyScreening}
               >
-                {homologyBusy ? "Screening…" : "Rerun screening"}
+                {screeningButtonLabel(screeningRuns.length, homologyBusy)}
+              </Button>
+              {showRefreshResults(newestRun) && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  sx={railBtnSx}
+                  disabled={!id}
+                  onClick={handleRefreshResults}
+                >
+                  Refresh results
+                </Button>
+              )}
+              <CopyVerificationLinkButton
+                hasScreen={Boolean(aclid?.screenId)}
+                mint={mintCustomerVerificationUrl}
+                sx={railBtnSx}
+              />
+              <Button
+                variant="outlined"
+                size="small"
+                sx={railBtnSx}
+                onClick={() => setReportingOptionsOpen(true)}
+              >
+                Reporting options
               </Button>
               {/* Gone once a run starts, so the recording shows only the result. */}
               {!demoRun && (
@@ -1327,48 +1422,17 @@ export default function TechnicianView() {
                   </Button>
                 </Stack>
               )}
-              {customerLinkAvailable && (
-                <>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    sx={railBtnSx}
-                    disabled={!id || mintingVerificationLink}
-                    onClick={handleCopyVerificationLink}
-                  >
-                    {mintingVerificationLink
-                      ? "Creating link…"
-                      : COPY_VERIFICATION_LINK}
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    sx={railBtnSx}
-                    disabled={!id || mintingVerificationLink}
-                    onClick={handleOpenHostedVerification}
-                  >
-                    Open hosted verification
-                  </Button>
-                </>
-              )}
             </>
           }
           details={
             demoRun ? (
               <BiosecurityDemoStages demo={demoRun} />
             ) : (
-            <BiosecurityScreeningSections
-              screenings={biosecurity}
-              notes={{ HOMOLOGY: homologyNote, CUSTOMER: customerNote }}
-              homologyDetailsAvailable={homologyDetailsAvailable}
-              onHomologyDetails={handleHomologyDetails}
-              customerDetailsAvailable={customerLinkAvailable}
-              onCustomerDetails={handleCopyVerificationLink}
-              customerClickLabel={COPY_VERIFICATION_LINK}
-            />
+              <ScreeningResults run={newestRun} />
             )
           }
         />
+        )}
 
         <div ref={sowSectionRef}>
           <ProcessCard
@@ -1545,6 +1609,19 @@ export default function TechnicianView() {
               : null
           }
           onClose={() => setHomologyModalOpen(false)}
+        />
+        <ReportingOptionsDialog
+          open={reportingOptionsOpen}
+          onClose={() => setReportingOptionsOpen(false)}
+        />
+        <ScreeningRunDetailsModal
+          open={screeningRunModalOpen}
+          run={screeningRunData?.screeningRun?.id === requestedRunId ? (screeningRunData?.screeningRun ?? null) : null}
+          loading={screeningRunIsLoading({ loading: screeningRunLoading, hasError: !!screeningRunError, data: screeningRunData, requestedId: requestedRunId })}
+          error={screeningRunError ? formatGqlError(screeningRunError, "Could not load the screening run.") : null}
+          batch={runBatchData?.screeningBatch ?? null}
+          batchLoading={runBatchLoading}
+          onClose={() => setScreeningRunModalOpen(false)}
         />
         <SowEditorModal
           open={sowModalOpen}

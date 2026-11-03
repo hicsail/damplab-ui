@@ -21,7 +21,7 @@ interface Props {
 }
 
 /**
- * The blank template on a samples-spreadsheet parameter. The file is uploaded
+ * The staff-uploaded blank template on a Table parameter that already has one. The file is uploaded
  * as soon as it is chosen, but the reference is only patched onto the
  * parameter, so nothing is live until the parameters are saved.
  */
@@ -84,26 +84,26 @@ export default function SampleSheetTemplateField({ owner, parameter, canWrite, o
   return (
     <Stack spacing={1}>
       <Typography variant='body2' color='text.secondary'>
-        Customers download this blank template, fill in one row per sample, and attach it to the operation. The number of rows below the header is the sample
-        count, so keep the column headings in the first row with nothing above them. When the operation's pricing is “Based on selected options”, this
-        parameter's price is charged once per sample row, at the customer's category.
+        This parameter has a blank template file uploaded by staff. While it is here, customers download this file instead of the one generated from the
+        columns. Remove it to serve the generated template.
       </Typography>
 
       {error && <Alert severity='error' onClose={() => setError(null)}>{error}</Alert>}
 
       <Stack direction='row' spacing={2} alignItems='center' flexWrap='wrap'>
         <Button variant='outlined' component='label' size='small' disabled={!canWrite || busy} sx={{ textTransform: 'none' }}>
-          {busy ? 'Uploading…' : template ? 'Replace template' : 'Upload template'}
+          {busy ? 'Uploading…' : 'Replace template'}
           <input hidden type='file' accept={SAMPLE_SHEET_ACCEPT} onChange={(e) => { void pick(e.target.files?.[0]); e.currentTarget.value = ''; }} />
         </Button>
-        {template?.filename ? (
+        {template?.filename && (
           <Typography variant='body2'>
             {template.filename}{' '}
             <MuiLink component='button' type='button' variant='body2' onClick={() => void download()}>(download)</MuiLink>
           </Typography>
-        ) : (
-          <Typography variant='body2' color='text.secondary'>No template attached yet.</Typography>
         )}
+        <Button size='small' color='error' disabled={!canWrite || busy} sx={{ textTransform: 'none' }} onClick={() => onChange({ templateFile: null })}>
+          Remove template
+        </Button>
       </Stack>
     </Stack>
   );
