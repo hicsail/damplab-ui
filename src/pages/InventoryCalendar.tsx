@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CloseIcon from '@mui/icons-material/Close';
 import ThumbUpAltOutlinedIcon from '@mui/icons-material/ThumbUpAltOutlined';
@@ -29,6 +30,7 @@ import { useEffectiveUser } from '../hooks/useEffectiveUser';
 import { formatSaveError } from '../utils/gqlError';
 import { bookingStatusColor, bookingStatusLabel, isBookingOver, spansForWeek } from '../utils/jobEquipmentBooking';
 import ReasonDialog from '../components/ReasonDialog';
+import CalendarFeedDialog from '../components/CalendarFeedDialog';
 
 /**
  * A timed booking spans its slot; a consumable is a point on the day it was used.
@@ -49,6 +51,7 @@ export default function InventoryCalendar() {
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [itemFilter, setItemFilter] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [feedOpen, setFeedOpen] = useState(false);
 
   /**
    * This calendar shows **every booking in the lab**, and the matrix amendment now
@@ -135,6 +138,7 @@ export default function InventoryCalendar() {
             {items.map((i: any) => <MenuItem key={i.id} value={i.id}>{i.name}</MenuItem>)}
           </Select>
         </FormControl>
+        <Button size="small" variant="outlined" startIcon={<CalendarMonthIcon />} onClick={() => setFeedOpen(true)}>Subscribe</Button>
         <Button size="small" onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
         <IconButton onClick={() => setWeekStart((w) => addDays(w, -7))}><ChevronLeftIcon /></IconButton>
         <Typography variant="subtitle1" sx={{ minWidth: 220, textAlign: 'center' }}>
@@ -227,6 +231,7 @@ export default function InventoryCalendar() {
           }
         }}
       />
+      <CalendarFeedDialog open={feedOpen} onClose={() => setFeedOpen(false)} />
     </Box>
   );
 }
