@@ -47,7 +47,7 @@ describe('inventory spreadsheet round-trip (pin 22)', () => {
   });
 
   it('uses headers the upload recognises for every field it reads back', () => {
-    const readBack = ['name', 'type', 'tags', 'station', 'quantity', 'uniqueId', 'modelNumber', 'serialNumber', 'hasServiceContract', 'serviceContractExpiration', 'dimensionL', 'dimensionW', 'dimensionH'];
+    const readBack = ['name', 'type', 'tags', 'station', 'quantity', 'uniqueId', 'modelNumber', 'serialNumber', 'hasServiceContract', 'serviceContractExpiration', 'dimensionL', 'dimensionW', 'dimensionH', 'imageUrl'];
     for (const f of fields.filter((field) => readBack.includes(field.key))) expect({ label: f.label, mapped: !!headerFieldFor(f.label) }).toEqual({ label: f.label, mapped: true });
     for (const f of fields.filter((field) => !readBack.includes(field.key))) expect({ label: f.label, mapped: headerFieldFor(f.label) }).toEqual({ label: f.label, mapped: undefined });
   });

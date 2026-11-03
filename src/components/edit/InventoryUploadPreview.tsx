@@ -1,4 +1,4 @@
-import { useApolloClient, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import {
   Alert,
   Autocomplete,
@@ -16,8 +16,9 @@ import {
   TextField,
   Typography
 } from '@mui/material';
+import ImageIcon from '@mui/icons-material/Image';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { useContext, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { UserContext } from '../../contexts/UserContext';
 import {
   CREATE_INVENTORY_ITEM,
@@ -26,6 +27,7 @@ import {
   GET_STATIONS,
   UPDATE_INVENTORY_ITEM
 } from '../../gql/queries';
+import { CREATE_INVENTORY_IMAGE_UPLOAD_URL } from '../../gql/mutations';
 import {
   buildCreateInput,
   buildUpdateChanges,
@@ -39,6 +41,7 @@ import {
   validateUploadRows,
   ValidationSummary
 } from './inventoryUploadUtils';
+import { extractImagesFromZip, ImageMatch, matchImagesToRows, ZipImage } from './inventoryImageZip';
 
 interface InventoryUploadPreviewProps {
   rows: ParsedInventoryRow[];
@@ -59,6 +62,12 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
   const [selectedColumns, setSelectedColumns] = useState<Set<UploadColumnKey>>(
     () => new Set(UPLOAD_COLUMNS.map((c) => c.key))
   );
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const [zipImages, setZipImages] = useState<ZipImage[]>([]);
+  const [imageMatches, setImageMatches] = useState<ImageMatch[]>([]);
+  const [unmatchedImages, setUnmatchedImages] = useState<string[]>([]);
+  const [zipFileName, setZipFileName] = useState<string>('');
+  const [createUploadUrl] = useMutation(CREATE_INVENTORY_IMAGE_UPLOAD_URL);
 
   const toggleColumn = (key: UploadColumnKey) => {
     setSelectedColumns((prev) => {
@@ -67,6 +76,23 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
       else next.add(key);
       return next;
     });
+  };
+
+  const handleZipFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = '';
+    try {
+      const images = await extractImagesFromZip(file);
+      setZipImages(images);
+      setZipFileName(file.name);
+      const { matches, unmatched } = matchImagesToRows(images, rows);
+      setImageMatches(matches);
+      setUnmatchedImages(unmatched);
+    } catch (e) {
+      console.error('Failed to read ZIP file:', e);
+      setError('Failed to read ZIP file. Make sure it is a valid .zip archive.');
+    }
   };
 
   const stations: Array<{ id: string; name: string }> = stationData?.stations ?? [];
@@ -96,6 +122,15 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
         .filter((name) => name && !existingStationNames.has(name.toLowerCase()))
     )
   ];
+
+  // Re-match ZIP images whenever rows change (e.g. after station resolution)
+  if (zipImages.length > 0 && imageMatches.length === 0 && unmatchedImages.length === 0) {
+    const { matches, unmatched } = matchImagesToRows(zipImages, rows);
+    if (matches.length > 0 || unmatched.length > 0) {
+      setImageMatches(matches);
+      setUnmatchedImages(unmatched);
+    }
+  }
 
   // Run pre-upload validation
   const validation: ValidationSummary = validateUploadRows(rows);
@@ -134,6 +169,17 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
     { field: 'quantity', headerName: 'Qty', width: 60 },
     { field: 'uniqueId', headerName: 'Unique ID', width: 110 },
     { field: 'modelNumber', headerName: 'Model #', width: 120 },
+    { field: 'imageUrl', headerName: 'Image URL', width: 200 },
+    {
+      field: 'zipImage',
+      headerName: 'ZIP Image',
+      width: 130,
+      renderCell: (params) => {
+        const match = imageMatches.find((m) => m.rowIndex === (params.row.id as number));
+        if (!match) return null;
+        return <Chip size='small' color='success' icon={<ImageIcon />} label={match.matchedBy === 'uniqueId' ? 'by ID' : 'by name'} />;
+      }
+    },
     {
       field: 'action',
       headerName: 'Action',
@@ -195,6 +241,8 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
     const summary: UploadSummary = { created: 0, updated: 0, skipped: 0, errors: [] };
     const affectedItemIds: string[] = [];
     const fieldSnapshots: Array<{ itemId: string; action: string; before?: Record<string, unknown>; after?: Record<string, unknown> }> = [];
+    /** Map row index → item ID for ZIP image uploads after import. */
+    const rowToItemId = new Map<number, string>();
 
     // Build a lookup of existing items for before-snapshots
     const existingById = new Map<string, Record<string, unknown>>();
@@ -226,6 +274,7 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
             const afterItem = result.data?.updateInventoryItem;
             const action = row.matchedIsDeleted && reactivateSet.has(i) ? 'REACTIVATE' : 'UPDATE';
             affectedItemIds.push(row.existingItemId);
+            rowToItemId.set(i, row.existingItemId);
             fieldSnapshots.push({
               itemId: row.existingItemId,
               action,
@@ -247,6 +296,7 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
             const created = result.data?.createInventoryItem;
             if (created?.id) {
               affectedItemIds.push(created.id);
+              rowToItemId.set(i, created.id);
               fieldSnapshots.push({
                 itemId: created.id,
                 action: 'CREATE',
@@ -286,6 +336,43 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
       });
     } catch (e) {
       console.error('Failed to create upload log:', e);
+    }
+
+    // Upload matched ZIP images to S3 and set imageKey on items
+    if (imageMatches.length > 0) {
+      for (const match of imageMatches) {
+        const itemId = rowToItemId.get(match.rowIndex);
+        if (!itemId) continue;
+        try {
+          const uploadResult = await createUploadUrl({
+            variables: {
+              itemId,
+              file: {
+                filename: match.image.filename,
+                contentType: match.image.contentType,
+                size: match.image.blob.size
+              }
+            }
+          });
+          const upload = uploadResult.data?.createInventoryImageUploadUrl;
+          if (!upload) continue;
+
+          const response = await fetch(upload.uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': upload.contentType },
+            body: match.image.blob
+          });
+          if (!response.ok) throw new Error(`S3 upload failed: ${response.statusText}`);
+
+          await client.mutate({
+            mutation: UPDATE_INVENTORY_ITEM,
+            variables: { item: itemId, changes: { imageKey: upload.key } }
+          });
+        } catch (e) {
+          console.error(`Failed to upload image for row ${match.rowIndex}:`, e);
+          summary.errors.push(`Image "${match.image.filename}": ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
 
     setImporting(false);
@@ -347,6 +434,38 @@ export const InventoryUploadPreview: React.FC<InventoryUploadPreviewProps> = ({ 
                 />
               ))}
             </Box>
+          </Box>
+
+          <Box>
+            <Typography variant='subtitle2' sx={{ mb: 0.5 }}>
+              Attach images (optional):
+            </Typography>
+            <Typography variant='body2' color='text.secondary' sx={{ mb: 1 }}>
+              Upload a .zip of images named by Unique ID or equipment name (e.g. <code>INV-0042.jpg</code> or <code>Thermocycler.png</code>).
+            </Typography>
+            <Stack direction='row' spacing={1} alignItems='center'>
+              <Button
+                variant='outlined'
+                size='small'
+                startIcon={<ImageIcon />}
+                onClick={() => zipInputRef.current?.click()}
+                disabled={importing}
+              >
+                {zipFileName ? 'Replace ZIP' : 'Attach image ZIP'}
+              </Button>
+              <input ref={zipInputRef} type='file' accept='.zip' style={{ display: 'none' }} onChange={handleZipFile} />
+              {zipFileName && (
+                <Typography variant='body2' color='text.secondary'>
+                  {zipFileName}: {zipImages.length} image{zipImages.length !== 1 ? 's' : ''} found, {imageMatches.length} matched
+                </Typography>
+              )}
+            </Stack>
+            {unmatchedImages.length > 0 && (
+              <Alert severity='warning' sx={{ mt: 1 }}>
+                {unmatchedImages.length} image{unmatchedImages.length !== 1 ? 's' : ''} could not be matched to any row:{' '}
+                {unmatchedImages.slice(0, 10).join(', ')}{unmatchedImages.length > 10 ? `, … and ${unmatchedImages.length - 10} more` : ''}
+              </Alert>
+            )}
           </Box>
 
           {error && <Alert severity='error'>{error}</Alert>}

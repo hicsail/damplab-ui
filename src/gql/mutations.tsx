@@ -779,6 +779,16 @@ export const ADD_BUG_ATTACHMENTS = gql`
   }
 `;
 
+export const CREATE_INVENTORY_IMAGE_UPLOAD_URL = gql`
+  mutation CreateInventoryImageUploadUrl($itemId: ID!, $file: InventoryImageUploadRequest!) {
+    createInventoryImageUploadUrl(itemId: $itemId, file: $file) {
+      uploadUrl
+      key
+      contentType
+    }
+  }
+`;
+
 export const SET_USER_KEYCLOAK_CUSTOMER_CATEGORY = gql`
   mutation SetUserKeycloakCustomerCategory(
     $userId: ID!

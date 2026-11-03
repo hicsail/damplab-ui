@@ -26,6 +26,7 @@
     "formik": "^2.4.6",
     "graphql": "^16.10.0",
     "isbot": "^5",
+    "jszip": "^3.10.2",
     "keycloak-js": "^26.1.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
