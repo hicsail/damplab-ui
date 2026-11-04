@@ -327,13 +327,6 @@ export const GET_OWN_JOB_BY_ID = gql`
         url
         uploadedAt
       }
-      # Submission only. Homology and the approve/reject decision stay on the
-      # staff query; this page shows whether identity verification was submitted.
-      aclidScreening {
-        screenId
-        verificationStatus
-        verificationCompletedAt
-      }
       sow {
         id
         sowNumber
@@ -1471,7 +1464,6 @@ const CUSTOMER_MANAGEMENT_ROW_FIELDS = `
   customerCategory
   isDefaultExternalCustomer
   accessTier
-  showBiosecurity
   profile {
     userSub
     canBookWithoutApproval
@@ -2452,7 +2444,7 @@ export const GET_PARAMETER_SET_SAMPLE_SHEET_TEMPLATE_URL = gql`
   }
 `;
 
-/** A job's screening history for the Biosecurity card (biosecurity-update). Staff with showBiosecurity only. */
+/** A job's screening history for the Biosecurity card (biosecurity-update). Staff only. */
 export const GET_JOB_SCREENING_RUNS = gql`
   query JobScreeningRuns($jobId: ID!) {
     jobScreeningRuns(jobId: $jobId) {

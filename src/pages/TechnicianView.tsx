@@ -202,8 +202,9 @@ export default function TechnicianView() {
   const navigate = useNavigate();
   const apolloClient = useApolloClient();
   const userContext = useContext(UserContext);
-  // On unless an admin has hidden it. Staff with it see the full card.
-  const showBiosecurity = userContext.userProps?.showBiosecurity !== false;
+  const { can } = usePermissions();
+  // Biosecurity belongs to jobs:view-all (Administrator and Technician).
+  const showBiosecurity = can(PERMISSIONS.JobsViewAll);
   // The catalogue, for re-attaching parameter definitions to a version snapshot.
   const { services } = useContext(AppContext);
 
@@ -250,7 +251,6 @@ export default function TechnicianView() {
 
   const jobForPeople = data?.jobById;
   const { userProps: viewerProps } = useEffectiveUser();
-  const { can } = usePermissions();
   const viewer = { subject: viewerProps?.subject, email: viewerProps?.idTokenParsed?.email };
   const people = jobPeople(jobForPeople);
   const isMember = viewerIsJobMember(jobForPeople, viewer);
@@ -355,7 +355,7 @@ export default function TechnicianView() {
     },
   );
   const [homologyModalOpen, setHomologyModalOpen] = useState(false);
-  // Screening history (biosecurity-update). Never asked for when the account hides biosecurity:
+  // Screening history (biosecurity-update). Never asked for without jobs:view-all:
   // the server would refuse it (behaviour 9).
   const { data: screeningRunsData, refetch: refetchScreeningRuns } = useQuery<{ jobScreeningRuns: ScreeningRunSummary[] }>(GET_JOB_SCREENING_RUNS, {
     variables: { jobId: id },

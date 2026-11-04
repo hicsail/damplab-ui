@@ -67,7 +67,7 @@ describe('screeningRuleViolation (mirror of damplab-backend parameter-validation
   const table = (over: Record<string, unknown> = {}) => ({ id: 'plate', type: 'table', tableData: { columns: [{ header: 'Well' }, { header: 'Insert' }] }, ...over });
 
   it('uses the server’s sentences', () => {
-    expect(screeningRuleViolation({ type: 'number', screening: true })).toBe('Only Text and Table parameters can require screening.');
+    expect(screeningRuleViolation({ type: 'number', screening: true })).toBe('Only Text, Table and File Upload parameters can require screening.');
     expect(screeningRuleViolation({ type: 'string', screening: 'yes' })).toBe('“Requires screening” must be true or false.');
     expect(screeningRuleViolation({ type: 'string', screening: true, screeningFields: ['x'] })).toBe('Only a Table has screening columns.');
     expect(screeningRuleViolation(table({ screening: true, screeningFields: 'Insert' }))).toBe('Screening columns must be a list of column names.');
@@ -80,10 +80,12 @@ describe('screeningRuleViolation (mirror of damplab-backend parameter-validation
     expect(screeningRuleViolation(table({ screening: true, screeningFields: ['insert'] }))).toBeNull();
     expect(screeningRuleViolation({ type: 'sampleSheet', templateFile: { key: 'sample-sheet-templates/a.xlsx' }, screening: true, screeningFields: ['Any'] })).toBeNull();
     expect(screeningRuleViolation({ type: 'number' })).toBeNull();
+    expect(screeningRuleViolation({ type: 'file', screening: true })).toBeNull();
+    expect(screeningRuleViolation({ type: 'file', screening: true, screeningFields: ['x'] })).toBe('Only a Table has screening columns.');
   });
 
-  it('isScreenableType is Text and both Table strings', () => {
-    expect(['string', 'table', 'sampleSheet'].map(isScreenableType)).toEqual([true, true, true]);
-    expect(['number', 'file', 'dropdown', 'boolean'].map(isScreenableType)).toEqual([false, false, false, false]);
+  it('isScreenableType is Text, File Upload and both Table strings', () => {
+    expect(['string', 'table', 'sampleSheet', 'file'].map(isScreenableType)).toEqual([true, true, true, true]);
+    expect(['number', 'dropdown', 'boolean'].map(isScreenableType)).toEqual([false, false, false]);
   });
 });

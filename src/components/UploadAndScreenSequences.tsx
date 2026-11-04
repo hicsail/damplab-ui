@@ -22,8 +22,7 @@ import {
   MAX_SECUREDNA_SEQUENCE_BATCH
 } from '../securedna/SequencesQueries';
 import { formatApolloError } from '../securedna/apolloError';
-import { mapSeqparseAnnotationsToSaved } from '../securedna/mapSeqparseAnnotations';
-import { parseFile } from 'seqparse';
+import { screenerSequencesFrom } from '../securedna/screenerSequences';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SequenceSeqVizModal from './SequenceSeqVizModal';
@@ -34,35 +33,13 @@ function isSequenceFileName(name: string): boolean {
   return SEQUENCE_FILE_RE.test(name);
 }
 
-function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsText(file);
-  });
-}
-
 /** Parse supported sequence files into local Sequence rows (skips bad files). */
 async function parseSequenceFiles(files: File[]): Promise<Sequence[]> {
   const allSequences: Sequence[] = [];
   for (const file of files) {
     if (!isSequenceFileName(file.name)) continue;
     try {
-      const fileContent = await readFileAsText(file);
-      const parsedSequences = await parseFile(fileContent);
-      allSequences.push(
-        ...parsedSequences.map((seq) => ({
-          id: '',
-          name: seq.name,
-          type: seq.type,
-          seq: seq.seq,
-          annotations: mapSeqparseAnnotationsToSaved(seq.annotations),
-          userId: '',
-          created_at: new Date(),
-          updated_at: new Date()
-        }))
-      );
+      allSequences.push(...(await screenerSequencesFrom(await file.arrayBuffer(), file.name)));
     } catch {
       continue;
     }
@@ -229,18 +206,7 @@ function UploadAndScreenSequences({ open, onClose }: UploadAndScreenSequencesPro
     event.target.value = '';
     if (!file) return;
     try {
-      const fileContent = await readFileAsText(file);
-      const parsedSequences = await parseFile(fileContent);
-      const formattedSequences: Sequence[] = parsedSequences.map((seq) => ({
-        id: '',
-        name: seq.name,
-        type: seq.type,
-        seq: seq.seq,
-        annotations: mapSeqparseAnnotationsToSaved(seq.annotations),
-        userId: '',
-        created_at: new Date(),
-        updated_at: new Date()
-      }));
+      const formattedSequences = await screenerSequencesFrom(await file.arrayBuffer(), file.name);
       setSequences((prev) => [...prev, ...formattedSequences]);
       setScreeningCompleted(false);
       setMessage('');

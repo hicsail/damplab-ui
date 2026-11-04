@@ -78,8 +78,8 @@ export function effectiveValidation(param: unknown): string {
   return parts.join(' && ');
 }
 
-/** A parameter type that can carry `screening: true`: Text, and a Table under either stored string. */
-export const isScreenableType = (type: unknown): boolean => type === 'string' || isTableType(type);
+/** A parameter type that can carry `screening: true`: Text, File Upload, and a Table under either stored string. */
+export const isScreenableType = (type: unknown): boolean => type === 'string' || type === 'file' || isTableType(type);
 
 /**
  * The screening flag's rules. Mirrors screeningRuleViolation in
@@ -91,7 +91,7 @@ export function screeningRuleViolation(param: unknown): string | null {
   const p = param as { type?: unknown; screening?: unknown; screeningFields?: unknown };
   const isTable = isTableType(p.type);
   if (p.screening !== undefined && p.screening !== null && typeof p.screening !== 'boolean') return '“Requires screening” must be true or false.';
-  if (p.screening === true && !isScreenableType(p.type)) return 'Only Text and Table parameters can require screening.';
+  if (p.screening === true && !isScreenableType(p.type)) return 'Only Text, Table and File Upload parameters can require screening.';
   const hasFields = p.screeningFields !== undefined && p.screeningFields !== null;
   if (hasFields && !isTable) return 'Only a Table has screening columns.';
   if (hasFields && (!Array.isArray(p.screeningFields) || p.screeningFields.some((field) => typeof field !== 'string'))) return 'Screening columns must be a list of column names.';

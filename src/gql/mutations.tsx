@@ -803,7 +803,6 @@ export const SET_USER_KEYCLOAK_CUSTOMER_CATEGORY = gql`
       customerCategory
       isDefaultExternalCustomer
       accessTier
-      showBiosecurity
     }
   }
 `;
@@ -828,23 +827,6 @@ export const SET_USER_KEYCLOAK_ACCESS_TIER = gql`
       isDefaultExternalCustomer
       accessTier
       accessRoleMapped
-      showBiosecurity
-    }
-  }
-`;
-
-export const SET_USER_SHOW_BIOSECURITY = gql`
-  mutation SetUserShowBiosecurity($userId: ID!, $enabled: Boolean!) {
-    setUserShowBiosecurity(userId: $userId, enabled: $enabled) {
-      id
-      username
-      email
-      firstName
-      lastName
-      customerCategory
-      isDefaultExternalCustomer
-      accessTier
-      showBiosecurity
     }
   }
 `;

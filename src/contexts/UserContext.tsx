@@ -31,11 +31,6 @@ export interface UserProps {
   customerCategory?: CustomerCategory;
   subject?: string;
   roles?: string[];
-  /**
-   * Whether this account sees the Biosecurity block. Shown unless an admin has
-   * hidden it. A missing answer (older backend, failed lookup) stays shown.
-   */
-  showBiosecurity?: boolean;
   // access token is refreshed as necessary and passed to the backend in graphql queries.
   getAccessToken: () => Promise<string | undefined>;
   idTokenParsed?: TokenClaims;
@@ -71,7 +66,7 @@ async function fetchPermissions(
    * boolean — so the authenticated path deliberately does not ask for it.
    */
   includeRoles = false
-): Promise<{ effective: string[]; asCustomer: string[]; roles: string[]; customerCategory?: CustomerCategory; showBiosecurity: boolean } | null> {
+): Promise<{ effective: string[]; asCustomer: string[]; roles: string[]; customerCategory?: CustomerCategory } | null> {
   const endpoint = import.meta.env.VITE_BACKEND;
   if (!endpoint) return null;
 
@@ -96,11 +91,10 @@ async function fetchPermissions(
   };
 
   try {
-    // `customerCategory` and `showBiosecurity` are newer than some deployed
-    // backends. Asking for them and falling back keeps a UI that reaches an
+    // `customerCategory` is newer than some deployed backends. Asking for it
+    // and falling back keeps a UI that reaches an
     // older server from losing its permissions entirely.
     const permissions =
-      (await ask(' customerCategory showBiosecurity')) ??
       (await ask(' customerCategory')) ??
       (await ask(''));
     if (!permissions) return null;
@@ -109,7 +103,6 @@ async function fetchPermissions(
       asCustomer: permissions.asCustomer ?? [],
       roles: permissions.roles ?? [],
       customerCategory: permissions.customerCategory ?? undefined,
-      showBiosecurity: permissions.showBiosecurity !== false,
     };
   } catch (error) {
     console.error('Failed to fetch permissions:', error);
@@ -196,7 +189,6 @@ async function initKeycloak(): Promise<UserProps | null> {
       // (e.g. "cancel only your own booking") is dead under the bypass, because
       // nothing would ever equal the owner's sub.
       subject: 'dev',
-      showBiosecurity: permissions?.showBiosecurity !== false,
       permissions: permissions?.effective ?? [],
       customerPermissions: permissions?.asCustomer ?? [],
       permissionsLoaded: permissions !== null,
@@ -239,7 +231,6 @@ async function initKeycloak(): Promise<UserProps | null> {
       isExternalCustomer,
       customerCategory,
       subject: keycloak.subject,
-      showBiosecurity: permissions?.showBiosecurity !== false,
       roles: roles,
       permissions: permissions?.effective ?? [],
       customerPermissions: permissions?.asCustomer ?? [],

@@ -36,17 +36,18 @@ const user = (over: any = {}) => ({
 describe('columns', () => {
   it('offers every column the human listed, headers verbatim, 16 stored fields', () => {
     expect(CUSTOMER_COLUMNS.map((c) => c.headerName)).toEqual([
-      'Name', 'Username', 'Email', 'Pricing category', 'Access tier', 'Biosecurity', 'Can book without approval',
+      'Name', 'Username', 'Email', 'Pricing category', 'Access tier', 'Can book without approval',
       'Position', 'Instrument type', 'Group', 'Start', 'End', 'Status', 'First Name', 'Last Name', 'BU ID',
       'Preferred Email', 'Swipe Category (For Daniel)', 'Swipe Access', 'Reports To', 'SciShield Trainings', 'ROHP', 'Affiliations'
     ]);
     expect(PROFILE_TEXT_FIELDS.length + PROFILE_ENUM_FIELDS.length).toBe(16);
   });
 
-  it('shows Name, Email, Pricing category, Access tier, Biosecurity, the flag and Status by default', () => {
+  it('shows Name, Email, Pricing category, Access tier, the flag and Status by default', () => {
     const v = defaultColumnVisibility();
-    expect(Object.entries(v).filter(([, on]) => on).map(([f]) => f)).toEqual(['name', 'email', 'pricingCategory', 'accessTier', 'showBiosecurity', 'canBookWithoutApproval', 'status']);
-    expect(Object.keys(v)).toHaveLength(23);
+    expect(Object.entries(v).filter(([, on]) => on).map(([f]) => f)).toEqual(['name', 'email', 'pricingCategory', 'accessTier', 'canBookWithoutApproval', 'status']);
+    expect(Object.keys(v)).toHaveLength(22);
+    expect(CUSTOMER_COLUMNS.map((c) => c.headerName)).not.toContain('Biosecurity');
   });
 
   it('labels the dropdowns with the human’s exact strings', () => {
@@ -100,12 +101,6 @@ describe('rowFromUser', () => {
     expect(row.canBookWithoutApproval).toBe(false);
   });
 
-  it('shows Biosecurity unless an admin has hidden it', () => {
-    expect(rowFromUser(user()).showBiosecurity).toBe(true);
-    expect(rowFromUser(user({ showBiosecurity: null })).showBiosecurity).toBe(true);
-    expect(rowFromUser(user({ showBiosecurity: true })).showBiosecurity).toBe(true);
-    expect(rowFromUser(user({ showBiosecurity: false })).showBiosecurity).toBe(false);
-  });
 });
 
 describe('planRowSave', () => {
@@ -118,7 +113,6 @@ describe('planRowSave', () => {
   it('plans only the axes that changed', () => {
     expect(planRowSave(before, { ...before, accessTier: 'TECHNICIAN' })).toEqual({ tier: 'TECHNICIAN' });
     expect(planRowSave(before, { ...before, pricingCategory: '' })).toEqual({ category: null });
-    expect(planRowSave(before, { ...before, showBiosecurity: false })).toEqual({ showBiosecurity: false });
     expect(planRowSave(before, { ...before, canBookWithoutApproval: true, position: 'PI' })).toEqual({ profile: { canBookWithoutApproval: true, position: 'PI' } });
   });
 
@@ -133,7 +127,6 @@ describe('saveRow', () => {
   const calls = () => ({
     setCategory: vi.fn(async () => undefined),
     setTier: vi.fn(async () => ({ accessRoleMapped: true })),
-    setShowBiosecurity: vi.fn(async () => undefined),
     updateProfile: vi.fn(async () => undefined)
   });
 
@@ -142,23 +135,7 @@ describe('saveRow', () => {
     await saveRow(before, { ...before, canBookWithoutApproval: true }, c);
     expect(c.setCategory).not.toHaveBeenCalled();
     expect(c.setTier).not.toHaveBeenCalled();
-    expect(c.setShowBiosecurity).not.toHaveBeenCalled();
     expect(c.updateProfile).toHaveBeenCalledWith({ canBookWithoutApproval: true });
-  });
-
-  it('writes Biosecurity through its own mutation, never the profile', async () => {
-    const c = calls();
-    await saveRow(before, { ...before, showBiosecurity: false }, c);
-    expect(c.setShowBiosecurity).toHaveBeenCalledWith(false);
-    expect(c.updateProfile).not.toHaveBeenCalled();
-  });
-
-  it('keeps a saved Biosecurity change when the profile write fails', async () => {
-    const c = calls();
-    c.updateProfile.mockRejectedValueOnce(new Error('boom'));
-    const err = await saveRow(before, { ...before, showBiosecurity: false, position: 'PI' }, c).catch((e) => e);
-    expect(err).toBeInstanceOf(RowSaveError);
-    expect(err.saved).toEqual({ showBiosecurity: false });
   });
 
   it('reports an unmapped access role', async () => {
@@ -176,18 +153,16 @@ describe('saveRow', () => {
     expect(err).toBeInstanceOf(RowSaveError);
     expect(err.failure).toBe(refusal);
     expect(err.saved).toEqual({ pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC' });
-    expect(c.setShowBiosecurity).not.toHaveBeenCalled();
     expect(c.updateProfile).not.toHaveBeenCalled();
   });
 
-  it('when Biosecurity fails after pricing and tier saved, reports both, skips the profile, and carries the mapping', async () => {
+  it('when the profile fails after pricing and tier saved, reports both and carries the mapping', async () => {
     const c = calls();
-    c.setShowBiosecurity.mockRejectedValueOnce(new Error('boom'));
-    const after = { ...before, pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC', accessTier: 'TECHNICIAN', showBiosecurity: false, position: 'PI' };
+    c.updateProfile.mockRejectedValueOnce(new Error('boom'));
+    const after = { ...before, pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC', accessTier: 'TECHNICIAN', position: 'PI' };
     const err = await saveRow(before, after, c).catch((e) => e);
     expect(err).toBeInstanceOf(RowSaveError);
     expect(err.saved).toEqual({ pricingCategory: 'EXTERNAL_CUSTOMER_ACADEMIC', accessTier: 'TECHNICIAN' });
-    expect(c.updateProfile).not.toHaveBeenCalled();
     expect(err.accessRoleMapped).toBe(true);
   });
 
