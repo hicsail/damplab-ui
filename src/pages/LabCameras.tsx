@@ -211,25 +211,21 @@ const ANALYTICS_PANELS: Array<{ title: string; blurb: string; icon: React.ReactN
 
 function AnalyticsPlaceholder() {
   return (
-    <Box sx={{ mt: 5 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
         <InsightsIcon sx={{ color: '#6b7280' }} />
         <Typography variant="h6" sx={{ fontWeight: 700, color: '#374151' }}>
           Experimental Analytics Dashboard
         </Typography>
         <Chip size="small" label="Coming soon" sx={{ height: 22 }} />
       </Box>
-      <Box
-        sx={{
-          display: 'grid',
-          gap: 2,
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: 'repeat(2, 1fr)',
-            md: 'repeat(3, 1fr)',
-          },
-        }}
+      <Typography
+        variant="overline"
+        sx={{ display: 'block', color: '#9ca3af', fontWeight: 700, letterSpacing: 0.5, mb: 1.5 }}
       >
+        Ideas for the analytics dashboard
+      </Typography>
+      <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: '1fr' }}>
         {ANALYTICS_PANELS.map((panel) => (
           <Card
             key={panel.title}
@@ -265,11 +261,17 @@ export default function LabCameras() {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
+        // Fill the viewport below the fixed app header so the camera pane can
+        // scroll on its own while the analytics pane stays put (a dashboard, not
+        // a long page). Falls back to natural flow on small screens.
+        height: { md: 'calc(100vh - var(--app-header-height, 64px))' },
+        minHeight: { xs: '100vh', md: 0 },
         backgroundColor: '#f9fafb',
         color: '#111827',
         p: 2,
         width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       <Box
@@ -277,11 +279,12 @@ export default function LabCameras() {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          mb: 3,
+          mb: 2,
           pb: 2,
           borderBottom: '1px solid #e5e7eb',
           flexWrap: 'wrap',
           gap: 1,
+          flexShrink: 0,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -305,27 +308,60 @@ export default function LabCameras() {
         </Box>
       </Box>
 
-      <Alert severity="info" sx={{ mb: 3 }}>
+      <Alert severity="info" sx={{ mb: 2, flexShrink: 0 }}>
         Work in progress — live views of the lab cameras. If a feed stays blank it may be offline;
         use the reload or open-in-new-tab controls on each feed. Feedback on what this should show is welcome.
       </Alert>
 
       <Box
         sx={{
-          display: 'grid',
-          gap: 2,
-          gridTemplateColumns: {
-            xs: '1fr',
-            md: 'repeat(2, 1fr)',
-          },
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: 3,
         }}
       >
-        {LAB_CAMERAS.map((camera) => (
-          <CameraTile key={camera.id} camera={camera} onExpand={setExpanded} />
-        ))}
-      </Box>
+        {/* Cameras: the scrolling pane (grid lives inside so its rows keep their
+            natural height and the pane scrolls instead of squishing them). */}
+        <Box
+          sx={{
+            flex: { md: 1 },
+            minWidth: 0,
+            width: '100%',
+            minHeight: 0,
+            overflowY: { md: 'auto' },
+            pr: { md: 1 },
+          }}
+        >
+          <Box
+            sx={{
+              display: 'grid',
+              gap: 2,
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(2, 1fr)',
+              },
+            }}
+          >
+            {LAB_CAMERAS.map((camera) => (
+              <CameraTile key={camera.id} camera={camera} onExpand={setExpanded} />
+            ))}
+          </Box>
+        </Box>
 
-      <AnalyticsPlaceholder />
+        {/* Analytics: always visible while the cameras scroll. */}
+        <Box
+          sx={{
+            width: { xs: '100%', md: 360 },
+            flexShrink: 0,
+            minHeight: 0,
+            overflowY: { md: 'auto' },
+          }}
+        >
+          <AnalyticsPlaceholder />
+        </Box>
+      </Box>
 
       <CameraDialog camera={expanded} onClose={() => setExpanded(null)} />
     </Box>
