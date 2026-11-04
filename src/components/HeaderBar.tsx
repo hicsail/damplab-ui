@@ -70,11 +70,20 @@ export default function HeaderBar() {
   const [navOpen, setNavOpen] = useState(false);
   const windowLocation = useLocation();
   const appBarRef = useRef<HTMLDivElement>(null);
+  // This bar is hidden on the lab monitor screens (dedicated displays, no nav).
+  const isLabMonitorScreen = windowLocation.pathname.startsWith("/lab-monitor");
 
   // Publishes the fixed bar's real height as a CSS var so sticky bars further
   // down the page (breadcrumbs, page headers) can offset below it without
-  // duplicating the Toolbar's responsive 56px/64px breakpoint.
+  // duplicating the Toolbar's responsive 56px/64px breakpoint. On the lab
+  // monitor screens the bar is not rendered, so publish 0 — otherwise the
+  // breadcrumb's `top: var(--app-header-height, 64px)` would reserve space for a
+  // header that is not there and clip the page's own heading.
   useLayoutEffect(() => {
+    if (isLabMonitorScreen) {
+      document.documentElement.style.setProperty('--app-header-height', '0px');
+      return;
+    }
     const el = appBarRef.current;
     if (!el) return;
     const publish = () => {
@@ -84,7 +93,7 @@ export default function HeaderBar() {
     const observer = new ResizeObserver(publish);
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [isLabMonitorScreen]);
 
   // This function is responsible for keeping currentCanvas up to date, it is called when user saves or loads a canvas.
   const updateCurrentCanvas = (canvasName = "") => {
@@ -186,7 +195,7 @@ export default function HeaderBar() {
   }, [areChangesUnsaved]);
 
   // Hide header on lab monitor screens (dedicated display, no nav)
-  if (windowLocation.pathname.startsWith("/lab-monitor")) {
+  if (isLabMonitorScreen) {
     return null;
   }
 

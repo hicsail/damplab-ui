@@ -271,11 +271,7 @@ export default function LabCameras() {
   return (
     <Box
       sx={{
-        // Fill the viewport below the fixed app header so the camera pane can
-        // scroll on its own while the analytics pane stays put (a dashboard, not
-        // a long page). Falls back to natural flow on small screens.
-        height: { md: 'calc(100vh - var(--app-header-height, 64px))' },
-        minHeight: { xs: '100vh', md: 0 },
+        minHeight: '100vh',
         backgroundColor: '#f9fafb',
         color: '#111827',
         p: 2,
@@ -323,61 +319,64 @@ export default function LabCameras() {
       <Box
         sx={{
           flex: 1,
-          minHeight: 0,
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
+          alignItems: 'flex-start',
+          gap: 3,
         }}
       >
         {/* Left: the work-in-progress banner (over the cameras only) and the
-            scrolling camera pane (grid inside so rows keep their natural height
-            and the pane scrolls instead of squishing them). */}
+            camera grid. The page scrolls here. */}
         <Box
           sx={{
             flex: { md: 1 },
             minWidth: 0,
             width: '100%',
-            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            pr: { md: 3 },
           }}
         >
-          <Alert severity="info" sx={{ mb: 2, flexShrink: 0 }}>
+          <Alert severity="info" sx={{ mb: 2 }}>
             Work in progress — live views of the lab cameras. If a feed stays blank it may be offline;
             use the reload or open-in-new-tab controls on each feed. Feedback on what this should show is welcome.
           </Alert>
-          <Box sx={{ flex: { md: 1 }, minHeight: 0, overflowY: { md: 'auto' }, pr: { md: 0.5 } }}>
-            <Box
-              sx={{
-                display: 'grid',
-                gap: 2,
-                gridTemplateColumns: {
-                  xs: '1fr',
-                  sm: 'repeat(2, 1fr)',
-                },
-              }}
-            >
-              {LAB_CAMERAS.map((camera) => (
-                <CameraTile key={camera.id} camera={camera} onExpand={setExpanded} />
-              ))}
-            </Box>
+          <Box
+            sx={{
+              display: 'grid',
+              gap: 2,
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(2, 1fr)',
+              },
+            }}
+          >
+            {LAB_CAMERAS.map((camera) => (
+              <CameraTile key={camera.id} camera={camera} onExpand={setExpanded} />
+            ))}
           </Box>
         </Box>
 
-        {/* Right: the fixed analytics panel. It does not scroll with the cameras
-            — a side panel on the right that stays put. */}
+        {/* Right: the analytics panel. It stays put on the right while the
+            cameras scroll (sticky under the breadcrumb bar). */}
         <Box
           sx={{
             width: { xs: '100%', md: 360 },
             flexShrink: 0,
-            minHeight: 0,
+            position: { md: 'sticky' },
+            top: { md: 'calc(var(--app-header-height, 64px) + var(--app-breadcrumb-height, 38px) + 16px)' },
+            maxHeight: {
+              md: 'calc(100vh - var(--app-header-height, 64px) - var(--app-breadcrumb-height, 38px) - 32px)',
+            },
             overflowY: { md: 'auto' },
+            alignSelf: 'flex-start',
             backgroundColor: '#ffffff',
             borderLeft: { md: '1px solid #e5e7eb' },
             borderTop: { xs: '1px solid #e5e7eb', md: 'none' },
+            borderRadius: 1,
             mt: { xs: 2, md: 0 },
             pl: { md: 3 },
-            pt: { xs: 2, md: 0 },
+            pr: { md: 2 },
+            py: 2,
             boxShadow: { md: '-6px 0 16px rgba(0,0,0,0.03)' },
           }}
         >
