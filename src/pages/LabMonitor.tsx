@@ -31,6 +31,7 @@ import PrecisionManufacturingIcon from '@mui/icons-material/PrecisionManufacturi
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import InventoryPickerDialog from '../components/InventoryPickerDialog';
+import LabMonitorTabs from '../components/LabMonitorTabs';
 import {
   DndContext,
   DragOverlay,
@@ -985,7 +986,7 @@ export default function LabMonitor() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            mb: 4,
+            mb: 2,
             pb: 2,
             borderBottom: '1px solid #e5e7eb',
           }}
@@ -1038,6 +1039,8 @@ export default function LabMonitor() {
             </Typography>
           </Box>
         </Box>
+
+        <LabMonitorTabs screen={screen} current="board" />
 
         <Box
           sx={{

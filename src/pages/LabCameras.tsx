@@ -1,4 +1,5 @@
 import React from 'react';
+import { Navigate, useParams } from 'react-router';
 import {
   Alert,
   Box,
@@ -24,6 +25,7 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CircularProgress from '@mui/material/CircularProgress';
 import { LAB_CAMERAS, cameraStreamUrl, type LabCamera } from '../constants/cameras';
+import LabMonitorTabs from '../components/LabMonitorTabs';
 
 /** A ticking header clock, matching the Lab Monitor board. */
 function useClock() {
@@ -255,8 +257,16 @@ function AnalyticsPlaceholder() {
 }
 
 export default function LabCameras() {
+  const { screen } = useParams<{ screen: string }>();
   const { time, date } = useClock();
   const [expanded, setExpanded] = React.useState<LabCamera | null>(null);
+
+  // Keep the cameras tab in step with the board's screen contract.
+  if (screen !== 'north' && screen !== 'south') {
+    return <Navigate to="/lab-monitor/north/cameras" replace />;
+  }
+
+  const subtitle = screen === 'north' ? 'North Monitor Lab' : 'South Monitor Lab';
 
   return (
     <Box
@@ -297,7 +307,7 @@ export default function LabCameras() {
               variant="h6"
               sx={{ fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#111827' }}
             >
-              Lab Cameras
+              {subtitle}
             </Typography>
           </Box>
         </Box>
@@ -307,6 +317,8 @@ export default function LabCameras() {
           <Typography variant="body2" sx={{ ml: 0.5 }}>{date}</Typography>
         </Box>
       </Box>
+
+      <LabMonitorTabs screen={screen} current="cameras" />
 
       <Box
         sx={{

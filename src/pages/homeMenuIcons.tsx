@@ -8,7 +8,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import WorkHistoryIcon from "@mui/icons-material/WorkHistory";
 import SchoolIcon from "@mui/icons-material/School";
 import MonitorIcon from "@mui/icons-material/Monitor";
-import VideocamIcon from "@mui/icons-material/Videocam";
 import PeopleIcon from "@mui/icons-material/People";
 import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
 import InsightsIcon from "@mui/icons-material/Insights";
@@ -58,7 +57,6 @@ export const MENU_ICONS: Record<HomeMenuItemId, React.ReactNode> = {
   "data-translation": <EditIcon />,
   "lab-monitor-north": <MonitorIcon />,
   "lab-monitor-south": <MonitorIcon />,
-  "lab-cameras": <VideocamIcon />,
   "lab-status-tv": <MonitorIcon />,
 };
 

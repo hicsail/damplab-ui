@@ -69,17 +69,16 @@ describe('homepage sections match the access matrix', () => {
       // "Edit Announcements" is gone: /edit_announcements merged into /announcements,
       // whose editing controls are gated inside the page on announcements:write.
       'Admin Operational Tools': ['Release Notes', 'Catalog Editor', 'Protocol Library', 'Lab Layout', 'Billing', 'AI Lab Assistant'],
-      'Admin Management Tools': ['User Management', 'API Keys', 'Data Translation', 'Lab Monitor North', 'Lab Monitor South', 'Lab Cameras', 'Lab Status TV'],
+      'Admin Management Tools': ['User Management', 'API Keys', 'Data Translation', 'Lab Monitor North', 'Lab Monitor South', 'Lab Status TV'],
     });
   });
 
-  it('has 28 buttons', () => {
+  it('has 27 buttons', () => {
     // 25 until Notification Preferences arrived. Before that it was 26, then
     // "Edit Announcements" left when the editor merged into the feed, the same
     // way "My Jobs" left when the two jobs pages merged. Screener (SecureDNA)
-    // is staff-only: technicians and administrators, via jobs:view-all. Lab
-    // Cameras (labmonitor:view) brought it to 28.
-    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(28);
+    // is staff-only: technicians and administrators, via jobs:view-all.
+    expect(HOME_MENU.flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('has exactly one jobs button, keyed on the baseline permission', () => {
@@ -127,7 +126,7 @@ describe('what each role sees', () => {
       'Technician Tools': ['My Bench', 'Screener'],
       'Operational Tools': ['Inventory Availability', 'Inventory Schedule'],
       'Admin Operational Tools': ['Release Notes', 'Catalog Editor', 'Protocol Library', 'Lab Layout', 'AI Lab Assistant'],
-      'Admin Management Tools': ['Lab Monitor North', 'Lab Monitor South', 'Lab Cameras'],
+      'Admin Management Tools': ['Lab Monitor North', 'Lab Monitor South'],
     });
   });
 
@@ -139,7 +138,7 @@ describe('what each role sees', () => {
   });
 
   it('shows an administrator everything', () => {
-    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(28);
+    expect(visibleHomeMenu(STAFF).flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('gates each button on what its destination needs, not what its label resembles', () => {
@@ -171,7 +170,7 @@ describe('what each role sees', () => {
 describe('degraded mode: the permissions fetch failed', () => {
   it('falls back to the legacy staff boolean rather than hiding everything from staff', () => {
     const staffWithoutPermissions: HomeMenuUser = { permissions: [], permissionsLoaded: false, isDamplabStaff: true };
-    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(28);
+    expect(visibleHomeMenu(staffWithoutPermissions).flatMap((s) => s.items)).toHaveLength(27);
   });
 
   it('leaves a client with only the two unpermissioned buttons — the cost of the fallback, stated', () => {
