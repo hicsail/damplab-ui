@@ -57,6 +57,7 @@ export type HomeMenuItemId =
   | "data-translation"
   | "lab-monitor-north"
   | "lab-monitor-south"
+  | "lab-cameras"
   | "notification-preferences"
   | "lab-status-tv";
 
@@ -291,6 +292,12 @@ export const HOME_MENU: readonly HomeMenuSectionDef[] = [
         id: "lab-monitor-south",
         label: "Lab Monitor South",
         to: "/lab-monitor/south",
+        visible: needs(PERMISSIONS.LabMonitorView),
+      },
+      {
+        id: "lab-cameras",
+        label: "Lab Cameras",
+        to: "/lab-cameras",
         visible: needs(PERMISSIONS.LabMonitorView),
       },
       {

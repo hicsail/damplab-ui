@@ -97,6 +97,9 @@ export default [
   ]),
   layout("./layouts/PrivateRouteLabMonitor.tsx", [
     route("/lab-monitor/:screen", "./pages/LabMonitor.tsx"),
+    // Same labmonitor:view gate as the boards. Not nested under /lab-monitor/
+    // because that path's :screen param would swallow it.
+    route("/lab-cameras", "./pages/LabCameras.tsx"),
   ]),
   layout("./layouts/PrivateRouteProtocolLibrary.tsx", [
     route("/protocol-map", "./pages/ProtocolMap.tsx"),
