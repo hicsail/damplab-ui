@@ -215,16 +215,10 @@ function AnalyticsPlaceholder() {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
         <InsightsIcon sx={{ color: '#6b7280' }} />
         <Typography variant="h6" sx={{ fontWeight: 700, color: '#374151' }}>
-          Experimental Analytics
+          Experimental Analytics Dashboard
         </Typography>
         <Chip size="small" label="Coming soon" sx={{ height: 22 }} />
       </Box>
-      <Typography variant="body2" sx={{ color: '#6b7280', mb: 2, maxWidth: 820 }}>
-        As the DAMP Lab moves toward a cloud laboratory, a long-term goal is improving
-        experimental <strong>reproducibility</strong> — understanding whether subtle differences in how a
-        protocol is carried out affect results. This space is reserved for that analysis. Nothing here is
-        measured yet; the metrics will be defined with the lab before anything is built.
-      </Typography>
       <Box
         sx={{
           display: 'grid',
