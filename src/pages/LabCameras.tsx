@@ -308,55 +308,65 @@ export default function LabCameras() {
         </Box>
       </Box>
 
-      <Alert severity="info" sx={{ mb: 2, flexShrink: 0 }}>
-        Work in progress — live views of the lab cameras. If a feed stays blank it may be offline;
-        use the reload or open-in-new-tab controls on each feed. Feedback on what this should show is welcome.
-      </Alert>
-
       <Box
         sx={{
           flex: 1,
           minHeight: 0,
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
-          gap: 3,
         }}
       >
-        {/* Cameras: the scrolling pane (grid lives inside so its rows keep their
-            natural height and the pane scrolls instead of squishing them). */}
+        {/* Left: the work-in-progress banner (over the cameras only) and the
+            scrolling camera pane (grid inside so rows keep their natural height
+            and the pane scrolls instead of squishing them). */}
         <Box
           sx={{
             flex: { md: 1 },
             minWidth: 0,
             width: '100%',
             minHeight: 0,
-            overflowY: { md: 'auto' },
-            pr: { md: 1 },
+            display: 'flex',
+            flexDirection: 'column',
+            pr: { md: 3 },
           }}
         >
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 2,
-              gridTemplateColumns: {
-                xs: '1fr',
-                sm: 'repeat(2, 1fr)',
-              },
-            }}
-          >
-            {LAB_CAMERAS.map((camera) => (
-              <CameraTile key={camera.id} camera={camera} onExpand={setExpanded} />
-            ))}
+          <Alert severity="info" sx={{ mb: 2, flexShrink: 0 }}>
+            Work in progress — live views of the lab cameras. If a feed stays blank it may be offline;
+            use the reload or open-in-new-tab controls on each feed. Feedback on what this should show is welcome.
+          </Alert>
+          <Box sx={{ flex: { md: 1 }, minHeight: 0, overflowY: { md: 'auto' }, pr: { md: 0.5 } }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 2,
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  sm: 'repeat(2, 1fr)',
+                },
+              }}
+            >
+              {LAB_CAMERAS.map((camera) => (
+                <CameraTile key={camera.id} camera={camera} onExpand={setExpanded} />
+              ))}
+            </Box>
           </Box>
         </Box>
 
-        {/* Analytics: always visible while the cameras scroll. */}
+        {/* Right: the fixed analytics panel. It does not scroll with the cameras
+            — a side panel on the right that stays put. */}
         <Box
           sx={{
             width: { xs: '100%', md: 360 },
             flexShrink: 0,
             minHeight: 0,
             overflowY: { md: 'auto' },
+            backgroundColor: '#ffffff',
+            borderLeft: { md: '1px solid #e5e7eb' },
+            borderTop: { xs: '1px solid #e5e7eb', md: 'none' },
+            mt: { xs: 2, md: 0 },
+            pl: { md: 3 },
+            pt: { xs: 2, md: 0 },
+            boxShadow: { md: '-6px 0 16px rgba(0,0,0,0.03)' },
           }}
         >
           <AnalyticsPlaceholder />
