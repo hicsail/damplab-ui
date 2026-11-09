@@ -69,6 +69,22 @@ export function headerStepIds(steps: Array<{ id: string; number: string }>): Set
 }
 
 /**
+ * Whether the steps either side of a checkable step allow it to be toggled.
+ * Order is enforced across checkable steps only: a section header has no
+ * checkbox, so it can never be done and must not count as a neighbour.
+ */
+export function adjacentStepState(
+  checkable: Array<{ id: string }>,
+  stepId: string,
+  done: ReadonlySet<string>
+): { prevDone: boolean; nextUndone: boolean } {
+  const index = checkable.findIndex((s) => s.id === stepId);
+  const prev = checkable[index - 1];
+  const next = checkable[index + 1];
+  return { prevDone: !prev || done.has(prev.id), nextUndone: !next || !done.has(next.id) };
+}
+
+/**
  * Styles for protocols.io step HTML. Its tables arrive unstyled with fixed
  * `width="100"` header cells, so headers wrap and the grid has no lines.
  */
@@ -213,7 +229,7 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
 
       {protocol && protocol.steps.length > 0 && (
         <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-          {protocol.steps.map((step, stepIndex) => {
+          {protocol.steps.map((step) => {
             if (headers.has(step.id)) {
               return (
                 <Box
@@ -241,8 +257,7 @@ export default function ProtocolViewer({ protocolId, completedStepIds, onToggleS
             // Enforce sequential order: a step can only be checked if all
             // previous steps are already done, and unchecked only if no
             // later steps are still done.
-            const prevDone = stepIndex === 0 || done.has(protocol.steps[stepIndex - 1].id);
-            const nextUndone = stepIndex === protocol.steps.length - 1 || !done.has(protocol.steps[stepIndex + 1].id);
+            const { prevDone, nextUndone } = adjacentStepState(checkable, step.id, done);
             const canCheck = !checked && prevDone;
             const canUncheck = checked && nextUndone;
             const enabled = canCheck || canUncheck;
